@@ -158,13 +158,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 		uint8_t msg[3];
 	} MIDINoteEvent;
 
-	//float* const output = self->ports.output;
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->rate);
-
-	if (self->speed == 0.0f) {
-		//memset(output, 0, (end - begin) * sizeof(float));
-		return;
-	}
 
 	for (uint32_t i = begin; i < end; ++i) {
 		switch (self->state) {
@@ -180,11 +174,9 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 					note.msg[1] = 60; 		// Middle C
 					note.msg[2] = 100;		// Velocity
 
-//					lv2_atom_sequence_append_event(self->out_port, out_capacity, &note.event);
 					lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &note.event);
 
 					self->state = STATE_OFF;
-printf("NOTE FINISHED\n");
 				}
 				break;
 			case STATE_OFF:
@@ -196,19 +188,15 @@ printf("NOTE FINISHED\n");
 		if (++self->elapsedLen == framesPerBeat) {
 			MIDINoteEvent note;
 			note.event.time.frames = 0;
-//			note.event.time.frames = 100;
 			note.event.body.type =  self->uris.midi_Event;
 			note.event.body.size = 3;
 			note.msg[0] = 0x80; 	// Note off
 			note.msg[1] = 60;
 			note.msg[2] = 0;
-//			lv2_atom_sequence_append_event(self->out_port, out_capacity, &note.event);
-		//	lv2_atom_sequence_append_event(self->midi_port_out, sizeof(MIDINoteEvent), &note.event);
 			lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &note.event);
 
 			self->state = STATE_ON;
 			self->elapsedLen = 0;
-printf("NOTE STARTING\n");
 		}
 	}
 }
@@ -309,15 +297,8 @@ printf("run()  sample_count:%d\n",sample_count);
 	lv2_atom_sequence_clear(self->midi_port_out);
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
 
-
-//TODO try using:
-//  LV2_ATOM_SEQUENCE_FOREACH (self->in_port, ev) {
-
 	/* Loop through events: */
-	for (const LV2_Atom_Event* ev = lv2_atom_sequence_begin(&in->body);
-       !lv2_atom_sequence_is_end(&in->body, in->atom.size, ev);
-       ev = lv2_atom_sequence_next(ev)) 
-	{
+	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 		// Play the click for the time slice from last_t until now
 		play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
@@ -330,7 +311,7 @@ printf("run()  sample_count:%d\n",sample_count);
 		}
 
 		last_t = (uint32_t)ev->time.frames;
-  }
+	}
 
 	/* Play out the remainder of cycle: */
 	play(self, last_t, sample_count, outCapacity);

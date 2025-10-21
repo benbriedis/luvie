@@ -449,47 +449,6 @@ spec_files = files(
   'lv2/worker.lv2/worker.ttl',
 )
 
-#################
-# Documentation #
-#################
-
-# Determine if all the dependencies for building documentation are present
-doxygen = find_program('doxygen', required: get_option('docs'))
-build_docs = false
-build_lv2specgen = false
-doc_deps = []
-if not get_option('docs').disabled()
-  doc_python_modules = ['lxml', 'markdown', 'pygments', 'rdflib']
-
-  python = pymod.find_installation(
-    'python3',
-    modules: doc_python_modules,
-    required: get_option('docs'),
-  )
-
-  if python.found() and python.language_version().version_compare('<3.7')
-    warning('Python 3.7 is required for documentation')
-    build_docs = false
-  endif
-
-  build_docs = doxygen.found() and python.found()
-  build_lv2specgen = python.found()
-endif
-
-# Run Doxygen first to generate tags
-subdir('doc/c')
-
-# Set up lv2specgen and lv2specgen_command_prefix (which references tags)
-if build_lv2specgen
-  subdir('lv2specgen')
-endif
-
-# Generate specification documentation
-if build_docs
-  subdir('doc/style')
-  subdir('doc/ns')
-endif
-
 ###########
 # Plugins #
 ###########
@@ -514,8 +473,7 @@ endif
 if not meson.is_subproject()
   summary(
     {
-      'Tests': not get_option('tests').disabled(),
-      'Documentation': build_docs,
+      'Tests': not get_option('tests').disabled()
     },
     bool_yn: true,
     section: 'Components',
