@@ -4,8 +4,6 @@
 if not get_option('plugins').disabled()
   m_dep = cc.find_library('m', required: false)
 
-  subdir('bens1.lv2')
-#  subdir('bens2.lv2')
   subdir('luvie.lv2')
   subdir('eg-amp.lv2')
   subdir('eg-fifths.lv2')

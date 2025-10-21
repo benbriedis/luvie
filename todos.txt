@@ -1,2 +1,11 @@
 
 - change the URLs to my Github account
+
+
+GUI options
+-----------
+Does it run on mobiles as well as Windows and Mac?
+Can it be trimmed right down?
+
+- Look at Dragonfly reverb 
+- Look at the LV2 pianoroll pattern plugin
