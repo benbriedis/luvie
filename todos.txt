@@ -1,0 +1,30 @@
+
+
+pattern plugin will probably need a time offset to know when to start 
+and stop playing. I guess it may get caught part way through a loop
+
+
+======= Logs cleared ========
+frames: 0
+type: 47
+size: 3
+msg[0]: 144
+msg[1]: 72
+msg[2]: 100
+
+frames: 0
+type: 47
+size: 3
+msg[0]: 128
+msg[1]: 72
+msg[2]: 0
+
+
+ls -l /var/lib/systemd/coredump/core.*
+
+unzstd 
+
+
+https://github.com/unclechu/MIDI-Trigger/blob/master/src/interface/run.c
+
+
