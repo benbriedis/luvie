@@ -71,8 +71,8 @@ typedef struct {
 	URIs uris;   // Cache of mapped URIDs
 
 	// Variables to keep track of the tempo information sent by the host
-	double rate;  // Sample rate
-	float bpm;   // Beats per minute (tempo)
+	double sampleRate; 
+	float bpm;
 	float speed; // Transport speed (usually 0=stop, 1=play)
 
 	State state;
@@ -139,13 +139,79 @@ static LV2_Handle instantiate(
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
 
 	/* Initialise instance data: */
-	self->rate = sampleRate;
+	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
 	self->noteLen = (uint32_t)(0.3 * sampleRate);
 	self->state = STATE_OFF;
 
 	return (LV2_Handle)self;
 }
+
+typedef struct {
+	float start;
+	float pitch;
+	float length;
+	float velocity;
+} Note;
+
+typedef struct {
+    char name[20];
+    int length;
+    int baseOctave;
+    int baseNote;
+	Note notes[5];
+} Pattern;
+
+//XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
+Pattern patterns[] = {{
+	"pattern1", 4, 3, 0, {
+		{0.0, 0, 0.5, 100},
+		{0.0, 7, 0.5, 100},
+		{1.0, 5, 0.5, 100},
+		{2.0, 7, 0.5, 100},
+		{3.0, 9, 0.5, 100},
+	}
+}, {
+	"pattern2", 4, 3, 0, {
+		{0.0, 8, 0.5, 100},
+		{0.0, 7, 0.5, 100},
+		{1.0, 5, 0.5, 100},
+		{2.0, 7, 0.5, 100},
+		{3.0, 7, 0.5, 100},
+	}
+}};
+
+/*XXX JSON-style:
+const patterns = [
+	{
+		name: 'pattern1',	//XXX or make a key. Or store as a key when loaded in. Could be an object or something
+		length: 4,
+		baseOctave: 3,  //XXX not sure
+		baseNote: 0,    //XXX maybe C? MAYBE combine with baseOctave
+		notes = [
+			{start: 0.0, pitch: 0, length:0.5, velocity:100},
+			{start: 0.0, pitch: 7, length:0.5, velocity:100},
+			{start: 1.0, pitch: 5, length:0.5, velocity:100},
+			{start: 2.0, pitch: 7, length:0.5, velocity:100},
+			{start: 3.0, pitch: 9, length:0.5, velocity:100},
+		]
+	},
+	{
+		name: 'pattern2',
+		length: 4,
+		baseOctave: 3, 
+		baseNote: 0,  
+		notes = [
+			{start: 0.0, pitch: 8, length:0.5, velocity:100},
+			{start: 0.0, pitch: 7, length:0.5, velocity:100},
+			{start: 1.0, pitch: 5, length:0.5, velocity:100},
+			{start: 2.0, pitch: 7, length:0.5, velocity:100},
+			{start: 3.0, pitch: 7, length:0.5, velocity:100},
+		]
+	},
+];
+*/
+
 
 /**
    Play back audio for the range [begin..end) relative to this cycle.  This is
@@ -158,38 +224,34 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 		uint8_t msg[3];
 	} MIDINoteEvent;
 
-	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->rate);
+	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
+//TODO can we use logger? 
+
+//TODO presumbly could cut this up into segments for a more efficient solution.
 	for (uint32_t i = begin; i < end; ++i) {
-		switch (self->state) {
-			case STATE_ON:
-				if (self->elapsedLen >= self->noteLen) {
-//TODO can we use logger for this?					
+		if (self->state == STATE_ON && self->elapsedLen >= self->noteLen) {
+			MIDINoteEvent note;
+			note.event.time.frames = 0;
+			note.event.body.type = self->uris.midi_Event;
+			note.event.body.size = 3;
+			note.msg[0] = 0x90;		// Note On
+			note.msg[1] = 60; 		// Middle C
+			note.msg[2] = 100;		// Velocity
 
-					MIDINoteEvent note;
-					note.event.time.frames = 0;
-					note.event.body.type = self->uris.midi_Event;
-					note.event.body.size = 3;
-					note.msg[0] = 0x90;		// Note On
-					note.msg[1] = 60; 		// Middle C
-					note.msg[2] = 100;		// Velocity
+			lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &note.event);
 
-					lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &note.event);
-
-					self->state = STATE_OFF;
-				}
-				break;
-			case STATE_OFF:
-//				output[i] = 0.0f;
-				break;
+			self->state = STATE_OFF;
 		}
 
 		// Update elapsed time and start attack if necessary
 		if (++self->elapsedLen == framesPerBeat) {
 			MIDINoteEvent note;
+//XXX can we use frames here or some other mechanism to place the note accurately within the frame?			
 			note.event.time.frames = 0;
 			note.event.body.type =  self->uris.midi_Event;
 			note.event.body.size = 3;
+
 			note.msg[0] = 0x80; 	// Note off
 			note.msg[1] = 60;
 			note.msg[2] = 0;
@@ -199,6 +261,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 			self->elapsedLen = 0;
 		}
 	}
+//XXX may need to check the outCapacity is not exceeded	
 }
 
 /*
@@ -262,7 +325,7 @@ static void updatePosition(Self* self, const LV2_Atom_Object* obj)
     // This hard sync may cause clicks, a real plugin would be more graceful
 
 	if (beat && beat->type == uris->atom_Float) {
-		const float frames_per_beat = (float)(60.0 / self->bpm * self->rate);
+		const float frames_per_beat = (float)(60.0 / self->bpm * self->sampleRate);
 		const float bar_beats       = ((LV2_Atom_Float*)beat)->body;
 		const float beat_beats      = bar_beats - floorf(bar_beats);
 		self->elapsedLen           = (uint32_t)(beat_beats * frames_per_beat);
@@ -274,16 +337,9 @@ static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 	}
 }
 
-/*
-	The `run()` method is the main process function of the plugin.
-	It processes a block of audio in the audio context.  
-	Since this plugin is `lv2:hardRTCapable`, `run()` must be real-time safe, 
-	so blocking (e.g. with a mutex) or memory allocation are not allowed.
-*/
+/* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sample_count)
 {
-printf("run()  sample_count:%d\n",sample_count);	
-
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 

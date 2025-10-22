@@ -1,5 +1,18 @@
 
+MIDI monitoring: use gmidimonitor  (in Ubuntu repo)
+
+
 - change the URLs to my Github account
+
+
+Tools
+-----
+lv2lint    to check plugin
+valgrind   for memory issues
+
+Libraries
+---------
+sndfile    for audio file handling I think
 
 
 GUI options
@@ -9,3 +22,19 @@ Can it be trimmed right down?
 
 - Look at Dragonfly reverb 
 - Look at the LV2 pianoroll pattern plugin
+
+
+NB Cairo is the 2D vector rendering library used by gtk, although
+   they may be moving away from it
+
+B.Widgets: SOME music widgets (GPL licence)   Includes piano keys, knobs, meters
+
+
+
+
+"Building atoms: The LV2_Atom_Forge API allows developers to build atoms by progressively appending data to a buffer, 
+which can be a memory buffer, a ring buffer, or a plugin's output port"
+
+
+
+BUG: is starting immediately. Not waiting for transport.
