@@ -152,6 +152,8 @@ typedef struct {
 	float pitch;
 	float length;
 	float velocity;
+
+	int state;
 } Note;
 
 typedef struct {
@@ -165,19 +167,19 @@ typedef struct {
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
 	"pattern1", 4, 3, 0, {
-		{0.0, 0, 0.5, 100},
-		{0.0, 7, 0.5, 100},
-		{1.0, 5, 0.5, 100},
-		{2.0, 7, 0.5, 100},
-		{3.0, 9, 0.5, 100},
+		{0.0, 0, 0.5, 100, STATE_OFF},
+		{0.0, 7, 0.5, 100, STATE_OFF},
+		{1.0, 5, 0.5, 100, STATE_OFF},
+		{2.0, 7, 0.5, 100, STATE_OFF},
+		{3.0, 9, 0.5, 100, STATE_OFF},
 	}
 }, {
 	"pattern2", 4, 3, 0, {
-		{0.0, 8, 0.5, 100},
-		{0.0, 7, 0.5, 100},
-		{1.0, 5, 0.5, 100},
-		{2.0, 7, 0.5, 100},
-		{3.0, 7, 0.5, 100},
+		{0.0, 8, 0.5, 100, STATE_OFF},
+		{0.0, 7, 0.5, 100, STATE_OFF},
+		{1.0, 5, 0.5, 100, STATE_OFF},
+		{2.0, 7, 0.5, 100, STATE_OFF},
+		{3.0, 7, 0.5, 100, STATE_OFF},
 	}
 }};
 
@@ -226,9 +228,16 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
+printf("play() end - begin: %d\n",end-begin);	
+
+//TODO STATE_OFF ==> NOTE_OFF
+
 //TODO can we use logger? 
 
 //TODO presumbly could cut this up into segments for a more efficient solution.
+//     Could/should create an index that contains all note start and end offsets in order.
+//     Store a 'last position' and go from there each time. The states can be stored with the patterns.
+
 	for (uint32_t i = begin; i < end; ++i) {
 		if (self->state == STATE_ON && self->elapsedLen >= self->noteLen) {
 			MIDINoteEvent note;
