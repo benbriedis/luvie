@@ -36,5 +36,3 @@ B.Widgets: SOME music widgets (GPL licence)   Includes piano keys, knobs, meters
 which can be a memory buffer, a ring buffer, or a plugin's output port"
 
 
-
-BUG: is starting immediately. Not waiting for transport.

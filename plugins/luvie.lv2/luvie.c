@@ -147,6 +147,8 @@ static LV2_Handle instantiate(
 	return (LV2_Handle)self;
 }
 
+//TODO move these patterns into self
+
 typedef struct {
 	float start;
 	float pitch;
@@ -154,6 +156,7 @@ typedef struct {
 	float velocity;
 
 	int state;
+	uint32_t elapsed;
 } Note;
 
 typedef struct {
@@ -228,7 +231,9 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
-printf("play() end - begin: %d\n",end-begin);	
+//TODO replace 'speed' with 'playing' or something
+	if (self->speed == 0.0f) 
+		return;
 
 //TODO STATE_OFF ==> NOTE_OFF
 
@@ -322,13 +327,17 @@ static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 		NULL
 	);
 
+
     /* Tempo changed */
 	if (bpm && bpm->type == uris->atom_Float)
 		self->bpm = ((LV2_Atom_Float*)bpm)->body;
 
 	/* Speed changed, e.g. 0 (stop) to 1 (play) */
-	if (speed && speed->type == uris->atom_Float) 
+	if (speed && speed->type == uris->atom_Float)  {
 		self->speed = ((LV2_Atom_Float*)speed)->body;
+
+printf("updatePosition CHANGED  self->speed: %lf\n",self->speed);
+}
 
     // Received a beat position, synchronise
     // This hard sync may cause clicks, a real plugin would be more graceful
@@ -352,9 +361,6 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
-	const LV2_Atom_Sequence* in = self->control_port_in;
-	uint32_t last_t = 0;
-
   	/* Initially self->out_port contains a Chunk with size set to capacity */
 	const uint32_t outCapacity = self->midi_port_out->atom.size;
 
@@ -363,15 +369,20 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
 
 	/* Loop through events: */
+	const LV2_Atom_Sequence* in = self->control_port_in;
+	uint32_t last_t = 0;
+
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
+
+//XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
 		play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
-		//TODO deprecated Blank to tolerate old hosts (DELETE Blank? How deprecated is it?)
-		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
+		/* Handle a position message */
+		if (ev->body.type == uris->atom_Object || /*deprecated*/ ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
+
 			if (obj->body.otype == uris->time_Position) 
-				// Received position information, update
 				updatePosition(self, obj);
 		}
 
