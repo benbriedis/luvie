@@ -50,10 +50,9 @@ typedef struct {
 
 enum { CONTROL_IN = 0, MIDI_OUT = 1 };
 
-/** During execution this plugin can be in one of 3 states: */
 typedef enum {
-	STATE_ON,
-	STATE_OFF,
+	NOTE_ON,
+	NOTE_OFF,
 } State;
 
 /*
@@ -142,7 +141,7 @@ static LV2_Handle instantiate(
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
 	self->noteLen = (uint32_t)(0.3 * sampleRate);
-	self->state = STATE_OFF;
+	self->state = NOTE_OFF;
 
 	return (LV2_Handle)self;
 }
@@ -172,19 +171,19 @@ typedef struct {
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
 	"pattern1", 4, 3, 0, {
-		{0.0, 0, 0.5, 100, STATE_OFF, 0},
-		{0.0, 7, 0.5, 100, STATE_OFF, 0},
-		{1.0, 5, 0.5, 100, STATE_OFF, 0},
-		{2.0, 7, 0.5, 100, STATE_OFF, 0},
-		{3.0, 9, 0.5, 100, STATE_OFF, 0},
+		{0.0, 0, 0.5, 100, NOTE_OFF, 0},
+		{0.0, 7, 0.5, 100, NOTE_OFF, 0},
+		{1.0, 5, 0.5, 100, NOTE_OFF, 0},
+		{2.0, 7, 0.5, 100, NOTE_OFF, 0},
+		{3.0, 9, 0.5, 100, NOTE_OFF, 0},
 	}
 }, {
 	"pattern2", 4, 3, 0, {
-		{0.0, 8, 0.5, 100, STATE_OFF, 0},
-		{0.0, 7, 0.5, 100, STATE_OFF, 0},
-		{1.0, 5, 0.5, 100, STATE_OFF, 0},
-		{2.0, 7, 0.5, 100, STATE_OFF, 0},
-		{3.0, 7, 0.5, 100, STATE_OFF, 0},
+		{0.0, 8, 0.5, 100, NOTE_OFF, 0},
+		{0.0, 7, 0.5, 100, NOTE_OFF, 0},
+		{1.0, 5, 0.5, 100, NOTE_OFF, 0},
+		{2.0, 7, 0.5, 100, NOTE_OFF, 0},
+		{3.0, 7, 0.5, 100, NOTE_OFF, 0},
 	}
 }};
 
@@ -237,8 +236,6 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 	if (self->speed == 0.0f) 
 		return;
 
-//TODO STATE_OFF ==> NOTE_OFF
-
 //TODO can we use logger? 
 
 //TODO presumbly could cut this up into segments for a more efficient solution.
@@ -248,12 +245,12 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 	MIDINoteEvent out;
 
 	for (uint32_t i = begin; i < end; ++i) {
-		Pattern* pattern = &(patterns[0]);
+		Pattern* pattern = &patterns[0];
 
 		int patternEnd = pattern->length * framesPerBeat; 
 
 		for (int j=0; j<5; j++) {  //FIXME
-			Note* note = &(pattern->notes[j]);  //TODO try without ()
+			Note* note = &pattern->notes[j]; 
 
 			int noteStart = note->start * framesPerBeat;
 			int noteLen = note->length * framesPerBeat;
@@ -261,24 +258,23 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 
 			int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
 
-			if (note->state == STATE_OFF && pattern->elapsed >= noteStart && pattern->elapsed < noteEnd) {
-				note->state = STATE_ON;
+			if (note->state == NOTE_OFF && pattern->elapsed >= noteStart && pattern->elapsed < noteEnd) {
+				note->state = NOTE_ON;
 
-//XXX can we use frames here or some other mechanism to place the note accurately within the frame?			
-				out.event.time.frames = 0;
+				out.event.time.frames = 0;   //FIXME can we use frames here or some other mechanism to place the note accurately within the frame?			
 				out.event.body.type =  self->uris.midi_Event;
 				out.event.body.size = 3;
 				out.msg[0] = 0x90;		// Note On for channel 0
-				out.msg[1] = pitch; 		// Middle C
+				out.msg[1] = pitch;
 				out.msg[2] = 100;		// Velocity
 
 				lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
 			}
 
-			else if (note->state == STATE_ON && pattern->elapsed == noteEnd - 1) {
-				note->state = STATE_OFF;
+			else if (note->state == NOTE_ON && pattern->elapsed == noteEnd - 1) {
+				note->state = NOTE_OFF;
 
-				out.event.time.frames = 0;  //FIXME reckon this is the desired offset. May need to graph out to be sure (should do this anyway)
+				out.event.time.frames = 0;    //FIXME reckon this is the desired offset. May need to graph out to be sure (should do this anyway)
 				out.event.body.type = self->uris.midi_Event;
 				out.event.body.size = 3;
 				out.msg[0] = 0x80; 	// Note off
@@ -324,7 +320,7 @@ static void activate(LV2_Handle instance)
 	Self* self = (Self*)instance;
 
 	self->elapsedLen = 0;
-	self->state = STATE_OFF;
+	self->state = NOTE_OFF;
 }
 
 /*
@@ -370,9 +366,9 @@ printf("updatePosition CHANGED  self->speed: %lf\n",self->speed);
 
 //XXX how does this relate the the play() state changes?		
 		if (self->elapsedLen < self->noteLen)
-			self->state = STATE_ON;
+			self->state = NOTE_ON;
 		else 
-			self->state = STATE_OFF;
+			self->state = NOTE_OFF;
 	}
 }
 
