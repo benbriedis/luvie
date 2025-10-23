@@ -155,8 +155,7 @@ typedef struct {
 	float length;
 	float velocity;
 
-	int state;
-	uint32_t elapsed;
+	int state; //XXX probably wont need long term
 } Note;
 
 typedef struct {
@@ -165,24 +164,27 @@ typedef struct {
     int baseOctave;
     int baseNote;
 	Note notes[5];
+	//TODO probably add a MIDI channel here
+
+	uint32_t elapsed; // in frames
 } Pattern;
 
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
 	"pattern1", 4, 3, 0, {
-		{0.0, 0, 0.5, 100, STATE_OFF},
-		{0.0, 7, 0.5, 100, STATE_OFF},
-		{1.0, 5, 0.5, 100, STATE_OFF},
-		{2.0, 7, 0.5, 100, STATE_OFF},
-		{3.0, 9, 0.5, 100, STATE_OFF},
+		{0.0, 0, 0.5, 100, STATE_OFF, 0},
+		{0.0, 7, 0.5, 100, STATE_OFF, 0},
+		{1.0, 5, 0.5, 100, STATE_OFF, 0},
+		{2.0, 7, 0.5, 100, STATE_OFF, 0},
+		{3.0, 9, 0.5, 100, STATE_OFF, 0},
 	}
 }, {
 	"pattern2", 4, 3, 0, {
-		{0.0, 8, 0.5, 100, STATE_OFF},
-		{0.0, 7, 0.5, 100, STATE_OFF},
-		{1.0, 5, 0.5, 100, STATE_OFF},
-		{2.0, 7, 0.5, 100, STATE_OFF},
-		{3.0, 7, 0.5, 100, STATE_OFF},
+		{0.0, 8, 0.5, 100, STATE_OFF, 0},
+		{0.0, 7, 0.5, 100, STATE_OFF, 0},
+		{1.0, 5, 0.5, 100, STATE_OFF, 0},
+		{2.0, 7, 0.5, 100, STATE_OFF, 0},
+		{3.0, 7, 0.5, 100, STATE_OFF, 0},
 	}
 }};
 
@@ -243,37 +245,54 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 //     Could/should create an index that contains all note start and end offsets in order.
 //     Store a 'last position' and go from there each time. The states can be stored with the patterns.
 
+	MIDINoteEvent out;
+
 	for (uint32_t i = begin; i < end; ++i) {
-		if (self->state == STATE_ON && self->elapsedLen >= self->noteLen) {
-			MIDINoteEvent note;
-			note.event.time.frames = 0;
-			note.event.body.type = self->uris.midi_Event;
-			note.event.body.size = 3;
-			note.msg[0] = 0x90;		// Note On
-			note.msg[1] = 60; 		// Middle C
-			note.msg[2] = 100;		// Velocity
+		Pattern* pattern = &(patterns[0]);
 
-			lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &note.event);
+		int patternEnd = pattern->length * framesPerBeat; 
 
-			self->state = STATE_OFF;
-		}
+		for (int j=0; j<5; j++) {  //FIXME
+			Note* note = &(pattern->notes[j]);  //TODO try without ()
 
-		// Update elapsed time and start attack if necessary
-		if (++self->elapsedLen == framesPerBeat) {
-			MIDINoteEvent note;
+			int noteStart = note->start * framesPerBeat;
+			int noteLen = note->length * framesPerBeat;
+			int noteEnd = noteStart + noteLen;
+
+			int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
+
+			if (note->state == STATE_OFF && pattern->elapsed >= noteStart && pattern->elapsed < noteEnd) {
+				note->state = STATE_ON;
+
 //XXX can we use frames here or some other mechanism to place the note accurately within the frame?			
-			note.event.time.frames = 0;
-			note.event.body.type =  self->uris.midi_Event;
-			note.event.body.size = 3;
+				out.event.time.frames = 0;
+				out.event.body.type =  self->uris.midi_Event;
+				out.event.body.size = 3;
+				out.msg[0] = 0x90;		// Note On for channel 0
+				out.msg[1] = pitch; 		// Middle C
+				out.msg[2] = 100;		// Velocity
 
-			note.msg[0] = 0x80; 	// Note off
-			note.msg[1] = 60;
-			note.msg[2] = 0;
-			lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &note.event);
+				lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
+			}
 
-			self->state = STATE_ON;
-			self->elapsedLen = 0;
+			else if (note->state == STATE_ON && pattern->elapsed == noteEnd - 1) {
+				note->state = STATE_OFF;
+
+				out.event.time.frames = 0;  //FIXME reckon this is the desired offset. May need to graph out to be sure (should do this anyway)
+				out.event.body.type = self->uris.midi_Event;
+				out.event.body.size = 3;
+				out.msg[0] = 0x80; 	// Note off
+				out.msg[1] = pitch;       
+				out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
+
+				lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
+			}
 		}
+
+		if (++ pattern->elapsed == patternEnd)
+			pattern->elapsed = 0;
+
+//NOTE it appears one pitch can't be played twice on a given channel... TODO check
 	}
 //XXX may need to check the outCapacity is not exceeded	
 }
@@ -314,6 +333,8 @@ static void activate(LV2_Handle instance)
 */
 static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 {
+//XXX every few seconds seems to send through another 'speed' message	
+printf("updatePosition -1 \n");
 	const URIs* uris = &self->uris;
 
 	LV2_Atom* beat = NULL;
@@ -326,7 +347,6 @@ static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 		uris->time_speed, &speed,
 		NULL
 	);
-
 
     /* Tempo changed */
 	if (bpm && bpm->type == uris->atom_Float)
@@ -348,6 +368,7 @@ printf("updatePosition CHANGED  self->speed: %lf\n",self->speed);
 		const float beat_beats      = bar_beats - floorf(bar_beats);
 		self->elapsedLen           = (uint32_t)(beat_beats * frames_per_beat);
 
+//XXX how does this relate the the play() state changes?		
 		if (self->elapsedLen < self->noteLen)
 			self->state = STATE_ON;
 		else 
