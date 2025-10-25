@@ -1,0 +1,55 @@
+
+MIDI monitoring: use gmidimonitor  (in Ubuntu repo)
+
+
+- change the URLs to my Github account
+
+
+Tools
+-----
+lv2lint    to check plugin
+valgrind   for memory issues
+
+Libraries
+---------
+sndfile    for audio file handling I think
+
+
+GUI requirements
+----------------
+- Portable - ideally to mobile etc
+- Statically linkable
+- Ideally LGPL, Apache, MIT, or similar
+
+GUI Plan
+--------
+Initially try: 
+	https://github.com/sjaehn/BWidgets
+these are GPL but keep the code in a separate directory to isolate for the moment.
+
+ANOTHER OPTION (free):
+	https://github.com/DISTRHO/DPF-Widgets/tree/main
+
+Note this contains some LGPL options:
+	https://github.com/openAVproductions/openAV-AVTK
+
+Free JS pianoroll here:
+   	https://github.com/ryohey/signal/
+Maybe translate it
+
+- Look at Dragonfly reverb (uses Mesa 3D graphics library)
+- Look at the LV2 pianoroll pattern plugin in Ardour plugin
+
+
+NB Cairo is the 2D vector rendering library used by gtk, although
+   they may be moving away from it
+
+B.Widgets: SOME music widgets (GPL licence)   Includes piano keys, knobs, meters
+
+
+
+
+"Building atoms: The LV2_Atom_Forge API allows developers to build atoms by progressively appending data to a buffer, 
+which can be a memory buffer, a ring buffer, or a plugin's output port"
+
+

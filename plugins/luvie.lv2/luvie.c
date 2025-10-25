@@ -11,8 +11,84 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define PLUGIN_URI "http://benbriedis.com/lv2/luvie"
+
+typedef enum {
+	NOTE_ON,
+	NOTE_OFF,
+} State;
+
+typedef struct {
+	float start;
+	float pitch;
+	float length;
+	float velocity;
+
+	int state; //XXX probably wont need long term
+} Note;
+
+typedef struct {
+    char name[20];
+    int length;
+    int baseOctave;
+    int baseNote;
+	Note notes[5];
+	//TODO probably add a MIDI channel here
+
+	uint32_t elapsed; // in frames
+} Pattern;
+
+//XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
+Pattern patterns[] = {{
+	"pattern1", 4, 3, 0, {
+		{0.0, 0, 0.5, 100, NOTE_OFF},
+		{0.0, 7, 0.5, 100, NOTE_OFF},
+		{1.0, 5, 0.5, 100, NOTE_OFF},
+		{2.0, 7, 0.5, 100, NOTE_OFF},
+		{3.0, 9, 0.5, 100, NOTE_OFF},
+	}
+}, {
+	"pattern2", 4, 3, 0, {
+		{0.0, 8, 0.5, 100, NOTE_OFF},
+		{0.0, 7, 0.5, 100, NOTE_OFF},
+		{1.0, 5, 0.5, 100, NOTE_OFF},
+		{2.0, 7, 0.5, 100, NOTE_OFF},
+		{3.0, 7, 0.5, 100, NOTE_OFF},
+	}
+}};
+
+/*XXX JSON-style:
+const patterns = [
+	{
+		name: 'pattern1',	//XXX or make a key. Or store as a key when loaded in. Could be an object or something
+		length: 4,
+		baseOctave: 3,  //XXX not sure
+		baseNote: 0,    //XXX maybe C? MAYBE combine with baseOctave
+		notes = [
+			{start: 0.0, pitch: 0, length:0.5, velocity:100},
+			{start: 0.0, pitch: 7, length:0.5, velocity:100},
+			{start: 1.0, pitch: 5, length:0.5, velocity:100},
+			{start: 2.0, pitch: 7, length:0.5, velocity:100},
+			{start: 3.0, pitch: 9, length:0.5, velocity:100},
+		]
+	},
+	{
+		name: 'pattern2',
+		length: 4,
+		baseOctave: 3, 
+		baseNote: 0,  
+		notes = [
+			{start: 0.0, pitch: 8, length:0.5, velocity:100},
+			{start: 0.0, pitch: 7, length:0.5, velocity:100},
+			{start: 1.0, pitch: 5, length:0.5, velocity:100},
+			{start: 2.0, pitch: 7, length:0.5, velocity:100},
+			{start: 3.0, pitch: 7, length:0.5, velocity:100},
+		]
+	},
+];
+*/
 
 /*
 	GOAL: to play a simple hard-coded arpeggio in MIDI, using timing coming from the host.
@@ -50,11 +126,6 @@ typedef struct {
 
 enum { CONTROL_IN = 0, MIDI_OUT = 1 };
 
-typedef enum {
-	NOTE_ON,
-	NOTE_OFF,
-} State;
-
 /*
    All data associated with a plugin instance is stored here.
    Port buffers.
@@ -74,11 +145,15 @@ typedef struct {
 	float bpm;
 	float speed; // Transport speed (usually 0=stop, 1=play)
 
+
+
 	State state;
 	uint32_t noteLen;
 //XXX we're going to need a bunch of state storing where we are in patterns... eg
 
 	uint32_t elapsedLen; // Frames since the start of the last click
+
+	Pattern* patterns;
 } Self;
 
 /*
@@ -143,80 +218,13 @@ static LV2_Handle instantiate(
 	self->noteLen = (uint32_t)(0.3 * sampleRate);
 	self->state = NOTE_OFF;
 
+	self->patterns = calloc(1,sizeof(patterns));
+	if (!self)
+		return NULL;
+	memcpy(self->patterns,patterns,sizeof(patterns));
+
 	return (LV2_Handle)self;
 }
-
-//TODO move these patterns into self
-
-typedef struct {
-	float start;
-	float pitch;
-	float length;
-	float velocity;
-
-	int state; //XXX probably wont need long term
-} Note;
-
-typedef struct {
-    char name[20];
-    int length;
-    int baseOctave;
-    int baseNote;
-	Note notes[5];
-	//TODO probably add a MIDI channel here
-
-	uint32_t elapsed; // in frames
-} Pattern;
-
-//XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
-Pattern patterns[] = {{
-	"pattern1", 4, 3, 0, {
-		{0.0, 0, 0.5, 100, NOTE_OFF, 0},
-		{0.0, 7, 0.5, 100, NOTE_OFF, 0},
-		{1.0, 5, 0.5, 100, NOTE_OFF, 0},
-		{2.0, 7, 0.5, 100, NOTE_OFF, 0},
-		{3.0, 9, 0.5, 100, NOTE_OFF, 0},
-	}
-}, {
-	"pattern2", 4, 3, 0, {
-		{0.0, 8, 0.5, 100, NOTE_OFF, 0},
-		{0.0, 7, 0.5, 100, NOTE_OFF, 0},
-		{1.0, 5, 0.5, 100, NOTE_OFF, 0},
-		{2.0, 7, 0.5, 100, NOTE_OFF, 0},
-		{3.0, 7, 0.5, 100, NOTE_OFF, 0},
-	}
-}};
-
-/*XXX JSON-style:
-const patterns = [
-	{
-		name: 'pattern1',	//XXX or make a key. Or store as a key when loaded in. Could be an object or something
-		length: 4,
-		baseOctave: 3,  //XXX not sure
-		baseNote: 0,    //XXX maybe C? MAYBE combine with baseOctave
-		notes = [
-			{start: 0.0, pitch: 0, length:0.5, velocity:100},
-			{start: 0.0, pitch: 7, length:0.5, velocity:100},
-			{start: 1.0, pitch: 5, length:0.5, velocity:100},
-			{start: 2.0, pitch: 7, length:0.5, velocity:100},
-			{start: 3.0, pitch: 9, length:0.5, velocity:100},
-		]
-	},
-	{
-		name: 'pattern2',
-		length: 4,
-		baseOctave: 3, 
-		baseNote: 0,  
-		notes = [
-			{start: 0.0, pitch: 8, length:0.5, velocity:100},
-			{start: 0.0, pitch: 7, length:0.5, velocity:100},
-			{start: 1.0, pitch: 5, length:0.5, velocity:100},
-			{start: 2.0, pitch: 7, length:0.5, velocity:100},
-			{start: 3.0, pitch: 7, length:0.5, velocity:100},
-		]
-	},
-];
-*/
 
 
 /**
@@ -245,7 +253,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 	MIDINoteEvent out;
 
 	for (uint32_t i = begin; i < end; ++i) {
-		Pattern* pattern = &patterns[0];
+		Pattern* pattern = &self->patterns[0];
 
 		int patternEnd = pattern->length * framesPerBeat; 
 
@@ -429,7 +437,10 @@ static void deactivate(LV2_Handle instance)
 */
 static void cleanup(LV2_Handle instance)
 {
-	free(instance);
+	Self* self = (Self*)instance;
+
+	free(self->patterns);
+	free(self);
 }
 
 /*
