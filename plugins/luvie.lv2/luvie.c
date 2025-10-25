@@ -143,15 +143,8 @@ typedef struct {
 	// Variables to keep track of the tempo information sent by the host
 	double sampleRate; 
 	float bpm;
+//XXX THINK this might exist for jogging etc	
 	float speed; // Transport speed (usually 0=stop, 1=play)
-
-
-
-	State state;
-	uint32_t noteLen;
-//XXX we're going to need a bunch of state storing where we are in patterns... eg
-
-	uint32_t elapsedLen; // Frames since the start of the last click
 
 	Pattern* patterns;
 } Self;
@@ -172,6 +165,8 @@ static LV2_Handle instantiate(
 	const LV2_Feature* const* features     //XXX host provided features
 )
 {
+printf("CALLING instantiate()\n");			
+
 	Self* self = (Self*)calloc(1, sizeof(Self));
 	if (!self)
 		return NULL;
@@ -215,8 +210,6 @@ static LV2_Handle instantiate(
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
-	self->noteLen = (uint32_t)(0.3 * sampleRate);
-	self->state = NOTE_OFF;
 
 	self->patterns = calloc(1,sizeof(patterns));
 	if (!self)
@@ -240,7 +233,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
-//TODO replace 'speed' with 'playing' or something
+//TODO THINK how might speed affect things here?
 	if (self->speed == 0.0f) 
 		return;
 
@@ -269,7 +262,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 			if (note->state == NOTE_OFF && pattern->elapsed >= noteStart && pattern->elapsed < noteEnd) {
 				note->state = NOTE_ON;
 
-				out.event.time.frames = 0;   //FIXME can we use frames here or some other mechanism to place the note accurately within the frame?			
+				out.event.time.frames = i;   //FIXME can we use frames here or some other mechanism to place the note accurately within the frame?			
 				out.event.body.type =  self->uris.midi_Event;
 				out.event.body.size = 3;
 				out.msg[0] = 0x90;		// Note On for channel 0
@@ -282,7 +275,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 			else if (note->state == NOTE_ON && pattern->elapsed == noteEnd - 1) {
 				note->state = NOTE_OFF;
 
-				out.event.time.frames = 0;    //FIXME reckon this is the desired offset. May need to graph out to be sure (should do this anyway)
+				out.event.time.frames = i;    //FIXME reckon this is the desired offset. May need to graph out to be sure (should do this anyway)
 				out.event.body.type = self->uris.midi_Event;
 				out.event.body.size = 3;
 				out.msg[0] = 0x80; 	// Note off
@@ -325,10 +318,19 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 /* The plugin must reset all internal state */
 static void activate(LV2_Handle instance)
 {
+printf("CALLING activate()\n");			
+
 	Self* self = (Self*)instance;
 
-	self->elapsedLen = 0;
-	self->state = NOTE_OFF;
+	for (int p=0; p<2; p++) {     //FIXME
+		Pattern* pattern = &self->patterns[p];
+		pattern->elapsed = 0;
+
+		for (int n=0; n<5; n++) {  //FIXME
+			Note* note = &pattern->notes[n];
+			note->state = NOTE_OFF;
+		}
+	}
 }
 
 /*
@@ -337,8 +339,6 @@ static void activate(LV2_Handle instance)
 */
 static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 {
-//XXX every few seconds seems to send through another 'speed' message	
-printf("updatePosition -1 \n");
 	const URIs* uris = &self->uris;
 
 	LV2_Atom* beat = NULL;
@@ -357,27 +357,11 @@ printf("updatePosition -1 \n");
 		self->bpm = ((LV2_Atom_Float*)bpm)->body;
 
 	/* Speed changed, e.g. 0 (stop) to 1 (play) */
-	if (speed && speed->type == uris->atom_Float)  {
+	if (speed && speed->type == uris->atom_Float)  
 		self->speed = ((LV2_Atom_Float*)speed)->body;
 
-printf("updatePosition CHANGED  self->speed: %lf\n",self->speed);
-}
+//	if (beat && beat->type == uris->atom_Float) ...
 
-    // Received a beat position, synchronise
-    // This hard sync may cause clicks, a real plugin would be more graceful
-
-	if (beat && beat->type == uris->atom_Float) {
-		const float frames_per_beat = (float)(60.0 / self->bpm * self->sampleRate);
-		const float bar_beats       = ((LV2_Atom_Float*)beat)->body;
-		const float beat_beats      = bar_beats - floorf(bar_beats);
-		self->elapsedLen           = (uint32_t)(beat_beats * frames_per_beat);
-
-//XXX how does this relate the the play() state changes?		
-		if (self->elapsedLen < self->noteLen)
-			self->state = NOTE_ON;
-		else 
-			self->state = NOTE_OFF;
-	}
 }
 
 /* `run()` must be real-time safe. No memory allocations or blocking! */
@@ -399,17 +383,18 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 
-//XXX Q: should we calling this 'play' for all message types? 
-		// Play the click for the time slice from last_t until now
-		play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
-
-		/* Handle a position message */
-		if (ev->body.type == uris->atom_Object || /*deprecated*/ ev->body.type == uris->atom_Blank) {
+		/* Handle a position message */    //NOTE the metronome had this after the play() call. Dont know why.
+		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj);
 		}
+
+
+//XXX Q: should we calling this 'play' for all message types? 
+		// Play the click for the time slice from last_t until now
+		play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
 		last_t = (uint32_t)ev->time.frames;
 	}
@@ -427,7 +412,9 @@ static void run(LV2_Handle instance, uint32_t sample_count)
    methods on this instance will be called concurrently with it.
 */
 static void deactivate(LV2_Handle instance)
-{}
+{
+printf("CALLING deactivate\n");			
+}
 
 /*
    Destroy a plugin instance (counterpart to `instantiate()`).
@@ -464,4 +451,7 @@ LV2_SYMBOL_EXPORT const LV2_Descriptor* lv2_descriptor(uint32_t index)
 {
 	return index == 0 ? &descriptor : NULL;
 }
+
+
+//TODO later test that the output is all in time
 
