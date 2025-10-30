@@ -10,46 +10,45 @@ Tools
 lv2lint    to check plugin
 valgrind   for memory issues
 
+ninja!	Try this to speed up builds
+
+
+Plugin structures
+-----------------
+1. Monolithic, but with internal API
+   PRO can share the graphics library
+   PRO gui can easily be split into tabs etc
+   PRO dont have multiple plugins appear in Ardour that are somehow loosely connected
+
+2. Both an LV2 host and client.
+   Clients have extensions... eg option/requirement to share the host GUI.
+   Probably have some 'built in' plugins.
+   PRO child plugins could possibly be run separately if desired.
+   PRO allows for separate development of parts.
+   PRO other plugins could perhaps be run with constraints. 
+       eg play one pattern per instance, bring their own GUIs.
+	   We probably control their transport.
+	   This is could a type 'trigger' situation. Still a place for a MIDI trigger plugin.
+        
+
+3. The Song editor is a 'peer' plugin
+   Extensions required for discovery between plugins and maybe saving data.
+   PRO maybe easier...
+   CON probably liable to be confusing at the end of the day.
+
+Alternatives to using JSON for storage
+--------------------------------------
+https://dev.to/nikl/json-is-slower-here-are-its-4-faster-alternatives-2g30
+
+
 Libraries
 ---------
 sndfile    for audio file handling I think
 
+Packaging... alternative to JUCE I guess...
+============================================
+https://distrho.github.io/DPF/
+https://distrho.github.io/DPF/index.html
+https://github.com/DISTRHO/DPF/blob/main/FEATURES.md
 
-GUI requirements
-----------------
-- Portable - ideally to mobile etc
-- Statically linkable
-- Ideally LGPL, Apache, MIT, or similar
-
-GUI Plan
---------
-Initially try: 
-	https://github.com/sjaehn/BWidgets
-these are GPL but keep the code in a separate directory to isolate for the moment.
-
-ANOTHER OPTION (free):
-	https://github.com/DISTRHO/DPF-Widgets/tree/main
-
-Note this contains some LGPL options:
-	https://github.com/openAVproductions/openAV-AVTK
-
-Free JS pianoroll here:
-   	https://github.com/ryohey/signal/
-Maybe translate it
-
-- Look at Dragonfly reverb (uses Mesa 3D graphics library)
-- Look at the LV2 pianoroll pattern plugin in Ardour plugin
-
-
-NB Cairo is the 2D vector rendering library used by gtk, although
-   they may be moving away from it
-
-B.Widgets: SOME music widgets (GPL licence)   Includes piano keys, knobs, meters
-
-
-
-
-"Building atoms: The LV2_Atom_Forge API allows developers to build atoms by progressively appending data to a buffer, 
-which can be a memory buffer, a ring buffer, or a plugin's output port"
-
-
+	... Suspect using this would make the song editor harder. Would probably need to add extensions etc

@@ -1,0 +1,120 @@
+GUI_RESEARCH
+============
+
+Requirements
+------------
+- Portable - ideally to mobile etc
+- Statically linkable
+- Ideally LGPL, Apache, MIT, or similar
+
+
+Statically-Linkable Widget Libraries...  is probably a good place to start
+---------------------------------------
+imgui 
+	- designed for games, which is a similar use case
+    - MIT license  (yay!)
+	- apparently sophisticated architecture
+	- great looking cross-platform support
+
+	https://github.com/DISTRHO/dear-plugins
+	https://gitlab.com/GroGy/im-neo-sequencer
+	https://github.com/alanjfs/sequentity
+	https://github.com/epezent/implot might be handy!  (MIT license!)
+
+FLTK
+
+Note QT has statically linkable option, but need to be paid for.
+GTK is not statically linkable.
+wxWidgets is probably statically linkable.
+
+
+
+THOUGHTS
+--------
+
+- Juce - made for the purpose, but GPL or pay
+       - probably just rather use LV2
+
+- Probably best dynamically linked option: QT
+   GTK and wxWidgets are alternatives but GTK very much has a Gnome focus and its OO model is a bit yuck.
+   wxWidgets has no real advantage over Qt, except that it may be easier to statically link.
+   Can't statically link Gtk at all. With Qt I think its theoretically possible.
+
+- Static linking... looks painful (unless maybe using JUCE).
+   - OpenGL and Vulkan can be targetted using glfw. These are both meant for more full-on graphics.
+   - Could possibly combine with blend2D for vector graphics.
+   - Could maybe use https://github.com/wjakob/nanogui (OpenGL) or something similar for Vulkan 
+     to provide some widgets.
+
+pianoroll examples
+------------------
+	https://forum.juce.com/t/does-the-traction-engine-have-any-piano-roll-widget-in-it/51108/14
+	https://github.com/g200kg/webaudio-pianoroll
+
+
+
+Cross platform event handling and window libraries 
+==================================================
+glfw	https://www.glfw.org/  (more minimal. Just graphics, which is all we want) 
+sdl		https://www.libsdl.org/
+
+
+Vulkan 2D Drawing Libraries 
+===========================
+
+libvvk  https://github.com/jeffboody/libvkk
+skitty  https://github.com/lynx-family/skity
+vkvg    https://github.com/jpbruyere/vkvg 
+
+OpenGL Widgets
+==============
+https://github.com/wjakob/nanogui
+
+How to create a grid:
+	https://stackoverflow.com/questions/58494179/how-to-create-a-grid-in-opengl-and-drawing-it-with-lines
+
+
+2D Drawing Libraries
+====================
+A vector drawing program is probably needed if drawing pianrolls etc...
+
+See https://news.ycombinator.com/item?id=39443172 for useful discussion.
+cario and qt paint are pretty much in maintenance mode. skia looks difficult and maybe bloaty.
+
+blend2D  (speed) 
+	<== Looks like static linking might be ok 
+
+https://github.com/thorvg/thorvg may be good 
+  <== small memory useful 
+  <== can run in TS
+  <== suspect dynamic linking is more practical
+
+
+small alternatives:
+	Tiny Skia
+	https://github.com/a-e-k/canvas_ity
+	https://github.com/memononen/nanovg
+
+Some widget Libraries
+=====================
+Try wxWidgets
+ - How large are the binaries?
+ - NOTE: because it is not used as the basis of an OS, more likely to be able to statically link and cut down.
+ - Does it use/incorporate a drawing library?
+
+Initially try: 
+	https://github.com/sjaehn/BWidgets
+these are GPL but keep the code in a separate directory to isolate for the moment.
+
+ANOTHER OPTION (free):
+	https://github.com/DISTRHO/DPF-Widgets/tree/main
+
+Note this contains some LGPL options:
+	https://github.com/openAVproductions/openAV-AVTK
+
+Free JS pianoroll here:
+   	https://github.com/ryohey/signal/
+Maybe translate it
+
+
+

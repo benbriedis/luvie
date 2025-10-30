@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <lv2/atom/atom.h>
 #include <lv2/atom/util.h>
 #include <lv2/core/lv2.h>
@@ -8,7 +9,6 @@
 #include <lv2/patch/patch.h>
 #include <lv2/time/time.h>
 #include <lv2/urid/urid.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +23,7 @@ typedef enum {
 typedef struct {
 	float start;
 	float pitch;
-	float length;
+	float lengthInBeats;
 	float velocity;
 
 	int state; //XXX probably wont need long term
@@ -31,18 +31,20 @@ typedef struct {
 
 typedef struct {
     char name[20];
-    int length;
+    int lengthInBeats;
     int baseOctave;
     int baseNote;
+
+	//XXX patterns can start in different places from each, and be of different lengths
+	uint32_t positionInFrames; 
+
 	Note notes[5];
 	//TODO probably add a MIDI channel here
-
-	uint32_t elapsed; // in frames
 } Pattern;
 
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
-	"pattern1", 4, 3, 0, {
+	"pattern1", 4, 3, 0, 0, {
 		{0.0, 0, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -50,7 +52,7 @@ Pattern patterns[] = {{
 		{3.0, 9, 0.5, 100, NOTE_OFF},
 	}
 }, {
-	"pattern2", 4, 3, 0, {
+	"pattern2", 4, 3, 0,  0, {
 		{0.0, 8, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -117,6 +119,11 @@ typedef struct {
 	LV2_URID time_barBeat;
 	LV2_URID time_beatsPerMinute;
 	LV2_URID time_speed;
+
+LV2_URID time_position;
+LV2_URID time_beat;
+LV2_URID time_bar;
+
 	LV2_URID midi_Event;
 	LV2_URID patch_Set;
 	LV2_URID patch_property;
@@ -147,6 +154,7 @@ typedef struct {
 	float speed; // Transport speed (usually 0=stop, 1=play)
 
 	Pattern* patterns;
+	int numPatterns;
 } Self;
 
 /*
@@ -207,6 +215,10 @@ printf("CALLING instantiate()\n");
 	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
 
+	uris->time_position			= map->map(map->handle, LV2_TIME__position);
+	uris->time_beat				= map->map(map->handle, LV2_TIME__beat);
+	uris->time_bar				= map->map(map->handle, LV2_TIME__bar);
+
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
@@ -217,81 +229,6 @@ printf("CALLING instantiate()\n");
 	memcpy(self->patterns,patterns,sizeof(patterns));
 
 	return (LV2_Handle)self;
-}
-
-
-/**
-   Play back audio for the range [begin..end) relative to this cycle.  This is
-   called by run() in-between events to output audio up until the current time.
-*/
-static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
-{
-	typedef struct {
-		LV2_Atom_Event event;
-		uint8_t msg[3];
-	} MIDINoteEvent;
-
-	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
-
-//TODO THINK how might speed affect things here?
-	if (self->speed == 0.0f) 
-		return;
-
-//TODO can we use logger? 
-
-//TODO presumbly could cut this up into segments for a more efficient solution.
-//     Could/should create an index that contains all note start and end offsets in order.
-//     Store a 'last position' and go from there each time. The states can be stored with the patterns.
-
-	MIDINoteEvent out;
-
-	for (uint32_t i = begin; i < end; ++i) {
-		Pattern* pattern = &self->patterns[0];
-
-		int patternEnd = pattern->length * framesPerBeat; 
-
-		for (int j=0; j<5; j++) {  //FIXME
-			Note* note = &pattern->notes[j]; 
-
-			int noteStart = note->start * framesPerBeat;
-			int noteLen = note->length * framesPerBeat;
-			int noteEnd = noteStart + noteLen;
-
-			int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
-
-			if (note->state == NOTE_OFF && pattern->elapsed >= noteStart && pattern->elapsed < noteEnd) {
-				note->state = NOTE_ON;
-
-				out.event.time.frames = i;   //FIXME can we use frames here or some other mechanism to place the note accurately within the frame?			
-				out.event.body.type =  self->uris.midi_Event;
-				out.event.body.size = 3;
-				out.msg[0] = 0x90;		// Note On for channel 0
-				out.msg[1] = pitch;
-				out.msg[2] = 100;		// Velocity
-
-				lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
-			}
-
-			else if (note->state == NOTE_ON && pattern->elapsed == noteEnd - 1) {
-				note->state = NOTE_OFF;
-
-				out.event.time.frames = i;    //FIXME reckon this is the desired offset. May need to graph out to be sure (should do this anyway)
-				out.event.body.type = self->uris.midi_Event;
-				out.event.body.size = 3;
-				out.msg[0] = 0x80; 	// Note off
-				out.msg[1] = pitch;       
-				out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
-
-				lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
-			}
-		}
-
-		if (++ pattern->elapsed == patternEnd)
-			pattern->elapsed = 0;
-
-//NOTE it appears one pitch can't be played twice on a given channel... TODO check
-	}
-//XXX may need to check the outCapacity is not exceeded	
 }
 
 /*
@@ -322,15 +259,99 @@ printf("CALLING activate()\n");
 
 	Self* self = (Self*)instance;
 
-	for (int p=0; p<2; p++) {     //FIXME
+	self->numPatterns = 2;
+
+	for (int p=0; p<self->numPatterns; p++) {     //FIXME
 		Pattern* pattern = &self->patterns[p];
-		pattern->elapsed = 0;
+//XXX doesnt have to start at 0.		
+		pattern->positionInFrames = 0;
 
 		for (int n=0; n<5; n++) {  //FIXME
 			Note* note = &pattern->notes[n];
 			note->state = NOTE_OFF;
 		}
 	}
+}
+
+
+/**
+   Play back audio for the range [begin..end) relative to this cycle.  This is
+   called by run() in-between events to output audio up until the current time.
+*/
+static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
+{
+	typedef struct {
+		LV2_Atom_Event event;
+		uint8_t msg[3];
+	} MIDINoteEvent;
+
+	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
+
+//TODO THINK how might speed affect things here?
+	if (self->speed == 0.0f) 
+		return;
+
+//TODO can we use logger? 
+
+//TODO presumbly could cut this up into segments for a more efficient solution.
+//     Could/should create an index that contains all note start and end offsets in order.
+//     Store a 'last position' and go from there each time. The states can be stored with the patterns.
+
+	MIDINoteEvent out;
+
+	for (uint32_t i = begin; i < end; ++i) {
+
+		for (int p=0; p < self->numPatterns; p++) {
+
+		//TODO maybe... could add a fastForward(). Search through all notes for next event and add to i
+
+			Pattern* pattern = &self->patterns[p];
+
+			int patternEnd = pattern->lengthInBeats * framesPerBeat; 
+
+			for (int j=0; j<5; j++) {  //FIXME
+				Note* note = &pattern->notes[j]; 
+
+				int noteStart = note->start * framesPerBeat;
+				int noteLen = note->lengthInBeats * framesPerBeat;
+				int noteEnd = noteStart + noteLen;
+
+				int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
+
+				if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) {
+					note->state = NOTE_ON;
+
+					out.event.time.frames = i;
+					out.event.body.type =  self->uris.midi_Event;
+					out.event.body.size = 3;
+					out.msg[0] = 0x90;		// Note On for channel 0
+					out.msg[1] = pitch;
+					out.msg[2] = 100;		// Velocity
+
+					lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
+				}
+
+				else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) {
+					note->state = NOTE_OFF;
+
+					out.event.time.frames = i;
+					out.event.body.type = self->uris.midi_Event;
+					out.event.body.size = 3;
+					out.msg[0] = 0x80; 	// Note off
+					out.msg[1] = pitch;       
+					out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
+
+					lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
+				}
+			}
+
+			if (++ pattern->positionInFrames == patternEnd)
+				pattern->positionInFrames = 0;
+		}
+
+//NOTE it appears one pitch can't be played twice on a given channel... TODO check
+	}
+//XXX may need to check the outCapacity is not exceeded	
 }
 
 /*
@@ -345,23 +366,51 @@ static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 	LV2_Atom* bpm = NULL;
 	LV2_Atom* speed = NULL;
 
+LV2_Atom* Position = NULL;
+LV2_Atom* position = NULL;
+LV2_Atom* time_beat = NULL;
+LV2_Atom* time_bar = NULL;
+
 	lv2_atom_object_get(obj,
 		uris->time_barBeat, &beat,
 		uris->time_beatsPerMinute, &bpm,
 		uris->time_speed, &speed,
+
+uris->time_Position, &Position,
+uris->time_position, &position,
+uris->time_beat, &time_beat,
+uris->time_bar, &time_bar,
 		NULL
 	);
 
+printf("Position: %ld\n",(long)Position);  //XXX NOT SENT
+
+printf("position: %ld\n",(long)position);  //XXX NOT SENT
+
+if (time_beat) 
+printf("time_beat: %lf\n",((LV2_Atom_Double*)time_beat)->body);  //XXX NOT SENT
+else
+printf("time_beat: %ld\n",(long)time_beat);
+
+if (time_bar) 
+printf("time_bar: %ld\n",((LV2_Atom_Long*)time_bar)->body);
+
+if (speed) 
+printf("speed: %f\n",((LV2_Atom_Float*)speed)->body);
+
+if (beat) 
+printf("barBeat: %f\n",((LV2_Atom_Float*)beat)->body);
+
+if (bpm) 
+printf("bpm: %f\n",((LV2_Atom_Float*)bpm)->body);
+
     /* Tempo changed */
-	if (bpm && bpm->type == uris->atom_Float)
+	if (bpm && bpm->type == uris->atom_Float)		//XXX why the 1st guard?
 		self->bpm = ((LV2_Atom_Float*)bpm)->body;
 
 	/* Speed changed, e.g. 0 (stop) to 1 (play) */
-	if (speed && speed->type == uris->atom_Float)  
+	if (speed && speed->type == uris->atom_Float)  		//XXX why the 1st guard?
 		self->speed = ((LV2_Atom_Float*)speed)->body;
-
-//	if (beat && beat->type == uris->atom_Float) ...
-
 }
 
 /* `run()` must be real-time safe. No memory allocations or blocking! */
