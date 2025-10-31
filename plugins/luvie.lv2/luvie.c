@@ -1,4 +1,3 @@
-#include "lv2/atom/forge.h"
 #include <assert.h>
 #include <lv2/atom/atom.h>
 #include <lv2/atom/util.h>
@@ -109,21 +108,8 @@ typedef struct {
 	LV2_URID atom_URID;
 	LV2_URID atom_eventTransfer;
 	LV2_URID time_Position;
-	LV2_URID time_barBeat;
 	LV2_URID time_beatsPerMinute;
 	LV2_URID time_speed;
-
-LV2_URID time_position;
-LV2_URID time_beat;
-LV2_URID time_bar;
-	
-	LV2_URID time_Rate;
-	LV2_URID time_Time;
-	LV2_URID time_beatUnit;
-	LV2_URID time_frame;
-	LV2_URID time_framesPerSecond;
-	LV2_URID time_beatsPerBar;
-
 	LV2_URID midi_Event;
 	LV2_URID patch_Set;
 	LV2_URID patch_property;
@@ -208,22 +194,9 @@ printf("CALLING instantiate()\n");
 	uris->patch_Set           = map->map(map->handle, LV2_PATCH__Set);
 	uris->patch_property      = map->map(map->handle, LV2_PATCH__property);
 	uris->patch_value         = map->map(map->handle, LV2_PATCH__value);
-
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
-	uris->time_barBeat        = map->map(map->handle, LV2_TIME__barBeat);
 	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
-
-	uris->time_position			= map->map(map->handle, LV2_TIME__position);
-	uris->time_beat				= map->map(map->handle, LV2_TIME__beat);
-	uris->time_bar				= map->map(map->handle, LV2_TIME__bar);
-
-	uris->time_Rate				= map->map(map->handle, LV2_TIME__Rate);
-	uris->time_Time				= map->map(map->handle, LV2_TIME__Time);
-	uris->time_beatUnit			= map->map(map->handle, LV2_TIME__beatUnit);
-	uris->time_frame			= map->map(map->handle, LV2_TIME__frame);
-	uris->time_framesPerSecond	= map->map(map->handle, LV2_TIME__framesPerSecond);
-	uris->time_beatsPerBar		= map->map(map->handle, LV2_TIME__beatsPerBar);
 
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
@@ -396,80 +369,14 @@ static void updatePosition(Self* self, const LV2_Atom_Object* obj)
 {
 	const URIs* uris = &self->uris;
 
-	LV2_Atom* beat = NULL;
 	LV2_Atom* bpm = NULL;
 	LV2_Atom* speed = NULL;
 
-LV2_Atom* Position = NULL;
-LV2_Atom* position = NULL;
-LV2_Atom* time_beat = NULL;
-LV2_Atom* time_bar = NULL;
-
-LV2_Atom* time_Rate = NULL;
-LV2_Atom* time_Time = NULL;
-LV2_Atom* time_beatUnit = NULL;
-LV2_Atom* time_frame = NULL;
-LV2_Atom* time_framesPerSecond = NULL;
-LV2_Atom* time_beatsPerBar = NULL;
-
 	lv2_atom_object_get(obj,
-		uris->time_barBeat, &beat,
 		uris->time_beatsPerMinute, &bpm,
 		uris->time_speed, &speed,
-
-uris->time_Position, &Position,
-uris->time_position, &position,
-uris->time_beat, &time_beat,
-uris->time_bar, &time_bar,
-
-uris->time_Rate, &time_Rate,
-uris->time_Time, &time_Time,
-uris->time_beatUnit, &time_beatUnit,
-uris->time_frame, &time_frame,
-uris->time_framesPerSecond, &time_framesPerSecond,
-uris->time_beatsPerBar, &time_beatsPerBar,
 		NULL
 	);
-
-printf("Position: %ld\n",(long)Position);  //XXX NOT SENT
-
-printf("Rate: %ld\n",(long)time_Rate);
-
-printf("Time: %ld\n",(long)time_Time);
-
-
-printf("position: %ld\n",(long)position);  //XXX NOT SENT
-
-if (time_beat) 
-printf("time_beat: %lf\n",((LV2_Atom_Double*)time_beat)->body);  //XXX NOT SENT
-else
-printf("time_beat: %ld\n",(long)time_beat);
-
-if (time_bar) 
-printf("time_bar: %ld\n",((LV2_Atom_Long*)time_bar)->body);
-
-if (speed) 
-printf("speed: %f\n",((LV2_Atom_Float*)speed)->body);
-
-if (beat) 
-printf("barBeat: %f\n",((LV2_Atom_Float*)beat)->body);
-
-if (bpm) 
-printf("bpm: %f\n",((LV2_Atom_Float*)bpm)->body);
-
-if (time_beatUnit)
-printf("beatUnit: %d\n",((LV2_Atom_Int*)time_beatUnit)->body);
-
-if (time_frame)
-printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
-//TODO check this stays in sync with ev->time
-
-printf("framesPerSecond: %ld\n",(long)time_framesPerSecond);
-
-if (time_beatsPerBar)
-printf("beatsPerBar: %f\n",((LV2_Atom_Float*)time_beatsPerBar)->body);
-
-printf("\n");
 
     /* Tempo changed */
 	if (bpm && bpm->type == uris->atom_Float)
