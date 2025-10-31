@@ -1,4 +1,4 @@
-
+#include "lv2/atom/forge.h"
 #include <assert.h>
 #include <lv2/atom/atom.h>
 #include <lv2/atom/util.h>
@@ -31,8 +31,7 @@ typedef struct {
 	float pitch;
 	float lengthInBeats;
 	float velocity;
-
-	int state; //XXX probably wont need long term
+	int state; 
 } Note;
 
 typedef struct {
@@ -40,18 +39,14 @@ typedef struct {
     int lengthInBeats;
     int baseOctave;
     int baseNote;
-
 	int state;
 //TODO possibly/probably replace these two with endInFrames;	
 	uint32_t startInFrames; 
 	uint32_t lengthInFrames; 
-
-	//XXX patterns can start in different places from each, and be of different lengths
 	uint32_t positionInFrames; 
-
 //TODO generalise the number of notes
 	Note notes[5];
-	//TODO probably add a MIDI channel here
+//TODO probably add a MIDI channel here
 } Pattern;
 
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
@@ -83,24 +78,10 @@ const patterns = [
 		notes = [
 			{start: 0.0, pitch: 0, length:0.5, velocity:100},
 			{start: 0.0, pitch: 7, length:0.5, velocity:100},
-			{start: 1.0, pitch: 5, length:0.5, velocity:100},
-			{start: 2.0, pitch: 7, length:0.5, velocity:100},
-			{start: 3.0, pitch: 9, length:0.5, velocity:100},
+			...
 		]
 	},
-	{
-		name: 'pattern2',
-		length: 4,
-		baseOctave: 3, 
-		baseNote: 0,  
-		notes = [
-			{start: 0.0, pitch: 8, length:0.5, velocity:100},
-			{start: 0.0, pitch: 7, length:0.5, velocity:100},
-			{start: 1.0, pitch: 5, length:0.5, velocity:100},
-			{start: 2.0, pitch: 7, length:0.5, velocity:100},
-			{start: 3.0, pitch: 7, length:0.5, velocity:100},
-		]
-	},
+	...
 ];
 */
 
@@ -169,9 +150,7 @@ typedef struct {
 	// Variables to keep track of the tempo information sent by the host
 	double sampleRate; 
 	float bpm;
-//XXX THINK this might exist for jogging etc	
 	float speed; // Transport speed (usually 0=stop, 1=play)
-
 	Pattern* patterns;
 	int numPatterns;
 } Self;
@@ -342,6 +321,7 @@ static void noteOn(Self* self,Note* note,uint32_t position,int pitch,uint32_t ou
 	out.msg[1] = pitch;
 	out.msg[2] = 100;		// Velocity
 
+//XXX may need to check the outCapacity is not exceeded	
 	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
 }
 
@@ -361,50 +341,51 @@ static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t o
 	lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
 }
 
-/*
-   Play back audio for the range [begin..end) relative to this cycle.  This is
-   called by run() in-between events to output audio up until the current time.
-*/
-static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
+//NOTE it appears one pitch can't be played twice on a given channel... TODO check
+
+
+/* Play MIDI events in the range [begin..end) relative to this cycle.  */
+static void playPattern(Self* self, Pattern* pattern, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
+	int patternEnd = pattern->lengthInBeats * framesPerBeat; 
+
+	//TODO could probably make more efficient... cf moving the 'j' loop to around to 'i' loop. Calculate the notes on 
+	//     and off, then sort and output.
+
+	for (uint32_t i = begin; i < end; i++) {
+		for (int j=0; j<5; j++) {  //FIXME
+			Note* note = &pattern->notes[j]; 
+
+			int noteStart = note->start * framesPerBeat;
+			int noteLen = note->lengthInBeats * framesPerBeat;
+			int noteEnd = noteStart + noteLen;
+
+			int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
+
+			if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
+				noteOn(self,note,i,pitch,outCapacity);
+
+			else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
+				noteOff(self,note,i,pitch,outCapacity);
+		}
+
+		if (++ pattern->positionInFrames == patternEnd)
+			pattern->positionInFrames = 0;
+	}
+
+//TODO if we reach the end of a once-through pattern disable it.
+}
+
+static void playPatterns(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
+{
 	for (int p=0; p < self->numPatterns; p++) {
 		Pattern* pattern = &self->patterns[p];
 
-		if (pattern->state == PATTERN_OFF)
-			continue;
-
-		int patternEnd = pattern->lengthInBeats * framesPerBeat; 
-
-		for (uint32_t i = begin; i < end; ++i) {
-		//TODO probably... could add a fastForward(). Search through all notes for next event and add to i
-
-			for (int j=0; j<5; j++) {  //FIXME
-				Note* note = &pattern->notes[j]; 
-
-				int noteStart = note->start * framesPerBeat;
-				int noteLen = note->lengthInBeats * framesPerBeat;
-				int noteEnd = noteStart + noteLen;
-
-				int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
-
-				if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
-					noteOn(self,note,i,pitch,outCapacity);
-
-				else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
-					noteOff(self,note,i,pitch,outCapacity);
-			}
-
-			if (++ pattern->positionInFrames == patternEnd)
-				pattern->positionInFrames = 0;
-		}
-
-//NOTE it appears one pitch can't be played twice on a given channel... TODO check
+		if (pattern->state != PATTERN_OFF)
+			playPattern(self,pattern,begin,end,outCapacity);
 	}
-//XXX may need to check the outCapacity is not exceeded	
-
-//TODO if we reach the end of a once-through pattern disable it.
 }
 
 /*
@@ -491,11 +472,11 @@ printf("beatsPerBar: %f\n",((LV2_Atom_Float*)time_beatsPerBar)->body);
 printf("\n");
 
     /* Tempo changed */
-	if (bpm && bpm->type == uris->atom_Float)		//XXX why the 1st guard?
+	if (bpm && bpm->type == uris->atom_Float)
 		self->bpm = ((LV2_Atom_Float*)bpm)->body;
 
-	/* Speed changed, e.g. 0 (stop) to 1 (play) */
-	if (speed && speed->type == uris->atom_Float)  		//XXX why the 1st guard?
+	/* Speed=0 (stop) or speed=1 (play) */
+	if (speed && speed->type == uris->atom_Float)
 		self->speed = ((LV2_Atom_Float*)speed)->body;
 }
 
@@ -519,11 +500,15 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 
 		/* Handle a position message */    //NOTE the metronome had this after the play() call. Dont know why.
+
+//		if (lv2_atom_forge_is_object_type(const LV2_Atom_Forge *forge, uint32_t type))  XXX Use this in future if we create a forge
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj);
+			else
+printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
 //TODO probably accept another atom type message to change pattern indexes (and maybe allow patterns to be added or removed).
 //     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
@@ -533,14 +518,14 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
-			play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
+			playPatterns(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
 		last_t = (uint32_t)ev->time.frames;
 	}
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
-		play(self, last_t, sample_count, outCapacity);
+		playPatterns(self, last_t, sample_count, outCapacity);
 }
 
 /*
