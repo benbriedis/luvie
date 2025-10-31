@@ -35,9 +35,14 @@ typedef struct {
     int baseOctave;
     int baseNote;
 
+//TODO add state: off/limited/unlimited
+//TODO add startInFrames
+//TODO add lengthInFrames
+
 	//XXX patterns can start in different places from each, and be of different lengths
 	uint32_t positionInFrames; 
 
+//TODO generalise the number of notes
 	Note notes[5];
 	//TODO probably add a MIDI channel here
 } Pattern;
@@ -123,6 +128,13 @@ typedef struct {
 LV2_URID time_position;
 LV2_URID time_beat;
 LV2_URID time_bar;
+	
+	LV2_URID time_Rate;
+	LV2_URID time_Time;
+	LV2_URID time_beatUnit;
+	LV2_URID time_frame;
+	LV2_URID time_framesPerSecond;
+	LV2_URID time_beatsPerBar;
 
 	LV2_URID midi_Event;
 	LV2_URID patch_Set;
@@ -210,6 +222,7 @@ printf("CALLING instantiate()\n");
 	uris->patch_Set           = map->map(map->handle, LV2_PATCH__Set);
 	uris->patch_property      = map->map(map->handle, LV2_PATCH__property);
 	uris->patch_value         = map->map(map->handle, LV2_PATCH__value);
+
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
 	uris->time_barBeat        = map->map(map->handle, LV2_TIME__barBeat);
 	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
@@ -218,6 +231,13 @@ printf("CALLING instantiate()\n");
 	uris->time_position			= map->map(map->handle, LV2_TIME__position);
 	uris->time_beat				= map->map(map->handle, LV2_TIME__beat);
 	uris->time_bar				= map->map(map->handle, LV2_TIME__bar);
+
+	uris->time_Rate				= map->map(map->handle, LV2_TIME__Rate);
+	uris->time_Time				= map->map(map->handle, LV2_TIME__Time);
+	uris->time_beatUnit			= map->map(map->handle, LV2_TIME__beatUnit);
+	uris->time_frame			= map->map(map->handle, LV2_TIME__frame);
+	uris->time_framesPerSecond	= map->map(map->handle, LV2_TIME__framesPerSecond);
+	uris->time_beatsPerBar		= map->map(map->handle, LV2_TIME__beatsPerBar);
 
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
@@ -273,6 +293,24 @@ printf("CALLING activate()\n");
 	}
 }
 
+//static void gotMessage()
+//{
+	/* Updates:
+		[
+			{patternNum:1, state:limited/unlimited/off, position:inFrames, length:inFrames},  TODO cf BPM changes. Would beats be easier?
+			{patternNum:1, state:limited/unlimited/off, position:inFrames, length:inFrames}
+		]
+
+		Also cf add pattern, delete pattern
+	*/
+
+//}
+
+//static void sendMessage()
+//{
+	//XXX if a note has been added or removed whil playing, tell the host
+//}
+
 
 /**
    Play back audio for the range [begin..end) relative to this cycle.  This is
@@ -319,6 +357,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 				int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
 
 				if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) {
+//TODO separate out the contents					
 					note->state = NOTE_ON;
 
 					out.event.time.frames = i;
@@ -371,6 +410,13 @@ LV2_Atom* position = NULL;
 LV2_Atom* time_beat = NULL;
 LV2_Atom* time_bar = NULL;
 
+LV2_Atom* time_Rate = NULL;
+LV2_Atom* time_Time = NULL;
+LV2_Atom* time_beatUnit = NULL;
+LV2_Atom* time_frame = NULL;
+LV2_Atom* time_framesPerSecond = NULL;
+LV2_Atom* time_beatsPerBar = NULL;
+
 	lv2_atom_object_get(obj,
 		uris->time_barBeat, &beat,
 		uris->time_beatsPerMinute, &bpm,
@@ -380,10 +426,22 @@ uris->time_Position, &Position,
 uris->time_position, &position,
 uris->time_beat, &time_beat,
 uris->time_bar, &time_bar,
+
+uris->time_Rate, &time_Rate,
+uris->time_Time, &time_Time,
+uris->time_beatUnit, &time_beatUnit,
+uris->time_frame, &time_frame,
+uris->time_framesPerSecond, &time_framesPerSecond,
+uris->time_beatsPerBar, &time_beatsPerBar,
 		NULL
 	);
 
 printf("Position: %ld\n",(long)Position);  //XXX NOT SENT
+
+printf("Rate: %ld\n",(long)time_Rate);
+
+printf("Time: %ld\n",(long)time_Time);
+
 
 printf("position: %ld\n",(long)position);  //XXX NOT SENT
 
@@ -403,6 +461,20 @@ printf("barBeat: %f\n",((LV2_Atom_Float*)beat)->body);
 
 if (bpm) 
 printf("bpm: %f\n",((LV2_Atom_Float*)bpm)->body);
+
+if (time_beatUnit)
+printf("beatUnit: %d\n",((LV2_Atom_Int*)time_beatUnit)->body);
+
+if (time_frame)
+printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
+//TODO check this stays in sync with ev->time
+
+printf("framesPerSecond: %ld\n",(long)time_framesPerSecond);
+
+if (time_beatsPerBar)
+printf("beatsPerBar: %f\n",((LV2_Atom_Float*)time_beatsPerBar)->body);
+
+printf("\n");
 
     /* Tempo changed */
 	if (bpm && bpm->type == uris->atom_Float)		//XXX why the 1st guard?

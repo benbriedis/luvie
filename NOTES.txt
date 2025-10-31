@@ -52,3 +52,45 @@ https://distrho.github.io/DPF/index.html
 https://github.com/DISTRHO/DPF/blob/main/FEATURES.md
 
 	... Suspect using this would make the song editor harder. Would probably need to add extensions etc
+
+Display Idea
+============
+If a pattern is offset in the song editor (also cf the live looper), show where the pattern and/or its bars 
+(if there are multiple bars in the pattern) start and end with some lines:
+
+          +-!-----+
+ +------+-|-!--+--|---+------+------+------+------+
+ +------+-|-!--+--|---+------+------+------+------+
+          +-!-----+
+
+Ingen 
+=====
+Is another LV2 plugin in a plugin
+https://lac.linuxaudio.org/2015/papers/24.pdf
+https://gitlab.com/drobilla/ingen
+
+
+Ardour provides transport data like this:
+	Position: 0				- apparently unused. Probably ignore these unused for all hosts I guess *sigh*
+	Rate: 0					- apparently unused
+	Time: 0					- apparently unused
+	position: 0				- apparently unused
+	time_beat: 0			- apparently unused
+	time_bar: 8
+	speed: 1.000000
+	barBeat: 2.115104
+	bpm: 120.000000
+	beatUnit: 4
+	frame: 752234
+	framesPerSecond: 0		- apparently unused
+	beatsPerBar: 4.000000
+
+So in practice we have:
+	speed: 1.000000  		<-- Goes to 0 when stopped. NB if jogging or something run() just gets called more or less I think.
+	bpm: 120.000000			<-- Need this to calculate when to play notes.
+	frame: 752234			<-- Is the most solid item esp for transport jumps. Note that BPM changes need to be taken into account.
+	time_bar: 8
+	barBeat: 2.115104
+	beatsPerBar: 4.000000
+	beatUnit: 4
+

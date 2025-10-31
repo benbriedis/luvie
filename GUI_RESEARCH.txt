@@ -21,6 +21,8 @@ imgui
 	https://github.com/alanjfs/sequentity
 	https://github.com/epezent/implot might be handy!  (MIT license!)
 
+	KnobGallery images: https://www.g200kg.com/en/webknobman/gallery.php
+
 FLTK
 
 Note QT has statically linkable option, but need to be paid for.
