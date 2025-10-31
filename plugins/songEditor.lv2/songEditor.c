@@ -20,12 +20,6 @@ typedef enum {
 	NOTE_OFF,
 } State;
 
-typedef enum {
-	PATTERN_OFF,
-	PATTERN_LIMITED,
-	PATTERN_UNLIMITED
-} PatternState;
-
 typedef struct {
 	float start;
 	float pitch;
@@ -41,10 +35,9 @@ typedef struct {
     int baseOctave;
     int baseNote;
 
-	int state;
-//TODO possibly/probably replace these two with endInFrames;	
-	uint32_t startInFrames; 
-	uint32_t lengthInFrames; 
+//TODO add state: off/limited/unlimited
+//TODO add startInFrames
+//TODO add lengthInFrames
 
 	//XXX patterns can start in different places from each, and be of different lengths
 	uint32_t positionInFrames; 
@@ -56,7 +49,7 @@ typedef struct {
 
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
-	"pattern1", 4, 3, 0, 0, PATTERN_LIMITED, 0, 0,  {
+	"pattern1", 4, 3, 0, 0, {
 		{0.0, 0, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -64,7 +57,7 @@ Pattern patterns[] = {{
 		{3.0, 9, 0.5, 100, NOTE_OFF},
 	}
 }, {
-	"pattern2", 4, 3, 0, 0, PATTERN_LIMITED, 0, 0, {
+	"pattern2", 4, 3, 0,  0, {
 		{0.0, 8, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -293,10 +286,6 @@ printf("CALLING activate()\n");
 //XXX doesnt have to start at 0.		
 		pattern->positionInFrames = 0;
 
-		pattern->state = PATTERN_UNLIMITED;
-		pattern->startInFrames = 0;
-		pattern->lengthInFrames = 0;
-
 		for (int n=0; n<5; n++) {  //FIXME
 			Note* note = &pattern->notes[n];
 			note->state = NOTE_OFF;
@@ -348,20 +337,15 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 
 	MIDINoteEvent out;
 
-	for (int p=0; p < self->numPatterns; p++) {
-		Pattern* pattern = &self->patterns[p];
+	for (uint32_t i = begin; i < end; ++i) {
 
-		if (pattern->state == PATTERN_OFF)
-			continue;
-
-		int patternEnd = pattern->lengthInBeats * framesPerBeat; 
-
-		for (uint32_t i = begin; i < end; ++i) {
-
+		for (int p=0; p < self->numPatterns; p++) {
 
 		//TODO maybe... could add a fastForward(). Search through all notes for next event and add to i
 
+			Pattern* pattern = &self->patterns[p];
 
+			int patternEnd = pattern->lengthInBeats * framesPerBeat; 
 
 			for (int j=0; j<5; j++) {  //FIXME
 				Note* note = &pattern->notes[j]; 
@@ -526,9 +510,6 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj);
-
-//TODO probably accept another atom type message to change pattern indexes (and maybe allow patterns to be added or removed).
-//     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
 		}
 
 

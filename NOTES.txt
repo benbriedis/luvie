@@ -69,6 +69,17 @@ Is another LV2 plugin in a plugin
 https://lac.linuxaudio.org/2015/papers/24.pdf
 https://gitlab.com/drobilla/ingen
 
+NON - look at these 
+===================
+https://non.tuxfamily.org/wiki/Non%20Timeline
++ the sequencer
+
+CV Resources
+============
+https://www.cycfi.com/2025/09/cv-to-midi-a-practical-guide/#:~:text=Essentially%2C%20CV%20is%20MIDI's%20analog,filter%20or%20bends%20a%20note.
+https://linuxmusicians.com/viewtopic.php?t=20701
+
+
 
 Ardour provides transport data like this:
 	Position: 0				- apparently unused. Probably ignore these unused for all hosts I guess *sigh*
