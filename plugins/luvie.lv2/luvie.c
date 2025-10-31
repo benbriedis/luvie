@@ -322,31 +322,52 @@ printf("CALLING activate()\n");
 	//XXX if a note has been added or removed whil playing, tell the host
 //}
 
+//TODO can we use logger? 
 
-/**
+typedef struct {
+	LV2_Atom_Event event;
+	uint8_t msg[3];
+} MIDINoteEvent;
+
+static void noteOn(Self* self,Note* note,uint32_t position,int pitch,uint32_t outCapacity)
+{
+	MIDINoteEvent out;
+
+	note->state = NOTE_ON;
+
+	out.event.time.frames = position;
+	out.event.body.type =  self->uris.midi_Event;
+	out.event.body.size = 3;
+	out.msg[0] = 0x90;		// Note On for channel 0
+	out.msg[1] = pitch;
+	out.msg[2] = 100;		// Velocity
+
+	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
+}
+
+static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t outCapacity)
+{
+	MIDINoteEvent out;
+
+	note->state = NOTE_OFF;
+
+	out.event.time.frames = position;
+	out.event.body.type = self->uris.midi_Event;
+	out.event.body.size = 3;
+	out.msg[0] = 0x80; 	// Note off
+	out.msg[1] = pitch;       
+	out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
+
+	lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
+}
+
+/*
    Play back audio for the range [begin..end) relative to this cycle.  This is
    called by run() in-between events to output audio up until the current time.
 */
 static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
-	typedef struct {
-		LV2_Atom_Event event;
-		uint8_t msg[3];
-	} MIDINoteEvent;
-
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
-
-//TODO THINK how might speed affect things here?
-	if (self->speed == 0.0f) 
-		return;
-
-//TODO can we use logger? 
-
-//TODO presumbly could cut this up into segments for a more efficient solution.
-//     Could/should create an index that contains all note start and end offsets in order.
-//     Store a 'last position' and go from there each time. The states can be stored with the patterns.
-
-	MIDINoteEvent out;
 
 	for (int p=0; p < self->numPatterns; p++) {
 		Pattern* pattern = &self->patterns[p];
@@ -357,11 +378,7 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 		int patternEnd = pattern->lengthInBeats * framesPerBeat; 
 
 		for (uint32_t i = begin; i < end; ++i) {
-
-
-		//TODO maybe... could add a fastForward(). Search through all notes for next event and add to i
-
-
+		//TODO probably... could add a fastForward(). Search through all notes for next event and add to i
 
 			for (int j=0; j<5; j++) {  //FIXME
 				Note* note = &pattern->notes[j]; 
@@ -372,32 +389,11 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 
 				int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
 
-				if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) {
-//TODO separate out the contents					
-					note->state = NOTE_ON;
+				if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
+					noteOn(self,note,i,pitch,outCapacity);
 
-					out.event.time.frames = i;
-					out.event.body.type =  self->uris.midi_Event;
-					out.event.body.size = 3;
-					out.msg[0] = 0x90;		// Note On for channel 0
-					out.msg[1] = pitch;
-					out.msg[2] = 100;		// Velocity
-
-					lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
-				}
-
-				else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) {
-					note->state = NOTE_OFF;
-
-					out.event.time.frames = i;
-					out.event.body.type = self->uris.midi_Event;
-					out.event.body.size = 3;
-					out.msg[0] = 0x80; 	// Note off
-					out.msg[1] = pitch;       
-					out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
-
-					lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
-				}
+				else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
+					noteOff(self,note,i,pitch,outCapacity);
 			}
 
 			if (++ pattern->positionInFrames == patternEnd)
@@ -407,6 +403,8 @@ static void play(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 //NOTE it appears one pitch can't be played twice on a given channel... TODO check
 	}
 //XXX may need to check the outCapacity is not exceeded	
+
+//TODO if we reach the end of a once-through pattern disable it.
 }
 
 /*
@@ -534,13 +532,15 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
-		play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
+		if (self->speed != 0.0f) 
+			play(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
 		last_t = (uint32_t)ev->time.frames;
 	}
 
 	/* Play out the remainder of cycle: */
-	play(self, last_t, sample_count, outCapacity);
+	if (self->speed != 0.0f) 
+		play(self, last_t, sample_count, outCapacity);
 }
 
 /*
