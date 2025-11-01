@@ -102,6 +102,13 @@ LV2 Position data (ie transport data) notes
 		time_beat
 		framesPerSecond   (note we get the sampleRate separately)
 
+	Also missing from the Event headers (rather than the Time bodies):
+		ev->time.frames   
+		ev->time.beats
+	Q: why use Event at all? Maybe try an Atom.
+      WONDERING if this is used to distinguish between multiple events in a single cycle, in which case we may want it.
+
+
 So in practice we get:
 	speed: 1.000000  		<-- Goes to 0 when stopped. NB if jogging or something run() just gets called more or less I think.
 	bpm: 120.000000			<-- Need this to calculate when to play notes.

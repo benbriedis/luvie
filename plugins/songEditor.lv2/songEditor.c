@@ -14,7 +14,7 @@
 #include <string.h>
 #include <threads.h>
 
-#define PLUGIN_URI "http://benbriedis.com/lv2/luvie"
+#define PLUGIN_URI "http://benbriedis.com/lv2/songEditor"
 
 typedef enum {
 	NOTE_ON,
@@ -164,20 +164,8 @@ typedef struct {
 	LV2_URID atom_URID;
 	LV2_URID atom_eventTransfer;
 	LV2_URID time_Position;
-	LV2_URID time_barBeat;
-	LV2_URID time_beatsPerMinute;
 	LV2_URID time_speed;
-
-LV2_URID time_position;
-LV2_URID time_beat;
-LV2_URID time_bar;
-	
-	LV2_URID time_Rate;
-	LV2_URID time_Time;
-	LV2_URID time_beatUnit;
 	LV2_URID time_frame;
-	LV2_URID time_framesPerSecond;
-	LV2_URID time_beatsPerBar;
 
 //TODO probably delete. Replace some other Atom...	
 	LV2_URID midi_Event;
@@ -209,6 +197,8 @@ typedef struct {
 	float speed; // Transport speed (usually 0=stop, 1=play)
 	Pattern* patterns;
 	int numPatterns;
+
+	long positionInFrames;
 } Self;
 
 /*
@@ -266,29 +256,19 @@ printf("CALLING instantiate()\n");
 	uris->patch_value         = map->map(map->handle, LV2_PATCH__value);
 
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
-	uris->time_barBeat        = map->map(map->handle, LV2_TIME__barBeat);   //XXX UNUSED I THINK
-	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
-
-	uris->time_position			= map->map(map->handle, LV2_TIME__position);
-	uris->time_beat				= map->map(map->handle, LV2_TIME__beat);
-	uris->time_bar				= map->map(map->handle, LV2_TIME__bar);
-
-	uris->time_Rate				= map->map(map->handle, LV2_TIME__Rate);
-	uris->time_Time				= map->map(map->handle, LV2_TIME__Time);
-	uris->time_beatUnit			= map->map(map->handle, LV2_TIME__beatUnit);
 	uris->time_frame			= map->map(map->handle, LV2_TIME__frame);
-	uris->time_framesPerSecond	= map->map(map->handle, LV2_TIME__framesPerSecond);
-	uris->time_beatsPerBar		= map->map(map->handle, LV2_TIME__beatsPerBar);
 
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
 
+	/*
 	self->patterns = calloc(1,sizeof(patterns));
 	if (!self)
 		return NULL;
 	memcpy(self->patterns,patterns,sizeof(patterns));
+	*/
 
 	return (LV2_Handle)self;
 }
@@ -322,22 +302,7 @@ printf("CALLING activate()\n");
 
 	Self* self = (Self*)instance;
 
-	self->numPatterns = 2;
-
-	for (int p=0; p<self->numPatterns; p++) {     //FIXME
-		Pattern* pattern = &self->patterns[p];
-//XXX doesnt have to start at 0.		
-		pattern->positionInFrames = 0;
-
-		pattern->state = PATTERN_UNLIMITED;
-		pattern->startInFrames = 0;
-		pattern->lengthInFrames = 0;
-
-		for (int n=0; n<5; n++) {  //FIXME
-			Note* note = &pattern->notes[n];
-			note->state = NOTE_OFF;
-		}
-	}
+	self->positionInFrames = 0;
 }
 
 //static void gotMessage()
@@ -406,6 +371,7 @@ static void playPattern(Self* self, Pattern* pattern, uint32_t begin, uint32_t e
 {
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
+	/*
 	int patternEnd = pattern->lengthInBeats * framesPerBeat; 
 
 	//TODO could probably make more efficient... cf moving the 'j' loop to around to 'i' loop. Calculate the notes on 
@@ -431,109 +397,71 @@ static void playPattern(Self* self, Pattern* pattern, uint32_t begin, uint32_t e
 		if (++ pattern->positionInFrames == patternEnd)
 			pattern->positionInFrames = 0;
 	}
+	*/
 
 //TODO if we reach the end of a once-through pattern disable it.
 }
 
 static void playPatterns(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
+/*	
 	for (int p=0; p < self->numPatterns; p++) {
 		Pattern* pattern = &self->patterns[p];
 
 		if (pattern->state != PATTERN_OFF)
 			playPattern(self,pattern,begin,end,outCapacity);
 	}
+*/	
 }
 
 /*
-   Update the current position based on a host message.  This is called by
-   run() when a time:Position is received.
+	PRINCIPLES...
+
+	We can operate in either of 2 modes - live looper and song mode.
+	When in song mode we have a fixed time signature, so we can't really use the host's beatsPerBar or beatUnit. SO IGNORE THESE.
+
+	If synching with Ardour or similar we probably want to use the frames so we can sync with Ardour audio tracks. SO USE THE FRAMES.
+	Using the bar/barBeat pair might be possible, but would be confusing. 
+	KIND-OF possible, but I think when it comes to song editors sequencers a single source of truth is desirable. 
+	SO OMIT FOR THE MOMENT. Syncing with other sequencers is an advanced feature, and probably nasty to use anyway in practice.
+
+	We could use the host's BPM's if we really wanted, but the SOS argument suggests we shouldn't. SO IGNORE THIS.
 */
-static void updatePosition(Self* self, const LV2_Atom_Object* obj)
+static void maybeJump(Self* self, const LV2_Atom_Object* obj)
 {
 	const URIs* uris = &self->uris;
 
-	LV2_Atom* beat = NULL;
-	LV2_Atom* bpm = NULL;
+	/*
+		Ardour seems to take a while to establish itself on play. Possibly addressing latency issues.
+		Makes it hard to know when to use it when to jump.
+
+//TODO PLAN:
+// Try using 'speed' changes to determine when to use time_frame to determine when to jump. Otherwise ignore position changes.
+// Otherwise research...
+	*/
+
 	LV2_Atom* speed = NULL;
-
-LV2_Atom* Position = NULL;
-LV2_Atom* position = NULL;
-LV2_Atom* time_beat = NULL;
-LV2_Atom* time_bar = NULL;
-
-LV2_Atom* time_Rate = NULL;
-LV2_Atom* time_Time = NULL;
-LV2_Atom* time_beatUnit = NULL;
-LV2_Atom* time_frame = NULL;
-LV2_Atom* time_framesPerSecond = NULL;
-LV2_Atom* time_beatsPerBar = NULL;
+	LV2_Atom* time_frame = NULL;
 
 	lv2_atom_object_get(obj,
-		uris->time_barBeat, &beat,
-		uris->time_beatsPerMinute, &bpm,
 		uris->time_speed, &speed,
-
-uris->time_Position, &Position,
-uris->time_position, &position,
-uris->time_beat, &time_beat,
-uris->time_bar, &time_bar,
-
-uris->time_Rate, &time_Rate,
-uris->time_Time, &time_Time,
-uris->time_beatUnit, &time_beatUnit,
-uris->time_frame, &time_frame,
-uris->time_framesPerSecond, &time_framesPerSecond,
-uris->time_beatsPerBar, &time_beatsPerBar,
+		uris->time_frame, &time_frame,
 		NULL
 	);
 
-printf("Position: %ld\n",(long)Position);  //XXX NOT SENT
-
-printf("Rate: %ld\n",(long)time_Rate);
-
-printf("Time: %ld\n",(long)time_Time);
-
-
-printf("position: %ld\n",(long)position);  //XXX NOT SENT
-
-if (time_beat) 
-printf("time_beat: %lf\n",((LV2_Atom_Double*)time_beat)->body);  //XXX NOT SENT
-else
-printf("time_beat: %ld\n",(long)time_beat);
-
-if (time_bar) 
-printf("time_bar: %ld\n",((LV2_Atom_Long*)time_bar)->body);
 
 if (speed) 
 printf("speed: %f\n",((LV2_Atom_Float*)speed)->body);
 
-if (beat) 
-printf("barBeat: %f\n",((LV2_Atom_Float*)beat)->body);
-
-if (bpm) 
-printf("bpm: %f\n",((LV2_Atom_Float*)bpm)->body);
-
-if (time_beatUnit)
-printf("beatUnit: %d\n",((LV2_Atom_Int*)time_beatUnit)->body);
-
-if (time_frame)
+if (time_frame) 
 printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
-//TODO check this stays in sync with ev->time
 
-printf("framesPerSecond: %ld\n",(long)time_framesPerSecond);
-
-if (time_beatsPerBar)
-printf("beatsPerBar: %f\n",((LV2_Atom_Float*)time_beatsPerBar)->body);
+//self->positionInFrames = ((LV2_Atom_Long*)time_frame)->body;  TODO
 
 printf("\n");
 
-    /* Tempo changed */
-	if (bpm && bpm->type == uris->atom_Float)
-		self->bpm = ((LV2_Atom_Float*)bpm)->body;
-
 	/* Speed=0 (stop) or speed=1 (play) */
-	if (speed && speed->type == uris->atom_Float)
+	if (speed && speed->type == uris->atom_Float) 
 		self->speed = ((LV2_Atom_Float*)speed)->body;
 }
 
@@ -556,6 +484,9 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 
+//printf("time->frames: %ld\n",ev->time.frames);	ARDOUR ONLY RETURNS 0 HERE. Why use an Event then? Would an Atom work instead?
+//printf("time->beats: %lf\n",ev->time.beats);				
+
 		/* Handle a position message */    //NOTE the metronome had this after the play() call. Dont know why.
 
 //		if (lv2_atom_forge_is_object_type(const LV2_Atom_Forge *forge, uint32_t type))  XXX Use this in future if we create a forge
@@ -563,7 +494,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
 			if (obj->body.otype == uris->time_Position) 
-				updatePosition(self, obj);
+				maybeJump(self, obj);
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
@@ -583,6 +514,8 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
 		playPatterns(self, last_t, sample_count, outCapacity);
+
+	self->positionInFrames += sample_count;
 }
 
 /*

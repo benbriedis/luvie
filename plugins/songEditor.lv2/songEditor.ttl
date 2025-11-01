@@ -8,14 +8,14 @@
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
 
-<http://benbriedis.com/lv2/luvie>
+<http://benbriedis.com/lv2/songEditor>
 	a lv2:Plugin ,
 		lv2:SequencerPlugin ;
 
 #TODO is lv2:SequencerPlugin best??
 #TODO can we remove some prefixes?
 
-	doap:name "Luvie";
+	doap:name "Song Editor";
 	doap:license <http://opensource.org/licenses/isc> ;
 
 	lv2:project <http://benbriedis.com/lv2> ;
