@@ -366,52 +366,78 @@ static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t o
 //NOTE it appears one pitch can't be played twice on a given channel... TODO check
 
 
-/* Play MIDI events in the range [begin..end) relative to this cycle.  */
-static void playPattern(Self* self, Pattern* pattern, uint32_t begin, uint32_t end, uint32_t outCapacity)
+static void playTrack(Self* self, Pattern* pattern, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
-	/*
-	int patternEnd = pattern->lengthInBeats * framesPerBeat; 
 
-	//TODO could probably make more efficient... cf moving the 'j' loop to around to 'i' loop. Calculate the notes on 
-	//     and off, then sort and output.
+//TODO reinit currentPattern/nextPattern on jumps
+
+	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
+
+	int i = begin;
+
+	for (int p = track->currentOrNext; p < track->numPatterns; p++) {
+
+		/* NOTE a track can only play one pattern at a time */
+
+		if (track->patterns[currentOrNext]->state == ON && timeline->positionInFrames >= track->patterns[track->currentOrNext]->end) {
+			turn off;
+			track->playing = OFF;
+			track->currentOrNext++; //FIXME wrap
+			i = track->pattern[track->currentOrNext]->end;
+		}
+
+		/* NOTE a single loop can turn one pattern off and another on */
+
+		if (track->parrents[currentOrNext]->state == OFF &&  timeline->positionInFrames >= track->pattern[track->currentOrNext]->start) {
+			turn on;
+			track->playing = ON;
+			i = track->pattern[track->currentOrNext]->start;
+		}
+
+		if (i >= end)
+			break;
+	}
+
+	timeline->positionInFrames += sampleRate;
+
+
 
 	for (uint32_t i = begin; i < end; i++) {
-		for (int j=0; j<5; j++) {  //FIXME
-			Note* note = &pattern->notes[j]; 
 
-			int noteStart = note->start * framesPerBeat;
-			int noteLen = note->lengthInBeats * framesPerBeat;
-			int noteEnd = noteStart + noteLen;
 
-			int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
 
-			if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
-				noteOn(self,note,i,pitch,outCapacity);
+		Note* note = &pattern->notes[j]; 
 
-			else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
-				noteOff(self,note,i,pitch,outCapacity);
-		}
+		int noteStart = note->start * framesPerBeat;
+		int noteLen = note->lengthInBeats * framesPerBeat;
+		int noteEnd = noteStart + noteLen;
+
+		if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
+			noteOn(self,note,i,pitch,outCapacity);
+
+		else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
+			noteOff(self,note,i,pitch,outCapacity);
+
 
 		if (++ pattern->positionInFrames == patternEnd)
 			pattern->positionInFrames = 0;
 	}
-	*/
 
 //TODO if we reach the end of a once-through pattern disable it.
 }
 
-static void playPatterns(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
+/* Play patterns in the range [begin..end) relative to this cycle.  */
+static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
-/*	
-	for (int p=0; p < self->numPatterns; p++) {
-		Pattern* pattern = &self->patterns[p];
+//TODO add mute and solo features for tracks
 
-		if (pattern->state != PATTERN_OFF)
-			playPattern(self,pattern,begin,end,outCapacity);
+	for (int t=0; t < self->numTracks; t++) {
+		Track* track = &self->patterns[t];
+
+		playTrack(self,track,begin,end,outCapacity);
 	}
-*/	
 }
 
 /*
@@ -506,14 +532,14 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
-			playPatterns(self, last_t, (uint32_t)ev->time.frames,outCapacity);
+			playSong(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
 		last_t = (uint32_t)ev->time.frames;
 	}
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
-		playPatterns(self, last_t, sample_count, outCapacity);
+		playSong(self, last_t, sample_count, outCapacity);
 
 	self->positionInFrames += sample_count;
 }
