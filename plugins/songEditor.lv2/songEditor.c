@@ -27,6 +27,12 @@ typedef enum {
 	PATTERN_UNLIMITED
 } PatternState;
 
+typedef enum {
+	TRACK_PLAYING,
+	TRACK_NOT_PLAYING
+} TrackState;
+
+
 typedef struct {
 	float start;
 	float pitch;
@@ -62,12 +68,18 @@ typedef struct {
 	int id;
 	Interval start;
 	float length;
+	/* Calculated values: */
+	long startInFrames;
+	long endInFrames;
 } Pattern;
 
 typedef struct {
 	int id;
 	char label[8];
+	int numPatterns;
 	Pattern patterns[1];
+	int state;
+	int currentOrNext;
 } Track;
 
 typedef struct {
@@ -80,10 +92,11 @@ Timeline timeline = {
 	{{0,0,0}},
 	{{{140}}},
 	{
-		{7,"Track 8",{{
-			5, {7, 0.0, 0.0}, 8.0
-		}}}
-	}
+		{7,"Track 8", 1, {{
+			5, {7, 0.0, 0.0}, 8.0, 0, 0,
+		}}, TRACK_NOT_PLAYING, 0 }
+	},
+	0
 };
 
 
@@ -193,11 +206,13 @@ typedef struct {
 
 	// Variables to keep track of the tempo information sent by the host
 	double sampleRate; 
-	float bpm;
 	float speed; // Transport speed (usually 0=stop, 1=play)
-	Pattern* patterns;
-	int numPatterns;
 
+	float bpm; //XXX NOT SURE we want this here
+
+	Timeline* timeline;
+
+	long numTracks;
 	long positionInFrames;
 } Self;
 
@@ -263,12 +278,10 @@ printf("CALLING instantiate()\n");
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
 
-	/*
-	self->patterns = calloc(1,sizeof(patterns));
+	self->timeline = calloc(1,sizeof(timeline));
 	if (!self)
 		return NULL;
-	memcpy(self->patterns,patterns,sizeof(patterns));
-	*/
+	memcpy(self->timeline,&timeline,sizeof(timeline));
 
 	return (LV2_Handle)self;
 }
@@ -325,107 +338,57 @@ printf("CALLING activate()\n");
 
 //TODO can we use logger? 
 
-typedef struct {
-	LV2_Atom_Event event;
-	uint8_t msg[3];
-} MIDINoteEvent;
 
-static void noteOn(Self* self,Note* note,uint32_t position,int pitch,uint32_t outCapacity)
+//	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
+
+
+static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
-	MIDINoteEvent out;
-
-	note->state = NOTE_ON;
-
-	out.event.time.frames = position;
-	out.event.body.type =  self->uris.midi_Event;
-	out.event.body.size = 3;
-	out.msg[0] = 0x90;		// Note On for channel 0
-	out.msg[1] = pitch;
-	out.msg[2] = 100;		// Velocity
-
-//XXX may need to check the outCapacity is not exceeded	
-	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
-}
-
-static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t outCapacity)
-{
-	MIDINoteEvent out;
-
-	note->state = NOTE_OFF;
-
-	out.event.time.frames = position;
-	out.event.body.type = self->uris.midi_Event;
-	out.event.body.size = 3;
-	out.msg[0] = 0x80; 	// Note off
-	out.msg[1] = pitch;       
-	out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
-
-	lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
-}
-
-//NOTE it appears one pitch can't be played twice on a given channel... TODO check
-
-
-static void playTrack(Self* self, Pattern* pattern, uint32_t begin, uint32_t end, uint32_t outCapacity)
-{
+//TODO set current bpm somewhere I guess? Where used?
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
 
 
 //TODO reinit currentPattern/nextPattern on jumps
 
+	uint32_t pos = self->positionInFrames + begin;
+	uint32_t endPos = self->positionInFrames + end;
+
 	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
+	for (int pat=track->currentOrNext; pos<endPos && pat<track->numPatterns; pat++) {
 
-	int i = begin;
-
-	for (int p = track->currentOrNext; p < track->numPatterns; p++) {
+		Pattern* pattern = &track->patterns[track->currentOrNext];
 
 		/* NOTE a track can only play one pattern at a time */
 
-		if (track->patterns[currentOrNext]->state == ON && timeline->positionInFrames >= track->patterns[track->currentOrNext]->end) {
-			turn off;
-			track->playing = OFF;
-			track->currentOrNext++; //FIXME wrap
-			i = track->pattern[track->currentOrNext]->end;
+//FIXME current luvie.c is receiving the pattern length and turning itself off. Probably better not to.		
+
+//TODO init track->state, timeline->positionInFrames
+//TODO init startInFrames + endInFrames
+//TODO init self->numTricks
+
+		if (track->state == TRACK_PLAYING && pos >= pattern->endInFrames) {
+			//turnPatternOff();
+			printf("TURNING OFF PATTERN %d\n",track->currentOrNext);
+
+			track->state = TRACK_NOT_PLAYING;
+			pos = pattern->endInFrames;
+
+			track->currentOrNext++;
+			if (track->currentOrNext == track->numPatterns)
+				break;
+			pattern = &track->patterns[track->currentOrNext];
 		}
 
 		/* NOTE a single loop can turn one pattern off and another on */
 
-		if (track->parrents[currentOrNext]->state == OFF &&  timeline->positionInFrames >= track->pattern[track->currentOrNext]->start) {
-			turn on;
-			track->playing = ON;
-			i = track->pattern[track->currentOrNext]->start;
+		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
+			//turnPatternOn();
+			printf("TURNING ON PATTERN %d\n",track->currentOrNext);
+
+			track->state = TRACK_PLAYING;
+			pos = pattern->startInFrames;
 		}
-
-		if (i >= end)
-			break;
 	}
-
-	timeline->positionInFrames += sampleRate;
-
-
-
-	for (uint32_t i = begin; i < end; i++) {
-
-
-
-		Note* note = &pattern->notes[j]; 
-
-		int noteStart = note->start * framesPerBeat;
-		int noteLen = note->lengthInBeats * framesPerBeat;
-		int noteEnd = noteStart + noteLen;
-
-		if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
-			noteOn(self,note,i,pitch,outCapacity);
-
-		else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
-			noteOff(self,note,i,pitch,outCapacity);
-
-
-		if (++ pattern->positionInFrames == patternEnd)
-			pattern->positionInFrames = 0;
-	}
-
-//TODO if we reach the end of a once-through pattern disable it.
 }
 
 /* Play patterns in the range [begin..end) relative to this cycle.  */
@@ -434,10 +397,12 @@ static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapac
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
-		Track* track = &self->patterns[t];
+		Track* track = &self->timeline->tracks[t];
 
 		playTrack(self,track,begin,end,outCapacity);
 	}
+
+	self->positionInFrames += self->sampleRate;
 }
 
 /*
