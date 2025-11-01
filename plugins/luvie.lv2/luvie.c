@@ -33,6 +33,8 @@ typedef struct {
 	int state; 
 } Note;
 
+//TODO add a pattern ID. cf name ==> label
+
 typedef struct {
     char name[20];
     int lengthInBeats;
@@ -260,10 +262,23 @@ printf("CALLING activate()\n");
 //{
 	/* Updates:
 		[
-			{patternNum:1, state:limited/unlimited/off, position:inFrames, length:inFrames},  TODO cf BPM changes. Would beats be easier?
-			{patternNum:1, state:limited/unlimited/off, position:inFrames, length:inFrames}
+			{id:4, state:limited/unlimited/off, start:inFrames, length:inFrames},  TODO cf BPM changes. Would beats be easier?
+			{id:6, state:limited/unlimited/off, start:inFrames, length:inFrames}
 		]
 
+	  Atom version:
+
+			Event (but maybe Atom):        (event has timestamp too. Can/should we separate the atoms - probably not... 
+											always triggered by a time change. Except when the user has done something.)
+			   Vector:                     (pattern instructions)
+				  Object
+					 id: Int               (cf URID or URI)
+					 state: Int            (cf literal)
+					 position: Long        (using Time.Position.frame would be possible, but over the top)
+					 length:   Long
+
+
+         
 		Also cf add pattern, delete pattern
 	*/
 
@@ -365,14 +380,14 @@ static void playPatterns(Self* self, uint32_t begin, uint32_t end, uint32_t outC
    Update the current position based on a host message.  This is called by
    run() when a time:Position is received.
 */
-static void updatePosition(Self* self, const LV2_Atom_Object* obj)
+static void updatePosition(Self* self, const LV2_Atom_Object* timeObj)
 {
 	const URIs* uris = &self->uris;
 
 	LV2_Atom* bpm = NULL;
 	LV2_Atom* speed = NULL;
 
-	lv2_atom_object_get(obj,
+	lv2_atom_object_get(timeObj,
 		uris->time_beatsPerMinute, &bpm,
 		uris->time_speed, &speed,
 		NULL

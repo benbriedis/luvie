@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 
 #define PLUGIN_URI "http://benbriedis.com/lv2/luvie"
 
@@ -34,56 +35,110 @@ typedef struct {
 	int state; 
 } Note;
 
+
 typedef struct {
-    char name[20];
-    int lengthInBeats;
-    int baseOctave;
-    int baseNote;
-	int state;
-//TODO possibly/probably replace these two with endInFrames;	
-	uint32_t startInFrames; 
-	uint32_t lengthInFrames; 
-	uint32_t positionInFrames; 
-//TODO generalise the number of notes
-	Note notes[5];
-//TODO probably add a MIDI channel here
+	int bar;
+	int top;		//TODO better names for top and bottom?
+	int bottom;
+} TimeSignature;
+
+typedef struct {
+	int bar;
+	float beat;
+} Position;
+
+typedef struct {
+	Position position;  //TODO allow start and end instead. Need to use a union
+	float value;
+} Bpm;
+
+typedef struct {
+	int bar;
+	float beat;
+	float offset;
+} Interval;
+
+typedef struct {
+	int id;
+	Interval start;
+	float length;
 } Pattern;
 
-//XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
-Pattern patterns[] = {{
-	"pattern1", 4, 3, 0, 0, PATTERN_LIMITED, 0, 0,  {
-		{0.0, 0, 0.5, 100, NOTE_OFF},
-		{0.0, 7, 0.5, 100, NOTE_OFF},
-		{1.0, 5, 0.5, 100, NOTE_OFF},
-		{2.0, 7, 0.5, 100, NOTE_OFF},
-		{3.0, 9, 0.5, 100, NOTE_OFF},
+typedef struct {
+	int id;
+	char label[8];
+	Pattern patterns[1];
+} Track;
+
+typedef struct {
+	TimeSignature timeSignatures[1];
+	Bpm bpms[1];
+	Track tracks[1];
+} Timeline;
+
+Timeline timeline = {
+	{{0,0,0}},
+	{{{140}}},
+	{
+		{7,"Track 8",{{
+			5, {7, 0.0, 0.0}, 8.0
+		}}}
 	}
-}, {
-	"pattern2", 4, 3, 0, 0, PATTERN_LIMITED, 0, 0, {
-		{0.0, 8, 0.5, 100, NOTE_OFF},
-		{0.0, 7, 0.5, 100, NOTE_OFF},
-		{1.0, 5, 0.5, 100, NOTE_OFF},
-		{2.0, 7, 0.5, 100, NOTE_OFF},
-		{3.0, 7, 0.5, 100, NOTE_OFF},
-	}
-}};
+};
+
+
 
 /*XXX JSON-style:
-const patterns = [
+
+XXX cf variable time signatures. NEED A SEPARATE TIMELINE.  PROBABLY WORTH SUPPORTING...
+
+const timeline = {
+	timeSignatures: [{
+		bar: 7,
+		top: 3 		TODO better names for these?
+		bottom: 4
+	}],
+	bpms: [{
+			start: {bar: 6,beat 3.0}, end:{bar: 8,beat 3.0},    # A linear ramp
+			value: 140
+		}, {
+			position: {bar: 6,beat 3},
+			value: 140
+		},
+	],
+	tracks: [
+	]
+};
+
+const tracks = [
 	{
-		name: 'pattern1',	//XXX or make a key. Or store as a key when loaded in. Could be an object or something
-		length: 4,
-		baseOctave: 3,  //XXX not sure
-		baseNote: 0,    //XXX maybe C? MAYBE combine with baseOctave
-		notes = [
-			{start: 0.0, pitch: 0, length:0.5, velocity:100},
-			{start: 0.0, pitch: 7, length:0.5, velocity:100},
-			...
-		]
-	},
-	...
-];
+		id: 7,
+		label: 'Track 1',
+		patterns: [{
+			id:5,
+			start: {
+				bar: 7,     XXX cf allowing beats only, no bars?  bar could be omitted. PROBABLY no real value in this option.
+				beat: 0.0,   XXX allow fractions
+				offset: 0.0
+			}, 
+			length: 8.0   (# beats)
+		}]
+	}
+]
 */
+
+/*
+cf Precalculate frames of each bar? Recalc if user manually changes something.
+   OR just when there is a jump in the transport... we'd need to compare the frame with the expected frame or something.
+      Calculate on a needs basis... probably the best.
+
+
+   Probably send frames to the plugins, offset against the start of each pattern individually.
+*/
+
+//TODO read up on CC and CV, OSC
+
+
 
 /*
 	GOAL: to play a simple hard-coded arpeggio in MIDI, using timing coming from the host.
@@ -124,6 +179,7 @@ LV2_URID time_bar;
 	LV2_URID time_framesPerSecond;
 	LV2_URID time_beatsPerBar;
 
+//TODO probably delete. Replace some other Atom...	
 	LV2_URID midi_Event;
 	LV2_URID patch_Set;
 	LV2_URID patch_property;
@@ -210,7 +266,7 @@ printf("CALLING instantiate()\n");
 	uris->patch_value         = map->map(map->handle, LV2_PATCH__value);
 
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
-	uris->time_barBeat        = map->map(map->handle, LV2_TIME__barBeat);
+	uris->time_barBeat        = map->map(map->handle, LV2_TIME__barBeat);   //XXX UNUSED I THINK
 	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
 
@@ -252,6 +308,7 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 			self->control_port_in = (LV2_Atom_Sequence*)data;
 			break;
 
+//TODO ==> CONTROL_OUT
 		case MIDI_OUT:
 			self->midi_port_out = (LV2_Atom_Sequence*)data;
 			break;

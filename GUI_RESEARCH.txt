@@ -48,12 +48,17 @@ THOUGHTS
    - Could maybe use https://github.com/wjakob/nanogui (OpenGL) or something similar for Vulkan 
      to provide some widgets.
 
+SOME NICE LOOKING GUIS 
+======================
+http://openavproductions.com/doc/luppp.html  (+ similar functionality)
+https://michaelwillis.github.io/dragonfly-reverb/
+https://forum.juce.com/t/does-the-traction-engine-have-any-piano-roll-widget-in-it/51108/14  (pianoroll)
+
+
 pianoroll examples
 ------------------
 	https://forum.juce.com/t/does-the-traction-engine-have-any-piano-roll-widget-in-it/51108/14
 	https://github.com/g200kg/webaudio-pianoroll
-
-
 
 Cross platform event handling and window libraries 
 ==================================================

@@ -63,6 +63,16 @@ If a pattern is offset in the song editor (also cf the live looper), show where 
  +------+-|-!--+--|---+------+------+------+------+
           +-!-----+
 
+Can/should I support other plugins from the song editor?
+========================================================
+- May be able to run a simple sequencer or drum machine by wrapping it in something simple.
+
+Can/should I allow my plugins to be run without the song editor?
+================================================================
+- If its not too hard, perhaps support in 'single pattern' and/or 'single play' mode or something.
+
+
+
 Ingen 
 =====
 Is another LV2 plugin in a plugin
