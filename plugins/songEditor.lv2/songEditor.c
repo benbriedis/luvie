@@ -10,6 +10,7 @@
 #include <lv2/time/time.h>
 #include <lv2/urid/urid.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
@@ -213,7 +214,12 @@ typedef struct {
 	Timeline* timeline;
 
 	long numTracks;
+
 	long positionInFrames;
+
+	/* Used to check transport jumps seem to be working OK */
+	float lastSpeed;
+	long testPositionInFrames;
 } Self;
 
 /*
@@ -277,6 +283,8 @@ printf("CALLING instantiate()\n");
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
+	self->positionInFrames = 0;
+	self->testPositionInFrames = 0;
 
 	self->timeline = calloc(1,sizeof(timeline));
 	if (!self)
@@ -341,8 +349,7 @@ printf("CALLING activate()\n");
 
 	Self* self = (Self*)instance;
 
-//XXX activate is no the right place to set the current position... really need time position
-	self->positionInFrames = 0;
+	/* NOTE positionInFrames shouldn't be set here */
 
 	self->numTracks = 1;
 
@@ -448,7 +455,7 @@ static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapac
 
 	We could use the host's BPM's if we really wanted, but the SOS argument suggests we shouldn't. SO IGNORE THIS.
 */
-static void maybeJump(Self* self, const LV2_Atom_Object* obj)
+static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t frameOffset)
 {
 	const URIs* uris = &self->uris;
 
@@ -470,22 +477,41 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj)
 		NULL
 	);
 
-/*
 if (speed) 
 printf("speed: %f\n",((LV2_Atom_Float*)speed)->body);
 
 if (time_frame) 
 printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
 
-//self->positionInFrames = ((LV2_Atom_Long*)time_frame)->body;  TODO
+printf("positionInFrames: %ld\n",self->positionInFrames);
+
+	/* Test code: */
+	if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==0.0f) 
+		self->testPositionInFrames = self->positionInFrames;
+	else if (self->speed==0.0f && ((LV2_Atom_Float*)speed)->body==1.0f) {
+		if (((LV2_Atom_Long*)time_frame)->body != self->testPositionInFrames)
+			printf("TRANSPORT JUMPED\n");
+	}
+	else if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==1.0f) {
+		if (((LV2_Atom_Long*)time_frame)->body != self->positionInFrames)
+			printf("TRANSPORT JUMPED WHILE TRANSPORT RUNNING\n");
+	}
+
+	/* 
+		Ardour serves up some negative values while speed=0 and the transport is at the start.
+		The frames seem to be aligned OK when speed=1.
+	*/
+	self->positionInFrames = ((LV2_Atom_Long*)time_frame)->body;  
+
 
 printf("\n");
-*/
 
 	/* Speed=0 (stop) or speed=1 (play) */
 	if (speed && speed->type == uris->atom_Float) 
 		self->speed = ((LV2_Atom_Float*)speed)->body;
 }
+
+//TODO look into C unit tests
 
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sampleCount)
@@ -505,6 +531,8 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	uint32_t timeOffset = 0;
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
+//XXX cf 'handleCycle()'
+
 
 //printf("time->frames: %ld\n",ev->time.frames);	ARDOUR ONLY RETURNS 0 HERE. Why use an Event then? Would an Atom work instead?
 //printf("time->beats: %lf\n",ev->time.beats);				
@@ -516,7 +544,8 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
 			if (obj->body.otype == uris->time_Position) 
-				maybeJump(self, obj);
+//FIXME account for the frames offset here too				
+				maybeJump(self, obj,(uint32_t)ev->time.frames);
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
@@ -526,6 +555,9 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
 
 //XXX Q: should we calling this 'play' for all message types? 
+
+//FIXME probably cant use positionInFrames in here these calls...
+
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
 			playSong(self, timeOffset, (uint32_t)ev->time.frames,outCapacity);
@@ -536,6 +568,9 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) {
 		playSong(self, timeOffset, sampleCount, outCapacity);
+
+
+//FIXME if maybeJump() is called can update to a non-1024 value
 
 		/* positionInFrames is the point at the beginning of the cycle */
 		self->positionInFrames += sampleCount;
