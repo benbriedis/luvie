@@ -62,7 +62,6 @@ typedef struct {
 typedef struct {
 	int bar;	/* Indexed from 0 */
 	float beat; /* Indexed from 0 */
-	float offset;   //XXX whats this again?
 } Interval;
 
 typedef struct {
@@ -78,7 +77,7 @@ typedef struct {
 	int id;
 	char label[8];
 	int numPatterns;
-	Pattern patterns[1];
+	Pattern patterns[2];
 	int state;
 	int currentOrNext;
 } Track;
@@ -89,15 +88,17 @@ typedef struct {
 	Track tracks[1];
 } Timeline;
 
+//TODO use these time signatures and bpms
 Timeline timeline = {
 	{{0,0,0}},
 	{{{140}}},
 	{
-		{7,"Track 8", 1, {{
-			5, {2, 0.0, 0.0}, 4.0, 0, 0,
+		{7,"Track 8", 2, {{
+			5, {2, 0.0}, 4.0, 0, 0
+		},{
+			6, {5, 1.0}, 3.0, 0, 0
 		}}, TRACK_NOT_PLAYING, 0 }
-	},
-	0
+	}
 };
 
 
@@ -222,6 +223,32 @@ typedef struct {
 	long testPositionInFrames;
 } Self;
 
+static void initPatternEndPoints(Self* self)
+{
+	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
+
+//TODO handle multiple BPM and time signatures
+	int beatsPerBar = 4;
+	
+	for (int t=0; t<self->numTracks; t++) {
+		Track* track = &self->timeline->tracks[t];
+
+		for (int p=0; p<track->numPatterns; p++) {
+			Pattern* pattern = &track->patterns[p];
+
+			//XXX assuming start.beat starts at 0.0
+			float startBeat = pattern->start.bar*beatsPerBar + pattern->start.beat;
+			float endBeat = startBeat + pattern->length;
+
+			pattern->startInFrames = startBeat * framesPerBeat;
+			pattern->endInFrames = endBeat * framesPerBeat;
+
+printf("startBeat: %f  startInFrames: %ld\n",startBeat,pattern->startInFrames);			
+printf("  endBeat: %f    endInFrames: %ld\n",endBeat,pattern->endInFrames);			
+		}
+	}
+}
+
 /*
    The host passes the plugin descriptor, sample rate, and bundle
    path for plugins that need to load additional resources (e.g. waveforms).
@@ -291,6 +318,13 @@ printf("CALLING instantiate()\n");
 		return NULL;
 	memcpy(self->timeline,&timeline,sizeof(timeline));
 
+	self->numTracks = 1;
+
+	initPatternEndPoints(self);
+
+	for (int t=0; t<self->numTracks; t++) 
+		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
+
 	return (LV2_Handle)self;
 }
 
@@ -316,32 +350,6 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 	}
 }
 
-static void initPatternEndPoints(Self* self)
-{
-	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
-
-//TODO handle multiple BPM and time signatures
-	int beatsPerBar = 4;
-	
-	for (int t=0; t<self->numTracks; t++) {
-		Track* track = &self->timeline->tracks[t];
-
-		for (int p=0; p<track->numPatterns; p++) {
-			Pattern* pattern = &track->patterns[p];
-
-			//XXX assuming start.beat starts at 0.0
-			float startBeat = pattern->start.bar*beatsPerBar + pattern->start.beat;
-			float endBeat = startBeat + pattern->length;
-
-			pattern->startInFrames = startBeat * framesPerBeat;
-			pattern->endInFrames = endBeat * framesPerBeat;
-
-printf("startBeat: %f  startInFrames: %ld\n",startBeat,pattern->startInFrames);			
-printf("  endBeat: %f    endInFrames: %ld\n",endBeat,pattern->endInFrames);			
-		}
-	}
-}
-
 /* The plugin must reset all internal state */
 static void activate(LV2_Handle instance)
 {
@@ -351,13 +359,6 @@ printf("CALLING activate()\n");
 
 	/* NOTE positionInFrames shouldn't be set here */
 
-	self->numTracks = 1;
-
-//TODO cf if patterns or tracks and added dynamically. Only recalc the affected track.
-	for (int t=0; t<self->numTracks; t++) 
-		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
-
-	initPatternEndPoints(self);
 }
 
 //static void gotMessage()
@@ -476,28 +477,55 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 		NULL
 	);
 
-if (speed) 
-printf("speed: %f\n",((LV2_Atom_Float*)speed)->body);
-
-if (time_frame) 
-printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
-
-printf("positionInFrames: %ld\n",self->positionInFrames);
-printf("offsetFrames: %d\n",offsetFrames);
-
 //TODO if speed=0 probably turn off all states	
 
-	/* Test code: */
-	if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==0.0f) {
-		self->testPositionInFrames = ((LV2_Atom_Long*)time_frame)->body + offsetFrames;  // Save the first of the speed 0 position values
+	/* I believe newPos incorporates the offsetFrames */
+	long newPos = ((LV2_Atom_Long*)time_frame)->body;
+	float newSpeed = ((LV2_Atom_Float*)speed)->body;
+
+if (speed) 
+printf("speed: %f\n",newSpeed);
+
+if (time_frame) 
+printf("frame: %ld\n",newPos);
+
+printf("positionInFrames: %ld\n",self->positionInFrames);
+printf("offsetFrames: %d\n",offsetFrames); 
+
+
+
+	if (self->speed==1.0f && newSpeed==0.0f) {
+		self->testPositionInFrames = newPos;
+
+		for (int t=0; t<self->numTracks; t++) {
+			self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
+			//TODO send stop message to child plugins
+		}
 	}
-	else if (self->speed==0.0f && ((LV2_Atom_Float*)speed)->body==1.0f) {
-		if (((LV2_Atom_Long*)time_frame)->body != self->testPositionInFrames + offsetFrames)
+	else if (self->speed==0.0f && newSpeed==1.0f) {
+		if (newPos != self->testPositionInFrames + offsetFrames) {
+//XXX separate into function			
 			printf("TRANSPORT JUMPED\n");
-//TODO adjust pattern states (can probably just react to speed changes as above)
+
+			/* Set currentOrNext to match the new position */
+
+			for (int t=0; t<self->numTracks; t++) {
+				Track* track = &self->timeline->tracks[t];
+				track->currentOrNext = track->numPatterns;
+
+				for (int p=0; p<track->numPatterns; p++) {
+					Pattern* pattern = &track->patterns[p];
+
+					if (pattern->startInFrames >= newPos) {
+						track->currentOrNext = p;
+					 	break;
+					}
+				}
+			}
+		}
 	}
-	else if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==1.0f) {
-		if (((LV2_Atom_Long*)time_frame)->body != self->positionInFrames + offsetFrames)
+	else if (self->speed==1.0f && newSpeed==1.0f) {
+		if (newPos != self->positionInFrames + offsetFrames)
 			printf("TRANSPORT JUMPED WHILE TRANSPORT RUNNING\n");
 //TODO adjust pattern states? Maybe just let run and log a warning
 	}
@@ -512,15 +540,19 @@ printf("offsetFrames: %d\n",offsetFrames);
 		Ardour serves up some negative values while speed=0 and the transport is at the start.
 		The frames seem to be aligned OK when speed=1.
 	*/
-	self->positionInFrames = ((LV2_Atom_Long*)time_frame)->body;  
+	self->positionInFrames = newPos;
 
 
 printf("\n");
 
+//FIXME the speed (and frame) guard needs to be earlier...	
+
 	/* Speed=0 (stop) or speed=1 (play) */
 	if (speed && speed->type == uris->atom_Float) 
-		self->speed = ((LV2_Atom_Float*)speed)->body;
+		self->speed = newSpeed;
 }
+
+//XXX another use case muting or soloing a track should probably instantly start or stop the current pattern
 
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sampleCount)
@@ -602,7 +634,13 @@ i++;
 */
 static void deactivate(LV2_Handle instance)
 {
+	Self* self = (Self*)instance;
+
 printf("CALLING deactivate\n");			
+//TODO cf if patterns or tracks and added dynamically. Only recalc the affected track.
+	for (int t=0; t<self->numTracks; t++) 
+		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
+
 }
 
 /*
