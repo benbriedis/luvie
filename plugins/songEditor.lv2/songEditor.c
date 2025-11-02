@@ -59,9 +59,9 @@ typedef struct {
 } Bpm;
 
 typedef struct {
-	int bar;
-	float beat;
-	float offset;
+	int bar;	/* Indexed from 0 */
+	float beat; /* Indexed from 0 */
+	float offset;   //XXX whats this again?
 } Interval;
 
 typedef struct {
@@ -93,7 +93,7 @@ Timeline timeline = {
 	{{{140}}},
 	{
 		{7,"Track 8", 1, {{
-			5, {7, 0.0, 0.0}, 8.0, 0, 0,
+			5, {2, 0.0, 0.0}, 4.0, 0, 0,
 		}}, TRACK_NOT_PLAYING, 0 }
 	},
 	0
@@ -308,6 +308,32 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 	}
 }
 
+static void initPatternEndPoints(Self* self)
+{
+	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
+
+//TODO handle multiple BPM and time signatures
+	int beatsPerBar = 4;
+	
+	for (int t=0; t<self->numTracks; t++) {
+		Track* track = &self->timeline->tracks[t];
+
+		for (int p=0; p<track->numPatterns; p++) {
+			Pattern* pattern = &track->patterns[p];
+
+			//XXX assuming start.beat starts at 0.0
+			float startBeat = pattern->start.bar*beatsPerBar + pattern->start.beat;
+			float endBeat = startBeat + pattern->length;
+
+			pattern->startInFrames = startBeat * framesPerBeat;
+			pattern->endInFrames = endBeat * framesPerBeat;
+
+printf("startBeat: %f  startInFrames: %ld\n",startBeat,pattern->startInFrames);			
+printf("  endBeat: %f    endInFrames: %ld\n",endBeat,pattern->endInFrames);			
+		}
+	}
+}
+
 /* The plugin must reset all internal state */
 static void activate(LV2_Handle instance)
 {
@@ -315,7 +341,16 @@ printf("CALLING activate()\n");
 
 	Self* self = (Self*)instance;
 
+//XXX activate is no the right place to set the current position... really need time position
 	self->positionInFrames = 0;
+
+	self->numTracks = 1;
+
+//TODO cf if patterns or tracks and added dynamically. Only recalc the affected track.
+	for (int t=0; t<self->numTracks; t++) 
+		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
+
+	initPatternEndPoints(self);
 }
 
 //static void gotMessage()
@@ -344,14 +379,12 @@ printf("CALLING activate()\n");
 
 static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
-//TODO set current bpm somewhere I guess? Where used?
-	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
-
-
 //TODO reinit currentPattern/nextPattern on jumps
 
-	uint32_t pos = self->positionInFrames + begin;
-	uint32_t endPos = self->positionInFrames + end;
+	long pos = self->positionInFrames + begin;
+	long endPos = self->positionInFrames + end;
+
+//printf("playTrack pos: %d   endPos: %ld\n",end,endPos);
 
 	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
 	for (int pat=track->currentOrNext; pos<endPos && pat<track->numPatterns; pat++) {
@@ -361,10 +394,6 @@ static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, ui
 		/* NOTE a track can only play one pattern at a time */
 
 //FIXME current luvie.c is receiving the pattern length and turning itself off. Probably better not to.		
-
-//TODO init track->state, timeline->positionInFrames
-//TODO init startInFrames + endInFrames
-//TODO init self->numTricks
 
 		if (track->state == TRACK_PLAYING && pos >= pattern->endInFrames) {
 			//turnPatternOff();
@@ -378,6 +407,8 @@ static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, ui
 				break;
 			pattern = &track->patterns[track->currentOrNext];
 		}
+
+//TODO could there be a problem if a pattern starts at (0,0)?
 
 		/* NOTE a single loop can turn one pattern off and another on */
 
@@ -394,6 +425,7 @@ static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, ui
 /* Play patterns in the range [begin..end) relative to this cycle.  */
 static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
 {
+//printf("playSong()  positionInFrames: %ld\n",self->positionInFrames);
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
@@ -401,8 +433,6 @@ static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapac
 
 		playTrack(self,track,begin,end,outCapacity);
 	}
-
-	self->positionInFrames += self->sampleRate;
 }
 
 /*
@@ -440,7 +470,7 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj)
 		NULL
 	);
 
-
+/*
 if (speed) 
 printf("speed: %f\n",((LV2_Atom_Float*)speed)->body);
 
@@ -450,6 +480,7 @@ printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
 //self->positionInFrames = ((LV2_Atom_Long*)time_frame)->body;  TODO
 
 printf("\n");
+*/
 
 	/* Speed=0 (stop) or speed=1 (play) */
 	if (speed && speed->type == uris->atom_Float) 
@@ -457,7 +488,7 @@ printf("\n");
 }
 
 /* `run()` must be real-time safe. No memory allocations or blocking! */
-static void run(LV2_Handle instance, uint32_t sample_count)
+static void run(LV2_Handle instance, uint32_t sampleCount)
 {
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
@@ -471,7 +502,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 	/* Loop through events: */
 	const LV2_Atom_Sequence* in = self->control_port_in;
-	uint32_t last_t = 0;
+	uint32_t timeOffset = 0;
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 
@@ -497,16 +528,18 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
-			playSong(self, last_t, (uint32_t)ev->time.frames,outCapacity);
+			playSong(self, timeOffset, (uint32_t)ev->time.frames,outCapacity);
 
-		last_t = (uint32_t)ev->time.frames;
+		timeOffset = (uint32_t)ev->time.frames;
 	}
 
 	/* Play out the remainder of cycle: */
-	if (self->speed != 0.0f) 
-		playSong(self, last_t, sample_count, outCapacity);
+	if (self->speed != 0.0f) {
+		playSong(self, timeOffset, sampleCount, outCapacity);
 
-	self->positionInFrames += sample_count;
+		/* positionInFrames is the point at the beginning of the cycle */
+		self->positionInFrames += sampleCount;
+	}
 }
 
 /*
@@ -532,7 +565,7 @@ static void cleanup(LV2_Handle instance)
 {
 	Self* self = (Self*)instance;
 
-	free(self->patterns);
+//	free(self->patterns);
 	free(self);
 }
 
