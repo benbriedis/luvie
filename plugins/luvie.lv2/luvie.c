@@ -421,7 +421,15 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 
-		/* Handle a position message */    //NOTE the metronome had this after the play() call. Dont know why.
+//XXX Q: should we calling this 'play' for all message types? 
+		// Play the click for the time slice from last_t until now
+		if (self->speed != 0.0f) 
+			playPatterns(self, last_t, (uint32_t)ev->time.frames,outCapacity);
+
+		/* 
+			NOTE position messages sometimes come part way through a cycle (eg 1024 frames).
+			In this case the Position frames includes the start of the standard cycle.
+		*/
 
 //		if (lv2_atom_forge_is_object_type(const LV2_Atom_Forge *forge, uint32_t type))  XXX Use this in future if we create a forge
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
@@ -436,11 +444,6 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 //     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
 		}
 
-
-//XXX Q: should we calling this 'play' for all message types? 
-		// Play the click for the time slice from last_t until now
-		if (self->speed != 0.0f) 
-			playPatterns(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
 		last_t = (uint32_t)ev->time.frames;
 	}

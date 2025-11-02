@@ -384,17 +384,16 @@ printf("CALLING activate()\n");
 //	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
 
 
-static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, uint32_t outCapacity)
+static void playTrack(Self* self, Track* track, long begin, long end, uint32_t outCapacity)
 {
 //TODO reinit currentPattern/nextPattern on jumps
 
-	long pos = self->positionInFrames + begin;
-	long endPos = self->positionInFrames + end;
+	long pos = begin;
 
 //printf("playTrack pos: %d   endPos: %ld\n",end,endPos);
 
 	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
-	for (int pat=track->currentOrNext; pos<endPos && pat<track->numPatterns; pat++) {
+	for (int pat=track->currentOrNext; pos<end && pat<track->numPatterns; pat++) {
 
 		Pattern* pattern = &track->patterns[track->currentOrNext];
 
@@ -430,7 +429,7 @@ static void playTrack(Self* self, Track* track, uint32_t begin, uint32_t end, ui
 }
 
 /* Play patterns in the range [begin..end) relative to this cycle.  */
-static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapacity)
+static void playSong(Self* self, long begin, long end, uint32_t outCapacity)
 {
 //printf("playSong()  positionInFrames: %ld\n",self->positionInFrames);
 //TODO add mute and solo features for tracks
@@ -455,7 +454,7 @@ static void playSong(Self* self, uint32_t begin, uint32_t end, uint32_t outCapac
 
 	We could use the host's BPM's if we really wanted, but the SOS argument suggests we shouldn't. SO IGNORE THIS.
 */
-static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t frameOffset)
+static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFrames)
 {
 	const URIs* uris = &self->uris;
 
@@ -484,18 +483,30 @@ if (time_frame)
 printf("frame: %ld\n",((LV2_Atom_Long*)time_frame)->body);
 
 printf("positionInFrames: %ld\n",self->positionInFrames);
+printf("offsetFrames: %d\n",offsetFrames);
+
+//TODO if speed=0 probably turn off all states	
 
 	/* Test code: */
-	if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==0.0f) 
-		self->testPositionInFrames = self->positionInFrames;
+	if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==0.0f) {
+		self->testPositionInFrames = ((LV2_Atom_Long*)time_frame)->body + offsetFrames;  // Save the first of the speed 0 position values
+	}
 	else if (self->speed==0.0f && ((LV2_Atom_Float*)speed)->body==1.0f) {
-		if (((LV2_Atom_Long*)time_frame)->body != self->testPositionInFrames)
+		if (((LV2_Atom_Long*)time_frame)->body != self->testPositionInFrames + offsetFrames)
 			printf("TRANSPORT JUMPED\n");
+//TODO adjust pattern states (can probably just react to speed changes as above)
 	}
 	else if (self->speed==1.0f && ((LV2_Atom_Float*)speed)->body==1.0f) {
-		if (((LV2_Atom_Long*)time_frame)->body != self->positionInFrames)
+		if (((LV2_Atom_Long*)time_frame)->body != self->positionInFrames + offsetFrames)
 			printf("TRANSPORT JUMPED WHILE TRANSPORT RUNNING\n");
+//TODO adjust pattern states? Maybe just let run and log a warning
 	}
+
+//NOTE stopping and start in Ardour appears to jump back 3 "cycles"	(ie 3 x 1024frames).
+//     One implication is that everything the transport jumps/restarts we should recalculate our state.
+//     TODO maybe better not to have this state. Just delete it and assume when a boundary is crossed a stop or start message is sent.
+//     OR ELSE check the state is correct after every jump and amend.
+//     IF we jump into a changed position with different state we really need to old state so we can send the correct messages.
 
 	/* 
 		Ardour serves up some negative values while speed=0 and the transport is at the start.
@@ -510,8 +521,6 @@ printf("\n");
 	if (speed && speed->type == uris->atom_Float) 
 		self->speed = ((LV2_Atom_Float*)speed)->body;
 }
-
-//TODO look into C unit tests
 
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sampleCount)
@@ -530,22 +539,34 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	const LV2_Atom_Sequence* in = self->control_port_in;
 	uint32_t timeOffset = 0;
 
+int i=0;	
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
-//XXX cf 'handleCycle()'
+//XXX cf 'handlePartCycle()'
 
+//FIXME move the Position code above the play() code in luvie.c too 		
 
-//printf("time->frames: %ld\n",ev->time.frames);	ARDOUR ONLY RETURNS 0 HERE. Why use an Event then? Would an Atom work instead?
+		// Play the click for the time slice from last_t until now
+		if (self->speed != 0.0f) 
+			playSong(self, self->positionInFrames+timeOffset, self->positionInFrames+ev->time.frames,outCapacity);
+
+		/* ev->time.frames is usually 0 - except for when a position message comes part way through a cycle. */
+
+printf("time->frames: %ld\n",ev->time.frames);	//ARDOUR USUALLY RETURNS 0 HERE, 
 //printf("time->beats: %lf\n",ev->time.beats);				
 
-		/* Handle a position message */    //NOTE the metronome had this after the play() call. Dont know why.
+		/* 
+			NOTE position messages sometimes come part way through a cycle (eg 1024 frames).
+			In this case the Position frames includes the start of the standard cycle.
+		*/
 
 //		if (lv2_atom_forge_is_object_type(const LV2_Atom_Forge *forge, uint32_t type))  XXX Use this in future if we create a forge
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
-			if (obj->body.otype == uris->time_Position) 
-//FIXME account for the frames offset here too				
+			if (obj->body.otype == uris->time_Position)  {
+printf("i: %d  sampleCount:%d\n",i,sampleCount);				
 				maybeJump(self, obj,(uint32_t)ev->time.frames);
+			}
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
@@ -553,27 +574,21 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 //     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
 		}
 
+if (i!=0)
+printf("i: %d\n",i);				
 
 //XXX Q: should we calling this 'play' for all message types? 
 
-//FIXME probably cant use positionInFrames in here these calls...
-
-		// Play the click for the time slice from last_t until now
-		if (self->speed != 0.0f) 
-			playSong(self, timeOffset, (uint32_t)ev->time.frames,outCapacity);
-
 		timeOffset = (uint32_t)ev->time.frames;
+i++;		
 	}
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) {
-		playSong(self, timeOffset, sampleCount, outCapacity);
-
-
-//FIXME if maybeJump() is called can update to a non-1024 value
+		playSong(self, self->positionInFrames+timeOffset, self->positionInFrames+sampleCount, outCapacity);
 
 		/* positionInFrames is the point at the beginning of the cycle */
-		self->positionInFrames += sampleCount;
+		self->positionInFrames += sampleCount - timeOffset;
 	}
 }
 
