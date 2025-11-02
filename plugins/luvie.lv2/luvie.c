@@ -21,8 +21,7 @@ typedef enum {
 
 typedef enum {
 	PATTERN_OFF,
-	PATTERN_LIMITED,
-	PATTERN_UNLIMITED
+	PATTERN_ON
 } PatternState;
 
 typedef struct {
@@ -52,7 +51,7 @@ typedef struct {
 
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
-	"pattern1", 4, 3, 0, 0, PATTERN_LIMITED, 0, 0,  {
+	"pattern1", 4, 3, 0, 0, PATTERN_OFF, 0, 0,  {
 		{0.0, 0, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -60,7 +59,7 @@ Pattern patterns[] = {{
 		{3.0, 9, 0.5, 100, NOTE_OFF},
 	}
 }, {
-	"pattern2", 4, 3, 0, 0, PATTERN_LIMITED, 0, 0, {
+	"pattern2", 4, 3, 0, 0, PATTERN_OFF, 0, 0, {
 		{0.0, 8, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -247,7 +246,7 @@ printf("CALLING activate()\n");
 //XXX doesnt have to start at 0.		
 		pattern->positionInFrames = 0;
 
-		pattern->state = PATTERN_UNLIMITED;
+		pattern->state = PATTERN_ON;
 		pattern->startInFrames = 0;
 		pattern->lengthInFrames = 0;
 
@@ -262,8 +261,8 @@ printf("CALLING activate()\n");
 //{
 	/* Updates:
 		[
-			{id:4, state:limited/unlimited/off, start:inFrames, length:inFrames},  TODO cf BPM changes. Would beats be easier?
-			{id:6, state:limited/unlimited/off, start:inFrames, length:inFrames}
+			{id:4, state:on/off, offset:inFrames},  TODO cf BPM changes. Would beats be easier?
+			{id:6, state:on/off, offset:inFrames}
 		]
 
 	  Atom version:
@@ -274,12 +273,17 @@ printf("CALLING activate()\n");
 				  Object
 					 id: Int               (cf URID or URI)
 					 state: Int            (cf literal)
-					 position: Long        (using Time.Position.frame would be possible, but over the top)
-					 length:   Long
-
-
+					 offset: Long        (using Time.Position.frame would be possible, but over the top)
          
 		Also cf add pattern, delete pattern
+
+		ALSO cf supporting a basic 'default' mode or other hosts:
+		     play all patterns from the start (no offsets) in loops.
+
+		NOTE I've considered making state:ON/UNLIMITED/LIMITED where LIMITED has an length that can include multiple loops.
+		     Ultimately doesn't seem to be worthwhile. Any other host that used such a feature would need to be written to support it -
+			 and in these cases explicitly turning off a looping pattern is easy enough. Note that hosts need to be able to support
+			 muting which is pretty dynamic. Also it would complicate the implementation of future plugins.
 	*/
 
 //}

@@ -66,6 +66,7 @@ typedef struct {
 
 typedef struct {
 	int id;
+	//TODO probably add label here, not in luvie.c...
 	Interval start;
 	float length;
 	/* Calculated values: */
@@ -85,7 +86,7 @@ typedef struct {
 typedef struct {
 	TimeSignature timeSignatures[1];
 	Bpm bpms[1];
-	Track tracks[1];
+	Track tracks[2];
 } Timeline;
 
 //TODO use these time signatures and bpms
@@ -93,11 +94,18 @@ Timeline timeline = {
 	{{0,0,0}},
 	{{{140}}},
 	{
-		{7,"Track 8", 2, {{
-			5, {2, 0.0}, 4.0, 0, 0
-		},{
-			6, {5, 1.0}, 3.0, 0, 0
-		}}, TRACK_NOT_PLAYING, 0 }
+		{7,"Track 8", 2, 
+			{
+				{5, {2, 0.0}, 4.0, 0, 0},
+				{6, {6, 1.0}, 3.0, 0, 0}
+			}, TRACK_NOT_PLAYING, 0 
+		},
+		{9,"Track 11", 2, 
+			{
+				{3, {4, 0.0}, 4.0, 0, 0},
+				{4, {8, 1.0}, 3.0, 0, 0}
+			}, TRACK_NOT_PLAYING, 0 
+		},
 	}
 };
 
@@ -318,7 +326,7 @@ printf("CALLING instantiate()\n");
 		return NULL;
 	memcpy(self->timeline,&timeline,sizeof(timeline));
 
-	self->numTracks = 1;
+	self->numTracks = 2;
 
 	initPatternEndPoints(self);
 
@@ -361,22 +369,18 @@ printf("CALLING activate()\n");
 
 }
 
-//static void gotMessage()
+//static void sendMessage()
 //{
 	/* Updates:
 		[
-			{patternNum:1, state:limited/unlimited/off, position:inFrames, length:inFrames},  TODO cf BPM changes. Would beats be easier?
-			{patternNum:1, state:limited/unlimited/off, position:inFrames, length:inFrames}
+			{id:4, state:on/off, offset:inFrames}, 
+			{id:6, state:on/off, offset:inFrames}
 		]
+
 
 		Also cf add pattern, delete pattern
 	*/
 
-//}
-
-//static void sendMessage()
-//{
-	//XXX if a note has been added or removed whil playing, tell the host
 //}
 
 //TODO can we use logger? 
@@ -387,11 +391,7 @@ printf("CALLING activate()\n");
 
 static void playTrack(Self* self, Track* track, long begin, long end, uint32_t outCapacity)
 {
-//TODO reinit currentPattern/nextPattern on jumps
-
 	long pos = begin;
-
-//printf("playTrack pos: %d   endPos: %ld\n",end,endPos);
 
 	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
 	for (int pat=track->currentOrNext; pos<end && pat<track->numPatterns; pat++) {
@@ -400,11 +400,9 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 
 		/* NOTE a track can only play one pattern at a time */
 
-//FIXME current luvie.c is receiving the pattern length and turning itself off. Probably better not to.		
-
 		if (track->state == TRACK_PLAYING && pos >= pattern->endInFrames) {
-			//turnPatternOff();
-			printf("TURNING OFF PATTERN %d\n",track->currentOrNext);
+			//sendPatternOffMessage();
+			printf("TURNING OFF PATTERN       TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
 			track->state = TRACK_NOT_PLAYING;
 			pos = pattern->endInFrames;
@@ -420,8 +418,8 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 		/* NOTE a single loop can turn one pattern off and another on */
 
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
-			//turnPatternOn();
-			printf("TURNING ON PATTERN %d\n",track->currentOrNext);
+			//sendPatternOnMessage();
+			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
 			track->state = TRACK_PLAYING;
 			pos = pattern->startInFrames;
@@ -432,13 +430,29 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 /* Play patterns in the range [begin..end) relative to this cycle.  */
 static void playSong(Self* self, long begin, long end, uint32_t outCapacity)
 {
-//printf("playSong()  positionInFrames: %ld\n",self->positionInFrames);
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
 		Track* track = &self->timeline->tracks[t];
 
 		playTrack(self,track,begin,end,outCapacity);
+	}
+}
+
+static void adjustNextPatternIndexes(Self* self,long newPos)
+{
+	for (int t=0; t<self->numTracks; t++) {
+		Track* track = &self->timeline->tracks[t];
+		track->currentOrNext = track->numPatterns;
+
+		for (int p=0; p<track->numPatterns; p++) {
+			Pattern* pattern = &track->patterns[p];
+
+			if (pattern->startInFrames >= newPos) {
+				track->currentOrNext = p;
+				break;
+			}
+		}
 	}
 }
 
@@ -460,12 +474,10 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 	const URIs* uris = &self->uris;
 
 	/*
-		Ardour seems to take a while to establish itself on play. Possibly addressing latency issues.
-		Makes it hard to know when to use it when to jump.
+		Ardour seems to take a while to establish itself on play. Possibly addressing latency issues. You even get negative frames.
+		The frames seem to be OK and aligned once speed=1.
 
-//TODO PLAN:
-// Try using 'speed' changes to determine when to use time_frame to determine when to jump. Otherwise ignore position changes.
-// Otherwise research...
+		Stopping and start in Ardour appears to jump back 3 "cycles" (eg 3 x 1024frames).
 	*/
 
 	LV2_Atom* speed = NULL;
@@ -476,8 +488,6 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 		uris->time_frame, &time_frame,
 		NULL
 	);
-
-//TODO if speed=0 probably turn off all states	
 
 	/* I believe newPos incorporates the offsetFrames */
 	long newPos = ((LV2_Atom_Long*)time_frame)->body;
@@ -493,7 +503,6 @@ printf("positionInFrames: %ld\n",self->positionInFrames);
 printf("offsetFrames: %d\n",offsetFrames); 
 
 
-
 	if (self->speed==1.0f && newSpeed==0.0f) {
 		self->testPositionInFrames = newPos;
 
@@ -504,49 +513,22 @@ printf("offsetFrames: %d\n",offsetFrames);
 	}
 	else if (self->speed==0.0f && newSpeed==1.0f) {
 		if (newPos != self->testPositionInFrames + offsetFrames) {
-//XXX separate into function			
 			printf("TRANSPORT JUMPED\n");
-
-			/* Set currentOrNext to match the new position */
-
-			for (int t=0; t<self->numTracks; t++) {
-				Track* track = &self->timeline->tracks[t];
-				track->currentOrNext = track->numPatterns;
-
-				for (int p=0; p<track->numPatterns; p++) {
-					Pattern* pattern = &track->patterns[p];
-
-					if (pattern->startInFrames >= newPos) {
-						track->currentOrNext = p;
-					 	break;
-					}
-				}
-			}
+			adjustNextPatternIndexes(self,newPos);
 		}
 	}
 	else if (self->speed==1.0f && newSpeed==1.0f) {
 		if (newPos != self->positionInFrames + offsetFrames)
 			printf("TRANSPORT JUMPED WHILE TRANSPORT RUNNING\n");
-//TODO adjust pattern states? Maybe just let run and log a warning
+			//TODO Just log a warning if this happens
 	}
 
-//NOTE stopping and start in Ardour appears to jump back 3 "cycles"	(ie 3 x 1024frames).
-//     One implication is that everything the transport jumps/restarts we should recalculate our state.
-//     TODO maybe better not to have this state. Just delete it and assume when a boundary is crossed a stop or start message is sent.
-//     OR ELSE check the state is correct after every jump and amend.
-//     IF we jump into a changed position with different state we really need to old state so we can send the correct messages.
-
-	/* 
-		Ardour serves up some negative values while speed=0 and the transport is at the start.
-		The frames seem to be aligned OK when speed=1.
-	*/
 	self->positionInFrames = newPos;
 
 
 printf("\n");
 
-//FIXME the speed (and frame) guard needs to be earlier...	
-
+//FIXME the speed (and frame) guard needs to be earlier to use useful...	
 	/* Speed=0 (stop) or speed=1 (play) */
 	if (speed && speed->type == uris->atom_Float) 
 		self->speed = newSpeed;
@@ -574,8 +556,6 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 int i=0;	
 	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
 //XXX cf 'handlePartCycle()'
-
-//FIXME move the Position code above the play() code in luvie.c too 		
 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
