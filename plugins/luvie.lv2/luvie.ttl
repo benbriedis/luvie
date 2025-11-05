@@ -7,6 +7,10 @@
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix luvie: <https://github.com/benbriedis/luvie#> .
+
+#TODO replace URL + cf the best name for the extension.
+#   cf 'luvie:' ==> 'patterns:' / 'loops:'  (ie more generic)
 
 <http://benbriedis.com/lv2/luvie>
 	a lv2:Plugin ,
@@ -21,10 +25,14 @@
 	lv2:project <http://benbriedis.com/lv2> ;
 	lv2:requiredFeature urid:map ;
 	lv2:optionalFeature lv2:hardRTCapable ;
+#TODO possibly delete this? Note that the input port is currently using the same name, which is probably undesirable	
+	lv2:optionalFeature luvie:patterns ;
 
 	lv2:port [
 		a lv2:InputPort , atom:AtomPort ;
 		atom:bufferType atom:Sequence ;
+		atom:supports luvie:patterns ;
+#cf whether to keep this (eg if run by something other than Luvie)		
 		atom:supports time:Position ;
 		lv2:index 0 ;
 		lv2:symbol "control" ;
