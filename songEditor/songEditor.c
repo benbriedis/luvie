@@ -17,6 +17,10 @@
 
 #define PLUGIN_URI "http://benbriedis.com/lv2/songEditor"
 
+//TODO put into a .h file
+extern void addPlugin();
+
+
 typedef enum {
 	NOTE_ON,
 	NOTE_OFF,
@@ -313,7 +317,14 @@ printf("CALLING instantiate()\n");
 
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
-	uris->time_frame			= map->map(map->handle, LV2_TIME__frame);
+	uris->time_frame          = map->map(map->handle, LV2_TIME__frame);
+
+//////////////////
+
+	addPlugin();
+
+//////////////////
+	
 
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;

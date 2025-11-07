@@ -3,5 +3,5 @@
 
 <http://benbriedis.com/lv2/songEditor>
 	a lv2:Plugin ;
-	lv2:binary <songEditor@LIB_EXT@>  ;
+	lv2:binary <songEditor.so>  ;
 	rdfs:seeAlso <songEditor.ttl> .

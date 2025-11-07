@@ -129,7 +129,8 @@ lilv_node_free(portSupportPatterns);
 }
 
 
-int main(int argc, char** argv)
+//int main(int argc, char** argv)
+void addPlugin()
 {
  	char pluginUri[] = "http://benbriedis.com/lv2/luvie";
 
@@ -146,6 +147,7 @@ int main(int argc, char** argv)
 	const LilvPlugin* plugin = lilv_plugins_get_by_uri(plugins, uri);
 	lilv_node_free(uri);
 	if (!(self.plugin = plugin)) {
+//TODO replace with log and disable?		
 		printf("Plugin not found\n");
 		exit(1);
 	}

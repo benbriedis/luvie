@@ -1,18 +1,19 @@
 
-option('lint', type: 'boolean', value: false,
-       description: 'Run code quality checks')
+#option('lint', type: 'boolean', value: false,
+#       description: 'Run code quality checks')
 
-option('lv2dir', type: 'string', value: '',
-       description: 'LV2 bundle installation directory')
+#option('lv2dir', type: 'string', value: '',
+#       description: 'LV2 bundle installation directory')
 
-option('old_headers', type: 'boolean', value: true,
-       description: 'Install backwards compatible headers at URI-style paths')
+#XXX what are these?
+#option('old_headers', type: 'boolean', value: true,
+#       description: 'Install backwards compatible headers at URI-style paths')
 
 option('plugins', type: 'feature',
        description: 'Build example plugins')
 
-option('tests', type: 'feature',
-       description: 'Build tests')
+#option('tests', type: 'feature',
+#       description: 'Build tests')
 
 option('title', type: 'string', value: 'LV2',
        description: 'Project title')

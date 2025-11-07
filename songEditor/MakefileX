@@ -13,12 +13,15 @@ $(BUNDLE): build/songEditor.so
 	mkdir -- "$(BUNDLE)"
 	cp -- manifest.ttl songEditor.ttl build/songEditor.so "$(BUNDLE)"
 
-build/songEditor.so: prepare-build build/songEditor.o
+build/songEditor.so: prepare-build build/songEditor.o build/callLuvie.o
 	mkdir --parent -- build/
-	gcc $(C_FLAGS) -shared build/songEditor.o \
+	gcc $(C_FLAGS) -shared build/songEditor.o build/callLuvie.o \
 		-lm -o build/songEditor.so
 
 build/songEditor.o: prepare-build
 	gcc $(C_FLAGS) src/songEditor.c -c -o build/songEditor.o
+
+build/callLuvie.o: prepare-build
+	gcc $(C_FLAGS) src/callLuvie.c -c -o build/callLuvie.o
 
 
