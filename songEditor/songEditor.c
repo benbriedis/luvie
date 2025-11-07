@@ -323,6 +323,8 @@ printf("CALLING instantiate()\n");
 
 	addPlugin();
 
+printf("Back from addPlugin\n");	
+
 //////////////////
 	
 
@@ -344,6 +346,7 @@ printf("CALLING instantiate()\n");
 	for (int t=0; t<self->numTracks; t++) 
 		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
 
+printf("Finished instantiate()\n");	
 	return (LV2_Handle)self;
 }
 

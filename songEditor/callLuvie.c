@@ -112,12 +112,17 @@ lilv_node_free(portSupportPatterns);
 			printf("Got control port on %u\n",i);
 			port->type = TYPE_CONTROL;
 		}
+/*		
+XXX not sure why this is being called
+
 		else if (!port->optional) {
 			printf("Port %u has unsupported type\n", i);
 			exit(1);
 		}
+*/		
 	}
 
+printf("Started freeing \n");
 	lilv_node_free(lv2_connectionOptional);
 	lilv_node_free(lv2_ControlPort);
 	lilv_node_free(lv2_AudioPort);
@@ -164,6 +169,8 @@ void addPlugin()
 	if (create_ports(&self)) 
 		return 5;
 
+printf("Back from create_ports  n_params:%d\n",self.n_params);
+
 //	if (self.n_audio_in == 0 || (in_fmt.channels != (int)self.n_audio_in && in_fmt.channels != 1)) {
 //    	printf("Unable to map inputs to ports\n");
 //		exit(1);
@@ -189,17 +196,29 @@ void addPlugin()
 	/* Instantiate plugin and connect ports */
 	const uint32_t n_ports = lilv_plugin_get_num_ports(plugin);
 
+printf("HERE B n_ports:%d\n",n_ports);
+
 //  float* const   in_buf  = alloc_audio_buffer(self.n_audio_in);
 //  float* const   out_buf = alloc_audio_buffer(self.n_audio_out);
 
 //	self.instance = lilv_plugin_instantiate(self.plugin, in_fmt.samplerate, NULL);
 
+	/*
 	for (uint32_t p = 0, i = 0, o = 0; p < n_ports; ++p) {
+printf("HERE C\n");
 		if (self.ports[p].type == TYPE_CONTROL) 
+{			
+printf("HERE C1\n");  <== XXX currently dying here
 			lilv_instance_connect_port(self.instance, p, &self.ports[p].value);
+}
 		else 
+{		
+printf("HERE C2\n");
 			lilv_instance_connect_port(self.instance, p, NULL);
+}
 	}
+printf("HERE D\n");
+*/
 
   /* Ports are now connected to buffers in interleaved format, so we can run
      a single frame at a time and avoid having to interleave buffers to

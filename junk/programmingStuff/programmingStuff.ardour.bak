@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="3458" name-counter="1" event-counter="11643" vca-counter="1">
+<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="4118" name-counter="1" event-counter="21465" vca-counter="1">
   <ProgramVersion created-with="Ardour 6.9.0~ds0-1build1" modified-with="Ardour 6.9.0~ds0-1build1"/>
   <EngineHints backend="JACK" input-device="EDIROL UA-25" output-device="EDIROL UA-25"/>
   <MIDIPorts>
@@ -68,7 +68,7 @@
   <Sources/>
   <Regions/>
   <Selection>
-    <StripableAutomationControl stripable="167" control="0" order="0"/>
+    <StripableAutomationControl stripable="4071" control="0" order="1"/>
   </Selection>
   <Locations/>
   <Bundles/>
@@ -80,8 +80,12 @@
       <Controllable name="solo-iso" id="78" flags="Toggle,RealTime" value="0" solo-isolated="0"/>
       <Controllable name="solo-safe" id="80" flags="Toggle" value="0" solo-safe="0"/>
       <IO name="Master" id="92" direction="Input" default-type="audio">
-        <Port type="audio" name="Master/audio_in 1"/>
-        <Port type="audio" name="Master/audio_in 2"/>
+        <Port type="audio" name="Master/audio_in 1">
+          <Connection other="Bus/audio_out 1"/>
+        </Port>
+        <Port type="audio" name="Master/audio_in 2">
+          <Connection other="Bus/audio_out 2"/>
+        </Port>
       </IO>
       <IO name="Master" id="93" direction="Output" default-type="audio">
         <Port type="audio" name="Master/audio_out 1">
@@ -135,7 +139,7 @@
       <Processor id="97" name="meter-Master" active="1" user-latency="0" use-user-latency="0" type="meter"/>
       <Slavable/>
     </Route>
-    <Route version="6000" id="167" name="Bus" default-type="audio" strict-io="1" active="1" denormal-protection="0" meter-point="MeterPostFader" disk-io-point="DiskIOPreFader" meter-type="MeterPeak">
+    <Route version="6000" id="167" name="Bus" default-type="audio" strict-io="1" active="0" denormal-protection="0" meter-point="MeterPostFader" disk-io-point="DiskIOPreFader" meter-type="MeterPeak">
       <PresentationInfo order="1" flags="MidiBus,OrderSet" color="2732956927"/>
       <Controllable name="solo" id="175" flags="Toggle,RealTime" value="0" self-solo="0" soloed-by-upstream="0" soloed-by-downstream="0"/>
       <Controllable name="solo-iso" id="181" flags="Toggle,RealTime" value="0" solo-isolated="0"/>
@@ -144,6 +148,12 @@
         <Port type="midi" name="Bus/midi_in 1"/>
       </IO>
       <IO name="Bus" id="196" direction="Output" default-type="audio">
+        <Port type="audio" name="Bus/audio_out 1">
+          <Connection other="Master/audio_in 1"/>
+        </Port>
+        <Port type="audio" name="Bus/audio_out 2">
+          <Connection other="Master/audio_in 2"/>
+        </Port>
         <Port type="midi" name="Bus/midi_out 1"/>
       </IO>
       <MuteMaster mute-point="PostFader,Listen,Main" muted="0"/>
@@ -178,13 +188,7 @@
         </Automation>
         <Controllable name="trimcontrol" id="173" flags="GainLike" value="1"/>
       </Processor>
-      <Processor id="197" name="Amp" active="1" user-latency="0" use-user-latency="0" type="amp">
-        <Automation>
-          <AutomationList automation-id="gain" id="170" interpolation-style="Exponential" state="Off"/>
-        </Automation>
-        <Controllable name="gaincontrol" id="171" flags="GainLike" value="1.0364365577697754"/>
-      </Processor>
-      <Processor id="3455" name="Example Fifths" active="0" user-latency="0" use-user-latency="0" type="lv2" unique-id="http://lv2plug.in/plugins/eg-fifths" count="1" custom="0">
+      <Processor id="3609" name="Luvie" active="1" user-latency="0" use-user-latency="0" type="lv2" unique-id="http://benbriedis.com/lv2/luvie" count="1" custom="0">
         <ConfiguredInput>
           <Channels type="midi" count="1"/>
         </ConfiguredInput>
@@ -200,8 +204,91 @@
         <ThruMap/>
         <lv2 last-preset-uri="" last-preset-label="" parameter-changed-since-last-preset="0"/>
       </Processor>
+      <Processor id="197" name="Amp" active="1" user-latency="0" use-user-latency="0" type="amp">
+        <Automation>
+          <AutomationList automation-id="gain" id="170" interpolation-style="Exponential" state="Off"/>
+        </Automation>
+        <Controllable name="gaincontrol" id="171" flags="GainLike" value="1.0364365577697754"/>
+      </Processor>
+      <Processor id="3769" name="ACE Reasonable Synth" active="1" user-latency="0" use-user-latency="0" type="lv2" unique-id="https://community.ardour.org/node/7596" count="1" custom="0">
+        <ConfiguredInput>
+          <Channels type="midi" count="1"/>
+        </ConfiguredInput>
+        <CustomSinks>
+          <Channels type="midi" count="1"/>
+        </CustomSinks>
+        <ConfiguredOutput>
+          <Channels type="audio" count="2"/>
+          <Channels type="midi" count="1"/>
+        </ConfiguredOutput>
+        <PresetOutput/>
+        <InputMap-0>
+          <Channelmap type="midi" from="0" to="0"/>
+        </InputMap-0>
+        <OutputMap-0>
+          <Channelmap type="audio" from="0" to="0"/>
+          <Channelmap type="audio" from="1" to="1"/>
+        </OutputMap-0>
+        <ThruMap/>
+        <lv2 last-preset-uri="" last-preset-label="" parameter-changed-since-last-preset="0"/>
+      </Processor>
       <Processor id="201" name="meter-Bus" active="1" user-latency="0" use-user-latency="0" type="meter"/>
       <Processor id="202" name="Bus" active="1" user-latency="0" use-user-latency="0" own-input="1" own-output="0" output="Bus" type="main-outs" role="Main">
+        <PannerShell bypassed="0" user-panner="" linked-to-route="1"/>
+      </Processor>
+      <Slavable/>
+    </Route>
+    <Route version="6000" id="4071" name="Bus 1" default-type="audio" strict-io="1" active="1" denormal-protection="0" meter-point="MeterPostFader" disk-io-point="DiskIOPreFader" meter-type="MeterPeak">
+      <PresentationInfo order="2" flags="MidiBus,OrderSet" color="4222009087"/>
+      <Controllable name="solo" id="4079" flags="Toggle,RealTime" value="0" self-solo="0" soloed-by-upstream="0" soloed-by-downstream="0"/>
+      <Controllable name="solo-iso" id="4085" flags="Toggle,RealTime" value="0" solo-isolated="0"/>
+      <Controllable name="solo-safe" id="4087" flags="Toggle" value="0" solo-safe="0"/>
+      <IO name="Bus 1" id="4099" direction="Input" default-type="audio">
+        <Port type="midi" name="Bus 1/midi_in 1"/>
+      </IO>
+      <IO name="Bus 1" id="4100" direction="Output" default-type="audio">
+        <Port type="midi" name="Bus 1/midi_out 1"/>
+      </IO>
+      <MuteMaster mute-point="PostFader,Listen,Main" muted="0"/>
+      <Controllable name="mute" id="4081" flags="Toggle,RealTime" value="0"/>
+      <Controllable name="phase" id="4083" flags="Toggle" value="0" phase-invert=""/>
+      <Automation>
+        <AutomationList automation-id="solo" id="4078" interpolation-style="Discrete" state="Off"/>
+        <AutomationList automation-id="solo-iso" id="4084" interpolation-style="Discrete" state="Off"/>
+        <AutomationList automation-id="solo-safe" id="4086" interpolation-style="Discrete" state="Off"/>
+        <AutomationList automation-id="mute" id="4080" interpolation-style="Discrete" state="Off"/>
+        <AutomationList automation-id="phase" id="4082" interpolation-style="Discrete" state="Off"/>
+      </Automation>
+      <Pannable>
+        <Controllable name="pan-azimuth" id="4090" flags="" value="0.5"/>
+        <Controllable name="pan-width" id="4094" flags="" value="0"/>
+        <Controllable name="pan-elevation" id="4092" flags="" value="0"/>
+        <Controllable name="pan-frontback" id="4096" flags="" value="0"/>
+        <Controllable name="pan-lfe" id="4098" flags="" value="0"/>
+        <Automation>
+          <AutomationList automation-id="pan-azimuth" id="4089" interpolation-style="Linear" state="Off"/>
+          <AutomationList automation-id="pan-elevation" id="4091" interpolation-style="Linear" state="Off"/>
+          <AutomationList automation-id="pan-width" id="4093" interpolation-style="Linear" state="Off"/>
+          <AutomationList automation-id="pan-frontback" id="4095" interpolation-style="Linear" state="Off"/>
+          <AutomationList automation-id="pan-lfe" id="4097" interpolation-style="Linear" state="Off"/>
+        </Automation>
+      </Pannable>
+      <Processor id="4108" name="Return" active="1" user-latency="0" use-user-latency="0" type="intreturn"/>
+      <Processor id="4102" name="Polarity" active="1" user-latency="0" use-user-latency="0" type="polarity"/>
+      <Processor id="4104" name="Amp" active="1" user-latency="0" use-user-latency="0" type="trim">
+        <Automation>
+          <AutomationList automation-id="trim" id="4076" interpolation-style="Logarithmic" state="Off"/>
+        </Automation>
+        <Controllable name="trimcontrol" id="4077" flags="GainLike" value="1"/>
+      </Processor>
+      <Processor id="4101" name="Amp" active="1" user-latency="0" use-user-latency="0" type="amp">
+        <Automation>
+          <AutomationList automation-id="gain" id="4074" interpolation-style="Exponential" state="Off"/>
+        </Automation>
+        <Controllable name="gaincontrol" id="4075" flags="GainLike" value="1"/>
+      </Processor>
+      <Processor id="4105" name="meter-Bus 1" active="1" user-latency="0" use-user-latency="0" type="meter"/>
+      <Processor id="4106" name="Bus 1" active="1" user-latency="0" use-user-latency="0" own-input="1" own-output="0" output="Bus 1" type="main-outs" role="Main">
         <PannerShell bypassed="0" user-panner="" linked-to-route="1"/>
       </Processor>
       <Slavable/>
@@ -276,7 +363,7 @@
       <Window name="big-transport" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="virtual-keyboard" visible="0" x-off="138" y-off="333" x-size="750" y-size="186"/>
       <Window name="audio-connection-manager" visible="0" x-off="399" y-off="273" x-size="495" y-size="411"/>
-      <Window name="midi-connection-manager" visible="0" x-off="1005" y-off="200" x-size="453" y-size="350"/>
+      <Window name="midi-connection-manager" visible="0" x-off="1005" y-off="200" x-size="513" y-size="388"/>
       <Window name="idle-o-meter" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="plugin-manager" visible="0" x-off="342" y-off="145" x-size="1016" y-size="600"/>
       <Window name="plugin-dsp-load" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
@@ -284,8 +371,11 @@
       <Window name="transport-masters" visible="0" x-off="137" y-off="398" x-size="1164" y-size="257"/>
       <Window name="RPM-64" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="RPM-167" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
-      <Window name="P-167-3148" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
-      <Window name="PM-167-3148" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
+      <Window name="P-167-3609" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
+      <Window name="P-167-3769" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
+      <Window name="PM-167-3609" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
+      <Window name="PM-167-3769" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
+      <Window name="RPM-4071" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <GUIObjectState>
         <Object id="rtav 64" height="64" visible="1"/>
         <Object id="automation 68" height="64" visible="0"/>
@@ -315,7 +405,20 @@
           <Object id="processor 2538"/>
           <Object id="processor 2994"/>
           <Object id="processor 3148"/>
+          <Object id="processor 3609"/>
+          <Object id="processor 3769"/>
         </Object>
+        <Object id="rtav 4071" height="64" visible="1"/>
+        <Object id="automation 4075" height="64" visible="0"/>
+        <Object id="automation 4077" height="64" visible="0"/>
+        <Object id="automation 4071 12/0/0" height="64" visible="0"/>
+        <Object id="strip 4071" visible="1">
+          <Object id="processor 4101">
+            <Object id="control 4075" visible="0"/>
+          </Object>
+          <Object id="processor 4114"/>
+        </Object>
+        <Object id="automation 4090" height="64" visible="0"/>
       </GUIObjectState>
     </UI>
     <Videomonitor active="0"/>
