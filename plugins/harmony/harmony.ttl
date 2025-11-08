@@ -10,28 +10,27 @@
 @prefix luvie: <https://github.com/benbriedis/luvie#> .
 
 #TODO replace URL + cf the best name for the extension.
-#   cf 'luvie:' ==> 'patterns:' / 'loops:'  (ie more generic)
 
-<http://benbriedis.com/lv2/luvie>
+<https://github.com/benbriedis/luvie/harmony>
 	a lv2:Plugin ,
 		lv2:SequencerPlugin ;
 
 #TODO is lv2:SequencerPlugin best??
 #TODO can we remove some prefixes?
 
-	doap:name "Luvie";
+	doap:name "Harmony";
 	doap:license <http://opensource.org/licenses/isc> ;
 
-	lv2:project <http://benbriedis.com/lv2> ;
+	lv2:project <https://github.com/benbriedis/luvie> ;
 	lv2:requiredFeature urid:map ;
 	lv2:optionalFeature lv2:hardRTCapable ;
 #TODO possibly delete this? Note that the input port is currently using the same name, which is probably undesirable	
-	lv2:optionalFeature luvie:patterns ;
+	lv2:optionalFeature luvie:loops ;
 
 	lv2:port [
 		a lv2:InputPort , atom:AtomPort ;
 		atom:bufferType atom:Sequence ;
-		atom:supports luvie:patterns ;
+		atom:supports luvie:loopsControl ;
 #XXX would this be specific enough?		
 		atom:supports patch:Message ;
 #cf whether to keep this (eg if run by something other than Luvie)		

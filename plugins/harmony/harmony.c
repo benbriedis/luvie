@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PLUGIN_URI "http://benbriedis.com/lv2/luvie"
+#define PLUGIN_URI "https://github.com/benbriedis/luvie/harmony"
 
 typedef enum {
 	NOTE_ON,

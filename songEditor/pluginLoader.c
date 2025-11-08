@@ -37,7 +37,7 @@ typedef struct {
 /* Plugin information: */
 typedef struct {
 	char* uri;
-	LilvNode* uriObj;
+	LilvNode* uriObj;		//TODO possibly remove again - not using much. Remember: needs to be freed
 	LilvPlugin* lilvPlugin;
 	LilvInstance* instance;
 	unsigned numParams;
@@ -96,14 +96,9 @@ printf("PORT %u\n",i);
 printf("IS INPUT PORT %b\n",lilv_port_is_a(lilvPlugin, lport, lv2_InputPort));
 
 
-char feature[100]; //TODO make this stuff more robust. cf strcat
 //XXX xf #patterns + #patterns-inputPort  / #loops + #loopsInputPort
 
-//sprintf(feature,"%s%s",plugin->uri,"#patterns");
-sprintf(feature,"%s%s","https://github.com/benbriedis/luvie","#patterns");  //FIXME
-LilvNode* uriObj = lilv_new_uri(self->world, feature);
-printf("feature: %s\n",feature);
-
+LilvNode* uriObj = lilv_new_uri(self->world, "https://github.com/benbriedis/luvie#loopsControl");
 printf("DOES SUPPORT EVENT %b\n",lilv_port_supports_event(lilvPlugin,lport,uriObj));
 lilv_node_free(uriObj);
 
@@ -111,12 +106,7 @@ lilv_node_free(uriObj);
 		if (lilv_port_is_a(lilvPlugin, lport, lv2_InputPort) &&
 			lilv_port_supports_event(lilvPlugin,lport,plugin->uriObj)
 		) {
-//TODO also check it supports patterns/loops?			
 			printf("GOT OUR CONTROL PORT on %u\n",i);
-//TODO store it			
-//			port->type = TYPE_CONTROL;
-
-//TODO delete in struct
 		}
 
 		LilvNode* symbol = lilv_port_get_symbol(lilvPlugin,lport);
@@ -149,8 +139,6 @@ printf("addPlugin()  - A\n");
 
 	plugin->uriObj = lilv_new_uri(self->world, plugin->uri);
 
-printf("addPlugin()  - A1\n");
-
 	const LilvPlugin* lilvPlugin = lilv_plugins_get_by_uri(self->lilvPlugins, plugin->uriObj);
 	plugin->lilvPlugin = lilvPlugin;
 
@@ -163,8 +151,8 @@ printf("addPlugin()  - A1\n");
 		return false;
 	}
 
-	bool supportsPatterns = lilv_plugin_has_feature(lilvPlugin,plugin->uriObj);
-	printf("Supports patterns? %b\n",supportsPatterns);
+	bool supportsLoops = lilv_plugin_has_feature(lilvPlugin,"https://github.com/benbriedis/luvie#loops");
+	printf("Supports loops? %b\n",supportsLoops);
 
 	/* Create port structures */
 	if (!createPorts(self,plugin)) 
@@ -238,7 +226,7 @@ void addPlugins()
 {
 	int numPlugins = 1;
  	char* pluginUris[] = {
-		"http://benbriedis.com/lv2/luvie"
+		"https://github.com/benbriedis/luvie/harmony"
 	};
 
 	/*

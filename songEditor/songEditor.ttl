@@ -8,7 +8,7 @@
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
 
-<http://benbriedis.com/lv2/songEditor>
+<https://github.com/benbriedis/luvie/songEditor>
 	a lv2:Plugin ,
 		lv2:SequencerPlugin ;
 
@@ -18,7 +18,7 @@
 	doap:name "Song Editor";
 	doap:license <http://opensource.org/licenses/isc> ;
 
-	lv2:project <http://benbriedis.com/lv2> ;
+	lv2:project <https://github.com/benbriedis/luvie> ;
 	lv2:requiredFeature urid:map ;
 	lv2:optionalFeature lv2:hardRTCapable ;
 

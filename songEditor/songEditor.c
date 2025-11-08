@@ -15,7 +15,7 @@
 #include <string.h>
 #include <threads.h>
 
-#define PLUGIN_URI "http://benbriedis.com/lv2/songEditor"
+#define PLUGIN_URI "https://github.com/benbriedis/luvie/songEditor"
 
 //TODO put into a .h file
 extern void addPlugins();
