@@ -18,7 +18,7 @@
 #define PLUGIN_URI "http://benbriedis.com/lv2/songEditor"
 
 //TODO put into a .h file
-extern void addPlugin();
+extern void addPlugins();
 
 
 typedef enum {
@@ -321,9 +321,9 @@ printf("CALLING instantiate()\n");
 
 //////////////////
 
-	addPlugin();
+	addPlugins();
 
-printf("Back from addPlugin\n");	
+printf("Back from addPlugins\n");	
 
 //////////////////
 	
