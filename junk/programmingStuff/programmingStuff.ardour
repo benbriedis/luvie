@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="4320" name-counter="1" event-counter="21471" vca-counter="1">
+<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="4523" name-counter="1" event-counter="21477" vca-counter="1">
   <ProgramVersion created-with="Ardour 6.9.0~ds0-1build1" modified-with="Ardour 6.9.0~ds0-1build1"/>
   <EngineHints backend="JACK" input-device="EDIROL UA-25" output-device="EDIROL UA-25"/>
   <MIDIPorts>
@@ -68,7 +68,7 @@
   <Sources/>
   <Regions/>
   <Selection>
-    <StripableAutomationControl stripable="4071" control="0" order="1"/>
+    <StripableAutomationControl stripable="167" control="0" order="1"/>
   </Selection>
   <Locations/>
   <Bundles/>
@@ -188,22 +188,6 @@
         </Automation>
         <Controllable name="trimcontrol" id="173" flags="GainLike" value="1"/>
       </Processor>
-      <Processor id="3609" name="Luvie" active="1" user-latency="0" use-user-latency="0" type="lv2" unique-id="http://benbriedis.com/lv2/luvie" count="1" custom="0">
-        <ConfiguredInput>
-          <Channels type="midi" count="1"/>
-        </ConfiguredInput>
-        <CustomSinks/>
-        <ConfiguredOutput>
-          <Channels type="midi" count="1"/>
-        </ConfiguredOutput>
-        <PresetOutput/>
-        <InputMap-0/>
-        <OutputMap-0>
-          <Channelmap type="midi" from="0" to="0"/>
-        </OutputMap-0>
-        <ThruMap/>
-        <lv2 last-preset-uri="" last-preset-label="" parameter-changed-since-last-preset="0"/>
-      </Processor>
       <Processor id="197" name="Amp" active="1" user-latency="0" use-user-latency="0" type="amp">
         <Automation>
           <AutomationList automation-id="gain" id="170" interpolation-style="Exponential" state="Off"/>
@@ -287,7 +271,7 @@
         </Automation>
         <Controllable name="gaincontrol" id="4075" flags="GainLike" value="1"/>
       </Processor>
-      <Processor id="4318" name="Song Editor" active="1" user-latency="0" use-user-latency="0" type="lv2" unique-id="http://benbriedis.com/lv2/songEditor" count="1" custom="0">
+      <Processor id="4521" name="Song Editor" active="1" user-latency="0" use-user-latency="0" type="lv2" unique-id="https://github.com/benbriedis/luvie/songEditor" count="1" custom="0">
         <ConfiguredInput>
           <Channels type="midi" count="1"/>
         </ConfiguredInput>
@@ -388,12 +372,10 @@
       <Window name="RPM-64" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="RPM-167" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="RPM-4071" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
-      <Window name="P-167-3609" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
       <Window name="P-167-3769" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
-      <Window name="PM-167-3609" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="PM-167-3769" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
-      <Window name="P-4071-4318" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
-      <Window name="PM-4071-4318" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
+      <Window name="P-4071-4521" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
+      <Window name="PM-4071-4521" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <GUIObjectState>
         <Object id="rtav 64" height="64" visible="1"/>
         <Object id="automation 68" height="64" visible="0"/>
@@ -425,6 +407,7 @@
           <Object id="processor 3148"/>
           <Object id="processor 3609"/>
           <Object id="processor 3769"/>
+          <Object id="processor 4400"/>
         </Object>
         <Object id="rtav 4071" height="64" visible="1"/>
         <Object id="automation 4075" height="64" visible="0"/>
@@ -436,6 +419,8 @@
           </Object>
           <Object id="processor 4114"/>
           <Object id="processor 4318"/>
+          <Object id="processor 4443"/>
+          <Object id="processor 4521"/>
         </Object>
         <Object id="automation 4090" height="64" visible="0"/>
       </GUIObjectState>
