@@ -13,8 +13,15 @@ typedef struct Param {
 } Param;
 */
 
+typedef enum {
+	START_LOOP,
+	STOP_LOOP
+} LOOP_COMMAND;
+
 typedef struct {
-	int stuff[100];
+	int loopIndex;
+	LOOP_COMMAND command;
+	long startFrame;
 } LoopMessage;
 
 

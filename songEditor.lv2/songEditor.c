@@ -202,6 +202,8 @@ printf("Back from addPlugins\n");
 	for (int t=0; t<self->numTracks; t++) 
 		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
 
+    lv2_atom_forge_init(&self->forge, self->map);
+
 printf("Finished instantiate()\n");	
 	return (LV2_Handle)self;
 }
@@ -257,7 +259,62 @@ printf("CALLING activate()\n");
 //TODO can we use logger? 
 
 
+static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long startFrame)
+{
 //	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
+
+//TODO maybe try a 'Patch' or some other control message...
+
+//XXX may need a NOOP
+
+//TODO look at forge	
+
+//FIXME need to wrap this into a sequence event...	
+	plugin->message->loopIndex = loopIndex;
+	plugin->message->command = START_LOOP;
+	plugin->message->startFrame = startFrame;       //FIXME calculate this from the song/live looper +- currentPos I think
+													//      NB "2 strategies": loop start, loop offset
+	lilv_instance_run(plugin->instance,numSamples);  //XXX number of samples since last call...
+
+//TODO + run at end the cycle for each plugin??	
+}
+
+//XXX child plugins dont need to support time position. Song editor can look after that.
+
+static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex)
+{
+	plugin->message->loopIndex = loopIndex;
+	plugin->message->command = STOP_LOOP;
+	lilv_instance_run(plugin->instance,numSamples);
+
+/*	
+    LV2_Atom_Forge forge;
+    LV2_Atom*      buf = (LV2_Atom*)calloc(1, strlen(path) + 128);
+    lv2_atom_forge_init(&forge, self->map);
+    lv2_atom_forge_set_sink(&forge, atom_sink, atom_sink_deref, buf);
+    write_set_file(&forge, &self->uris, path, strlen(path));
+*/
+
+//TODO call   lv2_atom_forge_set_sink(&forge, atom_sink, atom_sink_deref, buf); ??
+
+//XXX NOTE: need to write a SEQUENCE of ATOMS	
+
+//	lv2_atom_forge_atom();		XXX THIS writes a header too...
+
+//XXX could maybe just add this into the middle of a tuple
+//	lv2_atom_forge_frame_time(&self->forge, self->frame_offset);
+
+	lv2_atom_forge_set_buffer();  //TODO USE THIS IF POSSIBLE
+//	lv2_atom_forge_set_sink();
+
+//XXX XXX BEST GUESS:
+	LV2_Atom_Forge_Frame frame;
+	lv2_atom_forge_sequence_head(&self->forge,frame,offset);
+	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
+	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_int(&self->forge, STOP_LOOP);
+	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+}
 
 
 static void playTrack(Self* self, Track* track, long begin, long end, uint32_t outCapacity)
@@ -272,8 +329,9 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 		/* NOTE a track can only play one pattern at a time */
 
 		if (track->state == TRACK_PLAYING && pos >= pattern->endInFrames) {
-			//sendPatternOffMessage();
 			printf("TURNING OFF PATTERN       TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
+
+			sendLoopOffMessage(self);
 
 			track->state = TRACK_NOT_PLAYING;
 			pos = pattern->endInFrames;
@@ -289,8 +347,9 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 		/* NOTE a single loop can turn one pattern off and another on */
 
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
-			//sendPatternOnMessage();
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
+
+			sendLoopOnMessage(self);
 
 			track->state = TRACK_PLAYING;
 			pos = pattern->startInFrames;
@@ -423,6 +482,19 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	/* Loop through events: */
 	const LV2_Atom_Sequence* in = self->controlPortIn;
 	uint32_t timeOffset = 0;
+
+
+//XXX dont have an output port to get this capacity from...
+//const uint32_t capacity = self->connectPort->atom.size;
+
+//TODO for every plugin...
+	for (int i=0; i<self->plugins.numPlugins; i++) {
+		Plugin* plugin = &self->plugins.plugins[i];
+		lv2_atom_forge_set_buffer(&self->forge, (uint8_t*)plugin->controlPort, capacity);
+		lv2_atom_forge_sequence_head(&self->forge, &self->notify_frame, 0);
+	}
+
+
 
 int i=0;	
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {

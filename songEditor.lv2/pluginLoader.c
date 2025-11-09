@@ -72,6 +72,10 @@ printf("addPlugin()  - A\n");
 
 	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, plugins->sampleRate, NULL);
 
+//XXX MAYBE MEANT TO BE CALLED IN run() - see LV2 documentaton about threading, but conversely see...
+//https://drobilla.net/docs/lilv/index.html#instances
+//   MAYBE the host can choose? Looks like it needs to be called before activate though.
+
 	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,plugin->message);
 //XXX disconnect sometime?
 
@@ -79,12 +83,11 @@ printf("addPlugin()  - A\n");
 
 bool instantiatePlugins(Plugins* plugins)
 {
-	int numPlugins = 1;
+	plugins->numPlugins = 1;
+
  	char* pluginUris[] = {
 		"https://github.com/benbriedis/luvie/harmony"
 	};
-
-	plugins->numPlugins = 1;
 
 	/* Create world and plugin URI */
 

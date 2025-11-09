@@ -7,6 +7,7 @@
 #include <lv2/patch/patch.h>
 #include <lv2/time/time.h>
 #include <lv2/urid/urid.h>
+#include <lv2/atom/forge.h>
 #include <stdint.h>
 #include <threads.h>
 #include "pluginLoader.h"
@@ -165,5 +166,9 @@ typedef struct {
 	long testPositionInFrames;
 
 	Plugins plugins;
+
+
+//	LV2_Atom_Forge_Frame notify_frame; ///< Cached for worker replies
+	LV2_Atom_Forge forge; 
 } Self;
 
