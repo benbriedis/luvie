@@ -1,97 +1,6 @@
-#include "lv2/atom/forge.h"
 #include <assert.h>
-#include <lv2/atom/atom.h>
-#include <lv2/atom/util.h>
-#include <lv2/core/lv2.h>
-#include <lv2/core/lv2_util.h>
-#include <lv2/log/logger.h>
-#include <lv2/midi/midi.h>
-#include <lv2/patch/patch.h>
-#include <lv2/time/time.h>
-#include <lv2/urid/urid.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <threads.h>
-
-#define PLUGIN_URI "https://github.com/benbriedis/luvie/songEditor"
-
-//TODO put into a .h file
-extern void addPlugins();
-
-
-typedef enum {
-	NOTE_ON,
-	NOTE_OFF,
-} State;
-
-typedef enum {
-	PATTERN_OFF,
-	PATTERN_LIMITED,
-	PATTERN_UNLIMITED
-} PatternState;
-
-typedef enum {
-	TRACK_PLAYING,
-	TRACK_NOT_PLAYING
-} TrackState;
-
-
-typedef struct {
-	float start;
-	float pitch;
-	float lengthInBeats;
-	float velocity;
-	int state; 
-} Note;
-
-
-typedef struct {
-	int bar;
-	int top;		//TODO better names for top and bottom?
-	int bottom;
-} TimeSignature;
-
-typedef struct {
-	int bar;
-	float beat;
-} Position;
-
-typedef struct {
-	Position position;  //TODO allow start and end instead. Need to use a union
-	float value;
-} Bpm;
-
-typedef struct {
-	int bar;	/* Indexed from 0 */
-	float beat; /* Indexed from 0 */
-} Interval;
-
-typedef struct {
-	int id;
-	//TODO probably add label here, not in luvie.c...
-	Interval start;
-	float length;
-	/* Calculated values: */
-	long startInFrames;
-	long endInFrames;
-} Pattern;
-
-typedef struct {
-	int id;
-	char label[8];
-	int numPatterns;
-	Pattern patterns[2];
-	int state;
-	int currentOrNext;
-} Track;
-
-typedef struct {
-	TimeSignature timeSignatures[1];
-	Bpm bpms[1];
-	Track tracks[2];
-} Timeline;
+#include "songEditor.h"
+#include "lv2/atom/forge.h"
 
 //TODO use these time signatures and bpms
 Timeline timeline = {
@@ -181,60 +90,6 @@ cf Precalculate frames of each bar? Recalc if user manually changes something.
 	whether we need our own host.
 */
 
-typedef struct {
-	LV2_URID atom_Blank;
-	LV2_URID atom_Float;
-	LV2_URID atom_Object;
-	LV2_URID atom_Path;
-	LV2_URID atom_Resource;
-	LV2_URID atom_Sequence;
-	LV2_URID atom_URID;
-	LV2_URID atom_eventTransfer;
-	LV2_URID time_Position;
-	LV2_URID time_speed;
-	LV2_URID time_frame;
-
-//TODO probably delete. Replace some other Atom...	
-	LV2_URID midi_Event;
-	LV2_URID patch_Set;
-	LV2_URID patch_property;
-	LV2_URID patch_value;
-} URIs;
-
-
-enum { CONTROL_IN = 0, MIDI_OUT = 1 };
-
-/*
-   All data associated with a plugin instance is stored here.
-   Port buffers.
-*/
-typedef struct {
-	LV2_URID_Map* map;
-	LV2_Log_Logger logger;
-
-	/* Ports: */
-	const LV2_Atom_Sequence* control_port_in;
-	LV2_Atom_Sequence* midi_port_out;
-
-	URIs uris;   // Cache of mapped URIDs
-
-	// Variables to keep track of the tempo information sent by the host
-	double sampleRate; 
-	float speed; // Transport speed (usually 0=stop, 1=play)
-
-	float bpm; //XXX NOT SURE we want this here
-
-	Timeline* timeline;
-
-	long numTracks;
-
-	long positionInFrames;
-
-	/* Used to check transport jumps seem to be working OK */
-	float lastSpeed;
-	long testPositionInFrames;
-} Self;
-
 static void initPatternEndPoints(Self* self)
 {
 	const uint32_t framesPerBeat = (uint32_t)(60.0f / self->bpm * self->sampleRate);
@@ -321,7 +176,8 @@ printf("CALLING instantiate()\n");
 
 //////////////////
 
-	addPlugins();
+	self->plugins.sampleRate = sampleRate;
+	instantiatePlugins(&self->plugins);
 
 printf("Back from addPlugins\n");	
 
@@ -362,12 +218,12 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 
 	switch (port) {
 		case CONTROL_IN:
-			self->control_port_in = (LV2_Atom_Sequence*)data;
+			self->controlPortIn = (LV2_Atom_Sequence*)data;
 			break;
 
 //TODO ==> CONTROL_OUT
 		case MIDI_OUT:
-			self->midi_port_out = (LV2_Atom_Sequence*)data;
+			self->midiPortOut = (LV2_Atom_Sequence*)data;
 			break;
 	}
 }
@@ -381,6 +237,7 @@ printf("CALLING activate()\n");
 
 	/* NOTE positionInFrames shouldn't be set here */
 
+	activatePlugins(&self->plugins);
 }
 
 //static void sendMessage()
@@ -557,18 +414,18 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
  	const URIs* uris = &self->uris;
 
   	/* Initially self->out_port contains a Chunk with size set to capacity */
-	const uint32_t outCapacity = self->midi_port_out->atom.size;
+	const uint32_t outCapacity = self->midiPortOut->atom.size;
 
 	/* Write an empty Sequence header to the output */
-	lv2_atom_sequence_clear(self->midi_port_out);
-	self->midi_port_out->atom.type = self->uris.atom_Sequence;
+	lv2_atom_sequence_clear(self->midiPortOut);
+	self->midiPortOut->atom.type = self->uris.atom_Sequence;
 
 	/* Loop through events: */
-	const LV2_Atom_Sequence* in = self->control_port_in;
+	const LV2_Atom_Sequence* in = self->controlPortIn;
 	uint32_t timeOffset = 0;
 
 int i=0;	
-	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
+	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
 //XXX cf 'handlePartCycle()'
 
 		// Play the click for the time slice from last_t until now
@@ -635,6 +492,7 @@ printf("CALLING deactivate\n");
 	for (int t=0; t<self->numTracks; t++) 
 		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
 
+	deactivatePlugins(&self->plugins);
 }
 
 /*
@@ -646,6 +504,8 @@ printf("CALLING deactivate\n");
 static void cleanup(LV2_Handle instance)
 {
 	Self* self = (Self*)instance;
+
+	cleanupPlugins(&self->plugins);
 
 //	free(self->patterns);
 	free(self);

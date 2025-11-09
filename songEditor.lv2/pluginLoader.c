@@ -1,135 +1,47 @@
-#include <lilv/lilv.h>
-#include <lv2/core/lv2.h>
-
-#include <math.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "pluginLoader.h"
+#include "lilv/lilv.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 
-/* Control port value set from the command line */
-typedef struct Param {
-	char* sym;   ///< Port symbol
-	float value; ///< Control value
-} Param;
-
-/* Port type (only float ports are supported) */
-typedef enum { TYPE_CONTROL } PortType;
-
-/* Runtime port information */
-typedef struct {
-	LilvPort* lilv_port; ///< Port description
-	PortType type;      ///< Datatype
-	uint32_t index;     ///< Port index
-	float value;     ///< Control value (if applicable)
-} Port;
-
-/* 
-	lilv has all of these:
-		LilvPlugin			- "only represents the data of the plugin"  (maybe the ttl files?)
-		LilvInstance        - allows us to load and "access the actual plugin code"
-		LilvPluginClass     - maybe grouping for plugins?
-*/
-
-/* Plugin information: */
-typedef struct {
-	char* uri;
-	LilvNode* uriObj;		//TODO possibly remove again - not using much. Remember: needs to be freed
-	LilvPlugin* lilvPlugin;
-	LilvInstance* instance;
-	unsigned numParams;
-	Param* params;
-	unsigned numPorts;
-	Port* ports;
-} Plugin;
-
-/* Application state */
-typedef struct {
-	LilvWorld* world;
-	int numPlugins;
-	Plugin* plugins;
-	LilvPlugins* lilvPlugins;
-} App; 
-
-
-/* Clean up all resources. */
-static int cleanup(int status, App* self)
-{
-	/* TODO
-	lilv_instance_free(self->instance);
-	lilv_world_free(self->world);
-	free(self->ports);
-	free(self->params);
-	return status;
-	*/
-}
-
-/* Create port structures from data (via create_port()) for all ports. */
-static int createPorts(App* self,Plugin* plugin)
+static int findControlPort(Plugins* plugins,Plugin* plugin)
 {
 	const LilvPlugin* lilvPlugin = plugin->lilvPlugin;
-
 	const uint32_t numPorts = lilv_plugin_get_num_ports(lilvPlugin);
-	plugin->numPorts = numPorts;
-	plugin->ports   = (Port*)calloc(numPorts, sizeof(Port));
-
-	/* Get default values for all ports */
-	float* values = (float*)calloc(numPorts, sizeof(float));
-	lilv_plugin_get_port_ranges_float(lilvPlugin, NULL, NULL, values);
-
-	LilvNode* lv2_InputPort   = lilv_new_uri(self->world, LV2_CORE__InputPort);
 
 //TODO save the control port in its own special place...
 
-	for (uint32_t i = 0; i < numPorts; ++i) {
-		Port* port  = &plugin->ports[i];
-		const LilvPort* lport = lilv_plugin_get_port_by_index(lilvPlugin, i);
+	bool found = false;
 
-		port->lilv_port = lport;
-		port->index = i;
-		port->value = isnan(values[i]) ? 0.0f : values[i];
+	for (uint32_t i = 0; i < numPorts; i++) {
+		const LilvPort* lilvPort = lilv_plugin_get_port_by_index(lilvPlugin, i);  //TODO free?
 
-printf("PORT %u\n",i);
-printf("IS INPUT PORT %b\n",lilv_port_is_a(lilvPlugin, lport, lv2_InputPort));
-
-
-//XXX xf #patterns + #patterns-inputPort  / #loops + #loopsInputPort
-
-LilvNode* uriObj = lilv_new_uri(self->world, "https://github.com/benbriedis/luvie#loopsControl");
-printf("DOES SUPPORT EVENT %b\n",lilv_port_supports_event(lilvPlugin,lport,uriObj));
-lilv_node_free(uriObj);
+		LilvNode* uriObj = lilv_new_uri(plugins->world, "https://github.com/benbriedis/luvie#loopsControl");
 
 		/* Look for our loop/pattern input control port: */
-		if (lilv_port_is_a(lilvPlugin, lport, lv2_InputPort) &&
-			lilv_port_supports_event(lilvPlugin,lport,plugin->uriObj)
-		) {
-			printf("GOT OUR CONTROL PORT on %u\n",i);
+		if (lilv_port_supports_event(lilvPlugin,lilvPort,uriObj)) {
+			/* Assuming we are an input port, etc */
+
+			printf("FOUND CONTROL PORT on %u\n",i);
+
+			Port* controlPort = calloc(sizeof(Port),1);   //TODO free
+			plugin->controlPort = controlPort;
+			controlPort->lilvPort = lilvPort;
+			controlPort->index = i;
+			found = true;
 		}
 
-		LilvNode* symbol = lilv_port_get_symbol(lilvPlugin,lport);
-		printf("symbol: %s\n",lilv_node_as_string(symbol));
-
-		LilvNode* name = lilv_port_get_name(lilvPlugin,lport);
-		printf("name: %s\n",lilv_node_as_string(name));
-		lilv_node_free(name);
-
-//XXX want our child to have a control input port so we can give it pattern on/off events
-//    We probably also need to capture and midi-on and bundle it up in our midi output. In time 
-//    maybe similar for audio and possibly control ports.
-
+		lilv_node_free(uriObj);
 	}
 
-printf("Started freeing \n");
-	lilv_node_free(lv2_InputPort);
-	free(values);
-
-	return true;
+	return found;
 }
 
-static bool addPlugin(App* self,Plugin* plugin)
+//XXX We probably also need to capture and midi-on and bundle it up in our midi output. In time 
+//    maybe similar for audio and possibly control ports.
+
+static bool addPlugin(Plugins* plugins,Plugin* plugin)
 {
 printf("addPlugin()  - A\n");
 
@@ -137,13 +49,10 @@ printf("addPlugin()  - A\n");
 //XXX cf adding to plugin and freeing at the end ... (also used in ports)	
 //TODO store uri in plugin too...
 
-	plugin->uriObj = lilv_new_uri(self->world, plugin->uri);
-
-	const LilvPlugin* lilvPlugin = lilv_plugins_get_by_uri(self->lilvPlugins, plugin->uriObj);
+	LilvNode* uriObj = lilv_new_uri(plugins->world, plugin->uri);
+	const LilvPlugin* lilvPlugin = lilv_plugins_get_by_uri(plugins->lilvPlugins, uriObj);
 	plugin->lilvPlugin = lilvPlugin;
-
-//TODO free these when returning
-// lilv_node_free(uriObj);
+	lilv_node_free(uriObj); 
 
 	if (!plugin) {
 //TODO replace with log and disable?		
@@ -151,132 +60,92 @@ printf("addPlugin()  - A\n");
 		return false;
 	}
 
+//TODO use at some point
 	bool supportsLoops = lilv_plugin_has_feature(lilvPlugin,"https://github.com/benbriedis/luvie#loops");
 	printf("Supports loops? %b\n",supportsLoops);
 
 	/* Create port structures */
-	if (!createPorts(self,plugin)) 
+	if (!findControlPort(plugins,plugin)) 
 		return false;
 
-printf("Back from create_ports  n_params:%d\n",plugin->numParams);
+	/* Instantiate plugin and connect the control port */
 
-//	if (self->n_audio_in == 0 || (in_fmt.channels != (int)self->n_audio_in && in_fmt.channels != 1)) {
-//    	printf("Unable to map inputs to ports\n");
-//		exit(1);
-//	}
+	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, plugins->sampleRate, NULL);
 
-	/* Set control values */
-	for (unsigned i = 0; i < plugin->numParams; ++i) {
-		const Param* param = &plugin->params[i];
-		LilvNode* sym   = lilv_new_string(self->world, param->sym);
-		const LilvPort* port  = lilv_plugin_get_port_by_symbol(lilvPlugin, sym);
-		lilv_node_free(sym);
-		if (!port) {
-			printf("Unknown port\n");
-			return false;
-		}
+	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,plugin->message);
+//XXX disconnect sometime?
 
-		plugin->ports[lilv_port_get_index(lilvPlugin, port)].value = param->value;
-	}
-
-//  out_fmt.channels = self->n_audio_out;
-//    free(self->ports);
-
-	/* Instantiate plugin and connect ports */
-	const uint32_t n_ports = lilv_plugin_get_num_ports(lilvPlugin);
-
-printf("HERE B n_ports:%d\n",n_ports);
-
-//  float* const   in_buf  = alloc_audio_buffer(self->n_audio_in);
-//  float* const   out_buf = alloc_audio_buffer(self->n_audio_out);
-
-//	self.instance = lilv_plugin_instantiate(self->plugin, in_fmt.samplerate, NULL);
-
-	/*
-	for (uint32_t p = 0, i = 0, o = 0; p < n_ports; ++p) {
-printf("HERE C\n");
-		if (self.ports[p].type == TYPE_CONTROL) 
-{			
-printf("HERE C1\n");  <== XXX currently dying here
-			lilv_instance_connect_port(self.instance, p, &self.ports[p].value);
-}
-		else 
-{		
-printf("HERE C2\n");
-			lilv_instance_connect_port(self.instance, p, NULL);
-}
-	}
-printf("HERE D\n");
-*/
-
-  /* Ports are now connected to buffers in interleaved format, so we can run
-     a single frame at a time and avoid having to interleave buffers to
-     read/write from/to sndfile. */
-
-//  lilv_instance_activate(self.instance);
-//  lilv_instance_run(self.instance, 1);
-//  lilv_instance_deactivate(self.instance);
-
-//  free(out_buf);
-//  free(in_buf);
-//	return st ? st : cleanup(0, &self);
 }
 
-void addPlugins()
+bool instantiatePlugins(Plugins* plugins)
 {
 	int numPlugins = 1;
  	char* pluginUris[] = {
 		"https://github.com/benbriedis/luvie/harmony"
 	};
 
-	/*
-typedef struct {
-	char* uri;
-	LilvNode* uriObj;
-	LilvPlugin* plugin;
-	LilvInstance* instance;
-	unsigned numParams;
-	Param* params;
-	unsigned numPorts;
-	Port* ports;
-} Plugin;
-*/
+	plugins->numPlugins = 1;
 
 	/* Create world and plugin URI */
-	App self = {NULL, numPlugins, NULL, NULL};
 
-	self.world = lilv_world_new();
-	lilv_world_load_all(self.world);
-	self.lilvPlugins = lilv_world_get_all_plugins(self.world);
+	plugins->world = lilv_world_new();
+	lilv_world_load_all(plugins->world);
+	plugins->lilvPlugins = lilv_world_get_all_plugins(plugins->world);
 
-printf("addPlugins() - 2\n");	
-/*	
-	LilvWorld* world;
-	int numPlugins;
-	Plugin* plugins;
-	LilvPlugins** lilvPlugins;
-*/	
 	//TODO check alloc OK + free
-	self.plugins = calloc(sizeof(Plugin),numPlugins);
+	plugins->plugins = calloc(sizeof(Plugin),plugins->numPlugins);
 
 	bool ok = true;
 
-	for (int i=0; i<numPlugins && ok; i++) {
+	for (int i=0; i<plugins->numPlugins && ok; i++) {
+		Plugin* plugin = &plugins->plugins[i];
+		plugin->uri = pluginUris[i];
+//XXX Q should we try using 'Patch' messages?
+//XXX or should this allow for multiple messages?
+		plugin->message = calloc(sizeof(LoopMessage),1);  //TODO free
 
-		self.plugins[i].uri = pluginUris[i];
-
-printf("addPlugins() - 2A\n");	
-printf("addPlugins() - 2B %ld\n",(long)&self.plugins[i]);	
-printf("addPlugins() - 2BB %ld\n",(long)&self);	
-printf("addPlugins() - 2C\n");	
-//		ok = ok && addPlugin(&self,&self.plugins[i]);
-		ok = ok && addPlugin(&self,&self.plugins[i]);
-printf("addPlugins() - 2D\n");	
+		ok = ok && addPlugin(plugins,plugin);
 	}
 
-printf("addPlugins() - 3\n");	
 	return ok;
 
-//TODO if !ok disable the plugin I uess
+//TODO if !ok disable the plugin I use
+}
+
+void runPlugins(Plugins* plugins)
+{
+//XXX or integrate into songEditor proper
+
+	for (int i=0; i<plugins->numPlugins; i++) {
+//run ***		
+		lilv_instance_activate(plugins->plugins[i].instance);
+//  lilv_instance_run(plugin->instance, 1);
+	}
+}
+
+
+//TODO App => Plugins  or merge with song editor app
+
+void activatePlugins(Plugins* plugins)
+{
+	for (int i=0; i<plugins->numPlugins; i++) 
+		lilv_instance_activate(plugins->plugins[i].instance);
+}
+
+void deactivatePlugins(Plugins* plugins)
+{
+	for (int i=0; i<plugins->numPlugins; i++) 
+		lilv_instance_deactivate(plugins->plugins[i].instance);
+}
+
+void cleanupPlugins(Plugins* plugins)
+{
+	for (int i=0; i<plugins->numPlugins; i++) {
+		lilv_instance_free(plugins->plugins[i].instance);
+	}
+
+	lilv_world_free(plugins->world);
+//	free(plugins->ports);
+//	free(plugins->params);
 }
 

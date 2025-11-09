@@ -129,7 +129,7 @@ typedef struct {
 	LV2_Log_Logger logger;
 
 	/* Ports: */
-	const LV2_Atom_Sequence* control_port_in;
+	const LV2_Atom_Sequence* controlPortIn;
 	LV2_Atom_Sequence* midi_port_out;
 
 	URIs uris;   // Cache of mapped URIDs
@@ -223,7 +223,7 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 
 	switch (port) {
 		case CONTROL_IN:
-			self->control_port_in = (LV2_Atom_Sequence*)data;
+			self->controlPortIn = (LV2_Atom_Sequence*)data;
 			break;
 
 		case MIDI_OUT:
@@ -420,10 +420,10 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
 
 	/* Loop through events: */
-	const LV2_Atom_Sequence* in = self->control_port_in;
+	const LV2_Atom_Sequence* in = self->controlPortIn;
 	uint32_t last_t = 0;
 
-	LV2_ATOM_SEQUENCE_FOREACH (self->control_port_in, ev) {
+	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
