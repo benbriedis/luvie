@@ -13,13 +13,15 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +539 plugins/songEditor.lv2/songEditor.c
-badd +0 NOTES.txt
+badd +312 songEditor.lv2/songEditor.c
+badd +52 ~/programming/luvie/songEditor.lv2/pluginLoader.c
+badd +169 songEditor.lv2/songEditor.h
+badd +55 songEditor.lv2/pluginLoader.h
 argglobal
 %argdel
-$argadd NOTES.txt
-edit plugins/songEditor.lv2/songEditor.c
+edit songEditor.lv2/songEditor.c
 argglobal
+balt songEditor.lv2/pluginLoader.h
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -30,11 +32,11 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 539 - ((17 * winheight(0) + 25) / 50)
+let s:l = 312 - ((51 * winheight(0) + 26) / 52)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 539
+keepjumps 312
 normal! 0
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'

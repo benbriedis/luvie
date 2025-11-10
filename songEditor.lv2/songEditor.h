@@ -21,9 +21,9 @@ typedef enum {
 
 typedef enum {
 	PATTERN_OFF,
-	PATTERN_LIMITED,
-	PATTERN_UNLIMITED
-} PatternState;
+	PATTERN_LIMITED, 
+	PATTERN_UNLIMITED   //XXX probably just want PATTERN_ON now
+} PatternState;			//XXX combine with LOOP_COMMAND in pluginLoader.h?
 
 typedef enum {
 	TRACK_PLAYING,
@@ -60,6 +60,7 @@ typedef struct {
 } Interval;
 
 typedef struct {
+	int pluginIndex;
 	int id;
 	//TODO probably add label here, not in luvie.c...
 	Interval start;

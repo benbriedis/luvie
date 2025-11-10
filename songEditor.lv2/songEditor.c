@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include "songEditor.h"
 #include "lv2/atom/forge.h"
 
@@ -9,14 +10,14 @@ Timeline timeline = {
 	{
 		{7,"Track 8", 2, 
 			{
-				{5, {2, 0.0}, 4.0, 0, 0},
-				{6, {6, 1.0}, 3.0, 0, 0}
+				{0, 5, {2, 0.0}, 4.0, 0, 0},
+				{0, 6, {6, 1.0}, 3.0, 0, 0}
 			}, TRACK_NOT_PLAYING, 0 
 		},
 		{9,"Track 11", 2, 
 			{
-				{3, {4, 0.0}, 4.0, 0, 0},
-				{4, {8, 1.0}, 3.0, 0, 0}
+				{0, 3, {4, 0.0}, 4.0, 0, 0},
+				{0, 4, {8, 1.0}, 3.0, 0, 0}
 			}, TRACK_NOT_PLAYING, 0 
 		},
 	}
@@ -259,33 +260,36 @@ printf("CALLING activate()\n");
 //TODO can we use logger? 
 
 
-static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long startFrame)
+static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples,long startFrame)
 {
-//	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
-
 //TODO maybe try a 'Patch' or some other control message...
 
-//XXX may need a NOOP
-
-//TODO look at forge	
 
 //FIXME need to wrap this into a sequence event...	
 	plugin->message->loopIndex = loopIndex;
 	plugin->message->command = START_LOOP;
 	plugin->message->startFrame = startFrame;       //FIXME calculate this from the song/live looper +- currentPos I think
 													//      NB "2 strategies": loop start, loop offset
-	lilv_instance_run(plugin->instance,numSamples);  //XXX number of samples since last call...
 
-//TODO + run at end the cycle for each plugin??	
+	lv2_atom_forge_set_buffer(&plugin->message);
+
+	LV2_Atom_Forge_Frame frame;
+	lv2_atom_forge_sequence_head(&self->forge,frame,unit);
+	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
+	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_int(&self->forge, START_LOOP);
+	lv2_atom_forge_int(&self->forge, startFrame);
+	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+
+	lilv_instance_run(plugin->instance,numSamples);
 }
 
 //XXX child plugins dont need to support time position. Song editor can look after that.
 
-static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex)
+static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples)
 {
-	plugin->message->loopIndex = loopIndex;
-	plugin->message->command = STOP_LOOP;
-	lilv_instance_run(plugin->instance,numSamples);
+//	plugin->message->loopIndex = loopIndex;
+//	plugin->message->command = STOP_LOOP;
 
 /*	
     LV2_Atom_Forge forge;
@@ -304,34 +308,38 @@ static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex)
 //XXX could maybe just add this into the middle of a tuple
 //	lv2_atom_forge_frame_time(&self->forge, self->frame_offset);
 
-	lv2_atom_forge_set_buffer();  //TODO USE THIS IF POSSIBLE
 //	lv2_atom_forge_set_sink();
 
 //XXX XXX BEST GUESS:
+	lv2_atom_forge_set_buffer(&plugin->message);
+
 	LV2_Atom_Forge_Frame frame;
-	lv2_atom_forge_sequence_head(&self->forge,frame,offset);
+	lv2_atom_forge_sequence_head(&self->forge,frame,unit);
 	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
 	lv2_atom_forge_int(&self->forge, loopIndex);
 	lv2_atom_forge_int(&self->forge, STOP_LOOP);
 	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+
+	lilv_instance_run(plugin->instance,numSamples);
 }
 
 
-static void playTrack(Self* self, Track* track, long begin, long end, uint32_t outCapacity)
+static void playTrack(Self* self, Track* track, long cyclePos, long absBegin, long absEnd, uint32_t outCapacity)
 {
-	long pos = begin;
+	long pos = absBegin;
 
 	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
-	for (int pat=track->currentOrNext; pos<end && pat<track->numPatterns; pat++) {
+	for (int pat=track->currentOrNext; pos<absEnd && pat<track->numPatterns; pat++) {
 
 		Pattern* pattern = &track->patterns[track->currentOrNext];
+		Plugin* plugin = &self->plugins.plugins[pattern->pluginIndex];
 
 		/* NOTE a track can only play one pattern at a time */
 
 		if (track->state == TRACK_PLAYING && pos >= pattern->endInFrames) {
 			printf("TURNING OFF PATTERN       TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
-			sendLoopOffMessage(self);
+			sendLoopOffMessage(self,plugin,pattern->id,absEnd - absBegin);
 
 			track->state = TRACK_NOT_PLAYING;
 			pos = pattern->endInFrames;
@@ -349,7 +357,7 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
-			sendLoopOnMessage(self);
+			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos)
 
 			track->state = TRACK_PLAYING;
 			pos = pattern->startInFrames;
@@ -358,14 +366,14 @@ static void playTrack(Self* self, Track* track, long begin, long end, uint32_t o
 }
 
 /* Play patterns in the range [begin..end) relative to this cycle.  */
-static void playSong(Self* self, long begin, long end, uint32_t outCapacity)
+static void playSong(Self* self, long cyclePos, long absBegin, long absEnd, uint32_t outCapacity)
 {
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
 		Track* track = &self->timeline->tracks[t];
 
-		playTrack(self,track,begin,end,outCapacity);
+		playTrack(self,track,cyclePos,absBegin,absEnd,outCapacity);
 	}
 }
 
@@ -481,7 +489,7 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 
 	/* Loop through events: */
 	const LV2_Atom_Sequence* in = self->controlPortIn;
-	uint32_t timeOffset = 0;
+	uint32_t lastPos = 0;
 
 
 //XXX dont have an output port to get this capacity from...
@@ -496,17 +504,17 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 
 
 
+//XXX cf 'handlePartCycle()'
 int i=0;	
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
-//XXX cf 'handlePartCycle()'
+		/* pos is usually 0 - except for when a position message comes part way through a cycle. */
+		uint32_t pos = ev->time.frames;
 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
-			playSong(self, self->positionInFrames+timeOffset, self->positionInFrames+ev->time.frames,outCapacity);
+			playSong(self,pos,self->positionInFrames+lastPos, self->positionInFrames+pos,outCapacity);
 
-		/* ev->time.frames is usually 0 - except for when a position message comes part way through a cycle. */
-
-printf("time->frames: %ld\n",ev->time.frames);	//ARDOUR USUALLY RETURNS 0 HERE, 
+printf("cyclePos: %d\n",pos);	//ARDOUR USUALLY RETURNS 0 HERE, 
 //printf("time->beats: %lf\n",ev->time.beats);				
 
 		/* 
@@ -520,7 +528,7 @@ printf("time->frames: %ld\n",ev->time.frames);	//ARDOUR USUALLY RETURNS 0 HERE,
 
 			if (obj->body.otype == uris->time_Position)  {
 printf("i: %d  sampleCount:%d\n",i,sampleCount);				
-				maybeJump(self, obj,(uint32_t)ev->time.frames);
+				maybeJump(self, obj,pos);
 			}
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
@@ -534,16 +542,16 @@ printf("i: %d\n",i);
 
 //XXX Q: should we calling this 'play' for all message types? 
 
-		timeOffset = (uint32_t)ev->time.frames;
+		lastPos = pos;
 i++;		
 	}
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) {
-		playSong(self, self->positionInFrames+timeOffset, self->positionInFrames+sampleCount, outCapacity);
+		playSong(self,sampleCount,self->positionInFrames+lastPos, self->positionInFrames+sampleCount, outCapacity);
 
 		/* positionInFrames is the point at the beginning of the cycle */
-		self->positionInFrames += sampleCount - timeOffset;
+		self->positionInFrames += sampleCount - lastPos;
 	}
 }
 
