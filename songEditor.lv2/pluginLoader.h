@@ -59,7 +59,6 @@ typedef struct {
 
 
 bool instantiatePlugins(Plugins* self);
-void runPlugins(Plugins* self);
 void activatePlugins(Plugins* self);
 void deactivatePlugins(Plugins* self);
 void cleanupPlugins(Plugins* self);

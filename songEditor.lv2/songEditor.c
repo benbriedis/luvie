@@ -14,7 +14,7 @@ Timeline timeline = {
 				{0, 6, {6, 1.0}, 3.0, 0, 0}
 			}, TRACK_NOT_PLAYING, 0 
 		},
-		{9,"Track 11", 2, 
+		{9,"Track 9", 2, 
 			{
 				{0, 3, {4, 0.0}, 4.0, 0, 0},
 				{0, 4, {8, 1.0}, 3.0, 0, 0}
@@ -234,13 +234,15 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 /* The plugin must reset all internal state */
 static void activate(LV2_Handle instance)
 {
-printf("CALLING activate()\n");			
+printf("CALLING songEditor activate() - START\n");			
 
 	Self* self = (Self*)instance;
 
 	/* NOTE positionInFrames shouldn't be set here */
 
 	activatePlugins(&self->plugins);
+
+printf("CALLING songEditor activate() - END\n");			
 }
 
 //static void sendMessage()
@@ -262,19 +264,15 @@ printf("CALLING activate()\n");
 
 static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples,long startFrame)
 {
+//XXX ALTERNATIVE: call child plugin run() at the same time as ours. Requires larger buffers.
+
 //TODO maybe try a 'Patch' or some other control message...
 
-
-//FIXME need to wrap this into a sequence event...	
-	plugin->message->loopIndex = loopIndex;
-	plugin->message->command = START_LOOP;
-	plugin->message->startFrame = startFrame;       //FIXME calculate this from the song/live looper +- currentPos I think
-													//      NB "2 strategies": loop start, loop offset
-
-	lv2_atom_forge_set_buffer(&plugin->message);
-
+//XXX alternative:  lv2_atom_forge_set_sink()
+	lv2_atom_forge_set_buffer(&self->forge,plugin->message,100);  //TODO replace 100. NB only one tuple sent per run() call
+ 
 	LV2_Atom_Forge_Frame frame;
-	lv2_atom_forge_sequence_head(&self->forge,frame,unit);
+	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
 	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
 	lv2_atom_forge_int(&self->forge, loopIndex);
 	lv2_atom_forge_int(&self->forge, START_LOOP);
@@ -288,33 +286,10 @@ static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSa
 
 static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples)
 {
-//	plugin->message->loopIndex = loopIndex;
-//	plugin->message->command = STOP_LOOP;
-
-/*	
-    LV2_Atom_Forge forge;
-    LV2_Atom*      buf = (LV2_Atom*)calloc(1, strlen(path) + 128);
-    lv2_atom_forge_init(&forge, self->map);
-    lv2_atom_forge_set_sink(&forge, atom_sink, atom_sink_deref, buf);
-    write_set_file(&forge, &self->uris, path, strlen(path));
-*/
-
-//TODO call   lv2_atom_forge_set_sink(&forge, atom_sink, atom_sink_deref, buf); ??
-
-//XXX NOTE: need to write a SEQUENCE of ATOMS	
-
-//	lv2_atom_forge_atom();		XXX THIS writes a header too...
-
-//XXX could maybe just add this into the middle of a tuple
-//	lv2_atom_forge_frame_time(&self->forge, self->frame_offset);
-
-//	lv2_atom_forge_set_sink();
-
-//XXX XXX BEST GUESS:
-	lv2_atom_forge_set_buffer(&plugin->message);
+	lv2_atom_forge_set_buffer(&self->forge,&plugin->message,100);  //replace 100
 
 	LV2_Atom_Forge_Frame frame;
-	lv2_atom_forge_sequence_head(&self->forge,frame,unit);
+	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);
 	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
 	lv2_atom_forge_int(&self->forge, loopIndex);
 	lv2_atom_forge_int(&self->forge, STOP_LOOP);
@@ -357,7 +332,7 @@ static void playTrack(Self* self, Track* track, long cyclePos, long absBegin, lo
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
-			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos)
+			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos);
 
 			track->state = TRACK_PLAYING;
 			pos = pattern->startInFrames;
@@ -477,6 +452,8 @@ printf("\n");
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sampleCount)
 {
+printf("CALLING songEditor.c run() - start\n");			
+
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
@@ -498,8 +475,7 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 //TODO for every plugin...
 	for (int i=0; i<self->plugins.numPlugins; i++) {
 		Plugin* plugin = &self->plugins.plugins[i];
-		lv2_atom_forge_set_buffer(&self->forge, (uint8_t*)plugin->controlPort, capacity);
-		lv2_atom_forge_sequence_head(&self->forge, &self->notify_frame, 0);
+//		lv2_atom_forge_sequence_head(&self->forge, &self->notify_frame, 0);
 	}
 
 

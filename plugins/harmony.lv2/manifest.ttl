@@ -4,4 +4,4 @@
 <https://github.com/benbriedis/luvie/harmony>
 	a lv2:Plugin ;
 	lv2:binary <harmony.so>  ;
-	rdfs:seeAlso <luvie.ttl> .
+	rdfs:seeAlso <harmony.ttl> .

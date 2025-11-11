@@ -43,8 +43,6 @@ static int findControlPort(Plugins* plugins,Plugin* plugin)
 
 static bool addPlugin(Plugins* plugins,Plugin* plugin)
 {
-printf("addPlugin()  - A\n");
-
 	/* Get plugin */
 //XXX cf adding to plugin and freeing at the end ... (also used in ports)	
 //TODO store uri in plugin too...
@@ -61,7 +59,10 @@ printf("addPlugin()  - A\n");
 	}
 
 //TODO use at some point
-	bool supportsLoops = lilv_plugin_has_feature(lilvPlugin,"https://github.com/benbriedis/luvie#loops");
+	LilvNode* featureUriObj = lilv_new_uri(plugins->world,"https://github.com/benbriedis/luvie#loops");
+	bool supportsLoops = lilv_plugin_has_feature(lilvPlugin,featureUriObj);
+	lilv_node_free(featureUriObj); 
+
 	printf("Supports loops? %b\n",supportsLoops);
 
 	/* Create port structures */
@@ -72,13 +73,23 @@ printf("addPlugin()  - A\n");
 
 	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, plugins->sampleRate, NULL);
 
+printf("CALLING songEditor  addPlugin() - 2 instance: %ld\n",(long)plugin->instance);
+printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlPort->index);
+printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)plugin->message);
+
 //XXX MAYBE MEANT TO BE CALLED IN run() - see LV2 documentaton about threading, but conversely see...
 //https://drobilla.net/docs/lilv/index.html#instances
 //   MAYBE the host can choose? Looks like it needs to be called before activate though.
 
+
+
+//XXX 'message' is used later when sending messages again which is a bit suspicious...
+
+
 	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,plugin->message);
 //XXX disconnect sometime?
 
+printf("CALLING songEditor  addPlugin() - END\n");
 }
 
 bool instantiatePlugins(Plugins* plugins)
@@ -105,7 +116,8 @@ bool instantiatePlugins(Plugins* plugins)
 		plugin->uri = pluginUris[i];
 //XXX Q should we try using 'Patch' messages?
 //XXX or should this allow for multiple messages?
-		plugin->message = calloc(sizeof(LoopMessage),1);  //TODO free
+//		plugin->message = calloc(sizeof(LoopMessage),1);  //TODO free
+		plugin->message = calloc(100,1);  //TODO free
 
 		ok = ok && addPlugin(plugins,plugin);
 	}
@@ -115,24 +127,23 @@ bool instantiatePlugins(Plugins* plugins)
 //TODO if !ok disable the plugin I use
 }
 
-void runPlugins(Plugins* plugins)
-{
-//XXX or integrate into songEditor proper
-
-	for (int i=0; i<plugins->numPlugins; i++) {
-//run ***		
-		lilv_instance_activate(plugins->plugins[i].instance);
-//  lilv_instance_run(plugin->instance, 1);
-	}
-}
-
 
 //TODO App => Plugins  or merge with song editor app
 
 void activatePlugins(Plugins* plugins)
 {
+printf("CALLING songEditor activatePlugins() - START\n");			
+
 	for (int i=0; i<plugins->numPlugins; i++) 
+{		
+printf("CALLING songEditor AAA i=%d\n",i);	
+printf("CALLING songEditor AAA  instance: %ld\n",(long)plugins->plugins[i].instance);	
+
 		lilv_instance_activate(plugins->plugins[i].instance);
+printf("CALLING songEditor BBB i=%d\n",i);			
+}
+
+printf("CALLING songEditor activatePlugins() - END\n");			
 }
 
 void deactivatePlugins(Plugins* plugins)

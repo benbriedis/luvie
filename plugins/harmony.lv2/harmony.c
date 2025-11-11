@@ -183,6 +183,7 @@ printf("CALLING instantiate()\n");
 	URIs* const uris = &self->uris;
 	LV2_URID_Map* const map = self->map;
 
+//XXX do I still need all of these?
 	uris->atom_Blank          = map->map(map->handle, LV2_ATOM__Blank);
 	uris->atom_Float          = map->map(map->handle, LV2_ATOM__Float);
 	uris->atom_Object         = map->map(map->handle, LV2_ATOM__Object);
@@ -235,7 +236,7 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 /* The plugin must reset all internal state */
 static void activate(LV2_Handle instance)
 {
-printf("CALLING activate()\n");			
+printf("CALLING harmony.c activate() - start\n");			
 
 	Self* self = (Self*)instance;
 
@@ -255,6 +256,7 @@ printf("CALLING activate()\n");
 			note->state = NOTE_OFF;
 		}
 	}
+printf("CALLING harmony.c activate() - end\n");			
 }
 
 //static void gotMessage()
@@ -409,6 +411,8 @@ static void updatePosition(Self* self, const LV2_Atom_Object* timeObj)
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sample_count)
 {
+printf("CALLING harmony.c run() - start\n");			
+
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
@@ -418,6 +422,8 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->midi_port_out);
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
+
+//TODO remove time position messages	
 
 	/* Loop through events: */
 	const LV2_Atom_Sequence* in = self->controlPortIn;
