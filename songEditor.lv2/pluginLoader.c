@@ -1,5 +1,6 @@
 #include "pluginLoader.h"
 #include "lilv/lilv.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,7 +72,12 @@ static bool addPlugin(Plugins* plugins,Plugin* plugin)
 
 	/* Instantiate plugin and connect the control port */
 
-	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, plugins->sampleRate, NULL);
+printf("CALLING songEditor  addPlugin() - 2 lilvPlugin: %ld\n",(long)plugin->lilvPlugin);
+printf("CALLING songEditor  addPlugin() - 2 sampleRate: %d\n",plugins->sampleRate);
+//XXX maybe sample rate should be stored as a double?	
+
+	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, (double)plugins->sampleRate, NULL); //TODO replace NULL with [loops feature]
+	assert(plugin->instance != NULL);
 
 printf("CALLING songEditor  addPlugin() - 2 instance: %ld\n",(long)plugin->instance);
 printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlPort->index);
@@ -118,6 +124,7 @@ bool instantiatePlugins(Plugins* plugins)
 //XXX or should this allow for multiple messages?
 //		plugin->message = calloc(sizeof(LoopMessage),1);  //TODO free
 		plugin->message = calloc(100,1);  //TODO free
+printf("Allocated memory to message: %ld\n",(long)plugin->message);
 
 		ok = ok && addPlugin(plugins,plugin);
 	}
