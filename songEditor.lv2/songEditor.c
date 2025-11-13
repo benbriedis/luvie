@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include "pluginLoader.h"
 #include "songEditor.h"
 #include "lv2/atom/forge.h"
 
@@ -178,7 +179,11 @@ printf("CALLING instantiate()\n");
 //////////////////
 
 	self->plugins.sampleRate = sampleRate;
-	instantiatePlugins(&self->plugins);
+
+	//XXX hack? will just pass through our features to our kids for the moment
+	self->features = features;
+
+	instantiatePlugins(self,&self->plugins);
 
 printf("Back from addPlugins\n");	
 
@@ -452,8 +457,6 @@ printf("\n");
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sampleCount)
 {
-printf("CALLING songEditor.c run() - start\n");			
-
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 

@@ -36,6 +36,14 @@ Plugin structures
    PRO maybe easier...
    CON probably liable to be confusing at the end of the day.
 
+Thoughts from 12/11/2015
+------------------------
+LV2, Lilv etc are pretty painful, so don't really want them at the core of the application.
+MAY make more sense I think to create a minimal interface to connect the host and plugins.
+If desired later can provider adapters to allow LV2 or Clap plugins.
+
+
+
 Alternatives to using JSON for storage
 --------------------------------------
 https://dev.to/nikl/json-is-slower-here-are-its-4-faster-alternatives-2g30

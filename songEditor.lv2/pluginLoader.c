@@ -1,6 +1,8 @@
 #include "pluginLoader.h"
+#include "songEditor.h"
 #include "lilv/lilv.h"
 #include <assert.h>
+#include <lv2/core/lv2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,7 +44,7 @@ static int findControlPort(Plugins* plugins,Plugin* plugin)
 //XXX We probably also need to capture and midi-on and bundle it up in our midi output. In time 
 //    maybe similar for audio and possibly control ports.
 
-static bool addPlugin(Plugins* plugins,Plugin* plugin)
+static bool addPlugin(Self* self,Plugins* plugins,Plugin* plugin)
 {
 	/* Get plugin */
 //XXX cf adding to plugin and freeing at the end ... (also used in ports)	
@@ -76,8 +78,15 @@ printf("CALLING songEditor  addPlugin() - 2 lilvPlugin: %ld\n",(long)plugin->lil
 printf("CALLING songEditor  addPlugin() - 2 sampleRate: %d\n",plugins->sampleRate);
 //XXX maybe sample rate should be stored as a double?	
 
-	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, (double)plugins->sampleRate, NULL); //TODO replace NULL with [loops feature]
+
+	//XXX hack - just passing our features through to our children for the moment
+//	LV2_Feature* feature1 = {"http://lv2plug.in/ns/ext/urid#map",map}
+//	LilvNode* features[] = {feature1};
+
+	plugin->instance = lilv_plugin_instantiate(plugin->lilvPlugin, (double)plugins->sampleRate, self->features);
 	assert(plugin->instance != NULL);
+
+//	lilv_node_free(feature1); 
 
 printf("CALLING songEditor  addPlugin() - 2 instance: %ld\n",(long)plugin->instance);
 printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlPort->index);
@@ -98,7 +107,7 @@ printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)plugin->messag
 printf("CALLING songEditor  addPlugin() - END\n");
 }
 
-bool instantiatePlugins(Plugins* plugins)
+bool instantiatePlugins(Self* self,Plugins* plugins)
 {
 	plugins->numPlugins = 1;
 
@@ -126,7 +135,7 @@ bool instantiatePlugins(Plugins* plugins)
 		plugin->message = calloc(100,1);  //TODO free
 printf("Allocated memory to message: %ld\n",(long)plugin->message);
 
-		ok = ok && addPlugin(plugins,plugin);
+		ok = ok && addPlugin(self,plugins,plugin);
 	}
 
 	return ok;

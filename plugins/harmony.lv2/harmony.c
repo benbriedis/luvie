@@ -158,12 +158,13 @@ static LV2_Handle instantiate(
 	const LV2_Feature* const* features     //XXX host provided features
 )
 {
-printf("CALLING instantiate()\n");			
+printf("CALLING instantiate() - 1\n");			
 
 	Self* self = (Self*)calloc(1, sizeof(Self));
 	if (!self)
 		return NULL;
 
+printf("CALLING instantiate() - 2\n");			
 	/* Scan host features for URID map */
 	const char* missing = lv2_features_query(
 		features,
@@ -178,6 +179,7 @@ printf("CALLING instantiate()\n");
 		free(self);
 		return NULL;
 	}
+printf("CALLING instantiate() - 4\n");			
 
 	// Map URIS
 	URIs* const uris = &self->uris;
@@ -204,11 +206,13 @@ printf("CALLING instantiate()\n");
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
 
+printf("CALLING instantiate() - 5\n");			
 	self->patterns = calloc(1,sizeof(patterns));
 	if (!self)
 		return NULL;
 	memcpy(self->patterns,patterns,sizeof(patterns));
 
+printf("CALLING instantiate() - 6\n");			
 	return (LV2_Handle)self;
 }
 
