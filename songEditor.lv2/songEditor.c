@@ -269,22 +269,39 @@ printf("CALLING songEditor activate() - END\n");
 
 static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples,long startFrame)
 {
+	printf("loopIndex: %d\n",loopIndex);
+	printf("numSamples: %ld\n",numSamples);
+	printf("startFrame: %ld\n",startFrame);
+
 //XXX ALTERNATIVE: call child plugin run() at the same time as ours. Requires larger buffers.
 
 //TODO maybe try a 'Patch' or some other control message...
 
 //XXX alternative:  lv2_atom_forge_set_sink()
 	lv2_atom_forge_set_buffer(&self->forge,plugin->message,100);  //TODO replace 100. NB only one tuple sent per run() call
- 
+
+//NOTE one int is sneaking out OK. Maybe try catching in harmony.c run()?
+
+printf("sendLoopOnMessage() -1\n");	
 	LV2_Atom_Forge_Frame frame;
+printf("sendLoopOnMessage() -1A\n");	
 	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
-	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
-	lv2_atom_forge_int(&self->forge, loopIndex);
+printf("sendLoopOnMessage() -1B\n");	
+//	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
+printf("sendLoopOnMessage() -1C\n");	
+//	lv2_atom_forge_int(&self->forge, loopIndex);
+printf("sendLoopOnMessage() -1D\n");	
 	lv2_atom_forge_int(&self->forge, START_LOOP);
-	lv2_atom_forge_int(&self->forge, startFrame);
-	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+printf("sendLoopOnMessage() -1E\n");	
+//	lv2_atom_forge_int(&self->forge, startFrame);
+printf("sendLoopOnMessage() -2\n");	
+//	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+
+printf("sendLoopOnMessage() -3\n");	
 
 	lilv_instance_run(plugin->instance,numSamples);
+
+printf("sendLoopOnMessage() END\n");	
 }
 
 //XXX child plugins dont need to support time position. Song editor can look after that.
@@ -337,7 +354,11 @@ static void playTrack(Self* self, Track* track, long cyclePos, long absBegin, lo
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
-			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos);
+//FIXME want the start, cyclePos is the current position (ie more like the end)			
+sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,0);
+//			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos);
+
+			printf("SENT MESSAGE A\n");
 
 			track->state = TRACK_PLAYING;
 			pos = pattern->startInFrames;

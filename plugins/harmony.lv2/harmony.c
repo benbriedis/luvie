@@ -420,9 +420,12 @@ printf("CALLING harmony.c run() - start\n");
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
+printf("CALLING harmony.c run() - self->midi_port_out: %ld\n",(long)self->midi_port_out);			
+
   	/* Initially self->out_port contains a Chunk with size set to capacity */
 	const uint32_t outCapacity = self->midi_port_out->atom.size;
 
+printf("CALLING harmony.c run() - 3\n");			
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->midi_port_out);
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
@@ -434,6 +437,10 @@ printf("CALLING harmony.c run() - start\n");
 	uint32_t last_t = 0;
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
+
+printf("GOT EVENT ev: %ld\n",(long)ev);
+printf("GOT EVENT ev->body: %ld\n",ev->body);
+printf("GOT EVENT ev->body.type: %d\n",ev->body.type);
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
@@ -448,6 +455,9 @@ printf("CALLING harmony.c run() - start\n");
 //		if (lv2_atom_forge_is_object_type(const LV2_Atom_Forge *forge, uint32_t type))  XXX Use this in future if we create a forge
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
+
+printf("GOT ATOM obj: %ld\n",(long)obj);
+printf("GOT ATOM obj->body: %ld\n",obj->body);
 
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj);
@@ -465,6 +475,8 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
 		playPatterns(self, last_t, sample_count, outCapacity);
+
+printf("CALLING harmony.c run() - 9\n");			
 }
 
 /*

@@ -27,6 +27,12 @@
 		long startFrame;
 	} LoopMessage;
 
+	typedef struct {
+		int todo1;
+		int todo2;
+		int todo3;
+	} MidiMessage;
+
 
 	/* Runtime port information */
 	typedef struct {
@@ -48,7 +54,10 @@
 		LilvInstance* instance;
 		Port* controlPort;
 	//XXX or allow for multiple messages?
-		LoopMessage* message;
+		LoopMessage* message;   //XXX can I embed it if single messages are used?
+
+		Port* midiPortOut;
+		MidiMessage midiMessage;
 	} Plugin;
 
 	/* Application state */

@@ -5,25 +5,27 @@
 #include <lv2/core/lv2.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 
-static int findControlPort(Plugins* plugins,Plugin* plugin)
+static int findPorts(Self* self,Plugins* plugins,Plugin* plugin)
 {
 	const LilvPlugin* lilvPlugin = plugin->lilvPlugin;
 	const uint32_t numPorts = lilv_plugin_get_num_ports(lilvPlugin);
 
 //TODO save the control port in its own special place...
 
-	bool found = false;
+	LilvNode* loopsControlUriObj = lilv_new_uri(plugins->world, "https://github.com/benbriedis/luvie#loopsControl");
+	LilvNode* midiObj = lilv_new_uri(plugins->world, "http://lv2plug.in/ns/ext/midi#MidiEvent");
+	LilvNode* outputObj = lilv_new_uri(plugins->world, "http://lv2plug.in/ns/lv2core#OutputPort");
+
+	bool foundLoopsControl = false;
+	bool foundMidiOut = false;
 
 	for (uint32_t i = 0; i < numPorts; i++) {
 		const LilvPort* lilvPort = lilv_plugin_get_port_by_index(lilvPlugin, i);  //TODO free?
 
-		LilvNode* uriObj = lilv_new_uri(plugins->world, "https://github.com/benbriedis/luvie#loopsControl");
-
 		/* Look for our loop/pattern input control port: */
-		if (lilv_port_supports_event(lilvPlugin,lilvPort,uriObj)) {
+		if (lilv_port_supports_event(lilvPlugin,lilvPort,loopsControlUriObj)) {
 			/* Assuming we are an input port, etc */
 
 			printf("FOUND CONTROL PORT on %u\n",i);
@@ -32,13 +34,29 @@ static int findControlPort(Plugins* plugins,Plugin* plugin)
 			plugin->controlPort = controlPort;
 			controlPort->lilvPort = lilvPort;
 			controlPort->index = i;
-			found = true;
+			foundLoopsControl = true;
 		}
 
-		lilv_node_free(uriObj);
+		if (
+			lilv_port_is_a(lilvPlugin, lilvPort, outputObj) &&
+			lilv_port_supports_event(lilvPlugin,lilvPort,midiObj)
+		) 
+		{
+			printf("FOUND MIDI OUTPUT PORT on %u\n",i);
+
+			Port* midiPort = calloc(sizeof(Port),1);   //TODO free
+			plugin->midiPortOut = midiPort;
+			midiPort->lilvPort = lilvPort;
+			midiPort->index = i;
+			foundMidiOut = true;
+		}
 	}
 
-	return found;
+	lilv_node_free(loopsControlUriObj);
+	lilv_node_free(midiObj);
+	lilv_node_free(outputObj);
+
+	return foundLoopsControl && foundMidiOut;;
 }
 
 //XXX We probably also need to capture and midi-on and bundle it up in our midi output. In time 
@@ -69,7 +87,7 @@ static bool addPlugin(Self* self,Plugins* plugins,Plugin* plugin)
 	printf("Supports loops? %b\n",supportsLoops);
 
 	/* Create port structures */
-	if (!findControlPort(plugins,plugin)) 
+	if (!findPorts(self,plugins,plugin)) 
 		return false;
 
 	/* Instantiate plugin and connect the control port */
@@ -103,6 +121,9 @@ printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)plugin->messag
 
 	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,plugin->message);
 //XXX disconnect sometime?
+
+//	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,self->midiPortOut); //XXX far from sure about this last argument
+	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&plugin->midiMessage); 
 
 printf("CALLING songEditor  addPlugin() - END\n");
 }
