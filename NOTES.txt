@@ -126,3 +126,7 @@ So in practice we get:
 	beatsPerBar: 4.000000
 	beatUnit: 4
 
+
+TO TEST
+=======
+1. If multiple midi plugins get called in same cycle and emit notes, are multiple notes outputted successfully?

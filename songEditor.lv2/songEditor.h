@@ -160,8 +160,8 @@
 		LV2_Log_Logger logger;
 
 		/* Ports: */
-		const LV2_Atom_Sequence* controlPortIn;
-		LV2_Atom_Sequence* midiPortOut;
+		const LV2_Atom_Sequence* controlInBuffer;
+		LV2_Atom_Sequence* midiOutBuffer;
 
 		URIs uris;   // Cache of mapped URIDs
 
@@ -184,9 +184,6 @@
 		Plugins plugins;
 
 
-	//	LV2_Atom_Forge_Frame notify_frame; ///< Cached for worker replies
-		LV2_Atom_Forge forge; 
-
 		//XXX hack - just passing our features through to our children for the moment
 		LV2_Feature* features;
 
@@ -195,10 +192,18 @@
 			See https://lv2plug.in/c/html/group__lv2core.html#a3cb9de627507db42e338384ab945660e - connect_port()
 		*/
 
+	//	LV2_Atom_Forge_Frame notify_frame; ///< Cached for worker replies
+
 	//XXX or allow for multiple messages?
 //		LoopMessage* controlMessage;   //XXX can I embed it if single messages are used?
 //		char controlMessage[200];   //XXX can I embed it if single messages are used?
-		uint64_t controlMessage[200];   //XXX can I embed it if single messages are used?
+
+		LV2_Atom_Forge controlForge; 
+		uint64_t controlBuffer[200];   //XXX can I embed it if single messages are used?
+
+		LV2_Atom_Forge midiForge; 
+//		MidiMessage midiMessage[100];
+		uint64_t midiBuffer[200];
 	} Self;
 
 #endif // SONG_EDITOR_H

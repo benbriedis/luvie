@@ -116,11 +116,12 @@ printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlP
 //XXX 'message' is used later when sending messages again which is a bit suspicious...
 
 
-	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlMessage);
+	/* Note these buffers are shared between all plugins */
+	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlBuffer);
 //XXX disconnect sometime?
 
 //	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,self->midiPortOut); //XXX far from sure about this last argument
-	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&plugin->midiMessage); 
+	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&self->midiBuffer); 
 
 printf("CALLING songEditor  addPlugin() - END\n");
 }

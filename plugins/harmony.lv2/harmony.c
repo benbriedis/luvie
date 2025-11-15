@@ -134,8 +134,8 @@ typedef struct {
 	LV2_Log_Logger logger;
 
 	/* Ports: */
-	const LV2_Atom_Sequence* controlPortIn;
-	LV2_Atom_Sequence* midi_port_out;
+	const LV2_Atom_Sequence* controlInBuffer;
+	LV2_Atom_Sequence* midiOutBuffer;
 
 	URIs uris;   // Cache of mapped URIDs
 
@@ -238,11 +238,11 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 
 	switch (port) {
 		case CONTROL_IN:
-			self->controlPortIn = (LV2_Atom_Sequence*)data;
+			self->controlInBuffer = (LV2_Atom_Sequence*)data;
 			break;
 
 		case MIDI_OUT:
-			self->midi_port_out = (LV2_Atom_Sequence*)data;
+			self->midiOutBuffer = (LV2_Atom_Sequence*)data;
 			break;
 	}
 }
@@ -319,6 +319,7 @@ typedef struct {
 static void noteOn(Self* self,Note* note,uint32_t position,int pitch,uint32_t outCapacity)
 {
 	MIDINoteEvent out;
+printf("NOTE ON  pitch:%d\n",pitch);
 
 	note->state = NOTE_ON;
 
@@ -330,7 +331,7 @@ static void noteOn(Self* self,Note* note,uint32_t position,int pitch,uint32_t ou
 	out.msg[2] = 100;		// Velocity
 
 //XXX may need to check the outCapacity is not exceeded	
-	lv2_atom_sequence_append_event(self->midi_port_out, outCapacity, &out.event);
+	lv2_atom_sequence_append_event(self->midiOutBuffer, outCapacity, &out.event);
 }
 
 static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t outCapacity)
@@ -338,6 +339,7 @@ static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t o
 	MIDINoteEvent out;
 
 	note->state = NOTE_OFF;
+printf("NOTE OFF pitch:%d\n",pitch);
 
 	out.event.time.frames = position;
 	out.event.body.type = self->uris.midi_Event;
@@ -346,7 +348,7 @@ static void noteOff(Self* self,Note* note,uint32_t position,int pitch,uint32_t o
 	out.msg[1] = pitch;       
 	out.msg[2] = 0;       //XXX this is how fast to release note (127 fastest). Not always (often?) implemented?
 
-	lv2_atom_sequence_append_event(self->midi_port_out,outCapacity, &out.event);
+	lv2_atom_sequence_append_event(self->midiOutBuffer,outCapacity, &out.event);
 }
 
 //NOTE it appears one pitch can't be played twice on a given channel... TODO check
@@ -431,19 +433,19 @@ static void run(LV2_Handle instance, uint32_t sample_count)
  	const URIs* uris = &self->uris;
 
   	/* Initially self->out_port contains a Chunk with size set to capacity */
-	const uint32_t outCapacity = self->midi_port_out->atom.size;
+	const uint32_t outCapacity = self->midiOutBuffer->atom.size;
 
 	/* Write an empty Sequence header to the output */
-	lv2_atom_sequence_clear(self->midi_port_out);
-	self->midi_port_out->atom.type = self->uris.atom_Sequence;
+	lv2_atom_sequence_clear(self->midiOutBuffer);
+	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
 
 //TODO remove time position messages	
 
 	/* Loop through events: */
-	const LV2_Atom_Sequence* in = self->controlPortIn;
+	const LV2_Atom_Sequence* in = self->controlInBuffer;
 	uint32_t last_t = 0;
 
-	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
+	LV2_ATOM_SEQUENCE_FOREACH (self->controlInBuffer, ev) {
 
 		//XXX empty sequences seem to send through single empty events
 		if (ev->body.type != 0)

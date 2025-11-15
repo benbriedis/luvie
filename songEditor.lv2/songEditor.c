@@ -243,7 +243,8 @@ printf("Back from addPlugins\n");
 	for (int t=0; t<self->numTracks; t++) 
 		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
 
-    lv2_atom_forge_init(&self->forge, self->map);
+    lv2_atom_forge_init(&self->controlForge, self->map);
+    lv2_atom_forge_init(&self->midiForge, self->map);
 
 printf("Finished instantiate()\n");	
 	return (LV2_Handle)self;
@@ -260,13 +261,13 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 	Self* self = (Self*)instance;
 
 	switch (port) {
+//XXX cf ==> 'TIME_IN'		
 		case CONTROL_IN:
-			self->controlPortIn = (LV2_Atom_Sequence*)data;
+			self->controlInBuffer = (LV2_Atom_Sequence*)data;
 			break;
 
-//TODO ==> CONTROL_OUT
 		case MIDI_OUT:
-			self->midiPortOut = (LV2_Atom_Sequence*)data;
+			self->midiOutBuffer = (LV2_Atom_Sequence*)data;
 			break;
 	}
 }
@@ -327,15 +328,15 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 //    NO -> one is relative to run(), the other to the pattern
 
 	LV2_Atom_Forge_Frame frame;
-	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
-	lv2_atom_forge_key(&self->forge, self->uris.loopId);
-	lv2_atom_forge_int(&self->forge, patternId);
-	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
-	lv2_atom_forge_bool(&self->forge, true);
-	lv2_atom_forge_key(&self->forge, self->uris.loopStartFrame);
+	lv2_atom_forge_object(&self->controlForge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
+	lv2_atom_forge_key(&self->controlForge, self->uris.loopId);
+	lv2_atom_forge_int(&self->controlForge, patternId);
+	lv2_atom_forge_key(&self->controlForge, self->uris.loopEnable);
+	lv2_atom_forge_bool(&self->controlForge, true);
+	lv2_atom_forge_key(&self->controlForge, self->uris.loopStartFrame);
 //TODO rename to 'offset' I think. Can start at 0 or at the point relative to the current pattern.
-	lv2_atom_forge_long(&self->forge, patternOffset);
-	lv2_atom_forge_pop(&self->forge, &frame); 
+	lv2_atom_forge_long(&self->controlForge, patternOffset);
+	lv2_atom_forge_pop(&self->controlForge, &frame); 
 printf("sendLoopOnMessage() END\n\n");	
 }
 
@@ -344,12 +345,12 @@ printf("sendLoopOnMessage() END\n\n");
 static void sendLoopOffMessage(Self* self,int patternId)
 {
 	LV2_Atom_Forge_Frame frame;
-	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
-	lv2_atom_forge_key(&self->forge, self->uris.loopId);
-	lv2_atom_forge_int(&self->forge, patternId);
-	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
-	lv2_atom_forge_bool(&self->forge, false);
-	lv2_atom_forge_pop(&self->forge, &frame); 
+	lv2_atom_forge_object(&self->controlForge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
+	lv2_atom_forge_key(&self->controlForge, self->uris.loopId);
+	lv2_atom_forge_int(&self->controlForge, patternId);
+	lv2_atom_forge_key(&self->controlForge, self->uris.loopEnable);
+	lv2_atom_forge_bool(&self->controlForge, false);
+	lv2_atom_forge_pop(&self->controlForge, &frame); 
 printf("sendLoopOffMessage() END\n\n");	
 }
 
@@ -516,23 +517,30 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
  	const URIs* uris = &self->uris;
 
 	/* Write an empty Sequence header to the output */
-	lv2_atom_sequence_clear(self->midiPortOut);
-	self->midiPortOut->atom.type = self->uris.atom_Sequence;
+	lv2_atom_sequence_clear(self->midiOutBuffer);
+	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
 
 	uint32_t pos = 0;
 
-	/* Set up the control port buffer: */
+	/* --- Create pattern messages and handle time position changes --- */
+
+	/* Prepare for creation of pattern messages: */
+//FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
+	memset(&self->controlBuffer,0,sizeof(self->controlBuffer));
+//XXX I image sequence_head does this... TODO probably delete   NOT WORKING
+//	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
+
 //XXX alternative:  lv2_atom_forge_set_sink()
-	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
-	LV2_Atom_Forge_Frame sequenceFrame; 
-	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
-    lv2_atom_forge_frame_time(&self->forge,0);
+	lv2_atom_forge_set_buffer(&self->controlForge,(uint8_t*)&self->controlBuffer,sizeof(self->controlBuffer));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
+	LV2_Atom_Forge_Frame controlSequenceFrame; 
+	lv2_atom_forge_sequence_head(&self->controlForge,&controlSequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
+    lv2_atom_forge_frame_time(&self->controlForge,0);
 
 
 //XXX cf separate into handleEvents() or handleEvent()...
 	/* Loop through events: */
 int i=0;	
-	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
+	LV2_ATOM_SEQUENCE_FOREACH (self->controlInBuffer, ev) {
 		uint32_t offset = ev->time.frames;
 
 		// Play the click for the time slice from last_t until now
@@ -576,7 +584,20 @@ i++;
 	self->absolutePosition += sampleCount - pos;
 
 	/* Complete the sequence: */
-	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
+	lv2_atom_forge_pop(&self->controlForge, &controlSequenceFrame);
+
+
+	/* --- Call our plugins --- */
+
+	/* Prepare for MIDI output: */
+//FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
+	memset(&self->controlBuffer,0,sizeof(self->controlBuffer));
+
+	lv2_atom_forge_set_buffer(&self->midiForge,(uint8_t*)&self->midiBuffer,sizeof(self->midiBuffer));
+	LV2_Atom_Forge_Frame midiSequenceFrame; 
+	lv2_atom_forge_sequence_head(&self->midiForge,&midiSequenceFrame,self->uris.time_frame);
+    lv2_atom_forge_frame_time(&self->midiForge,0);
+//TEST try adding a MIDI note ourselves before calling the plugin. Survive does it?
 
 	/* Call our plugins: */
 	for (int i=0; i<self->plugins.numPlugins; i++) {
@@ -584,11 +605,7 @@ i++;
 		lilv_instance_run(plugin->instance,sampleCount);
 	}
 
-//FIXME is this what people do? Presumably only need to set 0s at the start...
-	memset(&self->controlMessage,0,sizeof(self->controlMessage));
-
-//XXX I image sequence_head does this... TODO probably delete   NOT WORKING
-//	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
+	lv2_atom_forge_pop(&self->midiForge, &midiSequenceFrame);
 }
 
 /*

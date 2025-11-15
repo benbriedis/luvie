@@ -53,7 +53,7 @@
 
 	//TODO? share this buffer between plugins. IS permitted, but how is it achieved in practice?
 	//NOTE unlike the inputs we really have to allow multiple messages here.
-		MidiMessage midiMessage[100];
+	//	MidiMessage midiMessage[100];
 	} Plugin;
 
 	/* Application state */
