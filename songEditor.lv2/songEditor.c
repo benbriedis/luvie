@@ -464,6 +464,7 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 	long newPos = ((LV2_Atom_Long*)time_frame)->body;
 	float newSpeed = ((LV2_Atom_Float*)speed)->body;
 
+	/*
 if (speed) 
 printf("speed: %f\n",newSpeed);
 
@@ -472,6 +473,7 @@ printf("frame: %ld\n",newPos);
 
 printf("positionInFrames: %ld\n",self->absolutePosition);
 printf("offsetFrames: %d\n",offsetFrames); 
+*/
 
 
 	if (self->speed==1.0f && newSpeed==0.0f) {
@@ -497,7 +499,7 @@ printf("offsetFrames: %d\n",offsetFrames);
 	self->absolutePosition = newPos;
 
 
-printf("\n");
+//printf("\n");
 
 //FIXME the speed (and frame) guard needs to be earlier to use useful...	
 	/* Speed=0 (stop) or speed=1 (play) */
@@ -520,8 +522,6 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	lv2_atom_sequence_clear(self->midiOutBuffer);
 	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
 
-	uint32_t pos = 0;
-
 	/* --- Create pattern messages and handle time position changes --- */
 
 	/* Prepare for creation of pattern messages: */
@@ -539,7 +539,8 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 
 //XXX cf separate into handleEvents() or handleEvent()...
 	/* Loop through events: */
-int i=0;	
+	uint32_t pos = 0;
+
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlInBuffer, ev) {
 		uint32_t offset = ev->time.frames;
 
@@ -556,10 +557,8 @@ int i=0;
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
-			if (obj->body.otype == uris->time_Position)  {
-printf("i: %d  sampleCount:%d\n",i,sampleCount);				
+			if (obj->body.otype == uris->time_Position) 
 				maybeJump(self, obj,offset);
-			}
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
@@ -567,13 +566,9 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 //     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
 		}
 
-if (i!=0)
-printf("i: %d\n",i);				
-
 //XXX Q: should we calling this 'play' for all message types? 
 
 		pos = offset;
-i++;		
 	}
 
 	/* Play out the remainder of cycle: */
@@ -591,7 +586,7 @@ i++;
 
 	/* Prepare for MIDI output: */
 //FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
-	memset(&self->controlBuffer,0,sizeof(self->controlBuffer));
+	memset(&self->midiBuffer,0,sizeof(self->midiBuffer));
 
 	lv2_atom_forge_set_buffer(&self->midiForge,(uint8_t*)&self->midiBuffer,sizeof(self->midiBuffer));
 	LV2_Atom_Forge_Frame midiSequenceFrame; 
