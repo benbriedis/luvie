@@ -92,7 +92,6 @@ static bool addPlugin(Self* self,Plugins* plugins,Plugin* plugin)
 
 	/* Instantiate plugin and connect the control port */
 
-printf("CALLING songEditor  addPlugin() - 2 lilvPlugin: %ld\n",(long)plugin->lilvPlugin);
 printf("CALLING songEditor  addPlugin() - 2 sampleRate: %d\n",plugins->sampleRate);
 //XXX maybe sample rate should be stored as a double?	
 
@@ -106,9 +105,7 @@ printf("CALLING songEditor  addPlugin() - 2 sampleRate: %d\n",plugins->sampleRat
 
 //	lilv_node_free(feature1); 
 
-printf("CALLING songEditor  addPlugin() - 2 instance: %ld\n",(long)plugin->instance);
 printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlPort->index);
-printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)self->controlMessage);
 
 //XXX MAYBE MEANT TO BE CALLED IN run() - see LV2 documentaton about threading, but conversely see...
 //https://drobilla.net/docs/lilv/index.html#instances
@@ -154,7 +151,6 @@ bool instantiatePlugins(Self* self,Plugins* plugins)
 //XXX or should this allow for multiple messages?
 //		plugin->message = calloc(sizeof(LoopMessage),1);  //TODO free
 //		plugin->controlMessage = calloc(100,1);  //TODO free
-printf("Allocated memory to message: %ld\n",(long)self->controlMessage);
 
 		ok = ok && addPlugin(self,plugins,plugin);
 	}
@@ -174,13 +170,11 @@ printf("CALLING songEditor activatePlugins() - START\n");
 	for (int i=0; i<plugins->numPlugins; i++) 
 {		
 printf("CALLING songEditor AAA i=%d\n",i);	
-printf("CALLING songEditor AAA  instance: %ld\n",(long)plugins->plugins[i].instance);	
 
 		lilv_instance_activate(plugins->plugins[i].instance);
 printf("CALLING songEditor BBB i=%d\n",i);			
 }
 
-printf("CALLING songEditor activatePlugins() - END\n");			
 }
 
 void deactivatePlugins(Plugins* plugins)

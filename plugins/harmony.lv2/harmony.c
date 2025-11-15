@@ -430,12 +430,9 @@ printf("CALLING harmony.c run() - start\n");
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
-printf("CALLING harmony.c run() - self->midi_port_out: %ld\n",(long)self->midi_port_out);			
-
   	/* Initially self->out_port contains a Chunk with size set to capacity */
 	const uint32_t outCapacity = self->midi_port_out->atom.size;
 
-printf("CALLING harmony.c run() - 3 NOTE loopsMessageId should be: %d\n",self->uris.loopsMessage);			
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->midi_port_out);
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
@@ -448,21 +445,7 @@ printf("CALLING harmony.c run() - 3 NOTE loopsMessageId should be: %d\n",self->u
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
 
-printf("GOT EVENT ev: %ld\n",(long)ev);
-printf("GOT EVENT ev->body: %ld\n",ev->body);
-printf("GOT EVENT ev->body.type: %d\n",ev->body.type);
-printf("GOT EVENT ev->body.size: %d\n",ev->body.size);
-printf("GOT EVENT ev->body.time: %d\n",ev->time);
-printf("GOT EVENT ev->body.beats: %lf\n",ev->time.beats);
-printf("GOT EVENT ev->body.frames: %ld\n",ev->time.frames);
-
-
-LV2_Atom* testAsAtom = (LV2_Atom*)&ev->body;
-printf("AS ATOM type: %d\n",testAsAtom->type);
-
-LV2_Atom_Int* testAsInt = (LV2_Atom_Int*)&ev->body;
-printf("AS INT type: %d\n",testAsInt->body);
-
+printf("GOT EVENT type: %d   size: %d\n",ev->body.type,ev->body.size);
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
@@ -478,15 +461,42 @@ printf("AS INT type: %d\n",testAsInt->body);
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
-printf("GOT ATOM obj: %ld\n",(long)obj);
-printf("GOT ATOM obj->body: %ld\n",obj->body);
+printf("GOT an atom  otype: %d\n",obj->body.otype);
 
 			if (obj->body.otype == uris->time_Position) 
-				updatePosition(self, obj);
-			else if (obj->body.otype == uris->loopsMessage)
-printf("GOT loop_Command  otype: %d\n",obj->body.otype);
-			else
-printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
+				updatePosition(self, obj); //TODO delete I think
+			else if (obj->body.otype == uris->loopsMessage) {
+printf("GOT loops mesasge\n");
+
+				LV2_Atom* loopId = NULL;
+				LV2_Atom* loopEnable = NULL;
+				LV2_Atom* startFrame = NULL;
+
+				lv2_atom_object_get(obj,
+					uris->loopId, &loopId,
+					uris->loopEnable, &loopEnable,
+					uris->loopStartFrame, &startFrame, //TODO its optional. How to deal with?
+					NULL
+				);
+
+//NOTE I'm favouring use of "pattern" again over "loop"				
+				printf("loopId: %ld\n",((LV2_Atom_Long*)loopId)->body);
+				printf("loopEnable: %b\n",((LV2_Atom_Bool*)loopEnable)->body);
+				if (startFrame)
+					printf("startFrame: %ld\n",((LV2_Atom_Long*)startFrame)->body);
+
+/*
+				if (loopId && loopId->type == uris->atom_Long)  //XXX they should really be an exceptions
+					self->loopId = ((LV2_Atom_Long*)loopId)->body;
+
+				if (loopEnable /*&& speed->type == uris->atom_Bool* /)
+					self->loopEnable = ((LV2_Atom_Bool*)loopEnable)->body;
+
+				if (startFrame /*&& speed->type == uris->atom_Long* /)
+					self->loopStartFrame = ((LV2_Atom_Long*)startFrame)->body;
+*/				
+
+			}
 
 //TODO probably accept another atom type message to change pattern indexes (and maybe allow patterns to be added or removed).
 //     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
@@ -499,8 +509,6 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
 		playPatterns(self, last_t, sample_count, outCapacity);
-
-printf("CALLING harmony.c run() - 9\n");			
 }
 
 /*

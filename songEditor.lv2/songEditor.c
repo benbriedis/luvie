@@ -302,45 +302,45 @@ printf("CALLING songEditor activate() - END\n");
 
 static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples,long startFrame)
 {
+/* TODO probably use a sequence of Patch.set instead to maximise reusabilty.  cf	
+
+    a patch:Set ;
+    patch:subject "Pattern5" ;
+    patch:property "enabled" ;
+    patch:value true .
+
+	patch:context "start frame: 500" .
+
+cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlGroup)
+   - Maybe add a group?
+   - + an enabled setting (or use bypass)
+*/	
+
+
 	printf("loopIndex: %d\n",loopIndex);
 	printf("numSamples: %ld\n",numSamples);
 	printf("startFrame: %ld\n",startFrame);
+	printf("sendLoopOnMessage() -1 loopsMessageId: %d\n",self->uris.loopsMessage);	
 
 //XXX ALTERNATIVE: call child plugin run() at the same time as ours. Requires larger buffers.
 
 //TODO maybe try a 'Patch' or some other control message...
 
-//XXX the plugins need to do this first, so maybe we do too?
-lv2_atom_sequence_clear(self->controlMessage);
-
+//lv2_atom_sequence_clear(self->controlMessage);
 //XXX alternative:  lv2_atom_forge_set_sink()
 
 	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
 
-//NOTE one int is sneaking out OK. Maybe try catching in harmony.c run()?
-
-printf("sendLoopOnMessage() -1 loopsMessageId: %d\n",self->uris.loopsMessage);	
-
 //NOTE if this frame is to span multiple calls I think we can/need to store it in self (See examplescope example)
 	LV2_Atom_Forge_Frame sequenceFrame; 
 
-//FIXME need this for the frame I think...
 	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
 
-    lv2_atom_forge_frame_time(&self->forge, 0);  //TODO check 0
+//XXX could/should probably use THIS time frame rather than the one below? 
+//    NO -> one is relative to run(), the other to the pattern
+
+    lv2_atom_forge_frame_time(&self->forge, 0);  //FIXME put in time frame  
 	LV2_Atom_Forge_Frame frame;
-/*
-printf("sendLoopOnMessage() -1B\n");	
-	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
-printf("sendLoopOnMessage() -1C\n");	
-	lv2_atom_forge_int(&self->forge, loopIndex);
-printf("sendLoopOnMessage() -1D\n");	
-	lv2_atom_forge_int(&self->forge, START_LOOP);
-printf("sendLoopOnMessage() -1E\n");	
-	lv2_atom_forge_int(&self->forge, startFrame);
-printf("sendLoopOnMessage() -2\n");	
-	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
-*/	
 
 	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->forge, self->uris.loopId);
@@ -348,21 +348,15 @@ printf("sendLoopOnMessage() -2\n");
 	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
 	lv2_atom_forge_bool(&self->forge, true);
 	lv2_atom_forge_key(&self->forge, self->uris.loopStartFrame);
+//TODO rename to 'offset' I think. Can start at 0 or at the point relative to the current pattern.
 	lv2_atom_forge_long(&self->forge, startFrame);
-	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+	lv2_atom_forge_pop(&self->forge, &frame); 
 	/* End the sequence */
 	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
 
-printf("sendLoopOnMessage() -3\n");	
-
 	lilv_instance_run(plugin->instance,numSamples);
 
-/* NOTE we CAN reuse the loopsMessage buffer between plugins.
-   We would need to ensure same pattern IDs are used between plugins.
-		See https://lv2plug.in/c/html/group__lv2core.html#a3cb9de627507db42e338384ab945660e - connect_port()
-*/
-
-printf("sendLoopOnMessage() END\n");	
+printf("sendLoopOnMessage() END\n\n");	
 }
 
 //XXX child plugins dont need to support time position. Song editor can look after that.
@@ -370,7 +364,7 @@ printf("sendLoopOnMessage() END\n");
 static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples)
 {
 //XXX the plugins need to do this first, so maybe we do too?
-lv2_atom_sequence_clear(self->controlMessage);
+//lv2_atom_sequence_clear(self->controlMessage);
 
 	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
 
@@ -378,26 +372,22 @@ lv2_atom_sequence_clear(self->controlMessage);
 	LV2_Atom_Forge_Frame sequenceFrame; 
 
 	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);
-    lv2_atom_forge_frame_time(&self->forge, 0);  //TODO check 0
+    lv2_atom_forge_frame_time(&self->forge, 0);  //FIXME put in time frame
 
 	LV2_Atom_Forge_Frame frame;
-/*	
-	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
-	lv2_atom_forge_int(&self->forge, loopIndex);
-	lv2_atom_forge_int(&self->forge, STOP_LOOP);
-	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
-*/	
 
 	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->forge, self->uris.loopId);
 	lv2_atom_forge_int(&self->forge, loopIndex);
 	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
 	lv2_atom_forge_bool(&self->forge, false);
-	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+	lv2_atom_forge_pop(&self->forge, &frame); 
 	/* End the sequence */
 	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
 
 	lilv_instance_run(plugin->instance,numSamples);
+
+printf("sendLoopOffMessage() END\n\n");	
 }
 
 

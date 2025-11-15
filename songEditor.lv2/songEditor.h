@@ -190,7 +190,8 @@
 		LV2_Feature* features;
 
 		/* 
-		   It's OK to share the buffer between plugins, so that's what I'm doing.
+			It's OK to share the buffer between plugins, so that's what I'm doing.
+			See https://lv2plug.in/c/html/group__lv2core.html#a3cb9de627507db42e338384ab945660e - connect_port()
 		*/
 
 	//XXX or allow for multiple messages?
