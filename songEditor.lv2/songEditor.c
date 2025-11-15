@@ -228,8 +228,8 @@ printf("Back from addPlugins\n");
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
-	self->positionInFrames = 0;
-	self->testPositionInFrames = 0;
+	self->absolutePosition = 0;
+	self->testPosition = 0;
 
 	self->timeline = calloc(1,sizeof(timeline));
 	if (!self)
@@ -320,7 +320,7 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 
 
 	printf("loopIndex: %d\n",patternId);
-	printf("startFrame: %ld\n",patternOffset);
+	printf("patternOffset: %ld\n",patternOffset);
 	printf("sendLoopOnMessage() -1 loopsMessageId: %d\n",self->uris.loopsMessage);	
 
 //XXX could/should probably use THIS time frame rather than the one below? 
@@ -354,12 +354,12 @@ printf("sendLoopOffMessage() END\n\n");
 }
 
 
-static void playTrack(Self* self, Track* track, long absBegin, long absEnd)
+static void playTrack(Self* self, Track* track,long absPos,int last,int current)
 {
-	long pos = absBegin;
+	long pos = absPos + last;
 
 	/* In theory a cycle can contain many note changes. Best to support it, however unlikely and undesirable. */
-	for (int pat=track->currentOrNext; pos<absEnd && pat<track->numPatterns; pat++) {
+	for (int pat=track->currentOrNext; pos<absPos+current && pat<track->numPatterns; pat++) {
 
 		Pattern* pattern = &track->patterns[track->currentOrNext];
 
@@ -387,8 +387,7 @@ static void playTrack(Self* self, Track* track, long absBegin, long absEnd)
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
 //FIXME want the start, cyclePos is the current position (ie more like the end)			
-sendLoopOnMessage(self,pattern->id,absEnd - absBegin);
-//			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos);
+			sendLoopOnMessage(self,pattern->id,absPos + current - pattern->startInFrames);
 
 			printf("SENT MESSAGE A\n");
 
@@ -398,15 +397,15 @@ sendLoopOnMessage(self,pattern->id,absEnd - absBegin);
 	}
 }
 
-/* Play patterns in the range [begin..end) relative to this cycle.  */
-static void playSong(Self* self, long absBegin, long absEnd)
+/* Play patterns in the range [lastPos..currentPos) relative to this cycle.  */
+static void playSong(Self* self,long absPos,int last,int current)
 {
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
 		Track* track = &self->timeline->tracks[t];
 
-		playTrack(self,track,absBegin,absEnd);
+		playTrack(self,track,absPos,last,current);
 	}
 }
 
@@ -470,12 +469,12 @@ printf("speed: %f\n",newSpeed);
 if (time_frame) 
 printf("frame: %ld\n",newPos);
 
-printf("positionInFrames: %ld\n",self->positionInFrames);
+printf("positionInFrames: %ld\n",self->absolutePosition);
 printf("offsetFrames: %d\n",offsetFrames); 
 
 
 	if (self->speed==1.0f && newSpeed==0.0f) {
-		self->testPositionInFrames = newPos;
+		self->testPosition = newPos;
 
 		for (int t=0; t<self->numTracks; t++) {
 			self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
@@ -483,18 +482,18 @@ printf("offsetFrames: %d\n",offsetFrames);
 		}
 	}
 	else if (self->speed==0.0f && newSpeed==1.0f) {
-		if (newPos != self->testPositionInFrames + offsetFrames) {
+		if (newPos != self->testPosition + offsetFrames) {
 			printf("TRANSPORT JUMPED\n");
 			adjustNextPatternIndexes(self,newPos);
 		}
 	}
 	else if (self->speed==1.0f && newSpeed==1.0f) {
-		if (newPos != self->positionInFrames + offsetFrames)
+		if (newPos != self->absolutePosition + offsetFrames)
 			printf("TRANSPORT JUMPED WHILE TRANSPORT RUNNING\n");
 			//TODO Just log a warning if this happens
 	}
 
-	self->positionInFrames = newPos;
+	self->absolutePosition = newPos;
 
 
 printf("\n");
@@ -520,39 +519,25 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	lv2_atom_sequence_clear(self->midiPortOut);
 	self->midiPortOut->atom.type = self->uris.atom_Sequence;
 
-/* XXX EASIER TO UNDERSTAND IF:
-	1. lastPos ==> pos
-	2. Pass 'positionInFrames' separately into playSong()
-	3. Rename positionInFrames to position / songPosition / absolutePosition
-
-	+ fix up hard-coded 0 offsets
-*/
-
-
-	
-	uint32_t lastPos = 0;
+	uint32_t pos = 0;
 
 	/* Set up the control port buffer: */
 //XXX alternative:  lv2_atom_forge_set_sink()
 	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
 	LV2_Atom_Forge_Frame sequenceFrame; 
 	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
-    lv2_atom_forge_frame_time(&self->forge, 0);  //FIXME put in time frame
+    lv2_atom_forge_frame_time(&self->forge,0);
 
 
 //XXX cf separate into handleEvents() or handleEvent()...
 	/* Loop through events: */
 int i=0;	
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
-		/* pos is usually 0 - except for when a position message comes part way through a cycle. */
-		uint32_t pos = ev->time.frames;
+		uint32_t offset = ev->time.frames;
 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
-			playSong(self,self->positionInFrames+lastPos, self->positionInFrames+pos);
-
-printf("cyclePos: %d\n",pos);	//ARDOUR USUALLY RETURNS 0 HERE, 
-//printf("time->beats: %lf\n",ev->time.beats);				
+			playSong(self,self->absolutePosition,pos,offset);
 
 		/* 
 			NOTE position messages sometimes come part way through a cycle (eg 1024 frames).
@@ -565,7 +550,7 @@ printf("cyclePos: %d\n",pos);	//ARDOUR USUALLY RETURNS 0 HERE,
 
 			if (obj->body.otype == uris->time_Position)  {
 printf("i: %d  sampleCount:%d\n",i,sampleCount);				
-				maybeJump(self, obj,pos);
+				maybeJump(self, obj,offset);
 			}
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
@@ -579,17 +564,16 @@ printf("i: %d\n",i);
 
 //XXX Q: should we calling this 'play' for all message types? 
 
-		lastPos = pos;
+		pos = offset;
 i++;		
 	}
 
 	/* Play out the remainder of cycle: */
-	if (self->speed != 0.0f) {
-		playSong(self,self->positionInFrames+lastPos, self->positionInFrames+sampleCount);
+	if (self->speed != 0.0f) 
+		playSong(self,self->absolutePosition,pos,sampleCount);
 
-		/* positionInFrames is the point at the beginning of the cycle */
-		self->positionInFrames += sampleCount - lastPos;
-	}
+	/* Update the absolute position: */
+	self->absolutePosition += sampleCount - pos;
 
 	/* Complete the sequence: */
 	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
@@ -601,10 +585,10 @@ i++;
 	}
 
 //FIXME is this what people do? Presumably only need to set 0s at the start...
-//	memset(&self->controlMessage,0,sizeof(self->controlMessage));
+	memset(&self->controlMessage,0,sizeof(self->controlMessage));
 
-//XXX I image sequence_head does this... TODO probably delete
-	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
+//XXX I image sequence_head does this... TODO probably delete   NOT WORKING
+//	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
 }
 
 /*

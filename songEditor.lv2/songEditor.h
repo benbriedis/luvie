@@ -68,6 +68,7 @@
 		//TODO probably add label here, not in luvie.c...
 		Interval start;
 		float length;
+
 		/* Calculated values: */
 		long startInFrames;
 		long endInFrames;
@@ -174,11 +175,11 @@
 
 		long numTracks;
 
-		long positionInFrames;
+		long absolutePosition;
 
 		/* Used to check transport jumps seem to be working OK */
 		float lastSpeed;
-		long testPositionInFrames;
+		long testPosition;
 
 		Plugins plugins;
 
