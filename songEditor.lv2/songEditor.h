@@ -144,6 +144,12 @@
 
 	enum { CONTROL_IN = 0, MIDI_OUT = 1 };
 
+	typedef struct {
+		int loopIndex;
+		LOOP_COMMAND command;
+		long startFrame;
+	} LoopMessage;
+
 	/*
 	   All data associated with a plugin instance is stored here.
 	   Port buffers.
@@ -182,6 +188,15 @@
 
 		//XXX hack - just passing our features through to our children for the moment
 		LV2_Feature* features;
+
+		/* 
+		   It's OK to share the buffer between plugins, so that's what I'm doing.
+		*/
+
+	//XXX or allow for multiple messages?
+//		LoopMessage* controlMessage;   //XXX can I embed it if single messages are used?
+//		char controlMessage[200];   //XXX can I embed it if single messages are used?
+		uint64_t controlMessage[200];   //XXX can I embed it if single messages are used?
 	} Self;
 
 #endif // SONG_EDITOR_H

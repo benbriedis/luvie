@@ -22,12 +22,6 @@
 	} LOOP_COMMAND;
 
 	typedef struct {
-		int loopIndex;
-		LOOP_COMMAND command;
-		long startFrame;
-	} LoopMessage;
-
-	typedef struct {
 		int todo1;
 		int todo2;
 		int todo3;
@@ -52,13 +46,14 @@
 		char* uri;
 		LilvPlugin* lilvPlugin;
 		LilvInstance* instance;
-		Port* controlPort;
-	//XXX or allow for multiple messages?
-//		LoopMessage* controlMessage;   //XXX can I embed it if single messages are used?
-		char controlMessage[200];   //XXX can I embed it if single messages are used?
 
+//XXX am I allowed to share the ports between plugins?
+		Port* controlPort;
 		Port* midiPortOut;
-		MidiMessage midiMessage;
+
+	//TODO? share this buffer between plugins. IS permitted, but how is it achieved in practice?
+	//NOTE unlike the inputs we really have to allow multiple messages here.
+		MidiMessage midiMessage[100];
 	} Plugin;
 
 	/* Application state */

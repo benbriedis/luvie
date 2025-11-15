@@ -108,7 +108,7 @@ printf("CALLING songEditor  addPlugin() - 2 sampleRate: %d\n",plugins->sampleRat
 
 printf("CALLING songEditor  addPlugin() - 2 instance: %ld\n",(long)plugin->instance);
 printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlPort->index);
-printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)plugin->controlMessage);
+printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)self->controlMessage);
 
 //XXX MAYBE MEANT TO BE CALLED IN run() - see LV2 documentaton about threading, but conversely see...
 //https://drobilla.net/docs/lilv/index.html#instances
@@ -119,7 +119,7 @@ printf("CALLING songEditor  addPlugin() - 2 message: %ld\n",(long)plugin->contro
 //XXX 'message' is used later when sending messages again which is a bit suspicious...
 
 
-	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,plugin->controlMessage);
+	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlMessage);
 //XXX disconnect sometime?
 
 //	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,self->midiPortOut); //XXX far from sure about this last argument
@@ -154,7 +154,7 @@ bool instantiatePlugins(Self* self,Plugins* plugins)
 //XXX or should this allow for multiple messages?
 //		plugin->message = calloc(sizeof(LoopMessage),1);  //TODO free
 //		plugin->controlMessage = calloc(100,1);  //TODO free
-printf("Allocated memory to message: %ld\n",(long)plugin->controlMessage);
+printf("Allocated memory to message: %ld\n",(long)self->controlMessage);
 
 		ok = ok && addPlugin(self,plugins,plugin);
 	}

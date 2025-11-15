@@ -451,6 +451,18 @@ printf("CALLING harmony.c run() - 3 NOTE loopsMessageId should be: %d\n",self->u
 printf("GOT EVENT ev: %ld\n",(long)ev);
 printf("GOT EVENT ev->body: %ld\n",ev->body);
 printf("GOT EVENT ev->body.type: %d\n",ev->body.type);
+printf("GOT EVENT ev->body.size: %d\n",ev->body.size);
+printf("GOT EVENT ev->body.time: %d\n",ev->time);
+printf("GOT EVENT ev->body.beats: %lf\n",ev->time.beats);
+printf("GOT EVENT ev->body.frames: %ld\n",ev->time.frames);
+
+
+LV2_Atom* testAsAtom = (LV2_Atom*)&ev->body;
+printf("AS ATOM type: %d\n",testAsAtom->type);
+
+LV2_Atom_Int* testAsInt = (LV2_Atom_Int*)&ev->body;
+printf("AS INT type: %d\n",testAsInt->body);
+
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now

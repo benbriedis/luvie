@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <lv2/urid/urid.h>
 #include <stdint.h>
 #include "pluginLoader.h"
 #include "songEditor.h"
@@ -140,11 +141,14 @@ printf("CALLING instantiate()\n");
 	if (!self)
 		return NULL;
 
+	LV2_URID_Unmap* unmap; //TODO delete
+
 	/* Scan host features for URID map */
 	const char* missing = lv2_features_query(
 		features,
 		LV2_LOG__log, &self->logger.log, false,
 		LV2_URID__map, &self->map, true,
+		LV2_URID__unmap, &unmap, true,
 		NULL
 	);
 
@@ -200,6 +204,10 @@ printf("MAP\tloops message: %d\n",uris->loopsMessage);
 printf("MAP\tloops id: %d\n",uris->loopId);
 printf("MAP\tloops enable: %d\n",uris->loopEnable);
 printf("MAP\tloops startFrame: %d\n",uris->loopStartFrame);
+
+printf("UMMAP\t2 is: %s\n",unmap->unmap(map->handle,2));
+printf("UMMAP\t32 is: %s\n",unmap->unmap(map->handle,32));
+printf("UMMAP\t35 is: %s\n",unmap->unmap(map->handle,35));
 
 //////////////////
 
@@ -302,18 +310,25 @@ static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSa
 
 //TODO maybe try a 'Patch' or some other control message...
 
+//XXX the plugins need to do this first, so maybe we do too?
+lv2_atom_sequence_clear(self->controlMessage);
+
 //XXX alternative:  lv2_atom_forge_set_sink()
-	lv2_atom_forge_set_buffer(&self->forge,plugin->controlMessage,100);  //TODO replace 100. NB only one tuple sent per run() call
+
+	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
 
 //NOTE one int is sneaking out OK. Maybe try catching in harmony.c run()?
 
 printf("sendLoopOnMessage() -1 loopsMessageId: %d\n",self->uris.loopsMessage);	
 
-	LV2_Atom_Forge_Frame frame;
+//NOTE if this frame is to span multiple calls I think we can/need to store it in self (See examplescope example)
+	LV2_Atom_Forge_Frame sequenceFrame; 
 
 //FIXME need this for the frame I think...
-//	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
+	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
 
+    lv2_atom_forge_frame_time(&self->forge, 0);  //TODO check 0
+	LV2_Atom_Forge_Frame frame;
 /*
 printf("sendLoopOnMessage() -1B\n");	
 	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
@@ -326,7 +341,7 @@ printf("sendLoopOnMessage() -1E\n");
 printf("sendLoopOnMessage() -2\n");	
 	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
 */	
- 
+
 	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->forge, self->uris.loopId);
 	lv2_atom_forge_int(&self->forge, loopIndex);
@@ -335,7 +350,8 @@ printf("sendLoopOnMessage() -2\n");
 	lv2_atom_forge_key(&self->forge, self->uris.loopStartFrame);
 	lv2_atom_forge_long(&self->forge, startFrame);
 	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
- 
+	/* End the sequence */
+	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
 
 printf("sendLoopOnMessage() -3\n");	
 
@@ -353,14 +369,33 @@ printf("sendLoopOnMessage() END\n");
 
 static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples)
 {
-	lv2_atom_forge_set_buffer(&self->forge,&plugin->controlMessage,100);  //replace 100
+//XXX the plugins need to do this first, so maybe we do too?
+lv2_atom_sequence_clear(self->controlMessage);
+
+	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
+
+//NOTE if this frame is to span multiple calls I think we can/need to store it in self (See examplescope example)
+	LV2_Atom_Forge_Frame sequenceFrame; 
+
+	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);
+    lv2_atom_forge_frame_time(&self->forge, 0);  //TODO check 0
 
 	LV2_Atom_Forge_Frame frame;
-//	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);
+/*	
 	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
 	lv2_atom_forge_int(&self->forge, loopIndex);
 	lv2_atom_forge_int(&self->forge, STOP_LOOP);
 	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+*/	
+
+	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
+	lv2_atom_forge_key(&self->forge, self->uris.loopId);
+	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
+	lv2_atom_forge_bool(&self->forge, false);
+	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+	/* End the sequence */
+	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
 
 	lilv_instance_run(plugin->instance,numSamples);
 }
