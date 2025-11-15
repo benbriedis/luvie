@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <lv2/urid/urid.h>
 #include <stdint.h>
+#include <string.h>
 #include "pluginLoader.h"
 #include "songEditor.h"
 #include "lv2/atom/forge.h"
@@ -208,6 +209,7 @@ printf("MAP\tloops startFrame: %d\n",uris->loopStartFrame);
 printf("UMMAP\t2 is: %s\n",unmap->unmap(map->handle,2));
 printf("UMMAP\t32 is: %s\n",unmap->unmap(map->handle,32));
 printf("UMMAP\t35 is: %s\n",unmap->unmap(map->handle,35));
+printf("UMMAP\t0 is: %s\n",unmap->unmap(map->handle,0));
 
 //////////////////
 
@@ -300,7 +302,7 @@ printf("CALLING songEditor activate() - END\n");
 //TODO can we use logger? 
 
 
-static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples,long startFrame)
+static void sendLoopOnMessage(Self* self,int patternId,long patternOffset)
 {
 /* TODO probably use a sequence of Patch.set instead to maximise reusabilty.  cf	
 
@@ -309,7 +311,7 @@ static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSa
     patch:property "enabled" ;
     patch:value true .
 
-	patch:context "start frame: 500" .
+	patch:context "offset: 500" .   *** Unclear about this bit ***
 
 cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlGroup)
    - Maybe add a group?
@@ -317,81 +319,42 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 */	
 
 
-	printf("loopIndex: %d\n",loopIndex);
-	printf("numSamples: %ld\n",numSamples);
-	printf("startFrame: %ld\n",startFrame);
+	printf("loopIndex: %d\n",patternId);
+	printf("startFrame: %ld\n",patternOffset);
 	printf("sendLoopOnMessage() -1 loopsMessageId: %d\n",self->uris.loopsMessage);	
-
-//XXX ALTERNATIVE: call child plugin run() at the same time as ours. Requires larger buffers.
-
-//TODO maybe try a 'Patch' or some other control message...
-
-//lv2_atom_sequence_clear(self->controlMessage);
-//XXX alternative:  lv2_atom_forge_set_sink()
-
-	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
-
-//NOTE if this frame is to span multiple calls I think we can/need to store it in self (See examplescope example)
-	LV2_Atom_Forge_Frame sequenceFrame; 
-
-	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
 
 //XXX could/should probably use THIS time frame rather than the one below? 
 //    NO -> one is relative to run(), the other to the pattern
 
-    lv2_atom_forge_frame_time(&self->forge, 0);  //FIXME put in time frame  
 	LV2_Atom_Forge_Frame frame;
-
 	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->forge, self->uris.loopId);
-	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_int(&self->forge, patternId);
 	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
 	lv2_atom_forge_bool(&self->forge, true);
 	lv2_atom_forge_key(&self->forge, self->uris.loopStartFrame);
 //TODO rename to 'offset' I think. Can start at 0 or at the point relative to the current pattern.
-	lv2_atom_forge_long(&self->forge, startFrame);
+	lv2_atom_forge_long(&self->forge, patternOffset);
 	lv2_atom_forge_pop(&self->forge, &frame); 
-	/* End the sequence */
-	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
-
-	lilv_instance_run(plugin->instance,numSamples);
-
 printf("sendLoopOnMessage() END\n\n");	
 }
 
 //XXX child plugins dont need to support time position. Song editor can look after that.
 
-static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples)
+static void sendLoopOffMessage(Self* self,int patternId)
 {
-//XXX the plugins need to do this first, so maybe we do too?
-//lv2_atom_sequence_clear(self->controlMessage);
-
-	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
-
-//NOTE if this frame is to span multiple calls I think we can/need to store it in self (See examplescope example)
-	LV2_Atom_Forge_Frame sequenceFrame; 
-
-	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);
-    lv2_atom_forge_frame_time(&self->forge, 0);  //FIXME put in time frame
-
 	LV2_Atom_Forge_Frame frame;
-
 	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->forge, self->uris.loopId);
-	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_int(&self->forge, patternId);
 	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
 	lv2_atom_forge_bool(&self->forge, false);
 	lv2_atom_forge_pop(&self->forge, &frame); 
-	/* End the sequence */
-	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
-
-	lilv_instance_run(plugin->instance,numSamples);
-
 printf("sendLoopOffMessage() END\n\n");	
 }
 
 
-static void playTrack(Self* self, Track* track, long cyclePos, long absBegin, long absEnd, uint32_t outCapacity)
+static void playTrack(Self* self, Track* track, long absBegin, long absEnd)
 {
 	long pos = absBegin;
 
@@ -399,14 +362,13 @@ static void playTrack(Self* self, Track* track, long cyclePos, long absBegin, lo
 	for (int pat=track->currentOrNext; pos<absEnd && pat<track->numPatterns; pat++) {
 
 		Pattern* pattern = &track->patterns[track->currentOrNext];
-		Plugin* plugin = &self->plugins.plugins[pattern->pluginIndex];
 
 		/* NOTE a track can only play one pattern at a time */
 
 		if (track->state == TRACK_PLAYING && pos >= pattern->endInFrames) {
 			printf("TURNING OFF PATTERN       TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
-			sendLoopOffMessage(self,plugin,pattern->id,absEnd - absBegin);
+			sendLoopOffMessage(self,pattern->id);
 
 			track->state = TRACK_NOT_PLAYING;
 			pos = pattern->endInFrames;
@@ -425,7 +387,7 @@ static void playTrack(Self* self, Track* track, long cyclePos, long absBegin, lo
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
 //FIXME want the start, cyclePos is the current position (ie more like the end)			
-sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,0);
+sendLoopOnMessage(self,pattern->id,absEnd - absBegin);
 //			sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,cyclePos);
 
 			printf("SENT MESSAGE A\n");
@@ -437,14 +399,14 @@ sendLoopOnMessage(self,plugin,pattern->id,absEnd - absBegin,0);
 }
 
 /* Play patterns in the range [begin..end) relative to this cycle.  */
-static void playSong(Self* self, long cyclePos, long absBegin, long absEnd, uint32_t outCapacity)
+static void playSong(Self* self, long absBegin, long absEnd)
 {
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
 		Track* track = &self->timeline->tracks[t];
 
-		playTrack(self,track,cyclePos,absBegin,absEnd,outCapacity);
+		playTrack(self,track,absBegin,absEnd);
 	}
 }
 
@@ -554,30 +516,32 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
-  	/* Initially self->out_port contains a Chunk with size set to capacity */
-	const uint32_t outCapacity = self->midiPortOut->atom.size;
-
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->midiPortOut);
 	self->midiPortOut->atom.type = self->uris.atom_Sequence;
 
-	/* Loop through events: */
-	const LV2_Atom_Sequence* in = self->controlPortIn;
+/* XXX EASIER TO UNDERSTAND IF:
+	1. lastPos ==> pos
+	2. Pass 'positionInFrames' separately into playSong()
+	3. Rename positionInFrames to position / songPosition / absolutePosition
+
+	+ fix up hard-coded 0 offsets
+*/
+
+
+	
 	uint32_t lastPos = 0;
 
-
-//XXX dont have an output port to get this capacity from...
-//const uint32_t capacity = self->connectPort->atom.size;
-
-//TODO for every plugin...
-	for (int i=0; i<self->plugins.numPlugins; i++) {
-		Plugin* plugin = &self->plugins.plugins[i];
-//		lv2_atom_forge_sequence_head(&self->forge, &self->notify_frame, 0);
-	}
+	/* Set up the control port buffer: */
+//XXX alternative:  lv2_atom_forge_set_sink()
+	lv2_atom_forge_set_buffer(&self->forge,(uint8_t*)&self->controlMessage,sizeof(self->controlMessage));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
+	LV2_Atom_Forge_Frame sequenceFrame; 
+	lv2_atom_forge_sequence_head(&self->forge,&sequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
+    lv2_atom_forge_frame_time(&self->forge, 0);  //FIXME put in time frame
 
 
-
-//XXX cf 'handlePartCycle()'
+//XXX cf separate into handleEvents() or handleEvent()...
+	/* Loop through events: */
 int i=0;	
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
 		/* pos is usually 0 - except for when a position message comes part way through a cycle. */
@@ -585,7 +549,7 @@ int i=0;
 
 		// Play the click for the time slice from last_t until now
 		if (self->speed != 0.0f) 
-			playSong(self,pos,self->positionInFrames+lastPos, self->positionInFrames+pos,outCapacity);
+			playSong(self,self->positionInFrames+lastPos, self->positionInFrames+pos);
 
 printf("cyclePos: %d\n",pos);	//ARDOUR USUALLY RETURNS 0 HERE, 
 //printf("time->beats: %lf\n",ev->time.beats);				
@@ -621,11 +585,26 @@ i++;
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) {
-		playSong(self,sampleCount,self->positionInFrames+lastPos, self->positionInFrames+sampleCount, outCapacity);
+		playSong(self,self->positionInFrames+lastPos, self->positionInFrames+sampleCount);
 
 		/* positionInFrames is the point at the beginning of the cycle */
 		self->positionInFrames += sampleCount - lastPos;
 	}
+
+	/* Complete the sequence: */
+	lv2_atom_forge_pop(&self->forge, &sequenceFrame);
+
+	/* Call our plugins: */
+	for (int i=0; i<self->plugins.numPlugins; i++) {
+		Plugin* plugin = &self->plugins.plugins[i];
+		lilv_instance_run(plugin->instance,sampleCount);
+	}
+
+//FIXME is this what people do? Presumably only need to set 0s at the start...
+//	memset(&self->controlMessage,0,sizeof(self->controlMessage));
+
+//XXX I image sequence_head does this... TODO probably delete
+	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
 }
 
 /*

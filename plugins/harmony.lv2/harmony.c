@@ -425,7 +425,7 @@ static void updatePosition(Self* self, const LV2_Atom_Object* timeObj)
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sample_count)
 {
-printf("CALLING harmony.c run() - start\n");			
+//printf("CALLING harmony.c run() - start\n");			
 
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
@@ -445,7 +445,9 @@ printf("CALLING harmony.c run() - start\n");
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlPortIn, ev) {
 
-printf("GOT EVENT type: %d   size: %d\n",ev->body.type,ev->body.size);
+		//XXX empty sequences seem to send through single empty events
+		if (ev->body.type != 0)
+			printf("GOT EVENT type: %d   size: %d\n",ev->body.type,ev->body.size);
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
@@ -466,7 +468,7 @@ printf("GOT an atom  otype: %d\n",obj->body.otype);
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj); //TODO delete I think
 			else if (obj->body.otype == uris->loopsMessage) {
-printf("GOT loops mesasge\n");
+printf("GOT loops message\n");
 
 				LV2_Atom* loopId = NULL;
 				LV2_Atom* loopEnable = NULL;
