@@ -115,6 +115,11 @@ typedef struct {
 	LV2_URID patch_Set;
 	LV2_URID patch_property;
 	LV2_URID patch_value;
+
+	LV2_URID loopsMessage;
+	LV2_URID loopId;
+	LV2_URID loopEnable;
+	LV2_URID loopStartFrame;
 } URIs;
 
 
@@ -201,6 +206,11 @@ printf("CALLING instantiate() - 4\n");
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
 	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
+
+	uris->loopsMessage        = map->map(map->handle, "https://github.com/benbriedis/luvie#loopsMessage");
+	uris->loopId              = map->map(map->handle, "https://github.com/benbriedis/luvie#loopId");
+	uris->loopEnable          = map->map(map->handle, "https://github.com/benbriedis/luvie#loopEnable");
+	uris->loopStartFrame      = map->map(map->handle, "https://github.com/benbriedis/luvie#loopStartFrame");
 
 	/* Initialise instance data: */
 	self->sampleRate = sampleRate;
@@ -425,7 +435,7 @@ printf("CALLING harmony.c run() - self->midi_port_out: %ld\n",(long)self->midi_p
   	/* Initially self->out_port contains a Chunk with size set to capacity */
 	const uint32_t outCapacity = self->midi_port_out->atom.size;
 
-printf("CALLING harmony.c run() - 3\n");			
+printf("CALLING harmony.c run() - 3 NOTE loopsMessageId should be: %d\n",self->uris.loopsMessage);			
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->midi_port_out);
 	self->midi_port_out->atom.type = self->uris.atom_Sequence;
@@ -461,6 +471,8 @@ printf("GOT ATOM obj->body: %ld\n",obj->body);
 
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj);
+			else if (obj->body.otype == uris->loopsMessage)
+printf("GOT loop_Command  otype: %d\n",obj->body.otype);
 			else
 printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 

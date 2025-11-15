@@ -54,7 +54,8 @@
 		LilvInstance* instance;
 		Port* controlPort;
 	//XXX or allow for multiple messages?
-		LoopMessage* message;   //XXX can I embed it if single messages are used?
+//		LoopMessage* controlMessage;   //XXX can I embed it if single messages are used?
+		char controlMessage[200];   //XXX can I embed it if single messages are used?
 
 		Port* midiPortOut;
 		MidiMessage midiMessage;

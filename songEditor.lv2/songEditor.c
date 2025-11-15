@@ -176,6 +176,31 @@ printf("CALLING instantiate()\n");
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
 	uris->time_frame          = map->map(map->handle, LV2_TIME__frame);
 
+	uris->loopsMessage        = map->map(map->handle, "https://github.com/benbriedis/luvie#loopsMessage");
+	uris->loopId              = map->map(map->handle, "https://github.com/benbriedis/luvie#loopId");
+	uris->loopEnable          = map->map(map->handle, "https://github.com/benbriedis/luvie#loopEnable");
+	uris->loopStartFrame      = map->map(map->handle, "https://github.com/benbriedis/luvie#loopStartFrame");
+
+printf("MAP\tatom blank: %d\n",uris->atom_Blank);
+printf("MAP\tatom float: %d\n",uris->atom_Float);
+printf("MAP\tatom object: %d\n",uris->atom_Object);
+printf("MAP\tatom path: %d\n",uris->atom_Path);
+printf("MAP\tatom resource: %d\n",uris->atom_Resource);
+printf("MAP\tatom sequence: %d\n",uris->atom_Sequence);
+printf("MAP\tatom URID: %d\n",uris->atom_URID);
+printf("MAP\tatom eventTransfer: %d\n",uris->atom_eventTransfer);
+printf("MAP\tmidi event: %d\n",uris->midi_Event);
+printf("MAP\tpatch set: %d\n",uris->patch_Set);
+printf("MAP\tpatch property: %d\n",uris->patch_property);
+printf("MAP\tpatch value: %d\n",uris->patch_value);
+printf("MAP\ttime position: %d\n",uris->time_Position);
+printf("MAP\ttime speed: %d\n",uris->time_speed);
+printf("MAP\ttime frame: %d\n",uris->time_frame);
+printf("MAP\tloops message: %d\n",uris->loopsMessage);
+printf("MAP\tloops id: %d\n",uris->loopId);
+printf("MAP\tloops enable: %d\n",uris->loopEnable);
+printf("MAP\tloops startFrame: %d\n",uris->loopStartFrame);
+
 //////////////////
 
 	self->plugins.sampleRate = sampleRate;
@@ -278,28 +303,48 @@ static void sendLoopOnMessage(Self* self,Plugin* plugin,int loopIndex,long numSa
 //TODO maybe try a 'Patch' or some other control message...
 
 //XXX alternative:  lv2_atom_forge_set_sink()
-	lv2_atom_forge_set_buffer(&self->forge,plugin->message,100);  //TODO replace 100. NB only one tuple sent per run() call
+	lv2_atom_forge_set_buffer(&self->forge,plugin->controlMessage,100);  //TODO replace 100. NB only one tuple sent per run() call
 
 //NOTE one int is sneaking out OK. Maybe try catching in harmony.c run()?
 
-printf("sendLoopOnMessage() -1\n");	
+printf("sendLoopOnMessage() -1 loopsMessageId: %d\n",self->uris.loopsMessage);	
+
 	LV2_Atom_Forge_Frame frame;
-printf("sendLoopOnMessage() -1A\n");	
-	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
+
+//FIXME need this for the frame I think...
+//	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
+
+/*
 printf("sendLoopOnMessage() -1B\n");	
-//	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
+	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
 printf("sendLoopOnMessage() -1C\n");	
-//	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_int(&self->forge, loopIndex);
 printf("sendLoopOnMessage() -1D\n");	
 	lv2_atom_forge_int(&self->forge, START_LOOP);
 printf("sendLoopOnMessage() -1E\n");	
-//	lv2_atom_forge_int(&self->forge, startFrame);
+	lv2_atom_forge_int(&self->forge, startFrame);
 printf("sendLoopOnMessage() -2\n");	
-//	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+*/	
+ 
+	lv2_atom_forge_object(&self->forge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
+	lv2_atom_forge_key(&self->forge, self->uris.loopId);
+	lv2_atom_forge_int(&self->forge, loopIndex);
+	lv2_atom_forge_key(&self->forge, self->uris.loopEnable);
+	lv2_atom_forge_bool(&self->forge, true);
+	lv2_atom_forge_key(&self->forge, self->uris.loopStartFrame);
+	lv2_atom_forge_long(&self->forge, startFrame);
+	lv2_atom_forge_pop(&self->forge, &frame); //XXX OR does the sequence look after this?
+ 
 
 printf("sendLoopOnMessage() -3\n");	
 
 	lilv_instance_run(plugin->instance,numSamples);
+
+/* NOTE we CAN reuse the loopsMessage buffer between plugins.
+   We would need to ensure same pattern IDs are used between plugins.
+		See https://lv2plug.in/c/html/group__lv2core.html#a3cb9de627507db42e338384ab945660e - connect_port()
+*/
 
 printf("sendLoopOnMessage() END\n");	
 }
@@ -308,10 +353,10 @@ printf("sendLoopOnMessage() END\n");
 
 static void sendLoopOffMessage(Self* self,Plugin* plugin,int loopIndex,long numSamples)
 {
-	lv2_atom_forge_set_buffer(&self->forge,&plugin->message,100);  //replace 100
+	lv2_atom_forge_set_buffer(&self->forge,&plugin->controlMessage,100);  //replace 100
 
 	LV2_Atom_Forge_Frame frame;
-	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);
+//	lv2_atom_forge_sequence_head(&self->forge,&frame,self->uris.time_frame);
 	LV2_Atom* tup = (LV2_Atom*)lv2_atom_forge_tuple(&self->forge, &frame);
 	lv2_atom_forge_int(&self->forge, loopIndex);
 	lv2_atom_forge_int(&self->forge, STOP_LOOP);
@@ -475,7 +520,10 @@ printf("\n");
 
 //XXX another use case muting or soloing a track should probably instantly start or stop the current pattern
 
-/* `run()` must be real-time safe. No memory allocations or blocking! */
+/*
+	`run()` must be real-time safe. No memory allocations or blocking!
+	Note the spec says that sampleCount=0 must be supported for latency updates etc.
+*/
 static void run(LV2_Handle instance, uint32_t sampleCount)
 {
 	Self* self = (Self*)instance;

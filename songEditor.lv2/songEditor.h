@@ -134,6 +134,11 @@
 		LV2_URID patch_Set;
 		LV2_URID patch_property;
 		LV2_URID patch_value;
+
+		LV2_URID loopsMessage;
+		LV2_URID loopId;
+		LV2_URID loopEnable;
+		LV2_URID loopStartFrame;
 	} URIs;
 
 
