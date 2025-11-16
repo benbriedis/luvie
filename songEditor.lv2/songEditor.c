@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <lv2/atom/atom.h>
 #include <lv2/urid/urid.h>
 #include <stdint.h>
 #include <string.h>
@@ -272,6 +273,8 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 			self->midiOutBuffer = (LV2_Atom_Sequence*)data;
 			break;
 	}
+
+	connectPorts(self,&self->plugins);
 }
 
 /* The plugin must reset all internal state */
@@ -330,6 +333,7 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 //    NO -> one is relative to run(), the other to the pattern
 
 	LV2_Atom_Forge_Frame frame;
+    lv2_atom_forge_frame_time(&self->controlForge,0);
 	lv2_atom_forge_object(&self->controlForge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->controlForge, self->uris.loopId);
 	lv2_atom_forge_int(&self->controlForge, patternId);
@@ -347,6 +351,7 @@ printf("sendLoopOnMessage() END\n\n");
 static void sendLoopOffMessage(Self* self,int patternId)
 {
 	LV2_Atom_Forge_Frame frame;
+    lv2_atom_forge_frame_time(&self->controlForge,0);
 	lv2_atom_forge_object(&self->controlForge, &frame,0,self->uris.loopsMessage); // 0 = "a blank ID"
 	lv2_atom_forge_key(&self->controlForge, self->uris.loopId);
 	lv2_atom_forge_int(&self->controlForge, patternId);
@@ -509,6 +514,12 @@ printf("offsetFrames: %d\n",offsetFrames);
 		self->speed = newSpeed;
 }
 
+//TODO delete after testing...
+typedef struct {
+	LV2_Atom_Event event;
+	uint8_t msg[3];
+} MIDINoteEvent;
+
 //XXX another use case muting or soloing a track should probably instantly start or stop the current pattern
 
 /*
@@ -521,22 +532,26 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
  	const URIs* uris = &self->uris;
 
 	/* Write an empty Sequence header to the output */
-	lv2_atom_sequence_clear(self->midiOutBuffer);
-	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
+//	lv2_atom_sequence_clear(self->midiOutBuffer);
+//	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
 
 	/* --- Create pattern messages and handle time position changes --- */
+
 
 	/* Prepare for creation of pattern messages: */
 //FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
 	memset(&self->controlBuffer,0,sizeof(self->controlBuffer));
 //XXX I image sequence_head does this... TODO probably delete   NOT WORKING
 //	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
+//XXX doesnt work either:
+//	((LV2_Atom_Sequence*)(&self->controlBuffer))->atom.size = 0;
+//	((LV2_Atom_Sequence*)(&self->controlBuffer))->atom.type = 0;
+
 
 //XXX alternative:  lv2_atom_forge_set_sink()
 	lv2_atom_forge_set_buffer(&self->controlForge,(uint8_t*)&self->controlBuffer,sizeof(self->controlBuffer));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
 	LV2_Atom_Forge_Frame controlSequenceFrame; 
 	lv2_atom_forge_sequence_head(&self->controlForge,&controlSequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
-    lv2_atom_forge_frame_time(&self->controlForge,0);
 
 
 //XXX cf separate into handleEvents() or handleEvent()...
@@ -588,12 +603,46 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
 	/* Prepare for MIDI output: */
 //FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
-	memset(&self->midiBuffer,0,sizeof(self->midiBuffer));
+//	memset(&self->midiBuffer,0,sizeof(self->midiBuffer));
 
+	/*
+//XXX XXX PROBABLY CANT / SHOULDNT USE FORGE HERE... CANT REALLY SHARE BETWEEN PLUGINS	
 	lv2_atom_forge_set_buffer(&self->midiForge,(uint8_t*)&self->midiBuffer,sizeof(self->midiBuffer));
 	LV2_Atom_Forge_Frame midiSequenceFrame; 
 	lv2_atom_forge_sequence_head(&self->midiForge,&midiSequenceFrame,self->uris.time_frame);
     lv2_atom_forge_frame_time(&self->midiForge,0);
+	*/
+
+	// 1. add sequence head
+	// 2. add frame time  (Q where are frame times really meant to be? Starts of sequences or in front of each member atom/event, or both?)
+//TODO delete midiBuffer... should be using midiOutBuffer...	
+//	void* buf = &self->midiBuffer;
+/*
+	((LV2_Atom_Sequence*)buf)->atom.size = sizeof(LV2_Atom_Sequence_Body);
+	((LV2_Atom_Sequence*)buf)->atom.type = self->uris.atom_Sequence;
+	((LV2_Atom_Sequence*)buf)->body.unit = self->uris.time_frame;
+	((LV2_Atom_Sequence*)buf)->body.pad = 0;
+*/	
+
+	//lv2_atom_sequence_clear(self->midiOutBuffer);
+	self->midiOutBuffer->atom.size = sizeof(LV2_Atom_Sequence_Body);
+	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; //XXX do we need these?
+	self->midiOutBuffer->body.unit = self->uris.time_frame;
+
+	/*
+//XXX ADD A TEST NOTE...
+	const uint32_t outCapacity = self->midiOutBuffer->atom.size; //TODO reconsider
+	MIDINoteEvent out;
+	out.event.time.frames = 50;
+	out.event.body.type = self->uris.midi_Event;
+	out.event.body.size = 3;
+	out.msg[0] = 0x90; 
+	out.msg[1] = 60;       
+	out.msg[2] = 100;   
+	lv2_atom_sequence_append_event(self->midiOutBuffer,outCapacity, &out.event);
+	*/
+
+
 //TEST try adding a MIDI note ourselves before calling the plugin. Survive does it?
 
 	/* Call our plugins: */
@@ -602,7 +651,10 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 		lilv_instance_run(plugin->instance,sampleCount);
 	}
 
-	lv2_atom_forge_pop(&self->midiForge, &midiSequenceFrame);
+//TODO close off the sequence
+//	lv2_atom_forge_pop(&self->midiForge, &midiSequenceFrame);
+
+	//3. End sequence if necessary
 }
 
 /*

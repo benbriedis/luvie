@@ -116,12 +116,11 @@ printf("CALLING songEditor  addPlugin() - 2 index: %ld\n",(long)plugin->controlP
 //XXX 'message' is used later when sending messages again which is a bit suspicious...
 
 
-	/* Note these buffers are shared between all plugins */
-	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlBuffer);
+//	lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlMessage);
 //XXX disconnect sometime?
 
 //	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,self->midiPortOut); //XXX far from sure about this last argument
-	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&self->midiBuffer); 
+//	lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&plugin->midiMessage); 
 
 printf("CALLING songEditor  addPlugin() - END\n");
 }
@@ -182,6 +181,22 @@ void deactivatePlugins(Plugins* plugins)
 {
 	for (int i=0; i<plugins->numPlugins; i++) 
 		lilv_instance_deactivate(plugins->plugins[i].instance);
+}
+
+bool connectPorts(Self* self,Plugins* plugins)
+{
+	/* 
+		These buffers are shared between all plugins.
+		midiPortOut comes from our host. Our plugins can use it directly.
+	*/
+
+	for (int i=0; i < plugins->numPlugins; i++) {
+		Plugin* plugin = &plugins->plugins[i];
+
+		lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlBuffer);
+		lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&self->midiOutBuffer);
+	}
+//XXX disconnect sometime?
 }
 
 void cleanupPlugins(Plugins* plugins)

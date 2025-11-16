@@ -431,11 +431,11 @@ static void run(LV2_Handle instance, uint32_t sample_count)
  	const URIs* uris = &self->uris;
 
   	/* Initially self->out_port contains a Chunk with size set to capacity */
-	const uint32_t outCapacity = self->midiOutBuffer->atom.size;
+	const uint32_t outCapacity = self->midiOutBuffer->atom.size; //TODO reconsider
 
 	/* Write an empty Sequence header to the output */
-	lv2_atom_sequence_clear(self->midiOutBuffer);
-	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
+//	lv2_atom_sequence_clear(self->midiOutBuffer);
+//	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
 
 //TODO remove time position messages	
 

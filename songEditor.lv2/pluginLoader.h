@@ -68,6 +68,7 @@
 	#include "songEditor.h"
 
 	bool instantiatePlugins(Self* self,Plugins* plugins);
+	bool connectPorts(Self* self,Plugins* plugins);
 	void activatePlugins(Plugins* plugins);
 	void deactivatePlugins(Plugins* plugins);
 	void cleanupPlugins(Plugins* plugins);
