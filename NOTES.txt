@@ -130,3 +130,16 @@ So in practice we get:
 TO TEST
 =======
 1. If multiple midi plugins get called in same cycle and emit notes, are multiple notes outputted successfully?
+
+
+TODOs
+=====
+Set up saving and loading of patterns and writing back of patterns from plugins
+
+Unit tests
+
+Chop up songEditor run()
+
+Use Patches? and Parameters?
+
+

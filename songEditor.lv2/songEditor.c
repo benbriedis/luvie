@@ -246,6 +246,7 @@ printf("Back from addPlugins\n");
 	for (int t=0; t<self->numTracks; t++) 
 		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
 
+	/* NOTE lv2_atom_forge_init() may notbe runtime safe, so keep out of run() (see API docs) */
     lv2_atom_forge_init(&self->controlForge, self->map);
 
 printf("Finished instantiate()\n");	
@@ -289,20 +290,6 @@ printf("CALLING songEditor activate() - START\n");
 
 printf("CALLING songEditor activate() - END\n");			
 }
-
-//static void sendMessage()
-//{
-	/* Updates:
-		[
-			{id:4, state:on/off, offset:inFrames}, 
-			{id:6, state:on/off, offset:inFrames}
-		]
-
-
-		Also cf add pattern, delete pattern
-	*/
-
-//}
 
 //TODO can we use logger? 
 
@@ -470,18 +457,6 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 	long newPos = ((LV2_Atom_Long*)time_frame)->body;
 	float newSpeed = ((LV2_Atom_Float*)speed)->body;
 
-	/*
-if (speed) 
-printf("speed: %f\n",newSpeed);
-
-if (time_frame) 
-printf("frame: %ld\n",newPos);
-
-printf("positionInFrames: %ld\n",self->absolutePosition);
-printf("offsetFrames: %d\n",offsetFrames); 
-*/
-
-
 	if (self->speed==1.0f && newSpeed==0.0f) {
 		self->testPosition = newPos;
 
@@ -504,9 +479,6 @@ printf("offsetFrames: %d\n",offsetFrames);
 
 	self->absolutePosition = newPos;
 
-
-//printf("\n");
-
 //FIXME the speed (and frame) guard needs to be earlier to use useful...	
 	/* Speed=0 (stop) or speed=1 (play) */
 	if (speed && speed->type == uris->atom_Float) 
@@ -525,27 +497,17 @@ typedef struct {
 	`run()` must be real-time safe. No memory allocations or blocking!
 	Note the spec says that sampleCount=0 must be supported for latency updates etc.
 */
-static void run(LV2_Handle instance, uint32_t sampleCount)
+static void run(LV2_Handle instance, uint32_t numFrames)
 {
 	Self* self = (Self*)instance;
  	const URIs* uris = &self->uris;
 
-	/* Write an empty Sequence header to the output */
-//	lv2_atom_sequence_clear(self->midiOutBuffer);
-//	self->midiOutBuffer->atom.type = self->uris.atom_Sequence;
-
 	/* --- Create pattern messages and handle time position changes --- */
 
-
-	/* Prepare for creation of pattern messages: */
-//FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
-	memset(&self->controlBuffer,0,sizeof(self->controlBuffer));
-//XXX I image sequence_head does this... TODO probably delete   NOT WORKING
-//	lv2_atom_sequence_clear((LV2_Atom_Sequence*)&self->controlMessage);
-//XXX doesnt work either:
-//	((LV2_Atom_Sequence*)(&self->controlBuffer))->atom.size = 0;
-//	((LV2_Atom_Sequence*)(&self->controlBuffer))->atom.type = 0;
-
+	/* Write an empty Sequence header to the output */
+	lv2_atom_sequence_clear(self->controlBuffer);
+	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; 
+	self->midiOutBuffer->body.unit = self->uris.time_frame;
 
 //XXX alternative:  lv2_atom_forge_set_sink()
 	lv2_atom_forge_set_buffer(&self->controlForge,(uint8_t*)&self->controlBuffer,sizeof(self->controlBuffer));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
@@ -564,12 +526,6 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 		if (self->speed != 0.0f) 
 			playSong(self,self->absolutePosition,pos,offset);
 
-		/* 
-			NOTE position messages sometimes come part way through a cycle (eg 1024 frames).
-			In this case the Position frames includes the start of the standard cycle.
-		*/
-
-//		if (lv2_atom_forge_is_object_type(const LV2_Atom_Forge *forge, uint32_t type))  XXX Use this in future if we create a forge
 		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
 			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
 
@@ -589,10 +545,10 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
-		playSong(self,self->absolutePosition,pos,sampleCount);
+		playSong(self,self->absolutePosition,pos,numFrames);
 
 	/* Update the absolute position: */
-	self->absolutePosition += sampleCount - pos;
+	self->absolutePosition += numFrames - pos;
 
 	/* Complete the sequence: */
 	lv2_atom_forge_pop(&self->controlForge, &controlSequenceFrame);
@@ -601,31 +557,9 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	/* --- Call our plugins --- */
 
 	/* Prepare for MIDI output: */
-//FIXME is this what people do? Presumably only need to set 0s at the start of the buffer...
-//	memset(&self->midiBuffer,0,sizeof(self->midiBuffer));
-
-	/*
-//XXX XXX PROBABLY CANT / SHOULDNT USE FORGE HERE... CANT REALLY SHARE BETWEEN PLUGINS	
-	lv2_atom_forge_set_buffer(&self->midiForge,(uint8_t*)&self->midiBuffer,sizeof(self->midiBuffer));
-	LV2_Atom_Forge_Frame midiSequenceFrame; 
-	lv2_atom_forge_sequence_head(&self->midiForge,&midiSequenceFrame,self->uris.time_frame);
-    lv2_atom_forge_frame_time(&self->midiForge,0);
-	*/
-
-	// 1. add sequence head
-	// 2. add frame time  (Q where are frame times really meant to be? Starts of sequences or in front of each member atom/event, or both?)
-//TODO delete midiBuffer... should be using midiOutBuffer...	
-//	void* buf = &self->midiBuffer;
-/*
-	((LV2_Atom_Sequence*)buf)->atom.size = sizeof(LV2_Atom_Sequence_Body);
-	((LV2_Atom_Sequence*)buf)->atom.type = self->uris.atom_Sequence;
-	((LV2_Atom_Sequence*)buf)->body.unit = self->uris.time_frame;
-	((LV2_Atom_Sequence*)buf)->body.pad = 0;
-*/	
 
 	lv2_atom_sequence_clear(self->midiOutBuffer);
-	//self->midiOutBuffer->atom.size = sizeof(LV2_Atom_Sequence_Body);
-	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; //XXX do we need these?
+	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; 
 	self->midiOutBuffer->body.unit = self->uris.time_frame;
 
 //XXX ADD A TEST NOTE...
@@ -656,7 +590,7 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	/* Call our plugins: */
 	for (int i=0; i<self->plugins.numPlugins; i++) {
 		Plugin* plugin = &self->plugins.plugins[i];
-		lilv_instance_run(plugin->instance,sampleCount);
+		lilv_instance_run(plugin->instance,numFrames);
 	}
 
 //TODO close off the sequence
