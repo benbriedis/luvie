@@ -109,7 +109,6 @@ typedef struct {
 	LV2_URID atom_Sequence;
 	LV2_URID atom_URID;
 	LV2_URID atom_eventTransfer;
-	LV2_URID time_Position;
 	LV2_URID time_beatsPerMinute;
 	LV2_URID time_speed;
 	LV2_URID midi_Event;
@@ -202,7 +201,6 @@ printf("CALLING instantiate() - 1\n");
 	uris->patch_Set           = map->map(map->handle, LV2_PATCH__Set);
 	uris->patch_property      = map->map(map->handle, LV2_PATCH__property);
 	uris->patch_value         = map->map(map->handle, LV2_PATCH__value);
-	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
 	uris->time_beatsPerMinute = map->map(map->handle, LV2_TIME__beatsPerMinute);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
 
@@ -396,32 +394,6 @@ static void playPatterns(Self* self, uint32_t begin, uint32_t end, uint32_t outC
 	}
 }
 
-/*
-   Update the current position based on a host message.  This is called by
-   run() when a time:Position is received.
-*/
-static void updatePosition(Self* self, const LV2_Atom_Object* timeObj)
-{
-	const URIs* uris = &self->uris;
-
-	LV2_Atom* bpm = NULL;
-	LV2_Atom* speed = NULL;
-
-	lv2_atom_object_get(timeObj,
-		uris->time_beatsPerMinute, &bpm,
-		uris->time_speed, &speed,
-		NULL
-	);
-
-    /* Tempo changed */
-	if (bpm && bpm->type == uris->atom_Float)
-		self->bpm = ((LV2_Atom_Float*)bpm)->body;
-
-	/* Speed=0 (stop) or speed=1 (play) */
-	if (speed && speed->type == uris->atom_Float)
-		self->speed = ((LV2_Atom_Float*)speed)->body;
-}
-
 /* `run()` must be real-time safe. No memory allocations or blocking! */
 static void run(LV2_Handle instance, uint32_t sample_count)
 {
@@ -463,9 +435,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 printf("GOT an atom  otype: %d\n",obj->body.otype);
 
-			if (obj->body.otype == uris->time_Position) 
-				updatePosition(self, obj); //TODO delete I think
-			else if (obj->body.otype == uris->loopsMessage) {
+			if (obj->body.otype == uris->loopsMessage) {
 //TODO separate into new function
 printf("GOT loops message\n");
 

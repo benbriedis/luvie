@@ -160,7 +160,7 @@
 		LV2_Log_Logger logger;
 
 		/* Ports: */
-		const LV2_Atom_Sequence* controlInBuffer;
+		const LV2_Atom_Sequence* timePositionBuffer;
 		LV2_Atom_Sequence* midiOutBuffer;
 
 		URIs uris;   // Cache of mapped URIDs
@@ -200,10 +200,6 @@
 
 		LV2_Atom_Forge controlForge; 
 		uint64_t controlBuffer[200];   //XXX can I embed it if single messages are used?
-
-		LV2_Atom_Forge midiForge; 
-//		MidiMessage midiMessage[100];
-		uint64_t midiBuffer[200];
 	} Self;
 
 #endif // SONG_EDITOR_H

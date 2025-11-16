@@ -247,7 +247,6 @@ printf("Back from addPlugins\n");
 		self->timeline->tracks[t].state = TRACK_NOT_PLAYING;
 
     lv2_atom_forge_init(&self->controlForge, self->map);
-    lv2_atom_forge_init(&self->midiForge, self->map);
 
 printf("Finished instantiate()\n");	
 	return (LV2_Handle)self;
@@ -266,7 +265,7 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 	switch (port) {
 //XXX cf ==> 'TIME_IN'		
 		case CONTROL_IN:
-			self->controlInBuffer = (LV2_Atom_Sequence*)data;
+			self->timePositionBuffer = (LV2_Atom_Sequence*)data;
 			break;
 
 		case MIDI_OUT:
@@ -558,7 +557,7 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	/* Loop through events: */
 	uint32_t pos = 0;
 
-	LV2_ATOM_SEQUENCE_FOREACH (self->controlInBuffer, ev) {
+	LV2_ATOM_SEQUENCE_FOREACH (self->timePositionBuffer, ev) {
 		uint32_t offset = ev->time.frames;
 
 		// Play the click for the time slice from last_t until now
@@ -624,15 +623,16 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	((LV2_Atom_Sequence*)buf)->body.pad = 0;
 */	
 
-	//lv2_atom_sequence_clear(self->midiOutBuffer);
-	self->midiOutBuffer->atom.size = sizeof(LV2_Atom_Sequence_Body);
+	lv2_atom_sequence_clear(self->midiOutBuffer);
+	//self->midiOutBuffer->atom.size = sizeof(LV2_Atom_Sequence_Body);
 	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; //XXX do we need these?
 	self->midiOutBuffer->body.unit = self->uris.time_frame;
 
-	/*
 //XXX ADD A TEST NOTE...
+/*	
 	const uint32_t outCapacity = self->midiOutBuffer->atom.size; //TODO reconsider
 	MIDINoteEvent out;
+
 	out.event.time.frames = 50;
 	out.event.body.type = self->uris.midi_Event;
 	out.event.body.size = 3;
@@ -640,7 +640,15 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 	out.msg[1] = 60;       
 	out.msg[2] = 100;   
 	lv2_atom_sequence_append_event(self->midiOutBuffer,outCapacity, &out.event);
-	*/
+
+	out.event.time.frames = 100;
+	out.event.body.type = self->uris.midi_Event;
+	out.event.body.size = 3;
+	out.msg[0] = 0x80; 
+	out.msg[1] = 60;       
+	out.msg[2] = 0;   
+	lv2_atom_sequence_append_event(self->midiOutBuffer,outCapacity, &out.event);
+*/	
 
 
 //TEST try adding a MIDI note ourselves before calling the plugin. Survive does it?

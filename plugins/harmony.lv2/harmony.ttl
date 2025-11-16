@@ -34,7 +34,6 @@
 #XXX would this be specific enough?		
 #		atom:supports patch:Message ;
 #cf whether to keep this (eg if run by something other than Luvie)		
-		atom:supports time:Position ;
 
 		lv2:designation lv2:control ;
 

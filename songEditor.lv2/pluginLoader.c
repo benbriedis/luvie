@@ -194,7 +194,7 @@ bool connectPorts(Self* self,Plugins* plugins)
 		Plugin* plugin = &plugins->plugins[i];
 
 		lilv_instance_connect_port(plugin->instance,plugin->controlPort->index,&self->controlBuffer);
-		lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,&self->midiOutBuffer);
+		lilv_instance_connect_port(plugin->instance,plugin->midiPortOut->index,self->midiOutBuffer);
 	}
 //XXX disconnect sometime?
 }
