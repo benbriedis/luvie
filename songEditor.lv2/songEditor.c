@@ -13,14 +13,14 @@ Timeline timeline = {
 	{
 		{7,"Track 8", 2, 
 			{
-				{0, 5, {2, 0.0}, 4.0, 0, 0},
-				{0, 6, {6, 1.0}, 3.0, 0, 0}
+				{0, 0, {2, 0.0}, 4.0, 0, 0},
+				{0, 1, {6, 1.0}, 3.0, 0, 0}
 			}, TRACK_NOT_PLAYING, 0 
 		},
 		{9,"Track 9", 2, 
 			{
-				{0, 3, {4, 0.0}, 4.0, 0, 0},
-				{0, 4, {8, 1.0}, 3.0, 0, 0}
+				{0, 1, {4, 0.0}, 4.0, 0, 0},
+				{0, 0, {8, 1.0}, 3.0, 0, 0}
 			}, TRACK_NOT_PLAYING, 0 
 		},
 	}
@@ -186,6 +186,7 @@ printf("CALLING instantiate()\n");
 	uris->loopEnable          = map->map(map->handle, "https://github.com/benbriedis/luvie#loopEnable");
 	uris->loopStartFrame      = map->map(map->handle, "https://github.com/benbriedis/luvie#loopStartFrame");
 
+	/*
 printf("MAP\tatom blank: %d\n",uris->atom_Blank);
 printf("MAP\tatom float: %d\n",uris->atom_Float);
 printf("MAP\tatom object: %d\n",uris->atom_Object);
@@ -210,6 +211,7 @@ printf("UMMAP\t2 is: %s\n",unmap->unmap(map->handle,2));
 printf("UMMAP\t32 is: %s\n",unmap->unmap(map->handle,32));
 printf("UMMAP\t35 is: %s\n",unmap->unmap(map->handle,35));
 printf("UMMAP\t0 is: %s\n",unmap->unmap(map->handle,0));
+*/
 
 //////////////////
 

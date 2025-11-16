@@ -39,19 +39,20 @@ typedef struct {
     int lengthInBeats;
     int baseOctave;
     int baseNote;
-	int state;
-//TODO possibly/probably replace these two with endInFrames;	
-	uint32_t startInFrames; 
-	uint32_t lengthInFrames; 
-	uint32_t positionInFrames; 
+	int enabled;
+
+	uint32_t position; 
+
 //TODO generalise the number of notes
 	Note notes[5];
 //TODO probably add a MIDI channel here
 } Pattern;
 
+//TODO replace NOTE_OFF and NOTE_ON with boolean too I think
+
 //XXX cf guaranteeing that the notes appear in order. Then can maintain a 'next note' for each pattern (maybe not worthwhile though...)
 Pattern patterns[] = {{
-	"pattern1", 4, 3, 0, 0, PATTERN_OFF, 0, 0,  {
+	"pattern1", 4, 3, 0, 0, false, {
 		{0.0, 0, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -59,7 +60,7 @@ Pattern patterns[] = {{
 		{3.0, 9, 0.5, 100, NOTE_OFF},
 	}
 }, {
-	"pattern2", 4, 3, 0, 0, PATTERN_OFF, 0, 0, {
+	"pattern2", 4, 3, 0, 0, false, {
 		{0.0, 8, 0.5, 100, NOTE_OFF},
 		{0.0, 7, 0.5, 100, NOTE_OFF},
 		{1.0, 5, 0.5, 100, NOTE_OFF},
@@ -169,7 +170,6 @@ printf("CALLING instantiate() - 1\n");
 	if (!self)
 		return NULL;
 
-printf("CALLING instantiate() - 2\n");			
 	/* Scan host features for URID map */
 	const char* missing = lv2_features_query(
 		features,
@@ -184,7 +184,6 @@ printf("CALLING instantiate() - 2\n");
 		free(self);
 		return NULL;
 	}
-printf("CALLING instantiate() - 4\n");			
 
 	// Map URIS
 	URIs* const uris = &self->uris;
@@ -216,13 +215,11 @@ printf("CALLING instantiate() - 4\n");
 	self->sampleRate = sampleRate;
 	self->bpm = 120.0f;
 
-printf("CALLING instantiate() - 5\n");			
 	self->patterns = calloc(1,sizeof(patterns));
 	if (!self)
 		return NULL;
 	memcpy(self->patterns,patterns,sizeof(patterns));
 
-printf("CALLING instantiate() - 6\n");			
 	return (LV2_Handle)self;
 }
 
@@ -258,12 +255,9 @@ printf("CALLING harmony.c activate() - start\n");
 
 	for (int p=0; p<self->numPatterns; p++) {     //FIXME
 		Pattern* pattern = &self->patterns[p];
-//XXX doesnt have to start at 0.		
-		pattern->positionInFrames = 0;
 
-		pattern->state = PATTERN_ON;
-		pattern->startInFrames = 0;
-		pattern->lengthInFrames = 0;
+		pattern->position = 0;
+		pattern->enabled = false;
 
 		for (int n=0; n<5; n++) {  //FIXME
 			Note* note = &pattern->notes[n];
@@ -374,15 +368,15 @@ static void playPattern(Self* self, Pattern* pattern, uint32_t begin, uint32_t e
 
 			int pitch = pattern->baseOctave * 12 + pattern->baseNote + note->pitch;
 
-			if (note->state == NOTE_OFF && pattern->positionInFrames >= noteStart && pattern->positionInFrames < noteEnd) 
+			if (note->state == NOTE_OFF && pattern->position >= noteStart && pattern->position < noteEnd) 
 				noteOn(self,note,i,pitch,outCapacity);
 
-			else if (note->state == NOTE_ON && pattern->positionInFrames == noteEnd - 1) 
+			else if (note->state == NOTE_ON && pattern->position == noteEnd - 1) 
 				noteOff(self,note,i,pitch,outCapacity);
 		}
 
-		if (++ pattern->positionInFrames == patternEnd)
-			pattern->positionInFrames = 0;
+		if (++ pattern->position == patternEnd)
+			pattern->position = 0;
 	}
 
 //TODO if we reach the end of a once-through pattern disable it.
@@ -393,8 +387,12 @@ static void playPatterns(Self* self, uint32_t begin, uint32_t end, uint32_t outC
 	for (int p=0; p < self->numPatterns; p++) {
 		Pattern* pattern = &self->patterns[p];
 
-		if (pattern->state != PATTERN_OFF)
+//printf("playPatterns() - 2\n");			
+
+		if (pattern->enabled) {
+//printf("Calling playPatterns()\n");			
 			playPattern(self,pattern,begin,end,outCapacity);
+		}			
 	}
 }
 
@@ -442,7 +440,6 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 //TODO remove time position messages	
 
 	/* Loop through events: */
-	const LV2_Atom_Sequence* in = self->controlInBuffer;
 	uint32_t last_t = 0;
 
 	LV2_ATOM_SEQUENCE_FOREACH (self->controlInBuffer, ev) {
@@ -453,8 +450,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
 //XXX Q: should we calling this 'play' for all message types? 
 		// Play the click for the time slice from last_t until now
-		if (self->speed != 0.0f) 
-			playPatterns(self, last_t, (uint32_t)ev->time.frames,outCapacity);
+		playPatterns(self, last_t, (uint32_t)ev->time.frames,outCapacity);
 
 		/* 
 			NOTE position messages sometimes come part way through a cycle (eg 1024 frames).
@@ -470,12 +466,14 @@ printf("GOT an atom  otype: %d\n",obj->body.otype);
 			if (obj->body.otype == uris->time_Position) 
 				updatePosition(self, obj); //TODO delete I think
 			else if (obj->body.otype == uris->loopsMessage) {
+//TODO separate into new function
 printf("GOT loops message\n");
 
 				LV2_Atom* loopId = NULL;
 				LV2_Atom* loopEnable = NULL;
 				LV2_Atom* startFrame = NULL;
 
+//NOTE I'm favouring use of "pattern" again over "loop"				
 				lv2_atom_object_get(obj,
 					uris->loopId, &loopId,
 					uris->loopEnable, &loopEnable,
@@ -483,23 +481,22 @@ printf("GOT loops message\n");
 					NULL
 				);
 
-//NOTE I'm favouring use of "pattern" again over "loop"				
 				printf("loopId: %ld\n",((LV2_Atom_Long*)loopId)->body);
 				printf("loopEnable: %b\n",((LV2_Atom_Bool*)loopEnable)->body);
 				if (startFrame)
 					printf("startFrame: %ld\n",((LV2_Atom_Long*)startFrame)->body);
 
-/*
-				if (loopId && loopId->type == uris->atom_Long)  //XXX they should really be an exceptions
-					self->loopId = ((LV2_Atom_Long*)loopId)->body;
+//FIXME Im mixing up pattern IDs and indexes here and in songEditor...
 
-				if (loopEnable /*&& speed->type == uris->atom_Bool* /)
-					self->loopEnable = ((LV2_Atom_Bool*)loopEnable)->body;
+//TODO delete the unused Pattern fields	(startInFrames && endInFrames). RENAME positionInFrames to position
+				if (loopId) {
+					int id = ((LV2_Atom_Long*)loopId)->body;		//TODO change loopId to int
+					self->patterns[id].enabled = ((LV2_Atom_Bool*)loopEnable)->body;
+					if (startFrame)
+						self->patterns[id].position = ((LV2_Atom_Long*)startFrame)->body;
 
-				if (startFrame /*&& speed->type == uris->atom_Long* /)
-					self->loopStartFrame = ((LV2_Atom_Long*)startFrame)->body;
-*/				
-
+printf("CHANGED PATTERN ID  id:%d  enabled:%b\n",id,self->patterns[id].enabled);					
+				}
 			}
 
 //TODO probably accept another atom type message to change pattern indexes (and maybe allow patterns to be added or removed).
@@ -511,8 +508,7 @@ printf("GOT loops message\n");
 	}
 
 	/* Play out the remainder of cycle: */
-	if (self->speed != 0.0f) 
-		playPatterns(self, last_t, sample_count, outCapacity);
+	playPatterns(self, last_t, sample_count, outCapacity);
 }
 
 /*
