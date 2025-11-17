@@ -3,6 +3,7 @@
 #include <lv2/urid/urid.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/types.h>
 #include "pluginLoader.h"
 #include "songEditor.h"
 #include "lv2/atom/forge.h"
@@ -348,7 +349,7 @@ printf("sendLoopOffMessage() END\n\n");
 }
 
 
-static void playTrack(Self* self, Track* track,long absPos,int last,int current)
+static void handleTrack(Self* self, Track* track,long absPos,int last,int current)
 {
 	long pos = absPos + last;
 
@@ -392,14 +393,14 @@ static void playTrack(Self* self, Track* track,long absPos,int last,int current)
 }
 
 /* Play patterns in the range [lastPos..currentPos) relative to this cycle.  */
-static void playSong(Self* self,long absPos,int last,int current)
+static void createLoopCommands(Self* self,long absPos,int last,int current)
 {
 //TODO add mute and solo features for tracks
 
 	for (int t=0; t < self->numTracks; t++) {
 		Track* track = &self->timeline->tracks[t];
 
-		playTrack(self,track,absPos,last,current);
+		handleTrack(self,track,absPos,last,current);
 	}
 }
 
@@ -435,8 +436,6 @@ static void adjustNextPatternIndexes(Self* self,long newPos)
 */
 static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFrames)
 {
-	const URIs* uris = &self->uris;
-
 	/*
 		Ardour seems to take a while to establish itself on play. Possibly addressing latency issues. You even get negative frames.
 		The frames seem to be OK and aligned once speed=1.
@@ -448,8 +447,8 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 	LV2_Atom* time_frame = NULL;
 
 	lv2_atom_object_get(obj,
-		uris->time_speed, &speed,
-		uris->time_frame, &time_frame,
+		self->uris.time_speed, &speed,
+		self->uris.time_frame, &time_frame,
 		NULL
 	);
 
@@ -481,122 +480,78 @@ static void maybeJump(Self* self, const LV2_Atom_Object* obj, uint32_t offsetFra
 
 //FIXME the speed (and frame) guard needs to be earlier to use useful...	
 	/* Speed=0 (stop) or speed=1 (play) */
-	if (speed && speed->type == uris->atom_Float) 
+	if (speed && speed->type == self->uris.atom_Float) 
 		self->speed = newSpeed;
 }
 
-//TODO delete after testing...
-typedef struct {
-	LV2_Atom_Event event;
-	uint8_t msg[3];
-} MIDINoteEvent;
+static void createLoopCommandsAndHandleJumps(Self* self,uint32_t* pos)
+{							 
+	LV2_ATOM_SEQUENCE_FOREACH (self->timePositionBuffer, ev) {
+		uint32_t offset = ev->time.frames;
 
-//XXX another use case muting or soloing a track should probably instantly start or stop the current pattern
+		if (self->speed != 0.0f) 
+			createLoopCommands(self,self->absolutePosition,pos,offset);
 
-/*
-	`run()` must be real-time safe. No memory allocations or blocking!
-	Note the spec says that sampleCount=0 must be supported for latency updates etc.
-*/
-static void run(LV2_Handle instance, uint32_t numFrames)
+		if (ev->body.type == self->uris.atom_Object || ev->body.type == self->uris.atom_Blank) {
+			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
+
+			if (obj->body.otype == self->uris.time_Position) 
+				maybeJump(self, obj,offset);
+			else
+printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
+		}
+
+		*pos = offset;
+	}
+}
+
+static void processInput(Self* self, uint32_t sampleCount)
 {
-	Self* self = (Self*)instance;
- 	const URIs* uris = &self->uris;
-
-	/* --- Create pattern messages and handle time position changes --- */
-
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->controlBuffer);
 	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; 
 	self->midiOutBuffer->body.unit = self->uris.time_frame;
 
-//XXX alternative:  lv2_atom_forge_set_sink()
 	lv2_atom_forge_set_buffer(&self->controlForge,(uint8_t*)&self->controlBuffer,sizeof(self->controlBuffer));  //TODO ensure size not exceeded. NB only one tuple sent per run() call
 	LV2_Atom_Forge_Frame controlSequenceFrame; 
-	lv2_atom_forge_sequence_head(&self->controlForge,&controlSequenceFrame,self->uris.time_frame);    //   unit is the URID of unit of event time stamps. 
+	lv2_atom_forge_sequence_head(&self->controlForge,&controlSequenceFrame,self->uris.time_frame);  
 
-
-//XXX cf separate into handleEvents() or handleEvent()...
-	/* Loop through events: */
+	/* Loop through the input events: */
 	uint32_t pos = 0;
-
-	LV2_ATOM_SEQUENCE_FOREACH (self->timePositionBuffer, ev) {
-		uint32_t offset = ev->time.frames;
-
-		// Play the click for the time slice from last_t until now
-		if (self->speed != 0.0f) 
-			playSong(self,self->absolutePosition,pos,offset);
-
-		if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
-			const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
-
-			if (obj->body.otype == uris->time_Position) 
-				maybeJump(self, obj,offset);
-			else
-printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
-
-//TODO probably accept another atom type message to change pattern indexes (and maybe allow patterns to be added or removed).
-//     Maybe a CC or CV message. MIDI is maybe a possibility. Otherwise custom.
-		}
-
-//XXX Q: should we calling this 'play' for all message types? 
-
-		pos = offset;
-	}
+	createLoopCommandsAndHandleJumps(self,&pos);
 
 	/* Play out the remainder of cycle: */
 	if (self->speed != 0.0f) 
-		playSong(self,self->absolutePosition,pos,numFrames);
+		createLoopCommands(self,self->absolutePosition,pos,sampleCount);
 
 	/* Update the absolute position: */
-	self->absolutePosition += numFrames - pos;
+	self->absolutePosition += sampleCount - pos;
 
 	/* Complete the sequence: */
 	lv2_atom_forge_pop(&self->controlForge, &controlSequenceFrame);
+}
 
-
-	/* --- Call our plugins --- */
-
-	/* Prepare for MIDI output: */
-
+static void runPlugins(Self* self,uint32_t sampleCount)
+{
+	/* Prepare MIDI output: */
 	lv2_atom_sequence_clear(self->midiOutBuffer);
 	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; 
 	self->midiOutBuffer->body.unit = self->uris.time_frame;
 
-//XXX ADD A TEST NOTE...
-/*	
-	const uint32_t outCapacity = self->midiOutBuffer->atom.size; //TODO reconsider
-	MIDINoteEvent out;
-
-	out.event.time.frames = 50;
-	out.event.body.type = self->uris.midi_Event;
-	out.event.body.size = 3;
-	out.msg[0] = 0x90; 
-	out.msg[1] = 60;       
-	out.msg[2] = 100;   
-	lv2_atom_sequence_append_event(self->midiOutBuffer,outCapacity, &out.event);
-
-	out.event.time.frames = 100;
-	out.event.body.type = self->uris.midi_Event;
-	out.event.body.size = 3;
-	out.msg[0] = 0x80; 
-	out.msg[1] = 60;       
-	out.msg[2] = 0;   
-	lv2_atom_sequence_append_event(self->midiOutBuffer,outCapacity, &out.event);
-*/	
-
-
-//TEST try adding a MIDI note ourselves before calling the plugin. Survive does it?
-
 	/* Call our plugins: */
 	for (int i=0; i<self->plugins.numPlugins; i++) {
 		Plugin* plugin = &self->plugins.plugins[i];
-		lilv_instance_run(plugin->instance,numFrames);
+		lilv_instance_run(plugin->instance,sampleCount);
 	}
+}
 
-//TODO close off the sequence
-//	lv2_atom_forge_pop(&self->midiForge, &midiSequenceFrame);
-
-	//3. End sequence if necessary
+/*
+	REMEMBER No memory allocations or blocking!
+*/
+static void run(LV2_Handle instance, uint32_t sampleCount)
+{
+	processInput((Self*)instance,sampleCount);
+	runPlugins((Self*)instance,sampleCount);
 }
 
 /*

@@ -310,6 +310,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
  	const URIs* uris = &self->uris;
 
   	/* Initially self->out_port contains a Chunk with size set to capacity */
+
 //	const uint32_t outCapacity = self->midiOutBuffer->atom.size; //TODO reconsider
 	const uint32_t outCapacity = 400; //FIXME
 

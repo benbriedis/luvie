@@ -134,11 +134,13 @@ TO TEST
 
 TODOs
 =====
+Fix up outCapacity in harmony.c  - see
+	https://lv2plug.in/ns/ext/buf-size
+	https://lv2plug.in/ns/ext/resize-port
+
 Set up saving and loading of patterns and writing back of patterns from plugins
 
 Unit tests
-
-Chop up songEditor run()
 
 Use Patches? and Parameters?
 
