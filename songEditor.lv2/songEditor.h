@@ -11,6 +11,7 @@
 	#include <lv2/time/time.h>
 	#include <lv2/urid/urid.h>
 	#include <lv2/atom/forge.h>
+	#include <lv2/state/state.h>
 	#include <stdint.h>
 	#include <threads.h>
 	#include "pluginLoader.h"
@@ -120,6 +121,7 @@
 	typedef struct {
 		LV2_URID atom_Blank;
 		LV2_URID atom_Float;
+		LV2_URID atom_String;
 		LV2_URID atom_Object;
 		LV2_URID atom_Path;
 		LV2_URID atom_Resource;
@@ -140,6 +142,9 @@
 		LV2_URID loopId;
 		LV2_URID loopEnable;
 		LV2_URID loopStartFrame;
+
+		/* State: */
+		LV2_URID myGreeting;
 	} URIs;
 
 
@@ -150,6 +155,12 @@
 		LOOP_COMMAND command;
 		long startFrame;
 	} LoopMessage;
+
+
+	typedef struct {
+		char* greeting;
+	} MyState;
+
 
 	/*
 	   All data associated with a plugin instance is stored here.
@@ -200,6 +211,9 @@
 
 		LV2_Atom_Forge controlForge; 
 		uint64_t controlBuffer[200];   //XXX can I embed it if single messages are used?
+
+
+		MyState state;
 	} Self;
 
 #endif // SONG_EDITOR_H

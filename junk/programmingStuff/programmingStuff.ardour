@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="7170" name-counter="1" event-counter="21757" vca-counter="1">
+<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="7374" name-counter="1" event-counter="21987" vca-counter="1">
   <ProgramVersion created-with="Ardour 6.9.0~ds0-1build1" modified-with="Ardour 6.9.0~ds0-1build1"/>
   <EngineHints backend="JACK" input-device="EDIROL UA-25" output-device="EDIROL UA-25"/>
   <MIDIPorts>
@@ -405,8 +405,8 @@
       <Window name="P-167-3769" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
       <Window name="PM-167-3769" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="P-4071-4521" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
-      <Window name="PM-4071-4521" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="P-4071-7166" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1" custom-ui="1"/>
+      <Window name="PM-4071-4521" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <Window name="PM-4071-7166" visible="0" x-off="-1" y-off="-1" x-size="-1" y-size="-1"/>
       <GUIObjectState>
         <Object id="rtav 64" height="64" visible="1"/>

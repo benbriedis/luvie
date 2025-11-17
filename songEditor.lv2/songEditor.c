@@ -250,15 +250,52 @@ printf("Back from addPlugins\n");
 	/* NOTE lv2_atom_forge_init() may notbe runtime safe, so keep out of run() (see API docs) */
     lv2_atom_forge_init(&self->controlForge, self->map);
 
+
+	//XXX TEST of State extension XXX
+	self->uris.atom_String = map->map(map->handle, LV2_ATOM__String);
+	self->uris.myGreeting = map->map(map->handle, PLUGIN_URI "greeting");
+	self->state.greeting = strdup("Hello");
+
 printf("Finished instantiate()\n");	
 	return (LV2_Handle)self;
+}
+
+
+LV2_State_Status my_save(LV2_Handle instance,LV2_State_Store_Function store,LV2_State_Handle handle,uint32_t flags,const LV2_Feature *const *features)
+{
+printf("my_save() CALLED!\n");
+    Self* self = (Self*)instance;
+    const char* greeting = self->state.greeting;
+
+    store(handle,self->uris.myGreeting, greeting, strlen(greeting) + 1, self->uris.atom_String, LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+
+    return LV2_STATE_SUCCESS;
+}
+
+LV2_State_Status my_restore(LV2_Handle instance, LV2_State_Retrieve_Function retrieve, LV2_State_Handle handle, uint32_t flags, const LV2_Feature *const * features)
+{
+printf("my_restore() CALLED!\n");
+    Self* self = (Self*)instance;
+
+    size_t size;
+    uint32_t type;
+//    uint32_t flags;
+    const char* greeting = retrieve(handle, self->uris.myGreeting, &size, &type, &flags);
+
+    if (greeting) {
+        free(self->state.greeting);
+        self->state.greeting = strdup(greeting);
+    } else 
+        self->state.greeting = strdup("Hello");
+
+    return LV2_STATE_SUCCESS;
 }
 
 /*
    The plugin must store the data location, but data may not be accessed except in run().
    This method is in the 'audio' threading class, and is called in the same context as run().
 */
-static void connect_port(LV2_Handle instance, uint32_t port, void* data)
+static void connectPort(LV2_Handle instance, uint32_t port, void* data)
 {
 //XXX looks like its meant to called over and over
 
@@ -598,14 +635,26 @@ static void cleanup(LV2_Handle instance)
    This method is in the 'discovery' threading class, so no other functions
    or methods in this plugin library will be called concurrently with it.
 */
-static const void* extension_data(const char* uri)
+static const void* extensionData(const char* uri)
 {
+printf("In extensionData() uri: %s\n",uri);	
+	static const LV2_State_Interface state_iface = { my_save, my_restore };
+	if (!strcmp(uri, LV2_STATE__interface)) 
+{		
+printf("In extensionData() returning state_iface\n");	
+
+//XXX Q: am I meant to put something in the .ttl file to request this? Ardour seems to poll it anyway
+
+		return &state_iface;
+}
+printf("In extensionData() returning NULL\n");	
+
 	return NULL;
 }
 
 /* Every plugin must define an `LV2_Descriptor`.  It is best to define descriptors statically. */
-static const LV2_Descriptor descriptor = {PLUGIN_URI, instantiate, connect_port, activate, 
-	run, deactivate, cleanup, extension_data};
+static const LV2_Descriptor descriptor = {PLUGIN_URI, instantiate, connectPort, activate, 
+	run, deactivate, cleanup, extensionData};
 
 LV2_SYMBOL_EXPORT const LV2_Descriptor* lv2_descriptor(uint32_t index)
 {
