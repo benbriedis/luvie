@@ -2,6 +2,7 @@
 #include <lv2/atom/atom.h>
 #include <lv2/urid/urid.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include "pluginLoader.h"
@@ -254,27 +255,28 @@ printf("Back from addPlugins\n");
 	//XXX TEST of State extension XXX
 	self->uris.atom_String = map->map(map->handle, LV2_ATOM__String);
 	self->uris.myGreeting = map->map(map->handle, PLUGIN_URI "greeting");
-	self->state.greeting = strdup("Hello");
+	memcpy(&self->state.greeting,"Hello",sizeof("Hello")+1);
 
 printf("Finished instantiate()\n");	
 	return (LV2_Handle)self;
 }
 
 
-LV2_State_Status my_save(LV2_Handle instance,LV2_State_Store_Function store,LV2_State_Handle handle,uint32_t flags,const LV2_Feature *const *features)
+static LV2_State_Status mySave(LV2_Handle instance,LV2_State_Store_Function store,LV2_State_Handle handle,uint32_t flags,const LV2_Feature *const *features)
 {
 printf("my_save() CALLED!\n");
     Self* self = (Self*)instance;
     const char* greeting = self->state.greeting;
 
-    store(handle,self->uris.myGreeting, greeting, strlen(greeting) + 1, self->uris.atom_String, LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+printf("my_save() SAVING %s\n",greeting);
+
+    store(handle,self->uris.myGreeting, greeting, strlen(greeting) + 1, self->uris.atom_String, LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);  //XXX what are these flags?
 
     return LV2_STATE_SUCCESS;
 }
 
-LV2_State_Status my_restore(LV2_Handle instance, LV2_State_Retrieve_Function retrieve, LV2_State_Handle handle, uint32_t flags, const LV2_Feature *const * features)
+static LV2_State_Status myRestore(LV2_Handle instance, LV2_State_Retrieve_Function retrieve, LV2_State_Handle handle, uint32_t flags, const LV2_Feature *const * features)
 {
-printf("my_restore() CALLED!\n");
     Self* self = (Self*)instance;
 
     size_t size;
@@ -284,9 +286,12 @@ printf("my_restore() CALLED!\n");
 
     if (greeting) {
         free(self->state.greeting);
-        self->state.greeting = strdup(greeting);
-    } else 
-        self->state.greeting = strdup("Hello");
+        memcpy(&self->state.greeting,greeting,sizeof(greeting)+1);
+printf("my_restore() CALLED  got greeting: %s\n",greeting);
+    } else {
+        memcpy(&self->state.greeting,"Hello2",sizeof("Hello2")+1);
+printf("my_restore() CALLED  but no greeting\n");
+	}
 
     return LV2_STATE_SUCCESS;
 }
@@ -416,6 +421,9 @@ static void handleTrack(Self* self, Track* track,long absPos,int last,int curren
 		/* NOTE a single loop can turn one pattern off and another on */
 
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
+
+sprintf(&self->state.greeting, "Last pattern: %d",pattern->id);
+
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
 //FIXME want the start, cyclePos is the current position (ie more like the end)			
@@ -638,7 +646,7 @@ static void cleanup(LV2_Handle instance)
 static const void* extensionData(const char* uri)
 {
 printf("In extensionData() uri: %s\n",uri);	
-	static const LV2_State_Interface state_iface = { my_save, my_restore };
+	static const LV2_State_Interface state_iface = { mySave, myRestore };
 	if (!strcmp(uri, LV2_STATE__interface)) 
 {		
 printf("In extensionData() returning state_iface\n");	

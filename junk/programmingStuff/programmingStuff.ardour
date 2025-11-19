@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="7374" name-counter="1" event-counter="21987" vca-counter="1">
+<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="7783" name-counter="1" event-counter="22392" vca-counter="1">
   <ProgramVersion created-with="Ardour 6.9.0~ds0-1build1" modified-with="Ardour 6.9.0~ds0-1build1"/>
   <EngineHints backend="JACK" input-device="EDIROL UA-25" output-device="EDIROL UA-25"/>
   <MIDIPorts>

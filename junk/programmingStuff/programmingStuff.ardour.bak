@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="7374" name-counter="1" event-counter="21987" vca-counter="1">
+<Session version="6000" name="programmingStuff" sample-rate="44100" end-is-free="1" session-range-is-free="1" id-counter="7578" name-counter="1" event-counter="22386" vca-counter="1">
   <ProgramVersion created-with="Ardour 6.9.0~ds0-1build1" modified-with="Ardour 6.9.0~ds0-1build1"/>
   <EngineHints backend="JACK" input-device="EDIROL UA-25" output-device="EDIROL UA-25"/>
   <MIDIPorts>
@@ -241,8 +241,8 @@
         </Port>
         <Port type="midi" name="Bus 1/midi_out 1"/>
       </IO>
-      <MuteMaster mute-point="PostFader,Listen,Main" muted="1"/>
-      <Controllable name="mute" id="4081" flags="Toggle,RealTime" value="1"/>
+      <MuteMaster mute-point="PostFader,Listen,Main" muted="0"/>
+      <Controllable name="mute" id="4081" flags="Toggle,RealTime" value="0"/>
       <Controllable name="phase" id="4083" flags="Toggle" value="0" phase-invert=""/>
       <Automation>
         <AutomationList automation-id="solo" id="4078" interpolation-style="Discrete" state="Off"/>

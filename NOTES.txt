@@ -134,6 +134,9 @@ TO TEST
 
 TODOs
 =====
+Will probably want a separate way to save a song - eg transfer between systems etc... Maybe just export?
+  cf warning if deleting the plugin.
+
 Fix up outCapacity in harmony.c  - see
 	https://lv2plug.in/ns/ext/buf-size
 	https://lv2plug.in/ns/ext/resize-port

@@ -158,7 +158,7 @@
 
 
 	typedef struct {
-		char* greeting;
+		char greeting[100];
 	} MyState;
 
 
