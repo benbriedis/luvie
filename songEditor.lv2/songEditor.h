@@ -148,7 +148,8 @@
 	} URIs;
 
 
-	enum { CONTROL_IN = 0, NOTIFY_OUT = 1, MIDI_OUT = 2 };
+//TODO swap these. Having trouble reordering the ports for some reason at the moment
+	enum { CONTROL_IN = 0, NOTIFY_OUT = 2, MIDI_OUT = 1 };
 
 	typedef struct {
 		int loopIndex;

@@ -251,6 +251,7 @@ printf("Back from addPlugins\n");
 
 	/* NOTE lv2_atom_forge_init() may notbe runtime safe, so keep out of run() (see API docs) */
     lv2_atom_forge_init(&self->controlForge, self->map);
+    lv2_atom_forge_init(&self->notifyForge, self->map);
 
 
 	//XXX TEST of State extension XXX
@@ -303,6 +304,7 @@ printf("my_restore() CALLED  but no greeting\n");
 */
 static void connectPort(LV2_Handle instance, uint32_t port, void* data)
 {
+//printf("connectPort  %d\n",port);	
 //XXX looks like its meant to called over and over
 
 	Self* self = (Self*)instance;
@@ -314,10 +316,12 @@ static void connectPort(LV2_Handle instance, uint32_t port, void* data)
 			break;
 
 		case NOTIFY_OUT:
+//printf("connectPort   - NOTIFY_OUT\n");	
 			self->notifyBuffer = (LV2_Atom_Sequence*)data;
 			break;
 
 		case MIDI_OUT:
+//printf("connectPort   - MIDI_OUT\n");	
 			self->midiOutBuffer = (LV2_Atom_Sequence*)data;
 			break;
 	}
@@ -380,10 +384,17 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 
 
 	//LV2_Atom_Forge_Frame notifyFrame;   XXX probably dont need the frame currently
-    lv2_atom_forge_frame_time(&self->notifyForge,0);
-	lv2_atom_forge_key(&self->notifyForge, self->uris.myGreeting);
-	lv2_atom_forge_string(&self->notifyForge, "patternX",sizeof("patternX")+1);
+//    lv2_atom_forge_frame_time(&self->notifyForge,0);
+//	lv2_atom_forge_key(&self->notifyForge, self->uris.myGreeting);
+//	lv2_atom_forge_string(&self->notifyForge, "patternX",sizeof("patternX")+1);
 
+	LV2_Atom_Forge_Frame frame2;
+	lv2_atom_forge_object(&self->notifyForge, &frame2, 0, self->uris->patch_Set);
+	lv2_atom_forge_key(&self->notifyForge, self->uris->patch_property);
+	lv2_atom_forge_urid(&self->notifyForge, self->uris->param_gain);
+	lv2_atom_forge_key(&self->notifyForge, self->uris->patch_value);
+	lv2_atom_forge_float(&self->notifyForge, gain);
+	lv2_atom_forge_pop(&self->notifyForge, &frame2);
 printf("sendLoopOnMessage() END\n\n");	
 }
 

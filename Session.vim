@@ -14,15 +14,19 @@ else
   set shortmess=aoO
 endif
 badd +117 NOTES.txt
-badd +247 songEditor.lv2/songEditor.c
-badd +427 plugins/harmony.lv2/harmony.c
-badd +176 songEditor.lv2/songEditor.h
+badd +391 songEditor.lv2/songEditor.c
+badd +146 plugins/harmony.lv2/harmony.c
+badd +151 songEditor.lv2/songEditor.h
 badd +187 /usr/include/string.h
+badd +67 songEditor.lv2/songEditor.ttl
+badd +633 /usr/include/lv2/atom/forge.h
+badd +50 ~/programming/luvie/songEditor.lv2/pluginLoader.c
+badd +90 ~/programming/luvie/plugins/harmony.lv2/harmony.h
 argglobal
 %argdel
 edit songEditor.lv2/songEditor.c
 argglobal
-balt /usr/include/string.h
+balt songEditor.lv2/songEditor.h
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -33,12 +37,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 247 - ((1 * winheight(0) + 25) / 50)
+let s:l = 391 - ((31 * winheight(0) + 25) / 50)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 247
-normal! 042|
+keepjumps 391
+normal! 0
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

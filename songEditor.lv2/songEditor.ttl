@@ -46,22 +46,24 @@ plug:greeting
 		lv2:symbol "control" ;
 		lv2:name "Control" ;
 	] , [
+		a lv2:OutputPort,
+			atom:AtomPort ;
+		atom:bufferType atom:Sequence ;
+		atom:supports midi:MidiEvent ;
+		lv2:index 1 ;
+		lv2:symbol "midi_out" ;
+		lv2:name "MIDI Out"
+	] , [
+#TODO swap with MIDI port. But why is it breaking?
+
 		a lv2:OutputPort ,
 			atom:AtomPort ;
 		atom:bufferType atom:Sequence ;
 		atom:supports patch:Message ;   #XXX I dont support (yet)
 		lv2:designation lv2:control ;   #XXX is this correct?
-		lv2:index 1 ;
+		lv2:index 2 ;
 		lv2:symbol "notify" ;
 		lv2:name "Notify"
-	] , [
-		a lv2:OutputPort,
-			atom:AtomPort ;
-		atom:bufferType atom:Sequence ;
-		atom:supports midi:MidiEvent ;
-		lv2:index 2 ;
-		lv2:symbol "midi_out" ;
-		lv2:name "MIDI Out"
 	] ;
 
 	patch:readable plug:greeting ;
