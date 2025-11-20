@@ -148,7 +148,7 @@
 	} URIs;
 
 
-	enum { CONTROL_IN = 0, MIDI_OUT = 1 };
+	enum { CONTROL_IN = 0, NOTIFY_OUT = 1, MIDI_OUT = 2 };
 
 	typedef struct {
 		int loopIndex;
@@ -173,6 +173,7 @@
 		/* Ports: */
 		const LV2_Atom_Sequence* timePositionBuffer;
 		LV2_Atom_Sequence* midiOutBuffer;
+		LV2_Atom_Sequence* notifyBuffer;
 
 		URIs uris;   // Cache of mapped URIDs
 
@@ -205,13 +206,13 @@
 
 	//	LV2_Atom_Forge_Frame notify_frame; ///< Cached for worker replies
 
-	//XXX or allow for multiple messages?
-//		LoopMessage* controlMessage;   //XXX can I embed it if single messages are used?
-//		char controlMessage[200];   //XXX can I embed it if single messages are used?
-
+		/* Communication to plugins: */
 		LV2_Atom_Forge controlForge; 
 		uint64_t controlBuffer[200];   //XXX can I embed it if single messages are used?
 
+		/* Communication out to our host */
+		LV2_Atom_Forge_Frame notifyFrame;
+		LV2_Atom_Forge notifyForge;
 
 		MyState state;
 	} Self;

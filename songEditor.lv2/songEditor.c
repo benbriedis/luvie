@@ -163,6 +163,7 @@ printf("CALLING instantiate()\n");
 		return NULL;
 	}
 
+//TODO separate this code
 	// Map URIS
 	URIs* const uris = &self->uris;
 	LV2_URID_Map* const map = self->map;
@@ -312,6 +313,10 @@ static void connectPort(LV2_Handle instance, uint32_t port, void* data)
 			self->timePositionBuffer = (LV2_Atom_Sequence*)data;
 			break;
 
+		case NOTIFY_OUT:
+			self->notifyBuffer = (LV2_Atom_Sequence*)data;
+			break;
+
 		case MIDI_OUT:
 			self->midiOutBuffer = (LV2_Atom_Sequence*)data;
 			break;
@@ -372,6 +377,13 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 //TODO rename to 'offset' I think. Can start at 0 or at the point relative to the current pattern.
 	lv2_atom_forge_long(&self->controlForge, patternOffset);
 	lv2_atom_forge_pop(&self->controlForge, &frame); 
+
+
+	//LV2_Atom_Forge_Frame notifyFrame;   XXX probably dont need the frame currently
+    lv2_atom_forge_frame_time(&self->notifyForge,0);
+	lv2_atom_forge_key(&self->notifyForge, self->uris.myGreeting);
+	lv2_atom_forge_string(&self->notifyForge, "patternX",sizeof("patternX")+1);
+
 printf("sendLoopOnMessage() END\n\n");	
 }
 
@@ -552,6 +564,8 @@ printf("GOT A DIFFERENT TYPE OF MESSAGE  otype: %d\n",obj->body.otype);
 
 static void processInput(Self* self, uint32_t sampleCount)
 {
+//XXX cf ==> controlOutBuffer
+
 	/* Write an empty Sequence header to the output */
 	lv2_atom_sequence_clear(self->controlBuffer);
 	self->midiOutBuffer->atom.type = self->uris.atom_Sequence; 
@@ -595,8 +609,25 @@ static void runPlugins(Self* self,uint32_t sampleCount)
 */
 static void run(LV2_Handle instance, uint32_t sampleCount)
 {
-	processInput((Self*)instance,sampleCount);
-	runPlugins((Self*)instance,sampleCount);
+	Self* self = (Self*)instance;
+
+  // Set up forge to write directly to notify output port.
+
+	const uint32_t notifyCapacity = self->notifyBuffer->atom.size;	
+//printf("notifyCapacity: %d\n",notifyCapacity);   XXX returning 32768
+	lv2_atom_forge_set_buffer(&self->notifyForge, (uint8_t*)self->notifyBuffer, notifyCapacity);
+	lv2_atom_forge_sequence_head(&self->notifyForge, &self->notifyFrame, 0);
+//	lv2_atom_sequence_clear(self->notifyBuffer);
+//	self->notifyBuffer->atom.type = self->uris.atom_Sequence; 
+//	self->notifyBuffer->body.unit = self->uris.time_frame;
+
+
+	processInput(self,sampleCount);
+
+	//XXX probably a temporary position for this. Probably actually get input from a worker and deal with above the processInput call
+	lv2_atom_forge_pop(&self->notifyForge, &self->notifyFrame);
+
+	runPlugins(self,sampleCount);
 }
 
 /*

@@ -7,6 +7,21 @@
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
+@prefix plug: <http://lv2plug.in/plugins/eg-params#> .
+@prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+
+
+# An existing parameter or RDF property can be used as a parameter.  The LV2
+# parameters extension <http://lv2plug.in/ns/ext/parameters> defines many
+# common audio parameters.  Where possible, existing parameters should be used
+# so hosts can intelligently control plugins.
+# If no suitable parameter exists, one can be defined for the plugin like so:
+plug:greeting
+	a lv2:Parameter ;
+	rdfs:label "string" ;
+	rdfs:range atom:String .
+
 
 <https://github.com/benbriedis/luvie/songEditor>
 	a lv2:Plugin ,
@@ -23,18 +38,39 @@
 	lv2:optionalFeature lv2:hardRTCapable ;
 
 	lv2:port [
-		a lv2:InputPort , atom:AtomPort ;
+		a lv2:InputPort,
+			atom:AtomPort ;
 		atom:bufferType atom:Sequence ;
 		atom:supports time:Position ;
 		lv2:index 0 ;
 		lv2:symbol "control" ;
 		lv2:name "Control" ;
 	] , [
-		a lv2:OutputPort , atom:AtomPort ;
+		a lv2:OutputPort ,
+			atom:AtomPort ;
+		atom:bufferType atom:Sequence ;
+		atom:supports patch:Message ;   #XXX I dont support (yet)
+		lv2:designation lv2:control ;   #XXX is this correct?
+		lv2:index 1 ;
+		lv2:symbol "notify" ;
+		lv2:name "Notify"
+	] , [
+		a lv2:OutputPort,
+			atom:AtomPort ;
 		atom:bufferType atom:Sequence ;
 		atom:supports midi:MidiEvent ;
-		lv2:index 1 ;
+		lv2:index 2 ;
 		lv2:symbol "midi_out" ;
 		lv2:name "MIDI Out"
+	] ;
+
+	patch:readable plug:greeting ;
+
+	state:state [
+#		<https://github.com/benbriedis/luvie/songEditor#greeting> <click.wav> ;
+#		param:gain "0.0"^^xsd:float
+#		param:greeting "0.0"^^xsd:float
+#SEE eg-params...
+		plug:greeting "Hello, world" ;
 	] .
 
