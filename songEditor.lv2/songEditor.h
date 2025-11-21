@@ -137,6 +137,7 @@
 		LV2_URID patch_Set;
 		LV2_URID patch_property;
 		LV2_URID patch_value;
+		LV2_URID param_gain;		//XXX temporary for testing
 
 		LV2_URID loopsMessage;
 		LV2_URID loopId;

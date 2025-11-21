@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <lv2/atom/atom.h>
 #include <lv2/urid/urid.h>
+#include <lv2/parameters/parameters.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -180,6 +181,7 @@ printf("CALLING instantiate()\n");
 	uris->patch_Set           = map->map(map->handle, LV2_PATCH__Set);
 	uris->patch_property      = map->map(map->handle, LV2_PATCH__property);
 	uris->patch_value         = map->map(map->handle, LV2_PATCH__value);
+	uris->param_gain          = map->map(map->handle, LV2_PARAMETERS__gain);
 
 	uris->time_Position       = map->map(map->handle, LV2_TIME__Position);
 	uris->time_speed          = map->map(map->handle, LV2_TIME__speed);
@@ -266,6 +268,7 @@ printf("Finished instantiate()\n");
 
 static LV2_State_Status mySave(LV2_Handle instance,LV2_State_Store_Function store,LV2_State_Handle handle,uint32_t flags,const LV2_Feature *const *features)
 {
+//TODO change to "gain"	
 printf("my_save() CALLED!\n");
     Self* self = (Self*)instance;
     const char* greeting = self->state.greeting;
@@ -279,22 +282,53 @@ printf("my_save() SAVING %s\n",greeting);
 
 static LV2_State_Status myRestore(LV2_Handle instance, LV2_State_Retrieve_Function retrieve, LV2_State_Handle handle, uint32_t flags, const LV2_Feature *const * features)
 {
+printf("IN myRestore()\n");
+
     Self* self = (Self*)instance;
+
+/*
+      lv2_atom_object_get(obj,
+                          uris->patch_property, &property,
+                          uris->patch_value,    &value,
+                          0);
+*/						  
 
     size_t size;
     uint32_t type;
+	uint32_t valflags = 0;
 //    uint32_t flags;
-    const char* greeting = retrieve(handle, self->uris.myGreeting, &size, &type, &flags);
+//    const char* greeting = retrieve(handle, self->uris.myGreeting, &size, &type, &flags);
 
-    if (greeting) {
-        free(self->state.greeting);
-        memcpy(&self->state.greeting,greeting,sizeof(greeting)+1);
-printf("my_restore() CALLED  got greeting: %s\n",greeting);
-    } else {
-        memcpy(&self->state.greeting,"Hello2",sizeof("Hello2")+1);
-printf("my_restore() CALLED  but no greeting\n");
+	const void* value = retrieve(handle, self->uris.param_gain, &size, &type, &valflags);
+
+	if (!value) {
+	// Not an error, since older versions did not save this property
+		lv2_log_note(&self->logger, "Missing param:gain\n");
+		return LV2_STATE_SUCCESS;
 	}
 
+	if (type != self->uris.atom_Float) {
+		lv2_log_error(&self->logger, "Non-float param:gain\n");
+		return LV2_STATE_ERR_BAD_TYPE;
+	}
+
+	printf("RESTORED GAIN-2: %f\n", *(const float*)value);
+
+
+//XXX is this going to be a sequence?	
+
+/*
+    if (greeting) {
+        free(self->state.greeting);
+//        memcpy(&self->state.greeting,greeting,sizeof(greeting)+1);
+printf("my_restore() CALLED  got greeting: %s\n",greeting);
+    } else {
+//        memcpy(&self->state.greeting,"Hello2",sizeof("Hello2")+1);
+printf("my_restore() CALLED  but no greeting\n");
+	}
+*/	
+
+  // Get param:gain from state
     return LV2_STATE_SUCCESS;
 }
 
@@ -389,13 +423,14 @@ cf also using LV2 Parameters (https://lv2plug.in/ns/ext/parameters.html#ControlG
 //	lv2_atom_forge_string(&self->notifyForge, "patternX",sizeof("patternX")+1);
 
 	LV2_Atom_Forge_Frame frame2;
-	lv2_atom_forge_object(&self->notifyForge, &frame2, 0, self->uris->patch_Set);
-	lv2_atom_forge_key(&self->notifyForge, self->uris->patch_property);
-	lv2_atom_forge_urid(&self->notifyForge, self->uris->param_gain);
-	lv2_atom_forge_key(&self->notifyForge, self->uris->patch_value);
-	lv2_atom_forge_float(&self->notifyForge, gain);
+	lv2_atom_forge_object(&self->notifyForge, &frame2, 0, self->uris.patch_Set);
+	lv2_atom_forge_key(&self->notifyForge, self->uris.patch_property);
+	lv2_atom_forge_urid(&self->notifyForge, self->uris.param_gain);
+	lv2_atom_forge_key(&self->notifyForge, self->uris.patch_value);
+	lv2_atom_forge_float(&self->notifyForge, 7.7);
 	lv2_atom_forge_pop(&self->notifyForge, &frame2);
 printf("sendLoopOnMessage() END\n\n");	
+
 }
 
 //XXX child plugins dont need to support time position. Song editor can look after that.
@@ -445,7 +480,7 @@ static void handleTrack(Self* self, Track* track,long absPos,int last,int curren
 
 		if (track->state == TRACK_NOT_PLAYING && pos >= pattern->startInFrames) {
 
-sprintf(&self->state.greeting, "Last pattern: %d",pattern->id);
+//sprintf(&self->state.greeting, "Last pattern: %d",pattern->id);
 
 			printf("TURNING ON PATTERN     TRACK: %d  PATTERN: %d\n",track->id,pattern->id);
 
@@ -636,7 +671,7 @@ static void run(LV2_Handle instance, uint32_t sampleCount)
 	processInput(self,sampleCount);
 
 	//XXX probably a temporary position for this. Probably actually get input from a worker and deal with above the processInput call
-	lv2_atom_forge_pop(&self->notifyForge, &self->notifyFrame);
+//	lv2_atom_forge_pop(&self->notifyForge, &self->notifyFrame);
 
 	runPlugins(self,sampleCount);
 }

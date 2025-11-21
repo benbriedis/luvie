@@ -8,8 +8,12 @@
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
 @prefix state: <http://lv2plug.in/ns/ext/state#> .
-@prefix plug: <http://lv2plug.in/plugins/eg-params#> .
 @prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+@prefix param: <http://lv2plug.in/ns/ext/parameters#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+# HACK
+@prefix plug: <https://github.com/benbriedis/luvie/songEditor#plug> .
 
 
 # An existing parameter or RDF property can be used as a parameter.  The LV2
@@ -37,6 +41,9 @@ plug:greeting
 	lv2:requiredFeature urid:map ;
 	lv2:optionalFeature lv2:hardRTCapable ;
 
+	patch:writable param:gain ;
+	patch:readable plug:greeting ;
+
 	lv2:port [
 		a lv2:InputPort,
 			atom:AtomPort ;
@@ -59,20 +66,14 @@ plug:greeting
 		a lv2:OutputPort ,
 			atom:AtomPort ;
 		atom:bufferType atom:Sequence ;
-		atom:supports patch:Message ;   #XXX I dont support (yet)
-		lv2:designation lv2:control ;   #XXX is this correct?
+		atom:supports patch:Message ;
+		lv2:designation lv2:control ;
 		lv2:index 2 ;
 		lv2:symbol "notify" ;
 		lv2:name "Notify"
 	] ;
 
-	patch:readable plug:greeting ;
-
 	state:state [
-#		<https://github.com/benbriedis/luvie/songEditor#greeting> <click.wav> ;
-#		param:gain "0.0"^^xsd:float
-#		param:greeting "0.0"^^xsd:float
-#SEE eg-params...
-		plug:greeting "Hello, world" ;
+		param:gain "7.7"^^xsd:float
 	] .
 
