@@ -1,0 +1,23 @@
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix pset: <http://lv2plug.in/ns/ext/presets#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<>
+	a pset:Preset ;
+	lv2:appliesTo <http://lv2plug.in/plugins/eg-params> ;
+	state:state [
+		<http://lv2plug.in/plugins/eg-params#spring> "0.0"^^xsd:float ;
+		<http://lv2plug.in/plugins/eg-params#int> "0"^^xsd:int ;
+		<http://lv2plug.in/plugins/eg-params#long> "1"^^xsd:long ;
+		<http://lv2plug.in/plugins/eg-params#float> "0.57216495"^^xsd:float ;
+		<http://lv2plug.in/plugins/eg-params#double> "0.0"^^xsd:double ;
+		<http://lv2plug.in/plugins/eg-params#bool> true ;
+		<http://lv2plug.in/plugins/eg-params#string> "Hello, world" ;
+		<http://lv2plug.in/plugins/eg-params#path> <params.ttl> ;
+		<http://lv2plug.in/plugins/eg-params#lfo> "0.0"^^xsd:float
+	] .
+
