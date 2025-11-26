@@ -124,4 +124,49 @@ Free JS pianoroll here:
 Maybe translate it
 
 
+Rust Frameworks
+===============
 
+Iced	- MIT	- not immediate updates		- 28.3*
+Xilem	- Apache							- 4.7*
+	+ CPU rather stressed
+Floem	- MIT - signals						- 3.8*
+	+ Starts easily
+	+ Button looks bad
+
+Freya	- MIT - Similar to Dioxus, but natively rendered I think
+			"Currently rewriting"	- 2.8*
+
+rui		- MIT							- 2*
+Vizia	- MIT							- 2*
+Cushy	- MIT						- 0.6*
+KAS		- Apache -green					- 1*    
+Makepad	 - MIT							- 6*
+Ribir	- MIT							- 1.6*
+
+
+Tauri	- similar to Electron
+Dioxus   Chrome-via-Edge-via-WebView2 rendering? "Diet Electron" - but probably works (big? slow?)
+
+
+
+Unsuitable
+----------
+Dear ImGui		- immediate updates. Otherwise probably good.
+egui			- immediate updates. Otherwise probably good.
+Slint			- Embedded is not free
+Crux	no desktop targets		
+relm	uses unmaintained GTK 3		
+masonry		- use Xilem which builds on top of it
+Pax				- no Windows support		
+Leptos	web-specific		
+flutter_rust_bridge	 - some kind of bindings
+Dominator	web-specific		
+qmetaobject	no windows-msvc		
+Rinf	does not use Rust for GUI		
+fltk	would rather use Rust without bindings
+WebRender	- no widgets
+fui	 - basically C bindings
+GPUI	- AI hype
+GemGui	
+Maycoon		- free  - Too new - 0.06*
