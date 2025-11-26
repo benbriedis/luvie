@@ -1,45 +1,17 @@
 
+use floem::kurbo::Stroke;
 use floem::prelude::*;
 use floem::taffy::FlexDirection;
 use floem::views::dropdown::Dropdown;
-use peniko::Mix;
-use peniko::color::{OpaqueColor, palette::css};
+use peniko::{Brush, Mix};
+use peniko::color::{palette::css};
 use std::sync::atomic::{AtomicU32, Ordering};
-use peniko::kurbo::{Affine, Rect, Shape, Size, Stroke};
+use peniko::kurbo::{Affine, Rect, Shape, Size, Line, Point};
 
-use floem::prelude::*;
-//use palette::css;
-//use peniko::kurbo::Rect;
-
-/*
-use peniko::{
-    Brush,
-    color::palette,
-    kurbo::{Circle, Point, RoundedRect, RoundedRectRadii}
-};
-*/
 use floem::{
     context::PaintCx,
-
-//    kurbo::{Affine, Circle, Point, Rect, Shape, Size, Stroke},
-/*    
-    context::PaintCx,
-    event::{Event, EventPropagation},
-    peniko::{
-        color::{AlphaColor, ColorSpaceTag::LinearSrgb, Hsl},
-        Gradient, Mix,
-    },
-*/
-//    prelude::{canvas},
-/*
-    reactive::create_updater,
-    ui_events::pointer::{PointerButtonEvent, PointerEvent},
-    ViewId,
-*/
 };
 
-
-//mod slider2;
 
 fn main() {
     floem::launch(counter_view);
@@ -105,21 +77,8 @@ fn counter_view() -> impl IntoView {
 //XXX is Floem's SVG stuff relevant?
 
     let paintTest = canvas(move |cx, size| {
-/*        
-        cx.fill(
-            &Rect::ZERO
-                .with_size(size)
-//                .to_rounded_rect(if rounded.get() { 8. } else { 0. }),
-                .to_rounded_rect(8.),
-            css::PURPLE,
-            0.,
-        );
-*/
-       // let rect_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
         let rect_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
 
-    //    let base_color = color.get();
-//        let base_color = css::YELLOW;
         let base_color = css::TRANSPARENT;
 
         draw_transparency_checkerboard(cx, size, &rect_path);
@@ -135,27 +94,20 @@ fn draw_transparency_checkerboard(cx: &mut PaintCx, size: Size, clip_path: &impl
 {
     cx.push_layer(Mix::Normal, 1.0, Affine::IDENTITY, clip_path);
 
-    let cell_size = 8.0;
-    let dark_color = css::LIGHT_GRAY;
-    let light_color = css::WHITE;
+    let cell_width = 20.0;
+    let cell_height = 10.0;
 
-    let cols = (size.width / cell_size).ceil() as usize;
-    let rows = (size.height / cell_size).ceil() as usize;
+    let cols = (size.width / cell_width).ceil() as usize;
+    let rows = (size.height / cell_height).ceil() as usize;
+
+    for col in 0..cols {
+        let line = Line::new(Point::new(col as f64 * cell_width,0.0),Point::new(col as f64 * cell_width,rows as f64 * cell_height));
+        cx.stroke(&line, &Brush::Solid(css::BLUE), &Stroke::new(1.0));
+    }
 
     for row in 0..rows {
-        for col in 0..cols {
-            let is_dark = (row + col) % 2 == 0;
-            let color = if is_dark { dark_color } else { light_color };
-
-            let rect = Rect::new(
-                col as f64 * cell_size,
-                row as f64 * cell_size,
-                (col + 1) as f64 * cell_size,
-                (row + 1) as f64 * cell_size,
-            );
-
-            cx.fill(&rect, color, 0.0);
-        }
+        let line = Line::new(Point::new(0.0,row as f64 * cell_height),Point::new(cols as f64 * cell_width,row as f64 * cell_height));
+        cx.stroke(&line, &Brush::Solid(css::ORANGE), &Stroke::new(1.0));
     }
 
     cx.pop_layer();
