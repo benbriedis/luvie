@@ -1,7 +1,7 @@
 
 use floem::event::{Event, EventPropagation};
 use floem::{ViewId, prelude::*};
-use floem::taffy::FlexDirection;
+use floem::taffy::{AlignItems, FlexDirection,Display};
 use floem::views::dropdown::Dropdown;
 use peniko::color::{AlphaColor, Hsl};
 use peniko::{Brush, Gradient, Mix};
@@ -41,14 +41,6 @@ fn counter_view() -> impl IntoView {
         ))
         .style(|s| s.size_full().items_center().justify_center().gap(10));
 
-    let items = create_rw_signal(vec![1,1,2,2,3,3,4,4]);
-    let unique_atomic = AtomicU32::new(0);
-    let dyn_stack_element = dyn_stack(
-            move || items.get(),
-            move |_item| unique_atomic.fetch_add(1, Ordering::Relaxed),
-            move |item| label(move || item),
-        ).style(|s| s.flex_direction(FlexDirection::Column));
-
     let baseNotePane = 
         h_stack((
             label(|| "Note"),
@@ -63,72 +55,23 @@ fn counter_view() -> impl IntoView {
         ))
         .style(|s| s.size_full().items_center().justify_center().gap(10));
 
-//XXX slider not showing for some reason...
-    let sliderTest = slider::Slider::new(|| 40.pct());
-//        .slider_style(|s| {
-//            s.edge_align(true)
-//            .handle_radius(50.pct())
-  //          .bar_color(Color::BLACK)
-//            .bar_color(css::BLACK)
- //           .bar_radius(100.pct())
-//            .accent_bar_color(css::GREEN)
-  //          .accent_bar_radius(100.pct())
-  //          .accent_bar_height(100.pct())
-//        });
-
-//XXX is Floem's SVG stuff relevant?
-
-
-    let paintTest = canvas(move |cx, size| {
-        let rect_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
-
-        let base_color = css::TRANSPARENT;
-
-        draw_transparency_checkerboard(cx, size, &rect_path);
-//        two_d_picker(color).style(|s| s.size(500, 500));
-
-        cx.fill(&rect_path, base_color, 0.);
-    })
-    .style(|s| s.size(500, 500));
-
     let color = RwSignal::new(css::ORANGE);
-    let two_d = two_d_picker(color).style(|s| s.border(1).border_radius(8));
 
-    v_stack((counter_element,baseNotePane,chordPane,sliderTest,text_element,two_d, paintTest, dyn_stack_element)).style(|s| s.gap(10)) //XXX gap is not working 
+    let noteGrid = SatValuePicker::new(move || color.get())
+        .on_change(move |c| color.set(c))
+        .style(|s| s.width(600).min_height(200).border(1))
+        .debug_name("2d picker")
+        ;
+
+//XXX how does items_center() relate to the CSS stuff? Is it an alternative?
+    v_stack((counter_element,baseNotePane,chordPane,noteGrid,text_element))
+        .style(|s| s.width_full().items_center())
+//        .style(|s| s.width_full().display(Display::Flex).flex_direction(FlexDirection::Column).align_items(AlignItems::Center))  XXX also works...
 }
 
-fn draw_transparency_checkerboard(cx: &mut PaintCx, size: Size, clip_path: &impl Shape) 
-{
-    cx.push_layer(Mix::Normal, 1.0, Affine::IDENTITY, clip_path);
-
-    let cell_width = 20.0;
-    let cell_height = 10.0;
-
-    let cols = (size.width / cell_width).ceil() as usize;
-    let rows = (size.height / cell_height).ceil() as usize;
-
-    for col in 0..cols {
-        let line = Line::new(Point::new(col as f64 * cell_width,0.0),Point::new(col as f64 * cell_width,rows as f64 * cell_height));
-        cx.stroke(&line, &Brush::Solid(css::BLUE), &Stroke::new(1.0));
-    }
-
-    for row in 0..rows {
-        let line = Line::new(Point::new(0.0,row as f64 * cell_height),Point::new(cols as f64 * cell_width,row as f64 * cell_height));
-        cx.stroke(&line, &Brush::Solid(css::ORANGE), &Stroke::new(1.0));
-    }
-
-    cx.pop_layer();
-}
 
 //////////////////////////
 
-
-fn two_d_picker(color: RwSignal<Color>) -> impl IntoView {
-    SatValuePicker::new(move || color.get())
-        .on_change(move |c| color.set(c))
-        .style(|s| s.width_full().aspect_ratio(3. / 2.))
-        .debug_name("2d picker")
-}
 
 pub struct SatValuePicker {
     id: ViewId,
@@ -154,6 +97,9 @@ impl SatValuePicker {
     fn position_to_hsl(&self, pos: Point) -> AlphaColor<Hsl> {
         let hue = self.current_color.components[0];
 
+println!("to_hsl  x: {}",pos.x);
+println!("to_hsl  y: {}",pos.y);
+
         let saturation =
             (pos.x / self.size.width * 100.).clamp(0.0 + f64::EPSILON, 100.0 - f64::EPSILON);
 
@@ -170,6 +116,7 @@ impl SatValuePicker {
         self
     }
 }
+
 impl View for SatValuePicker {
     fn id(&self) -> ViewId {
         self.id
@@ -219,28 +166,31 @@ impl View for SatValuePicker {
         EventPropagation::Stop
     }
 
-    fn paint(&mut self, cx: &mut PaintCx) {
+    fn paint(&mut self, cx: &mut PaintCx) 
+    {
         let size = self.size;
-        let rect_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
-        let hue = self.current_color.components[0];
 
-        let lightness_gradient = Gradient::new_linear(Point::ZERO, Point::new(0.0, size.height))
-            .with_stops([(0.0, css::WHITE), (1.0, css::BLACK)]);
-        cx.fill(&rect_path, &lightness_gradient, 0.);
+        let clip_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
 
-        cx.push_layer(Mix::Color, 1.0, Affine::IDENTITY, &rect_path);
+        cx.push_layer(Mix::Normal, 1.0, Affine::IDENTITY, &clip_path);
 
-        let saturation_gradient = Gradient::new_linear(Point::ZERO, Point::new(size.width, 0.0))
-            .with_stops([
-                (0.0, AlphaColor::<Hsl>::new([hue, 0., 50., 1.])),
-                (1.0, AlphaColor::<Hsl>::new([hue, 100., 50., 1.])),
-            ]);
-        cx.fill(&rect_path, &saturation_gradient, 0.);
+        let cell_width = 40.0;
+        let cell_height = 20.0;
 
-        cx.pop_layer();
-        cx.save();
-        cx.clip(&rect_path);
+        let cols = (size.width / cell_width).ceil() as usize;
+        let rows = (size.height / cell_height).ceil() as usize;
 
+        for col in 0..cols {
+            let line = Line::new(Point::new(col as f64 * cell_width,0.0),Point::new(col as f64 * cell_width,rows as f64 * cell_height));
+            cx.stroke(&line, &Brush::Solid(css::BLUE), &Stroke::new(1.0));
+        }
+
+        for row in 0..rows {
+            let line = Line::new(Point::new(0.0,row as f64 * cell_height),Point::new(cols as f64 * cell_width,row as f64 * cell_height));
+            cx.stroke(&line, &Brush::Solid(css::ORANGE), &Stroke::new(1.0));
+        }
+
+//XXX only showing once the cursor leaves the canvas!
         if size.width > 0.0 && size.height > 0.0 {
             let saturation = self.current_color.components[1];
             let value = self.current_color.components[2];
@@ -256,7 +206,14 @@ impl View for SatValuePicker {
             cx.stroke(&indicator_circle, css::WHITE, &Stroke::new(2.0));
             cx.stroke(&inner_indicator_circle, css::BLACK, &Stroke::new(2.0));
         }
-        cx.restore();
+
+//        cx.restore();
+//cx.save();
+
+        cx.pop_layer();
+
+        let base_color = css::TRANSPARENT;
+        cx.fill(&clip_path, base_color, 0.);
     }
 }
 
