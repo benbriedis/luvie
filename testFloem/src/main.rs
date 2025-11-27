@@ -57,7 +57,7 @@ fn counter_view() -> impl IntoView {
 
     let color = RwSignal::new(css::ORANGE);
 
-    let noteGrid = SatValuePicker::new(move || color.get())
+    let noteGrid = NoteGrid::new(move || color.get())
         .on_change(move |c| color.set(c))
         .style(|s| s.width(600).min_height(200).border(1))
         .debug_name("2d picker")
@@ -73,15 +73,17 @@ fn counter_view() -> impl IntoView {
 //////////////////////////
 
 
-pub struct SatValuePicker {
+pub struct NoteGrid {
     id: ViewId,
     size: Size,
     current_color: AlphaColor<Hsl>,
     on_change: Option<Box<dyn Fn(Color)>>,
     track: bool,
+    cell_width: f64,
+    cell_height: f64
 }
 
-impl SatValuePicker {
+impl NoteGrid {
     pub fn new(color: impl Fn() -> Color + 'static) -> Self {
         let id = ViewId::new();
         let color = create_updater(color, move |c| id.update_state(c));
@@ -91,14 +93,19 @@ impl SatValuePicker {
             current_color: color.convert(),
             on_change: None,
             track: false,
+            cell_width: 40.0,
+            cell_height: 20.0
         }
     }
 
     fn position_to_hsl(&self, pos: Point) -> AlphaColor<Hsl> {
         let hue = self.current_color.components[0];
 
-println!("to_hsl  x: {}",pos.x);
-println!("to_hsl  y: {}",pos.y);
+        let row = (pos.y / self.cell_height).floor();
+        let col = (pos.x / self.cell_width).floor();
+
+println!("to_hsl  x:{}  col:{}",pos.x,col);
+println!("to_hsl  y:{}  row:{}",pos.y,row);
 
         let saturation =
             (pos.x / self.size.width * 100.).clamp(0.0 + f64::EPSILON, 100.0 - f64::EPSILON);
@@ -117,7 +124,7 @@ println!("to_hsl  y: {}",pos.y);
     }
 }
 
-impl View for SatValuePicker {
+impl View for NoteGrid {
     fn id(&self) -> ViewId {
         self.id
     }
@@ -168,25 +175,24 @@ impl View for SatValuePicker {
 
     fn paint(&mut self, cx: &mut PaintCx) 
     {
+println!("In paint");
+
         let size = self.size;
 
         let clip_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
 
         cx.push_layer(Mix::Normal, 1.0, Affine::IDENTITY, &clip_path);
 
-        let cell_width = 40.0;
-        let cell_height = 20.0;
-
-        let cols = (size.width / cell_width).ceil() as usize;
-        let rows = (size.height / cell_height).ceil() as usize;
+        let cols = (size.width / self.cell_width).ceil() as usize;
+        let rows = (size.height / self.cell_height).ceil() as usize;
 
         for col in 0..cols {
-            let line = Line::new(Point::new(col as f64 * cell_width,0.0),Point::new(col as f64 * cell_width,rows as f64 * cell_height));
+            let line = Line::new(Point::new(col as f64 * self.cell_width,0.0),Point::new(col as f64 * self.cell_width,rows as f64 * self.cell_height));
             cx.stroke(&line, &Brush::Solid(css::BLUE), &Stroke::new(1.0));
         }
 
         for row in 0..rows {
-            let line = Line::new(Point::new(0.0,row as f64 * cell_height),Point::new(cols as f64 * cell_width,row as f64 * cell_height));
+            let line = Line::new(Point::new(0.0,row as f64 * self.cell_height),Point::new(cols as f64 * self.cell_width,row as f64 * self.cell_height));
             cx.stroke(&line, &Brush::Solid(css::ORANGE), &Stroke::new(1.0));
         }
 
