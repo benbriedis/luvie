@@ -9,7 +9,8 @@ use peniko::{Brush, Gradient, Mix};
 use peniko::color::{palette::css};
 use std::sync::atomic::{AtomicU32, Ordering};
 use peniko::kurbo::{Affine, Rect, Shape, Size, Line, Point, Circle,Stroke};
-use floem::reactive::{Scope, SignalRead, create_updater};
+use floem::reactive::{Scope, SignalRead, create_effect, create_updater};
+//use crate::form::{form, form_item};
 
 use floem::{
     context::PaintCx,
@@ -19,6 +20,12 @@ use floem::{
 fn main() {
     floem::launch(counter_view);
 }
+
+const CUSTOM_CHECK_SVG: &str = r##"
+<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M20.6097 5.20743C21.0475 5.54416 21.1294 6.17201 20.7926 6.60976L10.7926 19.6098C10.6172 19.8378 10.352 19.9793 10.0648 19.9979C9.77765 20.0166 9.49637 19.9106 9.29289 19.7072L4.29289 14.7072C3.90237 14.3166 3.90237 13.6835 4.29289 13.2929C4.68342 12.9024 5.31658 12.9024 5.70711 13.2929L9.90178 17.4876L19.2074 5.39034C19.5441 4.95258 20.172 4.87069 20.6097 5.20743Z" fill="#000000"/>
+</svg>
+"##;
 
 fn counter_view() -> impl IntoView {
     let mut counter1 = RwSignal::new(0);
@@ -60,10 +67,11 @@ fn counter_view() -> impl IntoView {
 
     //XXX this just makes the adding and removing of notes reactive, not the changing of the notes themselves
     let cx = Scope::new();
-    let notes = cx.create_rw_signal(Vec::new());
+//    let notes = cx.create_rw_signal(Vec::new());  THIS ONE COMPILES with the help of the cx
 //    let notes = RwSignal::new(Vec::new());
 
-//TODO look up the docs on the signals library. Is there a store equivalent? How do we create a vector as a signal?
+//XXX non-reactive version:
+    let notes = Vec::new();
 
     let noteGrid = NoteGrid::new(cx,notes,move || color.get())
         .on_change(move |c| color.set(c))
@@ -71,8 +79,13 @@ fn counter_view() -> impl IntoView {
         .debug_name("2d picker")
         ;
 
+    let is_checked = RwSignal::new(true);
+
+    let check1 = Checkbox::new_rw(is_checked).into_view();
+    let check2 = Checkbox::new_rw_custom(is_checked, CUSTOM_CHECK_SVG).into_view();
+
 //XXX how does items_center() relate to the CSS stuff? Is it an alternative?
-    v_stack((counter_element,baseNotePane,chordPane,noteGrid,text_element))
+    v_stack((counter_element,baseNotePane,chordPane,noteGrid,text_element,check1,check2))
         .style(|s| s.width_full().items_center())
 //        .style(|s| s.width_full().display(Display::Flex).flex_direction(FlexDirection::Column).align_items(AlignItems::Center))  XXX also works...
 }
@@ -96,17 +109,21 @@ pub struct NoteGrid {
 
     cell_width: f64,
     cell_height: f64,
-    notes: RwSignal<Vec<NotePosition>>
 //    notes: &'a RwSignal<Vec<NotePosition>>
  //   notes: Fn() -> RwSignal<Vec<NotePosition>> + 'static 
+//    notes: RwSignal<Vec<NotePosition>>   THIS REACTIVE ONE COMPILES
+    notes: Vec<NotePosition>
 }
 
 impl NoteGrid {
   //  pub fn new(notes: &'static RwSignal<Vec<NotePosition>>, color: impl Fn() -> Color + 'static) -> Self {
   //  pub fn new(notes: impl Fn() -> RwSignal<Vec<NotePosition>> + 'static, color: impl Fn() -> Color + 'static) -> Self {
-    pub fn new(cx:Scope,notes:RwSignal<Vec<NotePosition>>, color: impl Fn() -> Color + 'static) -> Self {
+
+//    pub fn new(cx:Scope,notes:RwSignal<Vec<NotePosition>>, color: impl Fn() -> Color + 'static) -> Self {     THIS REACTIVE ONE COMPILES
+    pub fn new(cx:Scope,notes:Vec<NotePosition>, color: impl Fn() -> Color + 'static) -> Self {
         let id = ViewId::new();
         let color = create_updater(color, move |c| id.update_state(c));
+
         Self {
             cx,
             id,
@@ -179,7 +196,25 @@ impl View for NoteGrid {
                     let pos = state.logical_point();
                     let row = (pos.y / self.cell_height) as i64;
                     let col = (pos.x / self.cell_width) as i64;
-                    self.notes.update(|val| val.push(NotePosition{row,col}));
+
+//XXX do we have to implement update()?
+println!("Adding rect   row:{row}  col:{col}");
+//                    self.notes.update(|val| val.clone().push(NotePosition{row,col})); THIS ONE COMPILES
+                    self.notes.push(NotePosition{row,col});
+
+
+//                        let notes = self.notes.get().clone().push(NotePosition{row,col});
+ //                       self.id.update_state(notes);
+
+
+                    //XXX is clone required here?
+
+/*
+                    create_effect(move |_| {
+                        self.notes.update(|val| val.clone().push(NotePosition{row,col}));
+                    });
+*/
+
                 }
                 Event::Pointer(PointerEvent::Up(PointerButtonEvent { state, .. })) => {
                     self.current_color = self.position_to_hsl(state.logical_point());
@@ -227,7 +262,8 @@ println!("In paint");
         }
 
 //XXX notion of paint isn't really reactive...        
-        for note in self.notes.get().iter() {
+//        for note in self.notes.get().iter() {   THIS ONE COMPILES
+        for note in self.notes.iter() {
             let x0 = note.col as f64 * self.cell_width;
             let y0 = note.row as f64 * self.cell_height;
 
@@ -238,27 +274,8 @@ println!("painting rect @ x0:{x0}  y0:{y0}");
                 In the y axis let us see the grid lines.
             */
             let rect = Rect::new(x0, y0+1.0, x0+self.cell_width-1.0, y0+self.cell_height-1.0);
-            cx.stroke(&rect, &Brush::Solid(css::PINK), &Stroke::new(1.0));
+            cx.fill(&rect, &Brush::Solid(css::PINK), 0.);
         }
-
-//XXX only showing once the cursor leaves the canvas!
-/*        
-        if size.width > 0.0 && size.height > 0.0 {
-            let saturation = self.current_color.components[1];
-            let value = self.current_color.components[2];
-
-            let x_pos = saturation as f64 / 100.0 * size.width;
-            let y_pos = (1.0 - value as f64 / 100.0) * size.height;
-
-            let indicator_radius = 6.0;
-            let indicator_circle = Circle::new(Point::new(x_pos, y_pos), indicator_radius);
-            let inner_indicator_circle =
-                Circle::new(Point::new(x_pos, y_pos), indicator_radius - 2.);
-
-            cx.stroke(&indicator_circle, css::WHITE, &Stroke::new(2.0));
-            cx.stroke(&inner_indicator_circle, css::BLACK, &Stroke::new(2.0));
-        }
-*/
 
 //        cx.restore();
 //cx.save();
