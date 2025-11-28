@@ -1,14 +1,15 @@
 
+use floem::context::LayoutCx;
 use floem::event::{Event, EventPropagation};
 use floem::{ViewId, prelude::*};
-use floem::taffy::{AlignItems, FlexDirection,Display};
+use floem::taffy::{AlignItems, Display, FlexDirection, NodeId};
 use floem::views::dropdown::Dropdown;
 use peniko::color::{AlphaColor, Hsl};
 use peniko::{Brush, Gradient, Mix};
 use peniko::color::{palette::css};
 use std::sync::atomic::{AtomicU32, Ordering};
 use peniko::kurbo::{Affine, Rect, Shape, Size, Line, Point, Circle,Stroke};
-use floem::reactive::create_updater;
+use floem::reactive::{Scope, SignalRead, create_updater};
 
 use floem::{
     context::PaintCx,
@@ -57,7 +58,14 @@ fn counter_view() -> impl IntoView {
 
     let color = RwSignal::new(css::ORANGE);
 
-    let noteGrid = NoteGrid::new(move || color.get())
+    //XXX this just makes the adding and removing of notes reactive, not the changing of the notes themselves
+    let cx = Scope::new();
+    let notes = cx.create_rw_signal(Vec::new());
+//    let notes = RwSignal::new(Vec::new());
+
+//TODO look up the docs on the signals library. Is there a store equivalent? How do we create a vector as a signal?
+
+    let noteGrid = NoteGrid::new(cx,notes,move || color.get())
         .on_change(move |c| color.set(c))
         .style(|s| s.width(600).min_height(200).border(1))
         .debug_name("2d picker")
@@ -72,29 +80,43 @@ fn counter_view() -> impl IntoView {
 
 //////////////////////////
 
+#[derive(Clone)]
+pub struct NotePosition {
+    row: i64,
+    col: i64
+}
 
 pub struct NoteGrid {
+    cx: Scope,
     id: ViewId,
     size: Size,
     current_color: AlphaColor<Hsl>,
     on_change: Option<Box<dyn Fn(Color)>>,
     track: bool,
+
     cell_width: f64,
-    cell_height: f64
+    cell_height: f64,
+    notes: RwSignal<Vec<NotePosition>>
+//    notes: &'a RwSignal<Vec<NotePosition>>
+ //   notes: Fn() -> RwSignal<Vec<NotePosition>> + 'static 
 }
 
 impl NoteGrid {
-    pub fn new(color: impl Fn() -> Color + 'static) -> Self {
+  //  pub fn new(notes: &'static RwSignal<Vec<NotePosition>>, color: impl Fn() -> Color + 'static) -> Self {
+  //  pub fn new(notes: impl Fn() -> RwSignal<Vec<NotePosition>> + 'static, color: impl Fn() -> Color + 'static) -> Self {
+    pub fn new(cx:Scope,notes:RwSignal<Vec<NotePosition>>, color: impl Fn() -> Color + 'static) -> Self {
         let id = ViewId::new();
         let color = create_updater(color, move |c| id.update_state(c));
         Self {
+            cx,
             id,
             size: Size::ZERO,
             current_color: color.convert(),
             on_change: None,
             track: false,
             cell_width: 40.0,
-            cell_height: 20.0
+            cell_height: 20.0,
+            notes
         }
     }
 
@@ -152,6 +174,12 @@ impl View for NoteGrid {
                     on_change(self.current_color.convert());
                     self.track = true;
                     self.id.request_active();
+
+                    //XXX may be better on mouse up. What are others using?
+                    let pos = state.logical_point();
+                    let row = (pos.y / self.cell_height) as i64;
+                    let col = (pos.x / self.cell_width) as i64;
+                    self.notes.update(|val| val.push(NotePosition{row,col}));
                 }
                 Event::Pointer(PointerEvent::Up(PointerButtonEvent { state, .. })) => {
                     self.current_color = self.position_to_hsl(state.logical_point());
@@ -177,6 +205,8 @@ impl View for NoteGrid {
     {
 println!("In paint");
 
+//TODO only apply paint when our canvas if affected. (sratom may be OK example)
+
         let size = self.size;
 
         let clip_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
@@ -196,7 +226,23 @@ println!("In paint");
             cx.stroke(&line, &Brush::Solid(css::ORANGE), &Stroke::new(1.0));
         }
 
+//XXX notion of paint isn't really reactive...        
+        for note in self.notes.get().iter() {
+            let x0 = note.col as f64 * self.cell_width;
+            let y0 = note.row as f64 * self.cell_height;
+
+println!("painting rect @ x0:{x0}  y0:{y0}");
+
+            /*
+                Start a note right at x0 for musical reasons and add just before the next note.
+                In the y axis let us see the grid lines.
+            */
+            let rect = Rect::new(x0, y0+1.0, x0+self.cell_width-1.0, y0+self.cell_height-1.0);
+            cx.stroke(&rect, &Brush::Solid(css::PINK), &Stroke::new(1.0));
+        }
+
 //XXX only showing once the cursor leaves the canvas!
+/*        
         if size.width > 0.0 && size.height > 0.0 {
             let saturation = self.current_color.components[1];
             let value = self.current_color.components[2];
@@ -212,6 +258,7 @@ println!("In paint");
             cx.stroke(&indicator_circle, css::WHITE, &Stroke::new(2.0));
             cx.stroke(&inner_indicator_circle, css::BLACK, &Stroke::new(2.0));
         }
+*/
 
 //        cx.restore();
 //cx.save();

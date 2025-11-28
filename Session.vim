@@ -13,20 +13,13 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +117 NOTES.txt
-badd +391 songEditor.lv2/songEditor.c
-badd +146 plugins/harmony.lv2/harmony.c
-badd +151 songEditor.lv2/songEditor.h
-badd +187 /usr/include/string.h
-badd +67 songEditor.lv2/songEditor.ttl
-badd +633 /usr/include/lv2/atom/forge.h
-badd +50 ~/programming/luvie/songEditor.lv2/pluginLoader.c
-badd +90 ~/programming/luvie/plugins/harmony.lv2/harmony.h
+badd +149 testFloem/src/main.rs
+badd +52 ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/num/f64.rs
 argglobal
 %argdel
-edit songEditor.lv2/songEditor.c
+edit testFloem/src/main.rs
 argglobal
-balt songEditor.lv2/songEditor.h
+balt ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/num/f64.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -37,11 +30,11 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 391 - ((31 * winheight(0) + 25) / 50)
+let s:l = 149 - ((2 * winheight(0) + 26) / 52)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 391
+keepjumps 149
 normal! 0
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
