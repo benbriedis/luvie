@@ -7,6 +7,7 @@ use floem::views::dropdown::Dropdown;
 use peniko::color::{AlphaColor, Hsl};
 use peniko::{Brush, Gradient, Mix};
 use peniko::color::{palette::css};
+use std::any::Any;
 use std::sync::atomic::{AtomicU32, Ordering};
 use peniko::kurbo::{Affine, Rect, Shape, Size, Line, Point, Circle,Stroke};
 use floem::reactive::{Scope, SignalRead, create_effect, create_updater};
@@ -124,6 +125,8 @@ impl NoteGrid {
         let id = ViewId::new();
         let color = create_updater(color, move |c| id.update_state(c));
 
+//self.id.inspect();
+
         Self {
             cx,
             id,
@@ -174,6 +177,7 @@ impl View for NoteGrid {
     }
 
     fn update(&mut self, _cx: &mut floem::context::UpdateCx, state: Box<dyn std::any::Any>) {
+println!("In update");
         if let Ok(color) = state.downcast::<Color>() {
             self.current_color = color.convert();
         }
@@ -201,6 +205,10 @@ impl View for NoteGrid {
 println!("Adding rect   row:{row}  col:{col}");
 //                    self.notes.update(|val| val.clone().push(NotePosition{row,col})); THIS ONE COMPILES
                     self.notes.push(NotePosition{row,col});
+
+                    //XXX if notes were reactive would paint be called automatically?
+                    //self.id.get_untracked().request_paint();
+                    self.id.request_paint();
 
 
 //                        let notes = self.notes.get().clone().push(NotePosition{row,col});
@@ -238,12 +246,23 @@ println!("Adding rect   row:{row}  col:{col}");
 
     fn paint(&mut self, cx: &mut PaintCx) 
     {
+//TODO check
+//self.id.layout_rect();
+//self.id.get_content_rect()
+//self.id.get_layout()
+//etc
+
 println!("In paint");
 
-//TODO only apply paint when our canvas if affected. (sratom may be OK example)
+//println!("is_focused:{}",cx.is_focused(self.id));
+//println!("debug_info:{}", cx.debug_info());
+//println!("type_id:{}", cx.type_id());
+
+//TODO only apply paint when our canvas if affected. (lapce may be OK example)
 
         let size = self.size;
 
+//cx.save();
         let clip_path = Rect::ZERO.with_size(size).to_rounded_rect(8.);
 
         cx.push_layer(Mix::Normal, 1.0, Affine::IDENTITY, &clip_path);
@@ -267,8 +286,6 @@ println!("In paint");
             let x0 = note.col as f64 * self.cell_width;
             let y0 = note.row as f64 * self.cell_height;
 
-println!("painting rect @ x0:{x0}  y0:{y0}");
-
             /*
                 Start a note right at x0 for musical reasons and add just before the next note.
                 In the y axis let us see the grid lines.
@@ -278,12 +295,14 @@ println!("painting rect @ x0:{x0}  y0:{y0}");
         }
 
 //        cx.restore();
-//cx.save();
 
         cx.pop_layer();
 
         let base_color = css::TRANSPARENT;
         cx.fill(&clip_path, base_color, 0.);
+
+
+//XXX PaintCx.is_drag_paint() might be useful in future        
     }
 }
 
