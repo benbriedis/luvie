@@ -7,3 +7,7 @@ project('luvie', 'c',
 subdir('songEditor.lv2')
 subdir('plugins/harmony.lv2')
 
+
+
+#XXX In time the UIs should be merged into the plugins
+subdir('testui')

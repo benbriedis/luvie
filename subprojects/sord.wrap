@@ -1,0 +1,5 @@
+[wrap-git]
+directory = sord.dir
+url = https://github.com/drobilla/sord.git
+revision = head
+depth = 1

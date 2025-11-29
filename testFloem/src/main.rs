@@ -1,17 +1,11 @@
 
-use floem::context::LayoutCx;
 use floem::event::{Event, EventPropagation};
 use floem::{ViewId, prelude::*};
-use floem::taffy::{AlignItems, Display, FlexDirection, NodeId};
 use floem::views::dropdown::Dropdown;
-use peniko::color::{AlphaColor, Hsl};
-use peniko::{Brush, Gradient, Mix};
+use peniko::{Brush, Mix};
 use peniko::color::{palette::css};
-use std::any::Any;
-use std::sync::atomic::{AtomicU32, Ordering};
-use peniko::kurbo::{Affine, Rect, Shape, Size, Line, Point, Circle,Stroke};
+use peniko::kurbo::{Affine, Rect, Size, Line, Point,Stroke};
 use floem::reactive::{Scope, SignalRead, create_effect, create_updater};
-//use crate::form::{form, form_item};
 
 use floem::{
     context::PaintCx,
@@ -75,7 +69,6 @@ fn counter_view() -> impl IntoView {
     let notes = Vec::new();
 
     let noteGrid = NoteGrid::new(cx,notes,move || color.get())
-        .on_change(move |c| color.set(c))
         .style(|s| s.width(600).min_height(200).border(1))
         .debug_name("2d picker")
         ;
@@ -104,8 +97,6 @@ pub struct NoteGrid {
     cx: Scope,
     id: ViewId,
     size: Size,
-    current_color: AlphaColor<Hsl>,
-    on_change: Option<Box<dyn Fn(Color)>>,
     track: bool,
 
     cell_width: f64,
@@ -123,7 +114,6 @@ impl NoteGrid {
 //    pub fn new(cx:Scope,notes:RwSignal<Vec<NotePosition>>, color: impl Fn() -> Color + 'static) -> Self {     THIS REACTIVE ONE COMPILES
     pub fn new(cx:Scope,notes:Vec<NotePosition>, color: impl Fn() -> Color + 'static) -> Self {
         let id = ViewId::new();
-        let color = create_updater(color, move |c| id.update_state(c));
 
 //self.id.inspect();
 
@@ -131,38 +121,11 @@ impl NoteGrid {
             cx,
             id,
             size: Size::ZERO,
-            current_color: color.convert(),
-            on_change: None,
             track: false,
             cell_width: 40.0,
             cell_height: 20.0,
             notes
         }
-    }
-
-    fn position_to_hsl(&self, pos: Point) -> AlphaColor<Hsl> {
-        let hue = self.current_color.components[0];
-
-        let row = (pos.y / self.cell_height).floor();
-        let col = (pos.x / self.cell_width).floor();
-
-println!("to_hsl  x:{}  col:{}",pos.x,col);
-println!("to_hsl  y:{}  row:{}",pos.y,row);
-
-        let saturation =
-            (pos.x / self.size.width * 100.).clamp(0.0 + f64::EPSILON, 100.0 - f64::EPSILON);
-
-        let value = ((1.0 - (pos.y / self.size.height)) * 100.)
-            .clamp(0.0 + f64::EPSILON, 100.0 - f64::EPSILON);
-
-        let alpha = self.current_color.components[3];
-
-        AlphaColor::<Hsl>::new([hue, saturation as f32, value as f32, alpha])
-    }
-
-    pub fn on_change(mut self, on_change: impl Fn(Color) + 'static) -> Self {
-        self.on_change = Some(Box::new(on_change));
-        self
     }
 }
 
@@ -177,10 +140,11 @@ impl View for NoteGrid {
     }
 
     fn update(&mut self, _cx: &mut floem::context::UpdateCx, state: Box<dyn std::any::Any>) {
+//XXX cf updating our grid data here instead?        
 println!("In update");
-        if let Ok(color) = state.downcast::<Color>() {
-            self.current_color = color.convert();
-        }
+//        if let Ok(color) = state.downcast::<Color>() {
+//            self.current_color = color.convert();
+ //       }
     }
 
     fn event_before_children(
@@ -188,57 +152,44 @@ println!("In update");
         _cx: &mut floem::context::EventCx,
         event: &Event,
     ) -> EventPropagation {
-        if let Some(on_change) = &self.on_change {
-            match event {
-                Event::Pointer(PointerEvent::Down(PointerButtonEvent { state, .. })) => {
-                    self.current_color = self.position_to_hsl(state.logical_point());
-                    on_change(self.current_color.convert());
-                    self.track = true;
-                    self.id.request_active();
+        match event {
+            Event::Pointer(PointerEvent::Down(PointerButtonEvent { state, .. })) => {
+                self.track = true;
+//XXX probably dont want                
+                self.id.request_active();
 
-                    //XXX may be better on mouse up. What are others using?
-                    let pos = state.logical_point();
-                    let row = (pos.y / self.cell_height) as i64;
-                    let col = (pos.x / self.cell_width) as i64;
+//XXX maybe move this to main struct like the code before?
+                //XXX may be better on mouse up. What are others using?
+                let pos = state.logical_point();
+                let row = (pos.y / self.cell_height) as i64;
+                let col = (pos.x / self.cell_width) as i64;
 
 //XXX do we have to implement update()?
 println!("Adding rect   row:{row}  col:{col}");
 //                    self.notes.update(|val| val.clone().push(NotePosition{row,col})); THIS ONE COMPILES
-                    self.notes.push(NotePosition{row,col});
+                self.notes.push(NotePosition{row,col});
 
-                    //XXX if notes were reactive would paint be called automatically?
-                    //self.id.get_untracked().request_paint();
-                    self.id.request_paint();
+                //XXX if notes were reactive would paint be called automatically?
+                //self.id.get_untracked().request_paint();
+                self.id.request_paint();
 
 
 //                        let notes = self.notes.get().clone().push(NotePosition{row,col});
- //                       self.id.update_state(notes);
+//                       self.id.update_state(notes);
 
 
-                    //XXX is clone required here?
+                //XXX is clone required here?
 
 /*
-                    create_effect(move |_| {
-                        self.notes.update(|val| val.clone().push(NotePosition{row,col}));
-                    });
+                create_effect(move |_| {
+                    self.notes.update(|val| val.clone().push(NotePosition{row,col}));
+                });
 */
 
-                }
-                Event::Pointer(PointerEvent::Up(PointerButtonEvent { state, .. })) => {
-                    self.current_color = self.position_to_hsl(state.logical_point());
-                    on_change(self.current_color.convert());
-                    self.id.clear_active();
-                    self.track = false;
-                }
-                Event::Pointer(PointerEvent::Move(pu)) => {
-                    if self.track {
-                        self.current_color = self.position_to_hsl(pu.current.logical_point());
-                        on_change(self.current_color.convert());
-                    }
-                }
-                _ => {
-                    return EventPropagation::Continue;
-                }
+            }
+            _ => {
+                //XXX do we need?
+                return EventPropagation::Continue;
             }
         }
         EventPropagation::Stop

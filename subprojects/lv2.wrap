@@ -1,0 +1,5 @@
+[wrap-git]
+directory = lv2.dir
+url = https://github.com/lv2/lv2.git
+revision = head
+depth = 1

@@ -1,0 +1,5 @@
+[wrap-git]
+directory = lilv.dir
+url = https://github.com/lv2/lilv.git
+revision = head
+depth = 1
