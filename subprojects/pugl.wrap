@@ -1,5 +1,0 @@
-[wrap-git]
-directory = pugl.dir
-url = https://github.com/lv2/pugl.git
-revision = head
-depth = 1
