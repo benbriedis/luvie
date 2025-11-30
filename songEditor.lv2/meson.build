@@ -6,6 +6,7 @@ lv2_dep = subproject('lv2').get_variable('lv2_dep')
 #XXX probably not use this, at least initially
 # Lilv dependencies:
 #lilvdep = dependency('lilv-0')
+serd_dep = subproject('serd').get_variable('serd_dep')
 sord_dep = subproject('sord').get_variable('sord_dep')
 lilv_dep = subproject('lilv').get_variable('lilv_dep')
 

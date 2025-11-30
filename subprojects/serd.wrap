@@ -1,0 +1,5 @@
+[wrap-git]
+directory = serd.dir
+url = https://github.com/drobilla/serd.git
+revision = head
+depth = 1

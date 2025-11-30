@@ -4,10 +4,10 @@ project('luvie', 'c',
     default_options : ['warning_level=3'])
 
 
-subdir('songEditor.lv2')
-subdir('plugins/harmony.lv2')
-
+#subdir('songEditor.lv2')
+#subdir('plugins/harmony.lv2')
 
 
 #XXX In time the UIs should be merged into the plugins
-subdir('testui')
+#subdir('testui')
+subdir('testui2')

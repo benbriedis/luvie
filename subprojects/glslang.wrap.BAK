@@ -1,0 +1,16 @@
+[wrap-git]
+directory = glslang.dir
+url = https://github.com/KhronosGroup/glslang.git
+revision = 16.0.0
+depth = 1
+
+create and apply diff - TODO
+
+
+NEED THIS MORE OR LESS ON LINUX:
+
+./update_glslang_sources.py
+mkdir build
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$(pwd)/install"
+cd build
+make -j4 install
