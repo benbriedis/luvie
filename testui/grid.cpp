@@ -119,18 +119,19 @@ void MyGrid::findNoteForCursor()
 	selectionState = NONE;
 
 	for (Note& n : notes) {
-		if (n.col != col)
+		if (n.row != row)
 			continue;
 
 		selectedNote = &n;
 
 		/* Move takes precedence over resize */
-		if (n.row == row) {
+		if (n.col == col) {
 			window()->cursor(FL_CURSOR_HAND); 
 			selectionState = MOVING;
 redraw(); //XXX is it needed? Could something less full on be used? Should it be draw()?
 			return;
 		}
+
 
 		int leftEdge = n.col * colWidth; 
 		int rightEdge = (n.col+1) * colWidth - 1;     //TODO instead of -1 here maybe reflect in length of note??
@@ -150,7 +151,6 @@ redraw(); //XXX is it needed? Could something less full on be used? Should it be
 //XXX should not have 'resizing' appear between them.
 //XXX also should not be able to resize one note over the other - except perhaps to join
 	if (selectionState == RESIZING) {
-printf("GOT RESIZING\n");		
 		window()->cursor(FL_CURSOR_WE); 
 }
 
