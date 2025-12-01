@@ -13,13 +13,33 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +149 testFloem/src/main.rs
-badd +52 ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/num/f64.rs
+badd +39 ~/programming/luvie/testui/grid.hpp
+badd +30 ~/programming/luvie/testui/main.cpp
+badd +1 ~/programming/luvie/testui/Makefile
+badd +130 ~/programming/luvie/testui/grid.cpp
 argglobal
 %argdel
-edit testFloem/src/main.rs
+edit ~/programming/luvie/testui/grid.hpp
+let s:save_splitbelow = &splitbelow
+let s:save_splitright = &splitright
+set splitbelow splitright
+wincmd _ | wincmd |
+vsplit
+1wincmd h
+wincmd w
+let &splitbelow = s:save_splitbelow
+let &splitright = s:save_splitright
+wincmd t
+let s:save_winminheight = &winminheight
+let s:save_winminwidth = &winminwidth
+set winminheight=0
+set winheight=1
+set winminwidth=0
+set winwidth=1
+exe 'vert 1resize ' . ((&columns * 81 + 102) / 205)
+exe 'vert 2resize ' . ((&columns * 123 + 102) / 205)
 argglobal
-balt ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/num/f64.rs
+balt ~/programming/luvie/testui/grid.cpp
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -30,12 +50,39 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 149 - ((2 * winheight(0) + 26) / 52)
+let s:l = 39 - ((38 * winheight(0) + 25) / 50)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 149
-normal! 0
+keepjumps 39
+normal! 08|
+wincmd w
+argglobal
+if bufexists(fnamemodify("~/programming/luvie/testui/grid.cpp", ":p")) | buffer ~/programming/luvie/testui/grid.cpp | else | edit ~/programming/luvie/testui/grid.cpp | endif
+if &buftype ==# 'terminal'
+  silent file ~/programming/luvie/testui/grid.cpp
+endif
+balt ~/programming/luvie/testui/grid.hpp
+setlocal foldmethod=manual
+setlocal foldexpr=0
+setlocal foldmarker={{{,}}}
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldenable
+silent! normal! zE
+let &fdl = &fdl
+let s:l = 130 - ((15 * winheight(0) + 25) / 50)
+if s:l < 1 | let s:l = 1 | endif
+keepjumps exe s:l
+normal! zt
+keepjumps 130
+normal! 036|
+wincmd w
+2wincmd w
+exe 'vert 1resize ' . ((&columns * 81 + 102) / 205)
+exe 'vert 2resize ' . ((&columns * 123 + 102) / 205)
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
@@ -43,6 +90,8 @@ endif
 unlet! s:wipebuf
 set winheight=1 winwidth=20
 let &shortmess = s:shortmess_save
+let &winminheight = s:save_winminheight
+let &winminwidth = s:save_winminwidth
 let s:sx = expand("<sfile>:p:r")."x.vim"
 if filereadable(s:sx)
   exe "source " . fnameescape(s:sx)
