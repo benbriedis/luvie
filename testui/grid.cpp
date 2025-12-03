@@ -11,7 +11,7 @@ using std::vector;
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth): 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),
-	selectionState(NONE),
+	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { }
 
@@ -55,7 +55,7 @@ void MyGrid::draw()
 //XXX at what point does copying these small structures become a bad idea?
 //	for (const Note& note : notes) { 
 	for (const Note note : notes) { 
-		int x0 = note.col * colWidth;
+		int x0 = note.beat * colWidth;  //TODO round to nearest?
 		int y0 = note.row * rowHeight;
 //printf("Drawing note @ %d, %d\n",note.row,note.col);
 
@@ -73,16 +73,40 @@ int MyGrid::handle(int event)
 
 	switch (event) {
 		case FL_PUSH: 
-			toggleNote(); //XXX or better on release? What do others do?
+			std::cout << "GOT push" << event << std::endl;	
 			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
-			std::cout << "GOT drag" << event << std::endl;	
+
+//TODO stop drag at ends of window
+
 //			int t = Fl::event_inside(this);
 
-			//TODO allow a click and drag option to create many options, but probably require a mode to be set
+			if (hoverState==MOVING) {				
+				float x = Fl::event_x();
+				selectedNote->beat = x / (float)colWidth; 
+				redraw();	//XXX is a full redraw really required?
+			}				
+			/*
+			   NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
+			   The second one (optional) might allow it to move relative to the bar.
+			*/
+//TODO add snap			
+			if (hoverState==RESIZING) {				
+				float x = Fl::event_x();
+
+				if (side == LEFT) {
+					selectedNote->beat = x / (float)colWidth; 
+					redraw();	//XXX is a full redraw really required?
+				}
+				//Right side to change duration...
+			}				
+
 			return 1;
 		case FL_RELEASE:
-			std::cout << "GOT release" << event << std::endl;	
+//TODO a delete note option is now required
+
+			if (hoverState==NONE)
+				toggleNote(); //XXX or better on release? What do others do?
 			//        redraw();
 			//        do_callback();
 			// never do anything after a callback, as the callback
@@ -110,13 +134,13 @@ void MyGrid::findNoteForCursor()
 {
 	const int resizeZone = 5;
 
-	int x = Fl::event_x();
+	float x = Fl::event_x();
 	int y = Fl::event_y();
 
 	int row = y / rowHeight;
-	int col = x / colWidth;
+	float beat = x / colWidth;
 
-	selectionState = NONE;
+	hoverState = NONE;
 
 	for (Note& n : notes) {
 		if (n.row != row)
@@ -124,25 +148,25 @@ void MyGrid::findNoteForCursor()
 
 		selectedNote = &n;
 
+		float leftEdge = n.beat * colWidth; 
+		float rightEdge = (n.beat + 1.0) * colWidth;
+
 		/* Move takes precedence over resize */
-		if (n.col == col) {
+		if (x >= leftEdge && x <= rightEdge) {
 			window()->cursor(FL_CURSOR_HAND); 
-			selectionState = MOVING;
+			hoverState = MOVING;
 redraw(); //XXX is it needed? Could something less full on be used? Should it be draw()?
 			return;
 		}
 
 
-		int leftEdge = n.col * colWidth; 
-		int rightEdge = (n.col+1) * colWidth - 1;     //TODO instead of -1 here maybe reflect in length of note??
-
 		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
-			selectionState = RESIZING;
+			hoverState = RESIZING;
 			side = LEFT;
 		}
 
 		if (rightEdge - x <= resizeZone && x - rightEdge <= resizeZone) {
-			selectionState = RESIZING;
+			hoverState = RESIZING;
 			side = RIGHT;
 		}
 	}
@@ -150,7 +174,7 @@ redraw(); //XXX is it needed? Could something less full on be used? Should it be
 //XXX two notes in a row are being connected - perhaps formalise in Notes...
 //XXX should not have 'resizing' appear between them.
 //XXX also should not be able to resize one note over the other - except perhaps to join
-	if (selectionState == RESIZING) {
+	if (hoverState == RESIZING) {
 		window()->cursor(FL_CURSOR_WE); 
 }
 
@@ -168,13 +192,13 @@ void MyGrid::toggleNote()
 	int ey = Fl::event_y();
 
 	int row = ey / rowHeight;
-	int col = ex / colWidth;
+	float col = (float)(ex / colWidth);
 
 	/* Remove the note if present */
 	int size = notes.size();
 
 	notes.erase(std::remove_if(notes.begin(), notes.end(), 
-		[=](const Note& n) { return n.row == row && n.col == col; }), 
+		[=](const Note& n) { return n.row == row && n.beat == col; }), 
 		notes.end());
 
 	/* Add the note */

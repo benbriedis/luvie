@@ -16,7 +16,7 @@ enum Side {
 
 typedef struct {
 	int row;
-	int col;  //XXX will want fractions + length + velocity + anything else? (parameters that can evolve etc)
+	float beat;  //XXX will want length + velocity + anything else? (parameters that can evolve etc)
 } Note;
 
 
@@ -35,7 +35,7 @@ private:
 	std::vector<Note> notes;
 
 	/* Cursor parameters: */
-	SelectionState selectionState;
+	SelectionState hoverState;
 	Note* selectedNote; 
 	Side side;
 
