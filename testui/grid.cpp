@@ -57,13 +57,16 @@ void MyGrid::draw()
 	for (const Note note : notes) { 
 		int x0 = note.beat * colWidth;  //TODO round to nearest?
 		int y0 = note.row * rowHeight;
+
+//TODO prevent to note from being so short its invisible (Q: how to handle very short notes?)		
+		int width = note.length * colWidth;
 //printf("Drawing note @ %d, %d\n",note.row,note.col);
 
 		/* 
 		   Fit slightly inside the grid lines, except at the note start where I'm 
 		   lining it up with the start of the beat.
 		*/
-		fl_rectf(x0,y0-1,colWidth+1,rowHeight+1,0x1111EE00);
+		fl_rectf(x0,y0-1,width,rowHeight+1,0x1111EE00);
 	}
 }
 
@@ -84,7 +87,7 @@ int MyGrid::handle(int event)
 			if (hoverState==MOVING) {				
 				float x = Fl::event_x();
 				selectedNote->beat = x / (float)colWidth; 
-				redraw();	//XXX is a full redraw really required?
+				redraw();	//XXX is a full redraw really required - consider all redraws()?
 			}				
 			/*
 			   NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
@@ -94,9 +97,15 @@ int MyGrid::handle(int event)
 			if (hoverState==RESIZING) {				
 				float x = Fl::event_x();
 
-				if (side == LEFT) {
+				if (side==LEFT) {
+					float lastEndX = (selectedNote->beat + selectedNote->length) * colWidth;
 					selectedNote->beat = x / (float)colWidth; 
-					redraw();	//XXX is a full redraw really required?
+					selectedNote->length = (lastEndX - x) / (float)colWidth; 
+					redraw();
+				}
+				else if (side==RIGHT) {
+					selectedNote->length = x / (float)colWidth - selectedNote->beat;
+					redraw();
 				}
 				//Right side to change duration...
 			}				
@@ -149,16 +158,15 @@ void MyGrid::findNoteForCursor()
 		selectedNote = &n;
 
 		float leftEdge = n.beat * colWidth; 
-		float rightEdge = (n.beat + 1.0) * colWidth;
+		float rightEdge = (n.beat + n.length) * colWidth;
 
 		/* Move takes precedence over resize */
 		if (x >= leftEdge && x <= rightEdge) {
 			window()->cursor(FL_CURSOR_HAND); 
 			hoverState = MOVING;
-redraw(); //XXX is it needed? Could something less full on be used? Should it be draw()?
+			redraw();
 			return;
 		}
-
 
 		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
 			hoverState = RESIZING;
@@ -203,7 +211,7 @@ void MyGrid::toggleNote()
 
 	/* Add the note */
 	if (notes.size() == size)
-		notes.push_back({row,col});
+		notes.push_back({row,col,1.0});
 
 	redraw();
 }

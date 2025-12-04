@@ -16,7 +16,8 @@ enum Side {
 
 typedef struct {
 	int row;
-	float beat;  //XXX will want length + velocity + anything else? (parameters that can evolve etc)
+	float beat;  //XXX will want velocity + anything else? (parameters that can evolve etc)
+	float length;
 } Note;
 
 
