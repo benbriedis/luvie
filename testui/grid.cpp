@@ -10,7 +10,7 @@ using std::vector;
 
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth): 
-	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),
+	notes(notes),numRows(numRows),numBeats(numCols),rowHeight(rowHeight),colWidth(colWidth),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { }
@@ -33,7 +33,7 @@ void MyGrid::draw()
 	for (int i = 0; i < numRows+1; i++) {
 		int x0 = 0;
 		int y0 = i * rowHeight;
-		int x1 = numCols * colWidth;
+		int x1 = numBeats * colWidth;
 		int y1 = y0; 
 
 		fl_line(x0, y0, x1, y1);
@@ -42,7 +42,7 @@ void MyGrid::draw()
 	fl_color(0x00EE0000); //green
 
 	/* Columns: */
-	for (int i = 0; i < numCols+1; i++) {
+	for (int i = 0; i < numBeats+1; i++) {
 		int x0 = i * colWidth;
 		int y0 = 0;
 		int x1 = x0; 
@@ -80,13 +80,18 @@ int MyGrid::handle(int event)
 			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
 
-//TODO stop drag at ends of window
-
-//			int t = Fl::event_inside(this);
+//TODO probably merge adjacent/overlapping notes
 
 			if (hoverState==MOVING) {				
 				float x = Fl::event_x();
-				selectedNote->beat = x / (float)colWidth; 
+				selectedNote->beat = (x - movingGrabOffset) / (float)colWidth; 
+
+				/* Ensure the note stays within bounds */
+				if (selectedNote->beat < 0.0)
+					selectedNote->beat = 0.0;
+				if (selectedNote->beat + selectedNote->length > numBeats)
+					selectedNote->beat = numBeats - selectedNote->length;
+
 				redraw();	//XXX is a full redraw really required - consider all redraws()?
 			}				
 			/*
@@ -98,13 +103,21 @@ int MyGrid::handle(int event)
 				float x = Fl::event_x();
 
 				if (side==LEFT) {
-					float lastEndX = (selectedNote->beat + selectedNote->length) * colWidth;
+					float endBeat = selectedNote->beat + selectedNote->length;
 					selectedNote->beat = x / (float)colWidth; 
-					selectedNote->length = (lastEndX - x) / (float)colWidth; 
+
+					if (selectedNote->beat < 0.0)
+						selectedNote->beat = 0.0;
+					selectedNote->length = endBeat - selectedNote->beat;
+
 					redraw();
 				}
 				else if (side==RIGHT) {
 					selectedNote->length = x / (float)colWidth - selectedNote->beat;
+
+					if (selectedNote->beat + selectedNote->length > numBeats)
+						selectedNote->length = numBeats - selectedNote->beat;
+
 					redraw();
 				}
 				//Right side to change duration...
@@ -164,6 +177,7 @@ void MyGrid::findNoteForCursor()
 		if (x >= leftEdge && x <= rightEdge) {
 			window()->cursor(FL_CURSOR_HAND); 
 			hoverState = MOVING;
+			movingGrabOffset = x - selectedNote->beat * colWidth;
 			redraw();
 			return;
 		}
@@ -209,6 +223,8 @@ void MyGrid::toggleNote()
 		[=](const Note& n) { return n.row == row && n.beat == col; }), 
 		notes.end());
 
+//TODO prevent a new note being added if a beat already contains part of a note
+//     (probably want to have an options to split the beats and zoom in)
 	/* Add the note */
 	if (notes.size() == size)
 		notes.push_back({row,col,1.0});

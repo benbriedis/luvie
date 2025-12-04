@@ -23,12 +23,12 @@ typedef struct {
 
 class MyGrid : public Fl_Box {
 public:
-	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth);
+	MyGrid(std::vector<Note> notes,int numRows,int numBeats,int rowHeight,int colWidth);
 
 private:
 	/* Grid parameters */
 	int numRows;
-	int numCols;
+	int numBeats;
 	int rowHeight;
 	int colWidth;
 
@@ -39,6 +39,7 @@ private:
 	SelectionState hoverState;
 	Note* selectedNote; 
 	Side side;
+	float movingGrabOffset;
 
 	void draw() override;
 	int handle(int event) override;
