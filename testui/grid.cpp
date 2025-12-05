@@ -128,7 +128,7 @@ int MyGrid::handle(int event)
 //TODO a delete note option is now required
 
 			if (hoverState==NONE)
-				toggleNote(); //XXX or better on release? What do others do?
+				toggleNote();
 			//        redraw();
 			//        do_callback();
 			// never do anything after a callback, as the callback
@@ -219,15 +219,31 @@ void MyGrid::toggleNote()
 	/* Remove the note if present */
 	int size = notes.size();
 
+//FIXME delete - need keycombo, right mouse key, or mode to distinguish from move. 
+//      Delete should probably be the exception I think rather than the rule as its probably a bit less common and 
+//      move requires more control. Cf using a right mouse shortcut menu? Maybe put velocity in there too?
 	notes.erase(std::remove_if(notes.begin(), notes.end(), 
 		[=](const Note& n) { return n.row == row && n.beat == col; }), 
 		notes.end());
 
-//TODO prevent a new note being added if a beat already contains part of a note
-//     (probably want to have an options to split the beats and zoom in)
+//TODO add option to split the beats and zoom in or out
+//     Probably best to keep using (pitch,beat,length) and to create a column() function and then use that to perform
+//     calcs rather than col.  (Probably dont want for the SongEditor gui though)
+
+//TODO allow multiple additions using a single click and drag
+
 	/* Add the note */
-	if (notes.size() == size)
-		notes.push_back({row,col,1.0});
+	if (notes.size() == size) {
+		/* Disallow note creation in partly occupied cells (too unclear to allow this behaviour) */
+		bool clear = true;
+		vector<Note>::iterator it = notes.begin();
+		while (it != notes.end() && clear) {
+			clear = it->row != row || (col < (int)it->beat || col > (int)(it->beat + it->length - 0.000000001));  //HACK
+			it++;
+		}
+		if (clear)
+			notes.push_back({row,col,1.0});
+	}
 
 	redraw();
 }
