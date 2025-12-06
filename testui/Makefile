@@ -4,7 +4,7 @@ CC = g++
 
 #cf using:  fltk-config --ldstaticflags
 FLTK_CONFIG = ../deps/installation/bin/fltk-config
-CXXFLAGS = `$(FLTK_CONFIG) --cxxflags`
+CXXFLAGS = `$(FLTK_CONFIG) --cxxflags -g`
 LDFLAGS = `$(FLTK_CONFIG) --ldflags` `$(FLTK_CONFIG) --libs`
 
 TARGET = main

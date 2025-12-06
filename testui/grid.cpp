@@ -76,21 +76,37 @@ int MyGrid::handle(int event)
 
 	switch (event) {
 		case FL_PUSH: 
-			std::cout << "GOT push" << event << std::endl;	
 			return 1;			// non-zero = we want the event
-		case FL_DRAG: 
+		case FL_DRAG: {
 
-//TODO probably merge adjacent/overlapping notes
+/* XXX 
+   Probable overlap strategy:
+   When sliding a note in from the side stick to a bit when the sides meet.
+   When notes start to overlap perhaps change cursor to 'forbidden' cursor.
+   Bounce back to original location if dropping in a forbidden place.
+
+   Show sides of notes/patterns in different colour.
+*/
+			Note* selected = &notes[selectedNote];
 
 			if (hoverState==MOVING) {				
 				float x = Fl::event_x();
-				selectedNote->beat = (x - movingGrabOffset) / (float)colWidth; 
+				selected->beat = (x - movingGrabXOffset) / (float)colWidth; 
 
-				/* Ensure the note stays within bounds */
-				if (selectedNote->beat < 0.0)
-					selectedNote->beat = 0.0;
-				if (selectedNote->beat + selectedNote->length > numBeats)
-					selectedNote->beat = numBeats - selectedNote->length;
+				/* Ensure the note stays within X bounds */
+				if (selected->beat < 0.0)
+					selected->beat = 0.0;
+				if (selected->beat + selected->length > numBeats)
+					selected->beat = numBeats - selected->length;
+
+				float y = Fl::event_y();
+				selected->row = (y - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
+
+				/* Ensure the note stays within Y bounds */
+				if (selected->row < 0)
+					selected->row = 0;
+				if (selected->row >= numRows)
+					selected->row = numRows - 1;
 
 				redraw();	//XXX is a full redraw really required - consider all redraws()?
 			}				
@@ -99,24 +115,26 @@ int MyGrid::handle(int event)
 			   The second one (optional) might allow it to move relative to the bar.
 			*/
 //TODO add snap			
-			if (hoverState==RESIZING) {				
+//TODO set minimum width			
+			if (hoverState==RESIZING) {	
+printf("In RESIZING\n");
 				float x = Fl::event_x();
 
 				if (side==LEFT) {
-					float endBeat = selectedNote->beat + selectedNote->length;
-					selectedNote->beat = x / (float)colWidth; 
+					float endBeat = selected->beat + selected->length;
+					selected->beat = x / (float)colWidth; 
 
-					if (selectedNote->beat < 0.0)
-						selectedNote->beat = 0.0;
-					selectedNote->length = endBeat - selectedNote->beat;
+					if (selected->beat < 0.0)
+						selected->beat = 0.0;
+					selected->length = endBeat - selected->beat;
 
 					redraw();
 				}
 				else if (side==RIGHT) {
-					selectedNote->length = x / (float)colWidth - selectedNote->beat;
+					selected->length = x / (float)colWidth - selected->beat;
 
-					if (selectedNote->beat + selectedNote->length > numBeats)
-						selectedNote->length = numBeats - selectedNote->beat;
+					if (selected->beat + selected->length > numBeats)
+						selected->length = numBeats - selected->beat;
 
 					redraw();
 				}
@@ -124,6 +142,7 @@ int MyGrid::handle(int event)
 			}				
 
 			return 1;
+		}
 		case FL_RELEASE:
 //TODO a delete note option is now required
 
@@ -163,34 +182,49 @@ void MyGrid::findNoteForCursor()
 	float beat = x / colWidth;
 
 	hoverState = NONE;
+//XXX better syntax for incorporating this into the loop?
+	int i = 0;
 
-	for (Note& n : notes) {
-		if (n.row != row)
+	for (Note n : notes) {
+		if (n.row != row) {
+			i++;
 			continue;
+		}
 
-		selectedNote = &n;
+		selectedNote = i;
 
 		float leftEdge = n.beat * colWidth; 
 		float rightEdge = (n.beat + n.length) * colWidth;
-
-		/* Move takes precedence over resize */
-		if (x >= leftEdge && x <= rightEdge) {
-			window()->cursor(FL_CURSOR_HAND); 
-			hoverState = MOVING;
-			movingGrabOffset = x - selectedNote->beat * colWidth;
-			redraw();
-			return;
-		}
 
 		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
 			hoverState = RESIZING;
 			side = LEFT;
 		}
-
-		if (rightEdge - x <= resizeZone && x - rightEdge <= resizeZone) {
+		else if (rightEdge - x <= resizeZone && x - rightEdge <= resizeZone) {
 			hoverState = RESIZING;
 			side = RIGHT;
 		}
+		else if (x >= leftEdge && x <= rightEdge) {
+			//XXX only required on initial press down
+			hoverState = MOVING;
+			movingGrabXOffset = x - n.beat * colWidth;
+			movingGrabYOffset = y - n.row * rowHeight;
+
+			if (overlapping())
+				window()->cursor(FL_CURSOR_WAIT); 
+			else
+				window()->cursor(FL_CURSOR_HAND); 
+//				window()->cursor(FL_CURSOR_CROSS); 
+
+			redraw();
+			/* Move takes precedence over resizing any neighbouring notes */
+			
+printf("GOT MOVING  selectedNote: %d",i);			
+
+			return;
+		}
+
+		i++;
 	}
 
 //XXX two notes in a row are being connected - perhaps formalise in Notes...
@@ -205,6 +239,42 @@ window()->cursor(FL_CURSOR_DEFAULT);
 
 redraw();
 
+}
+
+bool MyGrid::overlapping()
+{
+	float x = Fl::event_x();
+	int y = Fl::event_y();
+
+	int row = y / rowHeight;
+	float beat = x / colWidth;
+
+//TODO convert other iterators
+
+	int i = 0; //XXX again, can we incorporate this into the loop?
+
+printf("selectedNote: %d\n",selectedNote);	
+
+//	for (auto note = notes.begin(); note != notes.end(); ++note) {
+	for (const auto note : notes) {
+printf("i: %d\n",i);	
+		if (i == selectedNote || note.row != row) {
+			i++;
+			continue;
+		}
+
+		Note a = notes[selectedNote];
+		Note b = note;
+
+		if (a.beat > b.beat && a.beat < b.beat + b.length)
+			return true;
+
+		if (a.beat + a.length > b.beat  &&  a.beat + a.length < b.beat + b.length)
+			return true;
+
+		i++;
+	}
+	return false;
 }
 
 void MyGrid::toggleNote()

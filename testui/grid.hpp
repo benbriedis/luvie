@@ -36,15 +36,18 @@ private:
 	std::vector<Note> notes;
 
 	/* Cursor parameters: */
+	/* selectedNote points to 'notes'. This is a Vector and can be reallocated - so using a pointer is not safe. */
+	int selectedNote; 
 	SelectionState hoverState;
-	Note* selectedNote; 
 	Side side;
-	float movingGrabOffset;
+	float movingGrabXOffset;
+	float movingGrabYOffset;
 
 	void draw() override;
 	int handle(int event) override;
 	void findNoteForCursor();
 	void toggleNote();
+	bool overlapping();
 };
 
 #endif
