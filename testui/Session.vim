@@ -13,22 +13,14 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +22 main.cpp
-badd +30 ~/programming/luvie/deps/installation/include/FL/Fl_Window.H
-badd +1012 ~/programming/luvie/deps/installation/include/FL/Enumerations.H
-badd +13 grid.cpp
-badd +14 Makefile
-badd +19 grid.hpp
-badd +38 ~/programming/luvie/deps/installation/include/FL/fl_attr.h
-badd +59 ~/programming/luvie/deps/installation/include/FL/core/events.H
-badd +389 /usr/include/c++/11/bits/stl_vector.h
-badd +363 ~/programming/luvie/deps/installation/include/FL/Fl_Widget.H
+badd +27 ~/programming/luvie/testui/grid.cpp
+badd +39 ~/programming/luvie/testui/grid.hpp
+badd +12 Makefile
 argglobal
 %argdel
-$argadd main.cpp
-edit grid.cpp
+edit ~/programming/luvie/testui/grid.cpp
 argglobal
-balt ~/programming/luvie/deps/installation/include/FL/Fl_Widget.H
+balt Makefile
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -39,12 +31,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 13 - ((12 * winheight(0) + 25) / 50)
+let s:l = 27 - ((26 * winheight(0) + 26) / 52)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 13
-normal! 03|
+keepjumps 27
+normal! 067|
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

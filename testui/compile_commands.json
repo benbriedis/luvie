@@ -1,7 +1,7 @@
 [
   {
     "arguments": [
-      "/usr/bin/g++",
+      "/usr/bin/g++-13",
       "-c",
       "-I/home/ben/programming/luvie/deps/installation/include",
       "-D_LARGEFILE_SOURCE",
@@ -9,6 +9,10 @@
       "-D_FILE_OFFSET_BITS=64",
       "-D_THREAD_SAFE",
       "-D_REENTRANT",
+      "-std=c++23",
+      "-std=gnu++23",
+      "-fmodules-ts",
+      "-g",
       "/home/ben/programming/luvie/deps/installation/lib/libfltk.a",
       "-o",
       "main",
@@ -16,6 +20,29 @@
     ],
     "directory": "/home/ben/programming/luvie/testui",
     "file": "/home/ben/programming/luvie/testui/main.cpp",
+    "output": "/home/ben/programming/luvie/testui/main"
+  },
+  {
+    "arguments": [
+      "/usr/bin/g++-13",
+      "-c",
+      "-I/home/ben/programming/luvie/deps/installation/include",
+      "-D_LARGEFILE_SOURCE",
+      "-D_LARGEFILE64_SOURCE",
+      "-D_FILE_OFFSET_BITS=64",
+      "-D_THREAD_SAFE",
+      "-D_REENTRANT",
+      "-std=c++23",
+      "-std=gnu++23",
+      "-fmodules-ts",
+      "-g",
+      "/home/ben/programming/luvie/deps/installation/lib/libfltk.a",
+      "-o",
+      "main",
+      "grid.cpp"
+    ],
+    "directory": "/home/ben/programming/luvie/testui",
+    "file": "/home/ben/programming/luvie/testui/grid.cpp",
     "output": "/home/ben/programming/luvie/testui/main"
   }
 ]

@@ -1,10 +1,13 @@
 #include "grid.hpp"
 #include "FL/Enumerations.H"
 #include <cstdio>
+#include <ranges>
 #include <iostream>
 #include <algorithm>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
+
+//import std;
 
 using std::vector;
 
@@ -108,6 +111,9 @@ int MyGrid::handle(int event)
 				if (selected->row >= numRows)
 					selected->row = numRows - 1;
 
+//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it)
+				window()->cursor(overlapping() ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
+
 				redraw();	//XXX is a full redraw really required - consider all redraws()?
 			}				
 			/*
@@ -117,7 +123,6 @@ int MyGrid::handle(int event)
 //TODO add snap			
 //TODO set minimum width			
 			if (hoverState==RESIZING) {	
-printf("In RESIZING\n");
 				float x = Fl::event_x();
 
 				if (side==LEFT) {
@@ -182,14 +187,10 @@ void MyGrid::findNoteForCursor()
 	float beat = x / colWidth;
 
 	hoverState = NONE;
-//XXX better syntax for incorporating this into the loop?
-	int i = 0;
 
-	for (Note n : notes) {
-		if (n.row != row) {
-			i++;
+	for (const auto [i,n]: std::views::enumerate(notes)) {
+		if (n.row != row) 
 			continue;
-		}
 
 		selectedNote = i;
 
@@ -210,26 +211,18 @@ void MyGrid::findNoteForCursor()
 			movingGrabXOffset = x - n.beat * colWidth;
 			movingGrabYOffset = y - n.row * rowHeight;
 
-			if (overlapping())
-				window()->cursor(FL_CURSOR_WAIT); 
-			else
-				window()->cursor(FL_CURSOR_HAND); 
-//				window()->cursor(FL_CURSOR_CROSS); 
+			window()->cursor(FL_CURSOR_HAND); 
+//			window()->cursor(FL_CURSOR_CROSS); 
 
 			redraw();
 			/* Move takes precedence over resizing any neighbouring notes */
 			
-printf("GOT MOVING  selectedNote: %d",i);			
+printf("GOT MOVING  selectedNote: %d",i);	
 
 			return;
 		}
-
-		i++;
 	}
 
-//XXX two notes in a row are being connected - perhaps formalise in Notes...
-//XXX should not have 'resizing' appear between them.
-//XXX also should not be able to resize one note over the other - except perhaps to join
 	if (hoverState == RESIZING) {
 		window()->cursor(FL_CURSOR_WE); 
 }
@@ -243,36 +236,30 @@ redraw();
 
 bool MyGrid::overlapping()
 {
-	float x = Fl::event_x();
-	int y = Fl::event_y();
+	Note a = notes[selectedNote];
+	float aStart = a.beat;
+	float aEnd = a.beat + a.length;
 
-	int row = y / rowHeight;
-	float beat = x / colWidth;
-
-//TODO convert other iterators
-
-	int i = 0; //XXX again, can we incorporate this into the loop?
-
-printf("selectedNote: %d\n",selectedNote);	
-
-//	for (auto note = notes.begin(); note != notes.end(); ++note) {
-	for (const auto note : notes) {
-printf("i: %d\n",i);	
-		if (i == selectedNote || note.row != row) {
-			i++;
+	for (const auto [i,b]: std::views::enumerate(notes)) {
+		if (i == selectedNote || b.row != a.row) 
 			continue;
-		}
 
-		Note a = notes[selectedNote];
-		Note b = note;
+		float bStart = b.beat;
+		float bEnd = b.beat + b.length;
 
-		if (a.beat > b.beat && a.beat < b.beat + b.length)
+		/* Check overlapping: */
+		if (aStart > bStart && aStart < bEnd)
 			return true;
 
-		if (a.beat + a.length > b.beat  &&  a.beat + a.length < b.beat + b.length)
+		if (aEnd > bStart && aEnd < bEnd)
 			return true;
 
-		i++;
+		/* Check enveloping: */
+		if (aStart < bStart && aEnd > bEnd)
+			return true;
+
+		if (bStart < aStart && bEnd > aEnd)
+			return true;
 	}
 	return false;
 }
@@ -292,6 +279,7 @@ void MyGrid::toggleNote()
 //FIXME delete - need keycombo, right mouse key, or mode to distinguish from move. 
 //      Delete should probably be the exception I think rather than the rule as its probably a bit less common and 
 //      move requires more control. Cf using a right mouse shortcut menu? Maybe put velocity in there too?
+//TODO can we use a range instead?	
 	notes.erase(std::remove_if(notes.begin(), notes.end(), 
 		[=](const Note& n) { return n.row == row && n.beat == col; }), 
 		notes.end());
@@ -306,6 +294,7 @@ void MyGrid::toggleNote()
 	if (notes.size() == size) {
 		/* Disallow note creation in partly occupied cells (too unclear to allow this behaviour) */
 		bool clear = true;
+//TODO can we use a range instead?	
 		vector<Note>::iterator it = notes.begin();
 		while (it != notes.end() && clear) {
 			clear = it->row != row || (col < (int)it->beat || col > (int)(it->beat + it->length - 0.000000001));  //HACK
