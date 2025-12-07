@@ -20,6 +20,11 @@ typedef struct {
 	float length;
 } Note;
 
+typedef struct {
+	int row;
+	float beat; 
+} Point;
+
 
 class MyGrid : public Fl_Box {
 public:
@@ -42,12 +47,14 @@ private:
 	Side side;
 	float movingGrabXOffset;
 	float movingGrabYOffset;
+	bool amOverlapping;
+	Point pickupPoint;
 
 	void draw() override;
 	int handle(int event) override;
 	void findNoteForCursor();
 	void toggleNote();
-	bool overlapping();
+	int overlappingNote();
 };
 
 #endif

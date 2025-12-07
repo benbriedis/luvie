@@ -56,7 +56,6 @@ void MyGrid::draw()
 
 	/* Notes: */
 //XXX at what point does copying these small structures become a bad idea?
-//	for (const Note& note : notes) { 
 	for (const Note note : notes) { 
 		int x0 = note.beat * colWidth;  //TODO round to nearest?
 		int y0 = note.row * rowHeight;
@@ -69,12 +68,19 @@ void MyGrid::draw()
 		   Fit slightly inside the grid lines, except at the note start where I'm 
 		   lining it up with the start of the beat.
 		*/
-		fl_rectf(x0,y0-1,width,rowHeight+1,0x1111EE00);
+		fl_rectf(x0,y0+1,width,rowHeight-1,0x5555EE00);
+		fl_color(0x1111EE00);
+		fl_line_style(FL_SOLID,5);
+		fl_line(x0,y0+1,x0,y0+rowHeight-1);
+		fl_line_style(0);
 	}
 }
 
 int MyGrid::handle(int event) 
 {
+//XXX if changing grid size want the num of pixels to remain constant.
+	float minLength = 10.0 / colWidth;
+
 //damage() call may be  useful. Also cf double buffering (and scrolling)
 
 	switch (event) {
@@ -111,8 +117,9 @@ int MyGrid::handle(int event)
 				if (selected->row >= numRows)
 					selected->row = numRows - 1;
 
-//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it)
-				window()->cursor(overlapping() ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
+//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
+				amOverlapping = overlappingNote() >= 0;
+				window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
 
 				redraw();	//XXX is a full redraw really required - consider all redraws()?
 			}				
@@ -123,23 +130,39 @@ int MyGrid::handle(int event)
 //TODO add snap			
 //TODO set minimum width			
 			if (hoverState==RESIZING) {	
+printf("Started RESIZING\n");
+
 				float x = Fl::event_x();
 
+//TODO restrict length to a certain minimum				
 				if (side==LEFT) {
 					float endBeat = selected->beat + selected->length;
 					selected->beat = x / (float)colWidth; 
 
-					if (selected->beat < 0.0)
-						selected->beat = 0.0;
+					int neighbour = overlappingNote();
+					float min = neighbour < 0 ? 0.0 : notes[neighbour].beat + notes[neighbour].length;
+					if (selected->beat < min)
+						selected->beat = min;
+
 					selected->length = endBeat - selected->beat;
+
+					if (selected->length < minLength) {
+						selected->length = minLength;
+						selected->beat = endBeat - minLength;
+					}
 
 					redraw();
 				}
 				else if (side==RIGHT) {
 					selected->length = x / (float)colWidth - selected->beat;
 
-					if (selected->beat + selected->length > numBeats)
-						selected->length = numBeats - selected->beat;
+					int neighbour = overlappingNote();
+					float max = neighbour < 0 ? numBeats : notes[neighbour].beat;
+					if (selected->beat + selected->length > max)
+						selected->length = max - selected->beat;
+
+					if (selected->length < minLength)
+						selected->length = minLength;
 
 					redraw();
 				}
@@ -150,6 +173,13 @@ int MyGrid::handle(int event)
 		}
 		case FL_RELEASE:
 //TODO a delete note option is now required
+
+			if (hoverState==MOVING && amOverlapping) {
+				// TODO maybe drift back or fade out and in note
+				notes[selectedNote].row = pickupPoint.row;
+				notes[selectedNote].beat = pickupPoint.beat;
+				redraw();
+			}
 
 			if (hoverState==NONE)
 				toggleNote();
@@ -186,13 +216,13 @@ void MyGrid::findNoteForCursor()
 	int row = y / rowHeight;
 	float beat = x / colWidth;
 
+	int selectedIfResize = 0;
+
 	hoverState = NONE;
 
 	for (const auto [i,n]: std::views::enumerate(notes)) {
 		if (n.row != row) 
 			continue;
-
-		selectedNote = i;
 
 		float leftEdge = n.beat * colWidth; 
 		float rightEdge = (n.beat + n.length) * colWidth;
@@ -200,16 +230,20 @@ void MyGrid::findNoteForCursor()
 		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
 			hoverState = RESIZING;
 			side = LEFT;
+			selectedIfResize = i;
 		}
 		else if (rightEdge - x <= resizeZone && x - rightEdge <= resizeZone) {
 			hoverState = RESIZING;
 			side = RIGHT;
+			selectedIfResize = i;
 		}
 		else if (x >= leftEdge && x <= rightEdge) {
 			//XXX only required on initial press down
 			hoverState = MOVING;
+			selectedNote = i;
 			movingGrabXOffset = x - n.beat * colWidth;
 			movingGrabYOffset = y - n.row * rowHeight;
+			pickupPoint = {n.row,n.beat};
 
 			window()->cursor(FL_CURSOR_HAND); 
 //			window()->cursor(FL_CURSOR_CROSS); 
@@ -217,51 +251,18 @@ void MyGrid::findNoteForCursor()
 			redraw();
 			/* Move takes precedence over resizing any neighbouring notes */
 			
-printf("GOT MOVING  selectedNote: %d",i);	
-
 			return;
 		}
 	}
 
 	if (hoverState == RESIZING) {
+		selectedNote = selectedIfResize;
 		window()->cursor(FL_CURSOR_WE); 
-}
-
-else 
-window()->cursor(FL_CURSOR_DEFAULT); 
-
-redraw();
-
-}
-
-bool MyGrid::overlapping()
-{
-	Note a = notes[selectedNote];
-	float aStart = a.beat;
-	float aEnd = a.beat + a.length;
-
-	for (const auto [i,b]: std::views::enumerate(notes)) {
-		if (i == selectedNote || b.row != a.row) 
-			continue;
-
-		float bStart = b.beat;
-		float bEnd = b.beat + b.length;
-
-		/* Check overlapping: */
-		if (aStart > bStart && aStart < bEnd)
-			return true;
-
-		if (aEnd > bStart && aEnd < bEnd)
-			return true;
-
-		/* Check enveloping: */
-		if (aStart < bStart && aEnd > bEnd)
-			return true;
-
-		if (bStart < aStart && bEnd > aEnd)
-			return true;
 	}
-	return false;
+	else 
+		window()->cursor(FL_CURSOR_DEFAULT); 
+
+	redraw();
 }
 
 void MyGrid::toggleNote()
@@ -307,4 +308,34 @@ void MyGrid::toggleNote()
 	redraw();
 }
 
+/* Returns the note index, or -1 */
+int MyGrid::overlappingNote()
+{
+	Note a = notes[selectedNote];
+	float aStart = a.beat;
+	float aEnd = a.beat + a.length;
+
+	for (const auto [i,b]: std::views::enumerate(notes)) {
+		if (i == selectedNote || b.row != a.row) 
+			continue;
+
+		float bStart = b.beat;
+		float bEnd = b.beat + b.length;
+
+		/* Check overlapping: */
+		if (aStart > bStart && aStart < bEnd)
+			return i;
+
+		if (aEnd > bStart && aEnd < bEnd)
+			return i;
+
+		/* Check enveloping: */
+		if (aStart < bStart && aEnd > bEnd)
+			return i;
+
+		if (bStart < aStart && bEnd > aEnd)
+			return i;
+	}
+	return -1;
+}
 
