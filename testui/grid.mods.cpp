@@ -1,0 +1,402 @@
+module;
+
+//#include "grid.hpp"
+#include "FL/Enumerations.H"
+#include <cstdio>
+#include <ranges>
+#include <iostream>
+#include <algorithm>
+#include <FL/fl_draw.H>
+#include <FL/Fl_Window.H>
+#include <FL/Fl_Box.H>
+
+//import std;
+
+export module MyGrid;
+
+using std::vector;
+
+enum SelectionState {
+	NONE,
+	MOVING,
+	RESIZING
+};
+
+enum Side {
+	LEFT,
+	RIGHT,
+};
+
+export typedef struct {
+	int row;
+	float beat;  //XXX will want velocity + anything else? (parameters that can evolve etc)
+	float length;
+} Note;
+
+typedef struct {
+	int row;
+	float beat; 
+} Point;
+
+
+
+export class MyGrid : public Fl_Box {
+public:
+	MyGrid(std::vector<Note> notes,int numRows,int numBeats,int rowHeight,int colWidth);
+
+private:
+	/* Grid parameters */
+	int numRows;
+	int numBeats;
+	int rowHeight;
+	int colWidth;
+
+	/* Note parameters: */
+	std::vector<Note> notes;
+
+	/* Cursor parameters: */
+	/* selectedNote points to 'notes'. This is a Vector and can be reallocated - so using a pointer is not safe. */
+	int selectedNote; 
+	SelectionState hoverState;
+	Side side;
+	float movingGrabXOffset;
+	float movingGrabYOffset;
+	bool amOverlapping;
+	Point pickupPoint;
+
+//XXX still required?	
+	void draw() override;
+	int handle(int event) override;
+	void findNoteForCursor();
+	void toggleNote();
+	int overlappingNote();
+	void moving();
+	void resizing();
+};
+
+
+
+
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth): 
+	notes(notes),numRows(numRows),numBeats(numCols),rowHeight(rowHeight),colWidth(colWidth),
+	hoverState(NONE),
+	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
+{ }
+
+void MyGrid::draw() 
+{
+//XXX drawing is additive. Dont really need for add 	
+	// Call the base class draw method to handle border, label, etc.
+	Fl_Box::draw();  //XXX really needed?
+
+	fl_color(FL_BACKGROUND_COLOR); //TODO fix up background colour 
+	fl_rectf(x(), y(), w(), h()); 
+//XXX Q: are/can backgrounds be transparent?
+
+
+
+	fl_color(0xEE888800);  //orange
+
+	/* Rows: */
+	for (int i = 0; i < numRows+1; i++) {
+		int x0 = 0;
+		int y0 = i * rowHeight;
+		int x1 = numBeats * colWidth;
+		int y1 = y0; 
+
+		fl_line(x0, y0, x1, y1);
+	}
+
+	fl_color(0x00EE0000); //green
+
+	/* Columns: */
+	for (int i = 0; i < numBeats+1; i++) {
+		int x0 = i * colWidth;
+		int y0 = 0;
+		int x1 = x0; 
+		int y1 = numRows * rowHeight;
+
+		fl_line(x0, y0, x1, y1);
+	}
+
+	/* Notes: */
+//XXX at what point does copying these small structures become a bad idea?
+	for (const Note note : notes) { 
+		int x0 = note.beat * colWidth;  //TODO round to nearest?
+		int y0 = note.row * rowHeight;
+
+//TODO prevent to note from being so short its invisible (Q: how to handle very short notes?)		
+		int width = note.length * colWidth;
+//printf("Drawing note @ %d, %d\n",note.row,note.col);
+
+		/* 
+		   Fit slightly inside the grid lines, except at the note start where I'm 
+		   lining it up with the start of the beat.
+		*/
+		fl_rectf(x0,y0+1,width,rowHeight-1,0x5555EE00);
+		fl_color(0x1111EE00);
+		fl_line_style(FL_SOLID,5);
+		fl_line(x0,y0+1,x0,y0+rowHeight-1);
+		fl_line_style(0);
+	}
+}
+
+int MyGrid::handle(int event) 
+{
+//damage() call may be  useful. Also cf double buffering (and scrolling)
+
+	switch (event) {
+		case FL_PUSH: 
+			return 1;			// non-zero = we want the event
+		case FL_DRAG: 
+			if (hoverState==MOVING) 
+				moving();
+
+			if (hoverState==RESIZING) 
+				resizing();
+
+			return 1;
+
+		case FL_RELEASE:
+			if (hoverState==MOVING && amOverlapping) {
+				// TODO maybe drift back or fade out and in note
+				notes[selectedNote].row = pickupPoint.row;
+				notes[selectedNote].beat = pickupPoint.beat;
+				redraw();
+			}
+
+			if (hoverState==NONE)
+				toggleNote();
+			//        redraw();
+			//        do_callback();
+			// never do anything after a callback, as the callback
+			// may delete the widget!
+			return 1;
+
+		/* We want mouse events to change the cursor */
+		case FL_ENTER: 
+			return 1;		// non-zero = we want mouse events
+
+		/*
+		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving 
+		   by hovering the cursor over different parts of the note. MAY want keycombs and/or mode as well/instead.
+		*/
+		case FL_MOVE: {
+			findNoteForCursor();
+			return 1;  //XXX or true?
+		}
+		default:
+			return Fl_Widget::handle(event);
+	}
+}
+
+void MyGrid::moving()
+{
+	Note* selected = &notes[selectedNote];
+
+	float x = Fl::event_x();
+	selected->beat = (x - movingGrabXOffset) / (float)colWidth; 
+
+	/* Ensure the note stays within X bounds */
+	if (selected->beat < 0.0)
+		selected->beat = 0.0;
+	if (selected->beat + selected->length > numBeats)
+		selected->beat = numBeats - selected->length;
+
+	float y = Fl::event_y();
+	selected->row = (y - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
+
+	/* Ensure the note stays within Y bounds */
+	if (selected->row < 0)
+		selected->row = 0;
+	if (selected->row >= numRows)
+		selected->row = numRows - 1;
+
+//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
+	amOverlapping = overlappingNote() >= 0;
+	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
+
+	redraw();	//XXX is a full redraw really required - consider all redraws()?
+}
+
+/*
+   NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
+   The second one (optional) might allow it to move relative to the bar.
+*/
+void MyGrid::resizing()
+{
+//TODO add snap / magnetism
+//XXX if changing grid size want the num of pixels to remain constant.
+	float minLength = 10.0 / colWidth;
+
+	Note* selected = &notes[selectedNote];
+
+	float x = Fl::event_x();
+
+//TODO restrict length to a certain minimum				
+	if (side==LEFT) {
+		float endBeat = selected->beat + selected->length;
+		selected->beat = x / (float)colWidth; 
+
+		int neighbour = overlappingNote();
+		float min = neighbour < 0 ? 0.0 : notes[neighbour].beat + notes[neighbour].length;
+		if (selected->beat < min)
+			selected->beat = min;
+
+		selected->length = endBeat - selected->beat;
+
+		if (selected->length < minLength) {
+			selected->length = minLength;
+			selected->beat = endBeat - minLength;
+		}
+
+		redraw();
+	}
+	else if (side==RIGHT) {
+		selected->length = x / (float)colWidth - selected->beat;
+
+		int neighbour = overlappingNote();
+		float max = neighbour < 0 ? numBeats : notes[neighbour].beat;
+		if (selected->beat + selected->length > max)
+			selected->length = max - selected->beat;
+
+		if (selected->length < minLength)
+			selected->length = minLength;
+
+		redraw();
+	}
+	//Right side to change duration...
+}
+
+void MyGrid::findNoteForCursor()
+{
+	const int resizeZone = 5;
+
+	float x = Fl::event_x();
+	int y = Fl::event_y();
+
+	int row = y / rowHeight;
+	float beat = x / colWidth;
+
+	int selectedIfResize = 0;
+
+	hoverState = NONE;
+
+	for (const auto [i,n]: std::views::enumerate(notes)) {
+		if (n.row != row) 
+			continue;
+
+		float leftEdge = n.beat * colWidth; 
+		float rightEdge = (n.beat + n.length) * colWidth;
+
+		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
+			hoverState = RESIZING;
+			side = LEFT;
+			selectedIfResize = i;
+		}
+		else if (rightEdge - x <= resizeZone && x - rightEdge <= resizeZone) {
+			hoverState = RESIZING;
+			side = RIGHT;
+			selectedIfResize = i;
+		}
+		else if (x >= leftEdge && x <= rightEdge) {
+			//XXX only required on initial press down
+			hoverState = MOVING;
+			selectedNote = i;
+			movingGrabXOffset = x - n.beat * colWidth;
+			movingGrabYOffset = y - n.row * rowHeight;
+			pickupPoint = {n.row,n.beat};
+
+			window()->cursor(FL_CURSOR_HAND); 
+//			window()->cursor(FL_CURSOR_CROSS); 
+
+			redraw();
+			/* Move takes precedence over resizing any neighbouring notes */
+			
+			return;
+		}
+	}
+
+	if (hoverState == RESIZING) {
+		selectedNote = selectedIfResize;
+		window()->cursor(FL_CURSOR_WE); 
+	}
+	else 
+		window()->cursor(FL_CURSOR_DEFAULT); 
+
+	redraw();
+}
+
+void MyGrid::toggleNote()
+{
+//TODO adjust for the position of the grid in the window. MAYBE use a "subwindow" so position starts at (0,0)
+	int ex = Fl::event_x();
+	int ey = Fl::event_y();
+
+	int row = ey / rowHeight;
+	float col = (float)(ex / colWidth);
+
+	/* Remove the note if present */
+	int size = notes.size();
+
+//FIXME delete - need keycombo, right mouse key, or mode to distinguish from move. 
+//      Delete should probably be the exception I think rather than the rule as its probably a bit less common and 
+//      move requires more control. Cf using a right mouse shortcut menu? Maybe put velocity in there too?
+//TODO can we use a range instead?	
+	notes.erase(std::remove_if(notes.begin(), notes.end(), 
+		[=](const Note& n) { return n.row == row && n.beat == col; }), 
+		notes.end());
+
+//TODO add option to split the beats and zoom in or out
+//     Probably best to keep using (pitch,beat,length) and to create a column() function and then use that to perform
+//     calcs rather than col.  (Probably dont want for the SongEditor gui though)
+
+//TODO allow multiple additions using a single click and drag (sequencer only)
+
+	/* Add the note */
+	if (notes.size() == size) {
+		/* Disallow note creation in partly occupied cells (too unclear to allow this behaviour) */
+		bool clear = true;
+		for (const Note n : notes) { 
+			clear = n.row != row || (col < (int)n.beat || col > (int)(n.beat + n.length - 0.000000001));  //HACK
+			if (clear)
+				break;
+		}
+		if (clear)
+			notes.push_back({row,col,1.0});
+	}
+
+	redraw();
+}
+
+/* Returns the note index, or -1 */
+int MyGrid::overlappingNote()
+{
+	Note a = notes[selectedNote];
+	float aStart = a.beat;
+	float aEnd = a.beat + a.length;
+
+	for (const auto [i,b]: std::views::enumerate(notes)) {
+		if (i == selectedNote || b.row != a.row) 
+			continue;
+
+		float bStart = b.beat;
+		float bEnd = b.beat + b.length;
+
+		/* Check overlapping: */
+		if (aStart > bStart && aStart < bEnd)
+			return i;
+
+		if (aEnd > bStart && aEnd < bEnd)
+			return i;
+
+		/* Check enveloping: */
+		if (aStart < bStart && aEnd > bEnd)
+			return i;
+
+		if (bStart < aStart && bEnd > aEnd)
+			return i;
+	}
+	return -1;
+}
+
