@@ -55,6 +55,8 @@ private:
 	void findNoteForCursor();
 	void toggleNote();
 	int overlappingNote();
+	void moving();
+	void resizing();
 };
 
 #endif

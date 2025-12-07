@@ -78,94 +78,21 @@ void MyGrid::draw()
 
 int MyGrid::handle(int event) 
 {
-//XXX if changing grid size want the num of pixels to remain constant.
-	float minLength = 10.0 / colWidth;
-
 //damage() call may be  useful. Also cf double buffering (and scrolling)
 
 	switch (event) {
 		case FL_PUSH: 
 			return 1;			// non-zero = we want the event
-		case FL_DRAG: {
+		case FL_DRAG: 
+			if (hoverState==MOVING) 
+				moving();
 
-			Note* selected = &notes[selectedNote];
-
-			if (hoverState==MOVING) {				
-				float x = Fl::event_x();
-				selected->beat = (x - movingGrabXOffset) / (float)colWidth; 
-
-				/* Ensure the note stays within X bounds */
-				if (selected->beat < 0.0)
-					selected->beat = 0.0;
-				if (selected->beat + selected->length > numBeats)
-					selected->beat = numBeats - selected->length;
-
-				float y = Fl::event_y();
-				selected->row = (y - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
-
-				/* Ensure the note stays within Y bounds */
-				if (selected->row < 0)
-					selected->row = 0;
-				if (selected->row >= numRows)
-					selected->row = numRows - 1;
-
-//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-				amOverlapping = overlappingNote() >= 0;
-				window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
-
-				redraw();	//XXX is a full redraw really required - consider all redraws()?
-			}				
-			/*
-			   NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
-			   The second one (optional) might allow it to move relative to the bar.
-			*/
-//TODO add snap			
-//TODO set minimum width			
-			if (hoverState==RESIZING) {	
-printf("Started RESIZING\n");
-
-				float x = Fl::event_x();
-
-//TODO restrict length to a certain minimum				
-				if (side==LEFT) {
-					float endBeat = selected->beat + selected->length;
-					selected->beat = x / (float)colWidth; 
-
-					int neighbour = overlappingNote();
-					float min = neighbour < 0 ? 0.0 : notes[neighbour].beat + notes[neighbour].length;
-					if (selected->beat < min)
-						selected->beat = min;
-
-					selected->length = endBeat - selected->beat;
-
-					if (selected->length < minLength) {
-						selected->length = minLength;
-						selected->beat = endBeat - minLength;
-					}
-
-					redraw();
-				}
-				else if (side==RIGHT) {
-					selected->length = x / (float)colWidth - selected->beat;
-
-					int neighbour = overlappingNote();
-					float max = neighbour < 0 ? numBeats : notes[neighbour].beat;
-					if (selected->beat + selected->length > max)
-						selected->length = max - selected->beat;
-
-					if (selected->length < minLength)
-						selected->length = minLength;
-
-					redraw();
-				}
-				//Right side to change duration...
-			}				
+			if (hoverState==RESIZING) 
+				resizing();
 
 			return 1;
-		}
-		case FL_RELEASE:
-//TODO a delete note option is now required
 
+		case FL_RELEASE:
 			if (hoverState==MOVING && amOverlapping) {
 				// TODO maybe drift back or fade out and in note
 				notes[selectedNote].row = pickupPoint.row;
@@ -196,6 +123,84 @@ printf("Started RESIZING\n");
 		default:
 			return Fl_Widget::handle(event);
 	}
+}
+
+void MyGrid::moving()
+{
+	Note* selected = &notes[selectedNote];
+
+	float x = Fl::event_x();
+	selected->beat = (x - movingGrabXOffset) / (float)colWidth; 
+
+	/* Ensure the note stays within X bounds */
+	if (selected->beat < 0.0)
+		selected->beat = 0.0;
+	if (selected->beat + selected->length > numBeats)
+		selected->beat = numBeats - selected->length;
+
+	float y = Fl::event_y();
+	selected->row = (y - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
+
+	/* Ensure the note stays within Y bounds */
+	if (selected->row < 0)
+		selected->row = 0;
+	if (selected->row >= numRows)
+		selected->row = numRows - 1;
+
+//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
+	amOverlapping = overlappingNote() >= 0;
+	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
+
+	redraw();	//XXX is a full redraw really required - consider all redraws()?
+}
+
+/*
+   NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
+   The second one (optional) might allow it to move relative to the bar.
+*/
+void MyGrid::resizing()
+{
+//TODO add snap / magnetism
+//XXX if changing grid size want the num of pixels to remain constant.
+	float minLength = 10.0 / colWidth;
+
+	Note* selected = &notes[selectedNote];
+
+	float x = Fl::event_x();
+
+//TODO restrict length to a certain minimum				
+	if (side==LEFT) {
+		float endBeat = selected->beat + selected->length;
+		selected->beat = x / (float)colWidth; 
+
+		int neighbour = overlappingNote();
+		float min = neighbour < 0 ? 0.0 : notes[neighbour].beat + notes[neighbour].length;
+		if (selected->beat < min)
+			selected->beat = min;
+
+		selected->length = endBeat - selected->beat;
+
+		if (selected->length < minLength) {
+			selected->length = minLength;
+			selected->beat = endBeat - minLength;
+		}
+
+		redraw();
+	}
+	else if (side==RIGHT) {
+		selected->length = x / (float)colWidth - selected->beat;
+
+		int neighbour = overlappingNote();
+		float max = neighbour < 0 ? numBeats : notes[neighbour].beat;
+		if (selected->beat + selected->length > max)
+			selected->length = max - selected->beat;
+
+		if (selected->length < minLength)
+			selected->length = minLength;
+
+		redraw();
+	}
+	//Right side to change duration...
 }
 
 void MyGrid::findNoteForCursor()
