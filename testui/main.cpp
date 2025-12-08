@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
 
 	std::vector<Note> notes(0);
 
-	MyGrid p(notes,10,15,30,40);
+	MyGrid p(notes,10,15,30,40,0.25);
 	p.box(FL_UP_BOX);
 	p.align(FL_ALIGN_TOP);
 

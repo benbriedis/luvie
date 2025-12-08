@@ -4,6 +4,7 @@
 #include <ranges>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 
@@ -12,8 +13,8 @@
 using std::vector;
 
 
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth): 
-	notes(notes),numRows(numRows),numBeats(numCols),rowHeight(rowHeight),colWidth(colWidth),
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap): 
+	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { }
@@ -36,7 +37,7 @@ void MyGrid::draw()
 	for (int i = 0; i < numRows+1; i++) {
 		int x0 = 0;
 		int y0 = i * rowHeight;
-		int x1 = numBeats * colWidth;
+		int x1 = numCols * colWidth;
 		int y1 = y0; 
 
 		fl_line(x0, y0, x1, y1);
@@ -45,7 +46,7 @@ void MyGrid::draw()
 	fl_color(0x00EE0000); //green
 
 	/* Columns: */
-	for (int i = 0; i < numBeats+1; i++) {
+	for (int i = 0; i < numCols+1; i++) {
 		int x0 = i * colWidth;
 		int y0 = 0;
 		int x1 = x0; 
@@ -57,7 +58,7 @@ void MyGrid::draw()
 	/* Notes: */
 //XXX at what point does copying these small structures become a bad idea?
 	for (const Note note : notes) { 
-		int x0 = note.beat * colWidth;  //TODO round to nearest?
+		int x0 = note.col * colWidth;  //TODO round to nearest?
 		int y0 = note.row * rowHeight;
 
 //TODO prevent to note from being so short its invisible (Q: how to handle very short notes?)		
@@ -66,7 +67,7 @@ void MyGrid::draw()
 
 		/* 
 		   Fit slightly inside the grid lines, except at the note start where I'm 
-		   lining it up with the start of the beat.
+		   lining it up with the start of the column.
 		*/
 		fl_rectf(x0,y0+1,width,rowHeight-1,0x5555EE00);
 		fl_color(0x1111EE00);
@@ -96,7 +97,7 @@ int MyGrid::handle(int event)
 			if (hoverState==MOVING && amOverlapping) {
 				// TODO maybe drift back or fade out and in note
 				notes[selectedNote].row = pickupPoint.row;
-				notes[selectedNote].beat = pickupPoint.beat;
+				notes[selectedNote].col = pickupPoint.col;
 				redraw();
 			}
 
@@ -130,13 +131,17 @@ void MyGrid::moving()
 	Note* selected = &notes[selectedNote];
 
 	float x = Fl::event_x();
-	selected->beat = (x - movingGrabXOffset) / (float)colWidth; 
+	selected->col = (x - movingGrabXOffset) / (float)colWidth; 
 
 	/* Ensure the note stays within X bounds */
-	if (selected->beat < 0.0)
-		selected->beat = 0.0;
-	if (selected->beat + selected->length > numBeats)
-		selected->beat = numBeats - selected->length;
+	if (selected->col < 0.0)
+		selected->col = 0.0;
+	if (selected->col + selected->length > numCols)
+		selected->col = numCols - selected->length;
+
+	/* Apply snap */
+	if (snap > 0.0) 
+		selected->col = std::round(selected->col / snap) * snap;
 
 	float y = Fl::event_y();
 	selected->row = (y - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
@@ -149,6 +154,7 @@ void MyGrid::moving()
 
 //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
 	amOverlapping = overlappingNote() >= 0;
+printf("amOverlapping: %b\n",amOverlapping);
 	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
 
 	redraw();	//XXX is a full redraw really required - consider all redraws()?
@@ -170,30 +176,41 @@ void MyGrid::resizing()
 
 //TODO restrict length to a certain minimum				
 	if (side==LEFT) {
-		float endBeat = selected->beat + selected->length;
-		selected->beat = x / (float)colWidth; 
+		float endCol = selected->col + selected->length;
+		selected->col = x / (float)colWidth; 
+
+		/* Apply snap: */
+		if (snap)
+			selected->col = std::round(selected->col / snap) * snap;
 
 		int neighbour = overlappingNote();
-		float min = neighbour < 0 ? 0.0 : notes[neighbour].beat + notes[neighbour].length;
-		if (selected->beat < min)
-			selected->beat = min;
+		float min = neighbour < 0 ? 0.0 : notes[neighbour].col + notes[neighbour].length;
+		if (selected->col < min)
+			selected->col = min;
 
-		selected->length = endBeat - selected->beat;
+		selected->length = endCol - selected->col;
 
 		if (selected->length < minLength) {
 			selected->length = minLength;
-			selected->beat = endBeat - minLength;
+			selected->col = endCol - minLength;
 		}
 
 		redraw();
 	}
 	else if (side==RIGHT) {
-		selected->length = x / (float)colWidth - selected->beat;
+		selected->length = x / (float)colWidth - selected->col;
+
+		/* Apply snap: */
+		float endCol = selected->col + selected->length;
+		if (snap) {
+			endCol = std::round(endCol / snap) * snap;
+			selected->length = endCol - selected->col;
+		}
 
 		int neighbour = overlappingNote();
-		float max = neighbour < 0 ? numBeats : notes[neighbour].beat;
-		if (selected->beat + selected->length > max)
-			selected->length = max - selected->beat;
+		float max = neighbour < 0 ? numCols : notes[neighbour].col;
+		if (selected->col + selected->length > max)
+			selected->length = max - selected->col;
 
 		if (selected->length < minLength)
 			selected->length = minLength;
@@ -211,7 +228,7 @@ void MyGrid::findNoteForCursor()
 	int y = Fl::event_y();
 
 	int row = y / rowHeight;
-	float beat = x / colWidth;
+	float col = x / colWidth;
 
 	int selectedIfResize = 0;
 
@@ -221,8 +238,8 @@ void MyGrid::findNoteForCursor()
 		if (n.row != row) 
 			continue;
 
-		float leftEdge = n.beat * colWidth; 
-		float rightEdge = (n.beat + n.length) * colWidth;
+		float leftEdge = n.col * colWidth; 
+		float rightEdge = (n.col + n.length) * colWidth;
 
 		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
 			hoverState = RESIZING;
@@ -238,9 +255,9 @@ void MyGrid::findNoteForCursor()
 			//XXX only required on initial press down
 			hoverState = MOVING;
 			selectedNote = i;
-			movingGrabXOffset = x - n.beat * colWidth;
+			movingGrabXOffset = x - n.col * colWidth;
 			movingGrabYOffset = y - n.row * rowHeight;
-			pickupPoint = {n.row,n.beat};
+			pickupPoint = {n.row,n.col};
 
 			window()->cursor(FL_CURSOR_HAND); 
 //			window()->cursor(FL_CURSOR_CROSS); 
@@ -279,11 +296,11 @@ void MyGrid::toggleNote()
 //      move requires more control. Cf using a right mouse shortcut menu? Maybe put velocity in there too?
 //TODO can we use a range instead?	
 	notes.erase(std::remove_if(notes.begin(), notes.end(), 
-		[=](const Note& n) { return n.row == row && n.beat == col; }), 
+		[=](const Note& n) { return n.row == row && n.col == col; }), 
 		notes.end());
 
-//TODO add option to split the beats and zoom in or out
-//     Probably best to keep using (pitch,beat,length) and to create a column() function and then use that to perform
+//TODO add option to split the columns and zoom in or out
+//     Probably best to keep using (pitch,column,length) and to create a column() function and then use that to perform
 //     calcs rather than col.  (Probably dont want for the SongEditor gui though)
 
 //TODO allow multiple additions using a single click and drag (sequencer only)
@@ -293,7 +310,7 @@ void MyGrid::toggleNote()
 		/* Disallow note creation in partly occupied cells (too unclear to allow this behaviour) */
 		bool clear = true;
 		for (const Note n : notes) { 
-			clear = n.row != row || (col < (int)n.beat || col > (int)(n.beat + n.length - 0.000000001));  //HACK
+			clear = n.row != row || (col < (int)n.col || col > (int)(n.col + n.length - 0.000000001));  //HACK
 			if (clear)
 				break;
 		}
@@ -308,28 +325,20 @@ void MyGrid::toggleNote()
 int MyGrid::overlappingNote()
 {
 	Note a = notes[selectedNote];
-	float aStart = a.beat;
-	float aEnd = a.beat + a.length;
+	float aStart = a.col;
+	float aEnd = a.col + a.length;
 
 	for (const auto [i,b]: std::views::enumerate(notes)) {
 		if (i == selectedNote || b.row != a.row) 
 			continue;
 
-		float bStart = b.beat;
-		float bEnd = b.beat + b.length;
+		float bStart = b.col;
+		float bEnd = b.col + b.length;
 
-		/* Check overlapping: */
-		if (aStart > bStart && aStart < bEnd)
-			return i;
+		float firstEnd = aStart <= bStart ? aEnd : bEnd;
+		float secondStart = aStart <= bStart ? bStart : aStart;
 
-		if (aEnd > bStart && aEnd < bEnd)
-			return i;
-
-		/* Check enveloping: */
-		if (aStart < bStart && aEnd > bEnd)
-			return i;
-
-		if (bStart < aStart && bEnd > aEnd)
+		if (firstEnd > secondStart)
 			return i;
 	}
 	return -1;

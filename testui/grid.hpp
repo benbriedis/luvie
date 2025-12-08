@@ -14,28 +14,33 @@ enum Side {
 	RIGHT,
 };
 
+/* XXX
+   It would probably be best to have a single source of truth and store notes as beat and maybe pitch.
+   Consider using a facade to map these to row, col and length - used here.
+*/
 typedef struct {
 	int row;
-	float beat;  //XXX will want velocity + anything else? (parameters that can evolve etc)
+	float col;  //XXX will want velocity + anything else? (parameters that can evolve etc)
 	float length;
 } Note;
 
 typedef struct {
 	int row;
-	float beat; 
+	float col; 
 } Point;
 
 
 class MyGrid : public Fl_Box {
 public:
-	MyGrid(std::vector<Note> notes,int numRows,int numBeats,int rowHeight,int colWidth);
+	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap);
 
 private:
 	/* Grid parameters */
 	int numRows;
-	int numBeats;
+	int numCols;
 	int rowHeight;
 	int colWidth;
+	float snap;
 
 	/* Note parameters: */
 	std::vector<Note> notes;
