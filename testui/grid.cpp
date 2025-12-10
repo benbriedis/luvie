@@ -122,12 +122,10 @@ int MyGrid::handle(int event)
 	switch (event) {
   //  menu_button->type(Fl_Menu_Button::POPUP1); // Make it a pop-up menu (right-click)
 		case FL_PUSH: 
-return 0;			
-			if (Fl::event_button() == FL_RIGHT_MOUSE) {
-				// Handle right-click event here
-				fl_alert("Right-click detected!");
-				return 1; // Indicate that the event was handled
-			}
+			if (Fl::event_button() == FL_RIGHT_MOUSE) 
+//TODO may prefer to try using show() or something... think this is a better guarantee that the mouse button is the same as the one in Fl_Menu_Button
+				//XXX leaving the Fl_Menu_Button to handle...
+				return 0;
 
 			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
@@ -140,7 +138,6 @@ return 0;
 			return 1;
 
 		case FL_RELEASE:
-return 0;			
 			if (hoverState==MOVING && amOverlapping) {
 				// TODO maybe drift back or fade out and in note
 				notes[selectedNote].row = pickupPoint.row;
