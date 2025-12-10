@@ -27,6 +27,13 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 }
 */
 
+Fl_Menu_Item menutable[] = {
+  {"foo",0,0,0,FL_MENU_INACTIVE},
+  {"delete",0,0,0,FL_MENU_VALUE},
+  {"button",FL_F+4, 0, 0, FL_MENU_TOGGLE},
+  {0}
+};
+//Fl_Menu_Button mb(0,0,100000,100000);
 
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap): 
@@ -34,28 +41,29 @@ MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colW
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { 
+//	Fl_Menu_Button mb(0,0,100000,100000);
+//	mb.menu(menutable);
+//	mb.type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
+//	menu_button.callback(menu_callback);
 
-//XXX maybe in a different function? eg show()?
-/*
-    // Define menu items
-    Fl_Menu_Item menu_items[] = {
-        {"Item 1", FL_COMMAND + '1', menu_callback, 0, 0},
-        {"Item 2", FL_COMMAND + '2', menu_callback, 0, 0},
-        {"Submenu", 0, 0, 0, FL_SUBMENU},
-            {"Sub-item A", 0, menu_callback, 0, 0},
-            {"Sub-item B", 0, menu_callback, 0, 0},
-            {0}, // End of submenu
-        {0} // End of menu
-    };
+/*	
+	Fl_Menu_Button* mb = new Fl_Menu_Button(0,0,100000,100000);
+	mb->menu(menutable);
+	mb->type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
+*/	
 
-    // Create a menu button and set its menu
-    Fl_Menu_Button* menu_button = new Fl_Menu_Button(10, 10, 80, 25, "Menu");
-    menu_button->menu(menu_items);
-//    menu_button->type(Fl_Menu_Button::POPUP1); // Make it a pop-up menu (right-click)
-    menu_button->type(Fl_Menu_Button::POPUP2); // Make it a pop-up menu (right-click)
-	*/
-
+	menuButton = new Fl_Menu_Button(0,0,100000,100000);  //XXX change 100000?
+	menuButton->menu(menutable);
+	menuButton->type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
 }
+
+void MyGrid::init() 
+{
+//	Fl_Menu_Button mb(0,0,100000,100000);
+//	mb.menu(menutable);
+//	mb.type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
+//	menu_button.callback(menu_callback);
+}	
 
 void MyGrid::draw() 
 {
@@ -125,7 +133,12 @@ int MyGrid::handle(int event)
 			if (Fl::event_button() == FL_RIGHT_MOUSE) 
 //TODO may prefer to try using show() or something... think this is a better guarantee that the mouse button is the same as the one in Fl_Menu_Button
 				//XXX leaving the Fl_Menu_Button to handle...
-				return 0;
+			{
+menuButton->position (Fl::event_x (), Fl::event_y ());
+menuButton->show ();
+menuButton->popup ();
+				return 1;
+			}
 
 			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
@@ -198,7 +211,6 @@ void MyGrid::moving()
 
 //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
 	amOverlapping = overlappingNote() >= 0;
-printf("amOverlapping: %b\n",amOverlapping);
 	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
 
 	redraw();	//XXX is a full redraw really required - consider all redraws()?

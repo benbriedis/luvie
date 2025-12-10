@@ -2,6 +2,7 @@
 #define GRID_HPP
 
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Menu_Button.H>
 
 enum SelectionState {
 	NONE,
@@ -41,6 +42,7 @@ private:
 	int rowHeight;
 	int colWidth;
 	float snap;
+	Fl_Menu_Button* menuButton;
 
 	/* Note parameters: */
 	std::vector<Note> notes;
@@ -55,6 +57,7 @@ private:
 	bool amOverlapping;
 	Point pickupPoint;
 
+	void init();
 	void draw() override;
 	int handle(int event) override;
 	void findNoteForCursor();
