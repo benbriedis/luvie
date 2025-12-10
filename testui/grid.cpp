@@ -7,17 +7,55 @@
 #include <cmath>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
+#include <FL/fl_ask.H> // For fl_alert
+#include <FL/Fl_Menu_Button.H>
+#include <FL/Fl_Menu_Item.H>
+#include <FL/fl_ask.H> // For fl_alert
 
 //import std;
 
 using std::vector;
+
+// Callback function for menu items
+/*
+void menu_callback(Fl_Widget* w, void* user_data) {
+    Fl_Menu_Button* menu_button = static_cast<Fl_Menu_Button*>(w);
+    const Fl_Menu_Item* chosen_item = menu_button->mvalue(); // Get the chosen item
+    if (chosen_item) {
+        fl_alert("Selected: %s", chosen_item->label());
+    }
+}
+*/
+
 
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap): 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
-{ }
+{ 
+
+//XXX maybe in a different function? eg show()?
+/*
+    // Define menu items
+    Fl_Menu_Item menu_items[] = {
+        {"Item 1", FL_COMMAND + '1', menu_callback, 0, 0},
+        {"Item 2", FL_COMMAND + '2', menu_callback, 0, 0},
+        {"Submenu", 0, 0, 0, FL_SUBMENU},
+            {"Sub-item A", 0, menu_callback, 0, 0},
+            {"Sub-item B", 0, menu_callback, 0, 0},
+            {0}, // End of submenu
+        {0} // End of menu
+    };
+
+    // Create a menu button and set its menu
+    Fl_Menu_Button* menu_button = new Fl_Menu_Button(10, 10, 80, 25, "Menu");
+    menu_button->menu(menu_items);
+//    menu_button->type(Fl_Menu_Button::POPUP1); // Make it a pop-up menu (right-click)
+    menu_button->type(Fl_Menu_Button::POPUP2); // Make it a pop-up menu (right-click)
+	*/
+
+}
 
 void MyGrid::draw() 
 {
@@ -82,7 +120,15 @@ int MyGrid::handle(int event)
 //damage() call may be  useful. Also cf double buffering (and scrolling)
 
 	switch (event) {
+  //  menu_button->type(Fl_Menu_Button::POPUP1); // Make it a pop-up menu (right-click)
 		case FL_PUSH: 
+return 0;			
+			if (Fl::event_button() == FL_RIGHT_MOUSE) {
+				// Handle right-click event here
+				fl_alert("Right-click detected!");
+				return 1; // Indicate that the event was handled
+			}
+
 			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
 			if (hoverState==MOVING) 
@@ -94,6 +140,7 @@ int MyGrid::handle(int event)
 			return 1;
 
 		case FL_RELEASE:
+return 0;			
 			if (hoverState==MOVING && amOverlapping) {
 				// TODO maybe drift back or fade out and in note
 				notes[selectedNote].row = pickupPoint.row;
