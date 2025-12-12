@@ -27,12 +27,6 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 }
 */
 
-Fl_Menu_Item menutable[] = {
-  {"foo",0,0,0,FL_MENU_INACTIVE},
-  {"delete",0,0,0,FL_MENU_VALUE},
-  {"button",FL_F+4, 0, 0, FL_MENU_TOGGLE},
-  {0}
-};
 //Fl_Menu_Button mb(0,0,100000,100000);
 
 
@@ -41,29 +35,7 @@ MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colW
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { 
-//	Fl_Menu_Button mb(0,0,100000,100000);
-//	mb.menu(menutable);
-//	mb.type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
-//	menu_button.callback(menu_callback);
-
-/*	
-	Fl_Menu_Button* mb = new Fl_Menu_Button(0,0,100000,100000);
-	mb->menu(menutable);
-	mb->type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
-*/	
-
-	menuButton = new Fl_Menu_Button(0,0,100000,100000);  //XXX change 100000?
-	menuButton->menu(menutable);
-	menuButton->type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
 }
-
-void MyGrid::init() 
-{
-//	Fl_Menu_Button mb(0,0,100000,100000);
-//	mb.menu(menutable);
-//	mb.type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
-//	menu_button.callback(menu_callback);
-}	
 
 void MyGrid::draw() 
 {

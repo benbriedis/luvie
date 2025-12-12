@@ -12,11 +12,8 @@ TARGET = main
 
 all: $(TARGET)
 
-main2: main2.cpp
-	$(CC) $(CXXFLAGS) main2.cpp -o $(TARGET) $(LDFLAGS) 
-
 $(TARGET): main.cpp grid.cpp
-	$(CC) $(CXXFLAGS) main.cpp grid.cpp -o $(TARGET) $(LDFLAGS) 
+	$(CC) $(CXXFLAGS) main.cpp outerGrid.cpp grid.cpp -o $(TARGET) $(LDFLAGS) 
 
 clean:
 	rm -f $(TARGET)
