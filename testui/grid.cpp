@@ -100,8 +100,11 @@ int MyGrid::handle(int event)
 //damage() call may be  useful. Also cf double buffering (and scrolling)
 
 	switch (event) {
-  //  menu_button->type(Fl_Menu_Button::POPUP1); // Make it a pop-up menu (right-click)
 		case FL_PUSH: 
+
+printf("outerGrid.cpp handle()  GOT FL_PUSH\n");
+
+/*			
 			if (Fl::event_button() == FL_RIGHT_MOUSE) 
 //TODO may prefer to try using show() or something... think this is a better guarantee that the mouse button is the same as the one in Fl_Menu_Button
 				//XXX leaving the Fl_Menu_Button to handle...
@@ -111,6 +114,7 @@ menuButton->show ();
 menuButton->popup ();
 				return 1;
 			}
+*/			
 
 			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
@@ -140,6 +144,7 @@ menuButton->popup ();
 
 		/* We want mouse events to change the cursor */
 		case FL_ENTER: 
+printf("GOT FL_ENTER\n");			
 			return 1;		// non-zero = we want mouse events
 
 		/*
@@ -147,6 +152,7 @@ menuButton->popup ();
 		   by hovering the cursor over different parts of the note. MAY want keycombs and/or mode as well/instead.
 		*/
 		case FL_MOVE: {
+printf("GOT FL_MOVE\n");			
 			findNoteForCursor();
 			return 1;  //XXX or true?
 		}
@@ -307,6 +313,7 @@ void MyGrid::findNoteForCursor()
 	redraw();
 }
 
+//TODO change to addNote() and deleteNote() I guess. Connect deleteNote() up to the menu
 void MyGrid::toggleNote()
 {
 //TODO adjust for the position of the grid in the window. MAYBE use a "subwindow" so position starts at (0,0)

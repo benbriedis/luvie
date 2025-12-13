@@ -12,7 +12,7 @@ TARGET = main
 
 all: $(TARGET)
 
-$(TARGET): main.cpp grid.cpp
+$(TARGET): main.cpp grid.cpp outerGrid.cpp
 	$(CC) $(CXXFLAGS) main.cpp outerGrid.cpp grid.cpp -o $(TARGET) $(LDFLAGS) 
 
 clean:

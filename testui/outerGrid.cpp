@@ -1,6 +1,7 @@
 #include "outerGrid.hpp"
 #include <FL/Fl_Menu_Button.H>
 #include <vector>
+#include <cstdio>
 
 
 Fl_Menu_Item menutable[] = {
@@ -20,12 +21,34 @@ OuterGrid::OuterGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeig
 	menuButton.menu(menutable);
 	menuButton.type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
 
-
 	end();
 }
 
+int OuterGrid::handle(int event) 
+{
+	Fl_Group::handle(event);
+
+//	if (Fl_Group::handle(event)) 
+//		return 1;
+
+	return 0;
 /*
-	menuButton = new Fl_Menu_Button(0,0,100000,100000);  //XXX change 100000?
-	menuButton->menu(menutable);
-	menuButton->type(Fl_Menu_Button::POPUP3); // Make it a pop-up menu (right-click)
-*/	
+	switch (event) {
+		case FL_PUSH: 
+			if (Fl::event_button() == FL_RIGHT_MOUSE) 
+//TODO may prefer to try using show() or something... think this is a better guarantee that the mouse button is the same as the one in Fl_Menu_Button
+				//XXX leaving the Fl_Menu_Button to handle...
+			{
+//menuButton->position (Fl::event_x (), Fl::event_y ());
+//menuButton->show ();
+//menuButton->popup ();
+				return 1;
+			}
+			printf("outerGrid.cpp handle()  GOT PUSH\n");
+			return 0;			// non-zero = we want the event
+		default:
+			return Fl_Widget::handle(event);
+	}
+*/
+}
+

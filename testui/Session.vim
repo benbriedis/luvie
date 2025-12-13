@@ -13,13 +13,11 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +122 grid.cpp
-badd +21 main.cpp
-badd +30 grid.hpp
-badd +84 ~/programming/luvie/deps/installation/include/FL/Fl_Menu_Button.H
-badd +71 ~/programming/luvie/deps/installation/include/FL/Fl_Menu_.H
-badd +9 main2.cpp
-badd +16 Makefile
+badd +40 grid.cpp
+badd +16 main.cpp
+badd +5 grid.hpp
+badd +10 outerGrid.hpp
+badd +16 outerGrid.cpp
 argglobal
 %argdel
 $argadd grid.cpp
@@ -40,10 +38,10 @@ set winminheight=0
 set winheight=1
 set winminwidth=0
 set winwidth=1
-exe 'vert 1resize ' . ((&columns * 81 + 102) / 205)
-exe 'vert 2resize ' . ((&columns * 123 + 102) / 205)
+exe 'vert 1resize ' . ((&columns * 94 + 102) / 205)
+exe 'vert 2resize ' . ((&columns * 110 + 102) / 205)
 argglobal
-balt main.cpp
+balt outerGrid.hpp
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -54,19 +52,19 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 214 - ((24 * winheight(0) + 26) / 52)
+let s:l = 73 - ((0 * winheight(0) + 25) / 50)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 214
-normal! 09|
+keepjumps 73
+normal! 032|
 wincmd w
 argglobal
-if bufexists(fnamemodify("grid.cpp", ":p")) | buffer grid.cpp | else | edit grid.cpp | endif
+if bufexists(fnamemodify("outerGrid.hpp", ":p")) | buffer outerGrid.hpp | else | edit outerGrid.hpp | endif
 if &buftype ==# 'terminal'
-  silent file grid.cpp
+  silent file outerGrid.hpp
 endif
-balt grid.hpp
+balt outerGrid.cpp
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -77,16 +75,16 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 122 - ((17 * winheight(0) + 26) / 52)
+let s:l = 10 - ((9 * winheight(0) + 25) / 50)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 122
-normal! 025|
+keepjumps 10
+normal! 061|
 wincmd w
 2wincmd w
-exe 'vert 1resize ' . ((&columns * 81 + 102) / 205)
-exe 'vert 2resize ' . ((&columns * 123 + 102) / 205)
+exe 'vert 1resize ' . ((&columns * 94 + 102) / 205)
+exe 'vert 2resize ' . ((&columns * 110 + 102) / 205)
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
