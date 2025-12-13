@@ -17,20 +17,6 @@
 
 using std::vector;
 
-// Callback function for menu items
-/*
-void menu_callback(Fl_Widget* w, void* user_data) {
-    Fl_Menu_Button* menu_button = static_cast<Fl_Menu_Button*>(w);
-    const Fl_Menu_Item* chosen_item = menu_button->mvalue(); // Get the chosen item
-    if (chosen_item) {
-        fl_alert("Selected: %s", chosen_item->label());
-    }
-}
-*/
-
-//Fl_Menu_Button mb(0,0,100000,100000);
-
-
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap) : 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),
 	hoverState(NONE),
@@ -134,21 +120,15 @@ int MyGrid::handle(int event)
 
 		/* We want mouse events to change the cursor */
 		case FL_ENTER: 
-printf("GOT FL_ENTER\n");			
-			return 1;		// non-zero = we want mouse events
-//		case FL_LEAVE: 
-//printf("GOT FL_LEAVE\n");			
-//			return 1;		// non-zero = we want mouse events
+			return 1;
 
 		/*
 		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving 
 		   by hovering the cursor over different parts of the note. MAY want keycombs and/or mode as well/instead.
 		*/
 		case FL_MOVE: {
-printf("GOT FL_MOVE\n");			
 			findNoteForCursor();
-
-			return 0;  //XXX or true?
+			return 0; 
 		}
 		default:
 			return Fl_Widget::handle(event);
