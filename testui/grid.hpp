@@ -42,7 +42,6 @@ private:
 	int rowHeight;
 	int colWidth;
 	float snap;
-	Fl_Menu_Button* menuButton;
 
 	/* Note parameters: */
 	std::vector<Note> notes;

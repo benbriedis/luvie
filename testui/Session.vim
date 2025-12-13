@@ -13,35 +13,20 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +40 grid.cpp
-badd +16 main.cpp
-badd +5 grid.hpp
-badd +10 outerGrid.hpp
-badd +16 outerGrid.cpp
+badd +107 grid.cpp
+badd +1 main.cpp
+badd +61 grid.hpp
+badd +14 outerGrid.hpp
+badd +15 outerGrid.cpp
+badd +334 ~/programming/luvie/deps/installation/include/FL/Fl_Widget.H
+badd +15 popup.hpp
+badd +27 popup.cpp
 argglobal
 %argdel
 $argadd grid.cpp
 edit grid.cpp
-let s:save_splitbelow = &splitbelow
-let s:save_splitright = &splitright
-set splitbelow splitright
-wincmd _ | wincmd |
-vsplit
-1wincmd h
-wincmd w
-let &splitbelow = s:save_splitbelow
-let &splitright = s:save_splitright
-wincmd t
-let s:save_winminheight = &winminheight
-let s:save_winminwidth = &winminwidth
-set winminheight=0
-set winheight=1
-set winminwidth=0
-set winwidth=1
-exe 'vert 1resize ' . ((&columns * 94 + 102) / 205)
-exe 'vert 2resize ' . ((&columns * 110 + 102) / 205)
 argglobal
-balt outerGrid.hpp
+balt ~/programming/luvie/deps/installation/include/FL/Fl_Widget.H
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -52,39 +37,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 73 - ((0 * winheight(0) + 25) / 50)
+let s:l = 107 - ((25 * winheight(0) + 26) / 52)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 73
-normal! 032|
-wincmd w
-argglobal
-if bufexists(fnamemodify("outerGrid.hpp", ":p")) | buffer outerGrid.hpp | else | edit outerGrid.hpp | endif
-if &buftype ==# 'terminal'
-  silent file outerGrid.hpp
-endif
-balt outerGrid.cpp
-setlocal foldmethod=manual
-setlocal foldexpr=0
-setlocal foldmarker={{{,}}}
-setlocal foldignore=#
-setlocal foldlevel=0
-setlocal foldminlines=1
-setlocal foldnestmax=20
-setlocal foldenable
-silent! normal! zE
-let &fdl = &fdl
-let s:l = 10 - ((9 * winheight(0) + 25) / 50)
-if s:l < 1 | let s:l = 1 | endif
-keepjumps exe s:l
-normal! zt
-keepjumps 10
-normal! 061|
-wincmd w
-2wincmd w
-exe 'vert 1resize ' . ((&columns * 94 + 102) / 205)
-exe 'vert 2resize ' . ((&columns * 110 + 102) / 205)
+keepjumps 107
+normal! 026|
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
@@ -92,8 +50,6 @@ endif
 unlet! s:wipebuf
 set winheight=1 winwidth=20
 let &shortmess = s:shortmess_save
-let &winminheight = s:save_winminheight
-let &winminwidth = s:save_winminwidth
 let s:sx = expand("<sfile>:p:r")."x.vim"
 if filereadable(s:sx)
   exe "source " . fnameescape(s:sx)

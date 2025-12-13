@@ -1,5 +1,6 @@
 #include "grid.hpp"
 #include "FL/Enumerations.H"
+#include "outerGrid.hpp"
 #include <cstdio>
 #include <ranges>
 #include <iostream>
@@ -30,7 +31,7 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 //Fl_Menu_Button mb(0,0,100000,100000);
 
 
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap): 
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap) : 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
@@ -101,22 +102,11 @@ int MyGrid::handle(int event)
 
 	switch (event) {
 		case FL_PUSH: 
-
-printf("outerGrid.cpp handle()  GOT FL_PUSH\n");
-
-/*			
 			if (Fl::event_button() == FL_RIGHT_MOUSE) 
-//TODO may prefer to try using show() or something... think this is a better guarantee that the mouse button is the same as the one in Fl_Menu_Button
-				//XXX leaving the Fl_Menu_Button to handle...
-			{
-menuButton->position (Fl::event_x (), Fl::event_y ());
-menuButton->show ();
-menuButton->popup ();
-				return 1;
-			}
-*/			
+				//XXX is a callback desirable here?
+				((OuterGrid*)parent())->popup.popup();
+			return 1;
 
-			return 1;			// non-zero = we want the event
 		case FL_DRAG: 
 			if (hoverState==MOVING) 
 				moving();
@@ -146,6 +136,9 @@ menuButton->popup ();
 		case FL_ENTER: 
 printf("GOT FL_ENTER\n");			
 			return 1;		// non-zero = we want mouse events
+//		case FL_LEAVE: 
+//printf("GOT FL_LEAVE\n");			
+//			return 1;		// non-zero = we want mouse events
 
 		/*
 		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving 
@@ -154,7 +147,8 @@ printf("GOT FL_ENTER\n");
 		case FL_MOVE: {
 printf("GOT FL_MOVE\n");			
 			findNoteForCursor();
-			return 1;  //XXX or true?
+
+			return 0;  //XXX or true?
 		}
 		default:
 			return Fl_Widget::handle(event);
