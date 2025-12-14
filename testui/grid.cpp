@@ -104,7 +104,8 @@ int MyGrid::handle(int event)
 		case FL_PUSH: 
 			if (Fl::event_button() == FL_RIGHT_MOUSE) 
 				//XXX is a callback desirable here?
-				((OuterGrid*)parent())->popup.popup();
+//XXX add position				
+				((OuterGrid*)parent())->popup.show();
 			return 1;
 
 		case FL_DRAG: 
@@ -134,18 +135,13 @@ int MyGrid::handle(int event)
 
 		/* We want mouse events to change the cursor */
 		case FL_ENTER: 
-printf("GOT FL_ENTER\n");			
 			return 1;		// non-zero = we want mouse events
-//		case FL_LEAVE: 
-//printf("GOT FL_LEAVE\n");			
-//			return 1;		// non-zero = we want mouse events
 
 		/*
 		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving 
 		   by hovering the cursor over different parts of the note. MAY want keycombs and/or mode as well/instead.
 		*/
 		case FL_MOVE: {
-printf("GOT FL_MOVE\n");			
 			findNoteForCursor();
 
 			return 0;  //XXX or true?
