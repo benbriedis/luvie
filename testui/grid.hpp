@@ -34,9 +34,7 @@ typedef struct {
 
 class MyGrid : public Fl_Box {
 public:
-	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup* popup);
-
-	void setPopup(Popup* popup);
+	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup);
 
 
 private:
@@ -46,7 +44,7 @@ private:
 	int rowHeight;
 	int colWidth;
 	float snap;
-	Popup* popup;
+	Popup& popup;
 
 	/* Note parameters: */
 	std::vector<Note> notes;

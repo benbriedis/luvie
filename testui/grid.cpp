@@ -30,16 +30,11 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 //Fl_Menu_Button mb(0,0,100000,100000);
 
 
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup* popup) : 
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) : 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { 
-}
-
-void MyGrid::setPopup(Popup* p)
-{
-	popup = p;
 }
 
 void MyGrid::draw() 
@@ -110,7 +105,7 @@ int MyGrid::handle(int event)
 				//XXX is a callback desirable here?
 //XXX add position				
 //				((OuterGrid*)parent())->popup.show();
-				popup->show();
+				popup.show();
 			return 1;
 
 		case FL_DRAG: 

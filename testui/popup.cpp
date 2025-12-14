@@ -34,9 +34,9 @@ Fl_Menu_Item menutable[] = {
 //XXX are we sure window is the one to use?
 
 Popup::Popup() : 
-    Fl_Window(200,300,"blah2"),
+    Fl_Window(200,200,"blah2"),
 //	Fl_Flex(Fl_Flex::VERTICAL)
-	flex(0,0,200,300,"blah")
+	flex(0,0,200,200,"blah")
 {
     flex.type(Fl_Flex::VERTICAL);
     flex.begin();
