@@ -6,9 +6,7 @@
 #include <FL/Fl_Flex.H>
 
 class Popup : public Fl_Window {
-
-private:
-	Fl_Flex flex;
+//class Popup : public Fl_Window {
 
 public:
 	Popup();

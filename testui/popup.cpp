@@ -1,6 +1,5 @@
 
 #include "popup.hpp"
-#include "FL/Fl_Box.H"
 #include "FL/Fl_Window.H"
 #include "FL/Fl_Flex.H"
 #include "FL/Fl_Button.H"
@@ -35,28 +34,27 @@ Fl_Menu_Item menutable[] = {
 //XXX are we sure window is the one to use?
 
 Popup::Popup() : 
-    Fl_Window(200,200),
-	flex(0,0,0,0)
+//    Fl_Window(0,0)
+    Fl_Window(200,200)
 {
-	resizable(this);
-
-//begin();
-//end();
-hide();
+//	Fl_Flex *flex = new Fl_Flex(0,0,200,200);
+	Fl_Flex *flex = new Fl_Flex(Fl_Flex::COLUMN);
+resizable(flex);
 
 
-    flex.type(Fl_Flex::COLUMN);
-    flex.begin();
+//    flex.type(Fl_Flex::COLUMN);
 
-	Fl_Button *btn1 = new Fl_Button(0, 0, 0, 0, "Fixed Height Button");
+	flex->resizable(flex); //XXX Or not?
+    flex->begin();
+	Fl_Button *btn1 = new Fl_Button(0, 0, 0, 0, "Fixed Height Button");  //XXX remove new?
 	Fl_Button *btn2 = new Fl_Button(0, 0, 0, 0, "Expanding Button");
+	flex->fixed(btn1, 40);
+	flex->fixed(btn2, 40);
+    flex->end();
 
-	flex.fixed(btn1, 40);
-	flex.fixed(btn2, 40);
+//	add(flex);
 
-    // Optional: set a fixed size for a specific child
-    // flex->fixed(button_pointer, 50);
-
-    flex.end();
+	end();
+//	hide();
 }
 
