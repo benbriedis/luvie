@@ -14,9 +14,9 @@ int main(int argc, char **argv) {
 	window.end();
 
 	Popup popup{};
-	popup.begin();
-	popup.end();
-	popup.hide();
+
+//TODO position... 
+
 	window.add(popup);
 
 	std::vector<Note> notes(0);
