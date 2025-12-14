@@ -4,7 +4,7 @@
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Item.H>
 #include "grid.hpp"
-#include "outerGrid.hpp"
+#include "popup.hpp"
 
 
 int main(int argc, char **argv) {
@@ -13,11 +13,31 @@ int main(int argc, char **argv) {
 
 	std::vector<Note> notes(0);
 
-	OuterGrid p(notes,10,15,30,40,0.25);
-	p.box(FL_UP_BOX);
-	p.align(FL_ALIGN_TOP);
+window.begin(); //XXX internal windows SHOULD be added to this window...
+
+//	Popup popup{};
+//	popup.hide();
+
+//	MyGrid grid(notes,10,15,30,40,0.25,&popup);
+	MyGrid grid(notes,10,15,30,40,0.25,nullptr);
+
+
+//	OuterGrid p(notes,10,15,30,40,0.25);
+//	p.box(FL_UP_BOX);
+//	p.align(FL_ALIGN_TOP);
 
 	window.end();
+
+
+	Popup popup{};
+	popup.hide();
+
+grid.setPopup(&popup);	
+
+	window.add(popup);
+
+
+
 	window.show(argc, argv);
 	return Fl::run();
 }

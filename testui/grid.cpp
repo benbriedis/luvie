@@ -1,9 +1,8 @@
 #include "grid.hpp"
 #include "FL/Enumerations.H"
-#include "outerGrid.hpp"
+#include "popup.hpp"
 #include <cstdio>
 #include <ranges>
-#include <iostream>
 #include <algorithm>
 #include <cmath>
 #include <FL/fl_draw.H>
@@ -31,11 +30,16 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 //Fl_Menu_Button mb(0,0,100000,100000);
 
 
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap) : 
-	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup* popup) : 
+	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { 
+}
+
+void MyGrid::setPopup(Popup* p)
+{
+	popup = p;
 }
 
 void MyGrid::draw() 
@@ -105,7 +109,8 @@ int MyGrid::handle(int event)
 			if (Fl::event_button() == FL_RIGHT_MOUSE) 
 				//XXX is a callback desirable here?
 //XXX add position				
-				((OuterGrid*)parent())->popup.show();
+//				((OuterGrid*)parent())->popup.show();
+				popup->show();
 			return 1;
 
 		case FL_DRAG: 

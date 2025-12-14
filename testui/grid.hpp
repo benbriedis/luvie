@@ -1,6 +1,7 @@
 #ifndef GRID_HPP
 #define GRID_HPP
 
+#include "popup.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 
@@ -33,7 +34,10 @@ typedef struct {
 
 class MyGrid : public Fl_Box {
 public:
-	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap);
+	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup* popup);
+
+	void setPopup(Popup* popup);
+
 
 private:
 	/* Grid parameters */
@@ -42,6 +46,7 @@ private:
 	int rowHeight;
 	int colWidth;
 	float snap;
+	Popup* popup;
 
 	/* Note parameters: */
 	std::vector<Note> notes;
