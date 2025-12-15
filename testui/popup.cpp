@@ -35,38 +35,20 @@ Fl_Menu_Item menutable[] = {
 //XXX are we sure window is the one to use?
 
 Popup::Popup() : 
-//    Fl_Window(0,0,0,0)
-    Fl_Window(0,0,200,200)
+    Fl_Window(0,0,0,0)
 {
-//box(FL_DOWN_BOX);
+	//XXX haven't been able to size the flex up from its contents. Its meant to be possible...
+	//    The children heights are being calculated from the flex box, not the other way around.
+	Fl_Flex *flex = new Fl_Flex(0,0,150,100);
 
-	Fl_Flex *flex = new Fl_Flex(0,0,150,130);
-//	Fl_Flex *flex = new Fl_Flex(Fl_Flex::COLUMN);   //XXX cf smart pointers?
-
-flex->box(FL_DOWN_BOX);
-
-
-begin();
-//current(this);
-
-
-//    flex.type(Fl_Flex::COLUMN);
-
-//	flex->resizable(flex); //XXX Or not?
-	flex->resizable(NULL); //XXX Or not?
     flex->begin();
-	Fl_Button *btn1 = new Fl_Button(0, 0, 0, 0, "Fixed Height Button");  //XXX remove new?
-	Fl_Button *btn2 = new Fl_Button(0, 0, 0, 0, "Expanding Button");
-	flex->fixed(btn1, 40);
-	flex->fixed(btn2, 40);
+	Fl_Button *btn1 = new Fl_Button(0, 0, 0, 0, "Delete");  //XXX remove new?
+	Fl_Button *btn2 = new Fl_Button(0, 0, 0, 0, "Velocity Slider");
+	//flex->resizable(NULL);
     flex->end();
 
-	resize(0,0,flex->w(),flex->h());
-//	add(flex);
-
-resizable(flex);
+	resize(0,0,flex->w(),flex->h());  //XXX couldnt get resizable to work
+	//resizable(flex);
 	end();
-//resizable(this);
-
 }
 
