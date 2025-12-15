@@ -1,5 +1,6 @@
 
 #include "popup.hpp"
+#include "FL/Enumerations.H"
 #include "FL/Fl_Window.H"
 #include "FL/Fl_Flex.H"
 #include "FL/Fl_Button.H"
@@ -34,17 +35,25 @@ Fl_Menu_Item menutable[] = {
 //XXX are we sure window is the one to use?
 
 Popup::Popup() : 
-//    Fl_Window(0,0)
-    Fl_Window(200,200)
+//    Fl_Window(0,0,0,0)
+    Fl_Window(0,0,200,200)
 {
-//	Fl_Flex *flex = new Fl_Flex(0,0,200,200);
-	Fl_Flex *flex = new Fl_Flex(Fl_Flex::COLUMN);
-resizable(flex);
+//box(FL_DOWN_BOX);
+
+	Fl_Flex *flex = new Fl_Flex(0,0,150,130);
+//	Fl_Flex *flex = new Fl_Flex(Fl_Flex::COLUMN);   //XXX cf smart pointers?
+
+flex->box(FL_DOWN_BOX);
+
+
+begin();
+//current(this);
 
 
 //    flex.type(Fl_Flex::COLUMN);
 
-	flex->resizable(flex); //XXX Or not?
+//	flex->resizable(flex); //XXX Or not?
+	flex->resizable(NULL); //XXX Or not?
     flex->begin();
 	Fl_Button *btn1 = new Fl_Button(0, 0, 0, 0, "Fixed Height Button");  //XXX remove new?
 	Fl_Button *btn2 = new Fl_Button(0, 0, 0, 0, "Expanding Button");
@@ -52,9 +61,12 @@ resizable(flex);
 	flex->fixed(btn2, 40);
     flex->end();
 
+	resize(0,0,flex->w(),flex->h());
 //	add(flex);
 
+resizable(flex);
 	end();
-//	hide();
+//resizable(this);
+
 }
 
