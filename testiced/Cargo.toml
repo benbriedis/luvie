@@ -1,0 +1,30 @@
+[package]
+name = "rustui"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ben Briedis <you@example.com>"]
+
+features = ["glow"]
+
+[dependencies]
+iced = { version = "0.14.0", features = ["canvas"] }
+
+[profile.release]
+opt-level = "z"  # Optimize for minimum size ("s" is for size/speed balance)
+lto = true     # Using "thin" may save a little compilation time
+codegen-units = 1 # Helps LTO optimize more effectively (can increase compile time)
+
+# Together these remove about 3M for the counter application
+#strip = "symbols" # Strip debug symbols and backtrace information
+#panic = "abort"  # Abort on panic instead of unwinding the stack (saves unwinding machinery)
+
+# "wgpu" is Vulkan etc. glow is far far faster to compile and a bit smaller and
+#  0.5Meg smaller for the counter application.
+features = ["glow"]
+
+
+# More suggestions for smaller binaries
+# https://github.com/johnthagen/min-sized-rust
+
+# Maybe speed up compilation? Or is Rust using this already? Note that I think 'lto = true' disables parallel linking
+# https://github.com/rui314/mold

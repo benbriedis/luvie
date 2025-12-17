@@ -4,6 +4,7 @@
 #include "FL/Fl_Window.H"
 #include "FL/Fl_Flex.H"
 #include "FL/Fl_Button.H"
+#include "FL/Fl_Slider.H"
 #include <iostream>
 
 
@@ -42,8 +43,14 @@ Popup::Popup() :
 	Fl_Flex *flex = new Fl_Flex(0,0,150,100);
 
     flex->begin();
-	Fl_Button *btn1 = new Fl_Button(0, 0, 0, 0, "Delete");  //XXX remove new?
-	Fl_Button *btn2 = new Fl_Button(0, 0, 0, 0, "Velocity Slider");
+	Fl_Button *deleteItem = new Fl_Button(0, 0, 0, 0, "Delete");  //XXX remove new?
+
+	//XXX cf a "value" slider instead
+	Fl_Slider *slider = new Fl_Slider(0, 0, 150, 30, "Vel");
+    slider->type(FL_HOR_NICE_SLIDER);
+    slider->box(FL_FLAT_BOX);
+	slider->bounds(0.0,1.0);
+	slider->value(0.5);
 	//flex->resizable(NULL);
     flex->end();
 
