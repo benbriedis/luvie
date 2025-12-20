@@ -62,7 +62,6 @@ impl GridApp {
             Message::MouseMoved(position) => {
                 //self.mousePosition = Some(position);
                 self.grid.mousePosition = position;
-println!("Got position: {position:?}");
                 self.grid.findNoteForCursor(position);
                 //Task::none()
             }
@@ -141,16 +140,11 @@ impl canvas::Program<Message> for Grid {
             Event::Mouse(mouse::Event::ButtonPressed(button)) => { 
                 match button {
                     mouse::Button::Left => { 
-
-                        println!("Position: {cursorPosition:?}");
-
                         let row = (cursorPosition.y / self.rowHeight).floor() as i32;
                         let col = (cursorPosition.x / self.colWidth).floor() as f32;
 
-                        println!("Row: {row}  Col: {col}");
-
                         Some(canvas::Action::publish(
-                            Message::PointAdded(Cell{row,col,length:0.0}),
+                            Message::PointAdded(Cell{row,col,length:1.0}),
                         ))
                     },
                     mouse::Button::Right => {
@@ -242,8 +236,6 @@ impl canvas::Program<Message> for Grid {
     fn mouse_interaction(&self,_state: &Self::State,bounds: Rectangle,cursor: mouse::Cursor) 
         -> mouse::Interaction 
     {
-println!("hoverState: {:?}",self.hoverState);
-
         match self.hoverState {
             CursorMode::MOVING => mouse::Interaction::Grab,
 
@@ -286,9 +278,6 @@ impl Grid {
         let resizeZone: f32 = 5.0;
 
         let row = (pos.y / self.rowHeight).floor() as i32;
-        let col = (pos.x / self.colWidth).floor() as i32;
-
-        let mut selectedIfResize:i32 = 0;
 
         self.hoverState = CursorMode::NONE;
 
@@ -302,13 +291,13 @@ impl Grid {
 
             if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
                 self.hoverState = CursorMode::RESIZING;
+                self.selectedNote = i as i32;
                 self.side = Side::LEFT;
-                selectedIfResize = i as i32;
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
                 self.hoverState = CursorMode::RESIZING;
+                self.selectedNote = i as i32;
                 self.side = Side::RIGHT;
-                selectedIfResize = i as i32;
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
                 //XXX only required on initial press down
@@ -317,25 +306,9 @@ impl Grid {
                 self.movingGrabXOffset = pos.x - n.col * self.colWidth;
                 self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;
                 self.originalPosition = Cell {row:n.row,col:n.col,length:n.length};
-
-//                window()->cursor(FL_CURSOR_HAND); 
-    //			window()->cursor(FL_CURSOR_CROSS); 
-
-//                redraw();
                 /* Move takes precedence over resizing any neighbouring notes */
-                
                 return;
             }
         }
-
-    //XXX can I move above now?
-        if let CursorMode::RESIZING = self.hoverState {
-            self.selectedNote = selectedIfResize;
-//            window()->cursor(FL_CURSOR_WE); 
-        }
-//        else 
-//            window()->cursor(FL_CURSOR_DEFAULT); 
-
-//        redraw();
     }
 }
