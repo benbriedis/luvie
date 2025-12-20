@@ -57,7 +57,7 @@ private:
 	float movingGrabXOffset;
 	float movingGrabYOffset;
 	bool amOverlapping;
-	Point pickupPoint;
+	Point originalPosition;
 
 	void init();
 	void draw() override;

@@ -8,7 +8,6 @@ features = ["glow"]
 
 [dependencies]
 iced = { version = "0.14.0", features = ["canvas"] }
-rand = "0.9.2"   #TODO remove
 
 [profile.release]
 opt-level = "z"  # Optimize for minimum size ("s" is for size/speed balance)

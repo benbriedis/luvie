@@ -120,8 +120,8 @@ int MyGrid::handle(int event)
 		case FL_RELEASE:
 			if (hoverState==MOVING && amOverlapping) {
 				// TODO maybe drift back or fade out and in note
-				notes[selectedNote].row = pickupPoint.row;
-				notes[selectedNote].col = pickupPoint.col;
+				notes[selectedNote].row = originalPosition.row;
+				notes[selectedNote].col = originalPosition.col;
 				redraw();
 			}
 
@@ -281,7 +281,7 @@ void MyGrid::findNoteForCursor()
 			selectedNote = i;
 			movingGrabXOffset = x - n.col * colWidth;
 			movingGrabYOffset = y - n.row * rowHeight;
-			pickupPoint = {n.row,n.col};
+			originalPosition = {n.row,n.col};
 
 			window()->cursor(FL_CURSOR_HAND); 
 //			window()->cursor(FL_CURSOR_CROSS); 
