@@ -1,6 +1,5 @@
 /* TODO 
-    1. Detect hover over move and sides.
-       Maybe add scrollbars too...
+    1. Maybe add scrollbars too...
 
     2. Heavy line on left of the "note"
     3. Implement move and resize
@@ -15,10 +14,9 @@
 use iced::mouse::{self, Cursor};
 use iced::widget::canvas::{self, Canvas, Event, Geometry,Stroke,stroke,Path};
 use iced::widget::{column, row, slider, text};
-use iced::{
-    Center, Color, Element, Fill, Point, Rectangle, Renderer, Size, Theme,
-};
+use iced::{ Center, Color, Element, Fill, Point, Rectangle, Renderer, Size, Theme};
 use std::fmt::Debug;
+use mouse::Interaction::{Grab,ResizingHorizontally,NotAllowed};
 
 
 fn main() -> iced::Result {
@@ -27,7 +25,7 @@ fn main() -> iced::Result {
 
 #[derive(Debug,Clone,PartialEq)]
 struct Cell {
-    row: i32,
+    row: usize,
     col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
     length: f32
 }
@@ -41,12 +39,16 @@ struct GridApp {
 pub enum Message {
     PointAdded(Cell),
     PointRemoved,
-    MouseMoved(Point)
+    MouseMoved(Point),
+    HoverChanged(CursorMode)    //FIXME two different names being used here ALSO cf state vs mode
 }
 
 impl GridApp {
     //XXX can I move this into Grid?
     fn update(&mut self, message: Message) {
+
+println!("message:{:?}",message);        
+
         match message {
             Message::PointAdded(cell) => {
                 if !self.grid.cells.contains(&cell) {
@@ -60,10 +62,20 @@ impl GridApp {
                 self.grid.cells.pop();
             }
             Message::MouseMoved(position) => {
-                //self.mousePosition = Some(position);
-                self.grid.mousePosition = position;
-                self.grid.findNoteForCursor(position);
-                //Task::none()
+                match self.grid.hoverState {
+                    CursorMode::MOVING => {
+                        self.grid.moving(position);
+                    }
+                    _ => {
+                        //self.mousePosition = Some(position);
+                        self.grid.mousePosition = position;
+                        self.grid.findNoteForCursor(position);
+                        //Task::none()
+                    }
+                }
+            }
+            Message::HoverChanged(mode) => {
+                self.grid.hoverState = mode;
             }
         }
 
@@ -90,10 +102,11 @@ impl GridApp {
 
 #[derive(Debug)]
 struct Grid {
-    numRows: i32,
-    numCols: i32,
+    numRows: usize,
+    numCols: usize,
     rowHeight: f32,
     colWidth: f32,
+    snap: f32,
 
     cells: Vec<Cell>,
     cache: canvas::Cache,
@@ -107,24 +120,28 @@ struct Grid {
     originalPosition: Cell,
 
     hoverState: CursorMode,
-    selectedNote: i32,
-    side:Side
+    selectedNote: usize,
+    side:Side,
+    amOverlapping: bool
 }
 
 impl Default for Grid {
     fn default() -> Self {
+//XXX consider add a new() function or similar so I can avoid recursion         
         Grid {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,
             cells: Vec::default(), 
             cache: canvas::Cache::default(), mousePosition: Point::default(), 
             movingGrabXOffset:0.0, movingGrabYOffset:0.0, 
             originalPosition: Cell{row:0,col:0.0,length:0.0},
-            hoverState: CursorMode::NONE,selectedNote:0,side:Side::LEFT
+            hoverState: CursorMode::NONE,selectedNote:0,side:Side::LEFT,amOverlapping:false,snap:0.25
          }
     }
 }    
 
 impl canvas::Program<Message> for Grid {
+
+//XXX should my Grid state actually be in here?
     type State = ();
 
     fn update(
@@ -140,24 +157,49 @@ impl canvas::Program<Message> for Grid {
             Event::Mouse(mouse::Event::ButtonPressed(button)) => { 
                 match button {
                     mouse::Button::Left => { 
-                        let row = (cursorPosition.y / self.rowHeight).floor() as i32;
-                        let col = (cursorPosition.x / self.colWidth).floor() as f32;
+println!("BUTTON PRESSED");
 
-                        Some(canvas::Action::publish(
-                            Message::PointAdded(Cell{row,col,length:1.0}),
-                        ))
+                        match self.hoverState {
+                            CursorMode::MOVABLE => {
+                                Some(canvas::Action::publish(
+                                    Message::HoverChanged(CursorMode::MOVING),
+                                ))
+                            }
+                            _ => {
+                                /* Add a cell: */
+                                let row = (cursorPosition.y / self.rowHeight).floor() as usize;
+                                let col = (cursorPosition.x / self.colWidth).floor() as f32;
+
+                                Some(canvas::Action::publish(
+                                    Message::PointAdded(Cell{row,col,length:1.0}),
+                                ))
+                            }
+                        }
                     },
                     mouse::Button::Right => {
                         Some(canvas::Action::publish(Message::PointRemoved))
                     },
                     _ => None
                 }
-            },
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(button)) => { 
+                match button {
+                    mouse::Button::Left => { 
+                        match self.hoverState {
+                            CursorMode::MOVING => {
+                                Some(canvas::Action::publish(
+                                    Message::HoverChanged(CursorMode::MOVABLE),
+                                ))
+                            }
+                            _ => None
+                        }
+                    },
+                    _ => None
+                }
+            }
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
-//                Some(Message::MouseMoved(position))
-//                Message::MouseMoved(position)
 
-                //XXX do we need the Some? do we need the Action::publish() ?
+                //XXX Do we need the Action::publish() ?
                 Some(canvas::Action::publish(Message::MouseMoved(*position)))   //XXX *?
             },
             _ => None,
@@ -237,27 +279,17 @@ impl canvas::Program<Message> for Grid {
         -> mouse::Interaction 
     {
         match self.hoverState {
-            CursorMode::MOVING => mouse::Interaction::Grab,
-
-            CursorMode::RESIZING => mouse::Interaction::ResizingHorizontally,
-
+            CursorMode::MOVABLE => if self.amOverlapping { NotAllowed } else { Grab },
+            CursorMode::RESIZABLE => ResizingHorizontally,
             _ => mouse::Interaction::default()
         }
-
-
-/*            
-        if cursor.is_over(bounds) {
-            mouse::Interaction::Crosshair
-        } else {
-            mouse::Interaction::default()
-        }
-*/
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 enum CursorMode {
-    RESIZING,
+    RESIZABLE,
+    MOVABLE,
     MOVING,
     NONE
 }
@@ -277,7 +309,7 @@ impl Grid {
     {
         let resizeZone: f32 = 5.0;
 
-        let row = (pos.y / self.rowHeight).floor() as i32;
+        let row = (pos.y / self.rowHeight).floor() as usize;
 
         self.hoverState = CursorMode::NONE;
 
@@ -290,19 +322,19 @@ impl Grid {
             let rightEdge = (n.col + n.length) * self.colWidth;
 
             if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
-                self.hoverState = CursorMode::RESIZING;
-                self.selectedNote = i as i32;
+                self.hoverState = CursorMode::RESIZABLE;
+                self.selectedNote = i;
                 self.side = Side::LEFT;
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
-                self.hoverState = CursorMode::RESIZING;
-                self.selectedNote = i as i32;
+                self.hoverState = CursorMode::RESIZABLE;
+                self.selectedNote = i;
                 self.side = Side::RIGHT;
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
                 //XXX only required on initial press down
-                self.hoverState = CursorMode::MOVING;
-                self.selectedNote = i as i32;
+                self.hoverState = CursorMode::MOVABLE;
+                self.selectedNote = i;
                 self.movingGrabXOffset = pos.x - n.col * self.colWidth;
                 self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;
                 self.originalPosition = Cell {row:n.row,col:n.col,length:n.length};
@@ -311,4 +343,67 @@ impl Grid {
             }
         }
     }
+
+    fn moving(&mut self,pos:Point)
+    {
+        let selected = &mut self.cells[self.selectedNote];
+
+        selected.col = (pos.x - self.movingGrabXOffset) / self.colWidth; 
+
+        /* Ensure the note stays within X bounds */
+        if selected.col < 0.0 {
+            selected.col = 0.0;
+        }
+        if selected.col + selected.length > self.numCols as f32 {
+            selected.col = self.numCols as f32 - selected.length;
+        }
+
+        /* Apply snap */
+//FIXME snap on release...  For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
+        if self.snap > 0.0 {
+            selected.col = (selected.col / self.snap).round() * self.snap;
+        }
+
+//XXX its probably floor, but maybe round...
+        selected.row = ((pos.y - self.movingGrabYOffset + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
+
+        /* Ensure the note stays within Y bounds */
+        if selected.row < 0 {
+            selected.row = 0;
+        }
+        if selected.row >= self.numRows {
+            selected.row = self.numRows - 1;
+        }
+
+    //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
+        self.amOverlapping = self.overlappingNote().is_some();
+
+        //XXX need clear?
+    }
+
+    /* Returns the note index, or -1 */
+    fn overlappingNote(&mut self) -> Option<usize>
+    {
+        let a = &self.cells[self.selectedNote];
+        let aStart = a.col;
+        let aEnd = a.col + a.length;
+
+        for (i,b) in self.cells.iter().enumerate() {
+            if i == self.selectedNote || b.row != a.row {
+                continue;
+            }
+
+            let bStart = b.col;
+            let bEnd = b.col + b.length;
+
+            let firstEnd = if aStart <= bStart { aEnd } else { bEnd };
+            let secondStart = if aStart <= bStart { bStart } else { aStart };
+
+            if firstEnd > secondStart {
+                return Some(i);
+            }
+        }
+        return None;
+    }
 }
+
