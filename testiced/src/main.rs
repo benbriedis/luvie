@@ -46,40 +46,7 @@ pub enum Message {
 impl GridApp {
     //XXX can I move this into Grid?
     fn update(&mut self, message: Message) {
-
-println!("message:{:?}",message);        
-
-        match message {
-            Message::PointAdded(cell) => {
-                if !self.grid.cells.contains(&cell) {
-                    self.grid.cells.push(cell);
-
-//TODO clear the grid cache??
-                }
-
-            }
-            Message::PointRemoved => {
-                self.grid.cells.pop();
-            }
-            Message::MouseMoved(position) => {
-                match self.grid.hoverState {
-                    CursorMode::MOVING => {
-                        self.grid.moving(position);
-                    }
-                    _ => {
-                        //self.mousePosition = Some(position);
-                        self.grid.mousePosition = position;
-                        self.grid.findNoteForCursor(position);
-                        //Task::none()
-                    }
-                }
-            }
-            Message::HoverChanged(mode) => {
-                self.grid.hoverState = mode;
-            }
-        }
-
-        self.grid.redraw();
+        self.grid.update(message);
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -95,8 +62,6 @@ println!("message:{:?}",message);
         .into()
     }
 }
-
-
 
 
 
@@ -142,7 +107,7 @@ impl Default for Grid {
 impl canvas::Program<Message> for Grid {
 
 //XXX should my Grid state actually be in here?
-    type State = ();
+    type State = Grid;
 
     fn update(
         &self,
@@ -151,6 +116,9 @@ impl canvas::Program<Message> for Grid {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
+
+println!("state: {:?}",_state);
+
         let cursorPosition = cursor.position_in(bounds)?;
 
         match event {
@@ -301,6 +269,42 @@ enum Side {
 }
 
 impl Grid {
+    //XXX can I move this into Grid?
+    fn update(&mut self, message: Message) {
+
+        match message {
+            Message::PointAdded(cell) => {
+                if !self.cells.contains(&cell) {
+                    self.cells.push(cell);
+
+//TODO clear the grid cache??
+                }
+
+            }
+            Message::PointRemoved => {
+                self.cells.pop();
+            }
+            Message::MouseMoved(position) => {
+                match self.hoverState {
+                    CursorMode::MOVING => {
+                        self.moving(position);
+                    }
+                    _ => {
+                        //self.mousePosition = Some(position);
+                        self.mousePosition = position;
+                        self.findNoteForCursor(position);
+                        //Task::none()
+                    }
+                }
+            }
+            Message::HoverChanged(mode) => {
+                self.hoverState = mode;
+            }
+        }
+
+        self.redraw();
+    }
+
     fn redraw(&mut self) {
         self.cache.clear();
     }
