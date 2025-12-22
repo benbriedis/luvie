@@ -6,6 +6,8 @@
     4. Popups with delete and velocity slider, ...
 
     5. Old colours. Read from themes? Really theme extensions I think...
+
+6. Convert Canvas into a custom Widget
 */
 
 
@@ -35,18 +37,9 @@ struct GridApp {
     grid: Grid
 }
 
-#[derive(Debug, Clone)]
-pub enum Message {
-    PointAdded(Cell),
-    PointRemoved,
-    MouseMoved(Point),
-    HoverChanged(CursorMode)    //FIXME two different names being used here ALSO cf state vs mode
-}
-
 impl GridApp {
-    //XXX can I move this into Grid?
     fn update(&mut self, message: Message) {
-        self.grid.update(message);
+        self.grid.update(message);  //XXX nice if we could manage this within the Grid
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -104,10 +97,77 @@ impl Default for Grid {
     }
 }    
 
+#[derive(Debug, Clone)]
+pub enum Message {
+    ButtonPressed(mouse::Button,Point),
+    ButtonReleased(mouse::Button),
+    MouseMoved(Point)
+}
+
+//TODO probably move this stuff back down later...
+impl Grid {
+    fn update(&mut self, message: Message) {
+
+        match message {
+            Message::ButtonPressed(button,position) => {
+                match button {
+                    mouse::Button::Left => { 
+                        match self.hoverState {
+                            CursorMode::MOVABLE => {
+                                self.hoverState = CursorMode::MOVING;
+                            }
+                            _ => {
+                                /* Add a cell: */
+                                let row = (position.y / self.rowHeight).floor() as usize;
+                                let col = (position.x / self.colWidth).floor() as f32;
+
+                                let cell = Cell{row,col,length:1.0};
+
+                                if !self.cells.contains(&cell) {
+                                    self.cells.push(cell);
+                //TODO clear the grid cache??
+                                }
+                            }
+                        }
+                    },
+                    _ => ()
+                }
+            }
+            Message::ButtonReleased(button) => { 
+                //XXX might if let or if else work better here
+
+                match button {
+                    mouse::Button::Left => { 
+                        match self.hoverState {
+                            CursorMode::MOVING => {
+                                self.hoverState = CursorMode::MOVABLE;
+                            }
+                            _ => {}
+                        }
+                    },
+                    _ => {}
+                }
+            }
+            Message::MouseMoved(position) => {
+                match self.hoverState {
+                    CursorMode::MOVING => {
+                        self.moving(position);
+                    }
+                    _ => {
+                        self.mousePosition = position;
+                        self.findNoteForCursor(position);
+                    }
+                }
+            }
+        }
+
+        self.redraw();
+    }
+}
+
 impl canvas::Program<Message> for Grid {
 
-//XXX should my Grid state actually be in here?
-    type State = Grid;
+    type State = ();
 
     fn update(
         &self,
@@ -117,60 +177,24 @@ impl canvas::Program<Message> for Grid {
         cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
 
-println!("state: {:?}",_state);
-
-        let cursorPosition = cursor.position_in(bounds)?;
-
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(button)) => { 
-                match button {
-                    mouse::Button::Left => { 
-println!("BUTTON PRESSED");
+            Event::Mouse(mouse::Event::ButtonPressed(button)) => {
+                //let position = cursor.position_in(bounds)?;
+                let position = cursor.position()?;
 
-                        match self.hoverState {
-                            CursorMode::MOVABLE => {
-                                Some(canvas::Action::publish(
-                                    Message::HoverChanged(CursorMode::MOVING),
-                                ))
-                            }
-                            _ => {
-                                /* Add a cell: */
-                                let row = (cursorPosition.y / self.rowHeight).floor() as usize;
-                                let col = (cursorPosition.x / self.colWidth).floor() as f32;
-
-                                Some(canvas::Action::publish(
-                                    Message::PointAdded(Cell{row,col,length:1.0}),
-                                ))
-                            }
-                        }
-                    },
-                    mouse::Button::Right => {
-                        Some(canvas::Action::publish(Message::PointRemoved))
-                    },
-                    _ => None
-                }
+                Some(canvas::Action::publish(
+                    Message::ButtonPressed(*button,position)
+                ))
             }
-            Event::Mouse(mouse::Event::ButtonReleased(button)) => { 
-                match button {
-                    mouse::Button::Left => { 
-                        match self.hoverState {
-                            CursorMode::MOVING => {
-                                Some(canvas::Action::publish(
-                                    Message::HoverChanged(CursorMode::MOVABLE),
-                                ))
-                            }
-                            _ => None
-                        }
-                    },
-                    _ => None
-                }
-            }
-            Event::Mouse(mouse::Event::CursorMoved { position }) => {
-
-                //XXX Do we need the Action::publish() ?
-                Some(canvas::Action::publish(Message::MouseMoved(*position)))   //XXX *?
-            },
-            _ => None,
+            Event::Mouse(mouse::Event::ButtonReleased(button)) => 
+                Some(canvas::Action::publish(
+                    Message::ButtonReleased(*button)
+                )),
+            Event::Mouse(mouse::Event::CursorMoved { position }) => 
+                Some(canvas::Action::publish(
+                    Message::MouseMoved(*position)
+                )),
+            _ => None
         }
         .map(canvas::Action::and_capture)
     }
@@ -269,42 +293,6 @@ enum Side {
 }
 
 impl Grid {
-    //XXX can I move this into Grid?
-    fn update(&mut self, message: Message) {
-
-        match message {
-            Message::PointAdded(cell) => {
-                if !self.cells.contains(&cell) {
-                    self.cells.push(cell);
-
-//TODO clear the grid cache??
-                }
-
-            }
-            Message::PointRemoved => {
-                self.cells.pop();
-            }
-            Message::MouseMoved(position) => {
-                match self.hoverState {
-                    CursorMode::MOVING => {
-                        self.moving(position);
-                    }
-                    _ => {
-                        //self.mousePosition = Some(position);
-                        self.mousePosition = position;
-                        self.findNoteForCursor(position);
-                        //Task::none()
-                    }
-                }
-            }
-            Message::HoverChanged(mode) => {
-                self.hoverState = mode;
-            }
-        }
-
-        self.redraw();
-    }
-
     fn redraw(&mut self) {
         self.cache.clear();
     }
