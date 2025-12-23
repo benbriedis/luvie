@@ -143,10 +143,6 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
         let bounds = layout.bounds();
 //        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
 
-        
-//XXX what is this approach? cache.draw with a callback?
-//TODO combine with the rest?
-
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
             /* Draw the grid horizontal lines: */
             for i in 0..=self.numRows {
@@ -158,8 +154,7 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                 frame.stroke(&line, Stroke {
                     width: 1.0,
 //                    style: stroke::Style::Solid(palette.secondary.weak.color),
-//            iced::Theme::style(iced::Theme::Class,None)
-                    style: stroke::Style::Solid(Color::BLACK),
+                    style: stroke::Style::Solid(Color::from_rgb8(0x12, 0xee, 0x12)),
                     ..Stroke::default()
                 });
             }
@@ -173,8 +168,7 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
 
                 frame.stroke(&line, Stroke {
                     width: 1.0,
-//                    style: stroke::Style::Solid(palette.secondary.weak.color),
-                    style: stroke::Style::Solid(Color::BLACK),
+                    style: stroke::Style::Solid(Color::from_rgb8(0xee, 0x12, 0x12)),
                     ..Stroke::default()
                 });
             }
