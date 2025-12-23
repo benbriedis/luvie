@@ -7,25 +7,34 @@
 
     5. Old colours. Read from themes? Really theme extensions I think...
 
-6. Convert Canvas into a custom Widget
+6. Cursor should show "grabbing" when being moved, and "not allowed" before drop
+7. Attempt to drop on another cell show return note to where it can from originally.
+8. cf snap... maybe is better showing it "live"?
 */
 
 
 #![allow(non_snake_case)]
 
-use iced::mouse::{self, Cursor};
-use iced::widget::canvas::{self, Canvas, Event, Geometry,Stroke,stroke,Path};
-use iced::widget::{column, row, slider, text};
-use iced::{ Center, Color, Element, Fill, Point, Rectangle, Renderer, Size, Theme};
+use iced::mouse::{self};
+use iced::widget::{column, row};
+use iced::widget::canvas::{self,Stroke,stroke,Path};
+use iced::{ Center, Color, Element, Point, Rectangle, Renderer, Size, Length,Vector, Event};
+use iced::advanced::renderer;
+use iced::advanced::widget::{self,Widget};
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::{Clipboard,Shell};
+use iced::advanced::widget::tree::{self, Tree};
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,ResizingHorizontally,NotAllowed};
+use iced::window;
+
 
 
 fn main() -> iced::Result {
     iced::application(GridApp::default,GridApp::update,GridApp::view) .run()
 }
 
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug,Default,Clone,PartialEq)]
 struct Cell {
     row: usize,
     col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
@@ -34,17 +43,18 @@ struct Cell {
 
 #[derive(Debug, Default)]
 struct GridApp {
-    grid: Grid
 }
 
 impl GridApp {
     fn update(&mut self, message: Message) {
-        self.grid.update(message);  //XXX nice if we could manage this within the Grid
+//        self.grid.update(message);  //XXX nice if we could manage this within the Grid
     }
 
     fn view(&self) -> Element<'_, Message> {
         column![
-            Canvas::new(&self.grid).width(Fill).height(Fill),
+            Grid::new(),
+//            .width(Fill).height(Fill),
+
             row![
 //                slider(0..=10000, self.grid.iteration, Message::IterationSet)
             ]
@@ -58,7 +68,7 @@ impl GridApp {
 
 
 
-#[derive(Debug)]
+#[derive(Debug,Default)]
 struct Grid {
     numRows: usize,
     numCols: usize,
@@ -67,7 +77,6 @@ struct Grid {
     snap: f32,
 
     cells: Vec<Cell>,
-    cache: canvas::Cache,
 
 //XXX the delineate example code has this optional. Maybe don't define if not in the area??
     mousePosition: Point,
@@ -83,20 +92,6 @@ struct Grid {
     amOverlapping: bool
 }
 
-impl Default for Grid {
-    fn default() -> Self {
-//XXX consider add a new() function or similar so I can avoid recursion         
-        Grid {
-            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,
-            cells: Vec::default(), 
-            cache: canvas::Cache::default(), mousePosition: Point::default(), 
-            movingGrabXOffset:0.0, movingGrabYOffset:0.0, 
-            originalPosition: Cell{row:0,col:0.0,length:0.0},
-            hoverState: CursorMode::NONE,selectedNote:0,side:Side::LEFT,amOverlapping:false,snap:0.25
-         }
-    }
-}    
-
 #[derive(Debug, Clone)]
 pub enum Message {
     ButtonPressed(mouse::Button,Point),
@@ -104,116 +99,59 @@ pub enum Message {
     MouseMoved(Point)
 }
 
-//TODO probably move this stuff back down later...
-impl Grid {
-    fn update(&mut self, message: Message) {
-
-        match message {
-            Message::ButtonPressed(button,position) => {
-                match button {
-                    mouse::Button::Left => { 
-                        match self.hoverState {
-                            CursorMode::MOVABLE => {
-                                self.hoverState = CursorMode::MOVING;
-                            }
-                            _ => {
-                                /* Add a cell: */
-                                let row = (position.y / self.rowHeight).floor() as usize;
-                                let col = (position.x / self.colWidth).floor() as f32;
-
-                                let cell = Cell{row,col,length:1.0};
-
-                                if !self.cells.contains(&cell) {
-                                    self.cells.push(cell);
-                //TODO clear the grid cache??
-                                }
-                            }
-                        }
-                    },
-                    _ => ()
-                }
-            }
-            Message::ButtonReleased(button) => { 
-                //XXX might if let or if else work better here
-
-                match button {
-                    mouse::Button::Left => { 
-                        match self.hoverState {
-                            CursorMode::MOVING => {
-                                self.hoverState = CursorMode::MOVABLE;
-                            }
-                            _ => {}
-                        }
-                    },
-                    _ => {}
-                }
-            }
-            Message::MouseMoved(position) => {
-                match self.hoverState {
-                    CursorMode::MOVING => {
-                        self.moving(position);
-                    }
-                    _ => {
-                        self.mousePosition = position;
-                        self.findNoteForCursor(position);
-                    }
-                }
-            }
-        }
-
-        self.redraw();
-    }
+#[derive(Default)]
+struct State {
+    cache: canvas::Cache,
 }
 
-impl canvas::Program<Message> for Grid {
 
-    type State = ();
+//XXX do we need all these generic types?
+impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<State>()
+    }
 
-    fn update(
-        &self,
-        _state: &mut Self::State,
-        event: &Event,
-        bounds: Rectangle,
-        cursor: mouse::Cursor,
-    ) -> Option<canvas::Action<Message>> {
+    fn state(&self) -> tree::State {
+        tree::State::new(State::default())
+    }
 
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(button)) => {
-                //let position = cursor.position_in(bounds)?;
-                let position = cursor.position()?;
-
-                Some(canvas::Action::publish(
-                    Message::ButtonPressed(*button,position)
-                ))
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(button)) => 
-                Some(canvas::Action::publish(
-                    Message::ButtonReleased(*button)
-                )),
-            Event::Mouse(mouse::Event::CursorMoved { position }) => 
-                Some(canvas::Action::publish(
-                    Message::MouseMoved(*position)
-                )),
-            _ => None
+    fn size(&self) -> Size<Length> {
+        Size {
+            width: Length::Shrink,
+            height: Length::Shrink,
         }
-        .map(canvas::Action::and_capture)
+    }
+
+    fn layout(
+        &mut self,
+        _tree: &mut widget::Tree,
+        _renderer: &Renderer,
+        _limits: &layout::Limits,
+    ) -> layout::Node {
+        layout::Node::new(Size::new(self.numCols as f32 * self.colWidth, self.numRows as f32 * self.rowHeight))
     }
 
     fn draw(
         &self,
-        _state: &Self::State,
-        renderer: &Renderer,
+        tree: &Tree,
+        renderer: &mut Renderer,
         _theme: &Theme,
-        bounds: Rectangle,
+        _style: &renderer::Style,
+        layout: Layout<'_>,
         _cursor: mouse::Cursor,
-    ) -> Vec<Geometry> {
+        _viewport: &Rectangle,    //XXX relationship with layout.bounds?
+    ) {
+        let state = tree.state.downcast_ref::<State>();
 
+        let bounds = layout.bounds();
+//        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
+
+        
 //XXX what is this approach? cache.draw with a callback?
 //TODO combine with the rest?
 
-        let gridCache = self.cache.draw(renderer, bounds.size(), |frame| {
-            let palette = _theme.extended_palette();
-
+        let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
             /* Draw the grid horizontal lines: */
             for i in 0..=self.numRows {
                 let line = Path::line(
@@ -223,8 +161,9 @@ impl canvas::Program<Message> for Grid {
 
                 frame.stroke(&line, Stroke {
                     width: 1.0,
-    //                style: stroke::Style::Solid(palette.secondary.strong.text),
-                    style: stroke::Style::Solid(palette.secondary.weak.color),
+//                    style: stroke::Style::Solid(palette.secondary.weak.color),
+//            iced::Theme::style(iced::Theme::Class,None)
+                    style: stroke::Style::Solid(Color::BLACK),
                     ..Stroke::default()
                 });
             }
@@ -238,8 +177,8 @@ impl canvas::Program<Message> for Grid {
 
                 frame.stroke(&line, Stroke {
                     width: 1.0,
-    //                style: stroke::Style::Solid(palette.secondary.strong.text),
-                    style: stroke::Style::Solid(palette.secondary.weak.color),
+//                    style: stroke::Style::Solid(palette.secondary.weak.color),
+                    style: stroke::Style::Solid(Color::BLACK),
                     ..Stroke::default()
                 });
             }
@@ -255,20 +194,28 @@ impl canvas::Program<Message> for Grid {
             };
         });
 
+        use iced::advanced::Renderer as _; 
+        renderer.with_translation(
+            Vector::new(bounds.x, bounds.y),
+
+            |renderer| {
+                use iced::advanced::graphics::geometry::Renderer as _;  
+                renderer.draw_geometry(gridCache);
+            },
+        );
 
         /* Draw the app border: */
-        //XXX could be put in its own separate cache I guess
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
+/*        
         frame.stroke(
             &canvas::Path::rectangle(Point::ORIGIN, frame.size()),
             canvas::Stroke::default(),
         );
 
         vec![gridCache,frame.into_geometry()]
+*/
     }
 
-    fn mouse_interaction(&self,_state: &Self::State,bounds: Rectangle,cursor: mouse::Cursor) 
-        -> mouse::Interaction 
+    fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
     {
         match self.hoverState {
             CursorMode::MOVABLE => if self.amOverlapping { NotAllowed } else { Grab },
@@ -276,25 +223,101 @@ impl canvas::Program<Message> for Grid {
             _ => mouse::Interaction::default()
         }
     }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        _layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
+    ) {
+
+        let state = tree.state.downcast_ref::<State>();
+
+        match &event {
+
+            Event::Window(window::Event::RedrawRequested(now)) => {
+                state.cache.clear();
+                shell.request_redraw();
+            }
+
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                match self.hoverState {
+                    CursorMode::MOVABLE => {
+                        self.hoverState = CursorMode::MOVING;
+                    }
+                    _ => {
+                        if let Some(position) = cursor.position() {
+                            /* Add a cell: */
+                            let row = (position.y / self.rowHeight).floor() as usize;
+                            let col = (position.x / self.colWidth).floor() as f32;
+
+                            let cell = Cell{row,col,length:1.0};
+
+                            if !self.cells.contains(&cell) {
+                                self.cells.push(cell);
+            //TODO clear the grid cache??
+                            }
+                        }
+                    }
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                match self.hoverState {
+                    CursorMode::MOVING => {
+                        self.hoverState = CursorMode::MOVABLE;
+                    }
+                    _ => {}         //XXX can I use if let if let else?
+                }
+            }
+            Event::Mouse(mouse::Event::CursorMoved{position}) => {
+                match self.hoverState {
+                    CursorMode::MOVING => {
+                        self.moving(*position);
+                    }
+                    _ => {
+                        self.mousePosition = *position;
+                        self.findNoteForCursor(*position);
+                    }
+                }
+            }
+            _ => ()
+        }
+    }
 }
 
-#[derive(Debug,Clone)]
+impl<Message> From<Grid> for Element<'_, Message> {
+    fn from(grid: Grid) -> Self {
+        Self::new(grid)
+    }
+}
+
+
+#[derive(Debug,Default,Clone)]
 enum CursorMode {
     RESIZABLE,
     MOVABLE,
     MOVING,
-    NONE
+    #[default] NONE
 }
 
-#[derive(Debug)]
+#[derive(Debug,Default)]
 enum Side {
-    LEFT,
+    #[default] LEFT,
     RIGHT
 }
 
 impl Grid {
-    fn redraw(&mut self) {
-        self.cache.clear();
+    fn new() -> Self
+    {
+        Self {
+            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:0.25,
+            ..Default::default()
+        }
     }
 
     fn findNoteForCursor(&mut self,pos:Point)
