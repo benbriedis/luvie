@@ -7,8 +7,6 @@
 
     5. Old colours. Read from themes? Really theme extensions I think...
 
-6. Cursor should show "grabbing" when being moved, and "not allowed" before drop
-7. Attempt to drop on another cell show return note to where it can from originally.
 8. cf snap... maybe is better showing it "live"?
 */
 
@@ -25,7 +23,7 @@ use iced::advanced::layout::{self, Layout};
 use iced::advanced::{Clipboard,Shell};
 use iced::advanced::widget::tree::{self, Tree};
 use std::fmt::Debug;
-use mouse::Interaction::{Grab,ResizingHorizontally,NotAllowed};
+use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
 use iced::window;
 
 
@@ -34,7 +32,7 @@ fn main() -> iced::Result {
     iced::application(GridApp::default,GridApp::update,GridApp::view) .run()
 }
 
-#[derive(Debug,Default,Clone,PartialEq)]
+#[derive(Debug,Default,Clone,Copy,PartialEq)]
 struct Cell {
     row: usize,
     col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
@@ -46,9 +44,7 @@ struct GridApp {
 }
 
 impl GridApp {
-    fn update(&mut self, message: Message) {
-//        self.grid.update(message);  //XXX nice if we could manage this within the Grid
-    }
+    fn update(&mut self, message: Message) { }
 
     fn view(&self) -> Element<'_, Message> {
         column![
@@ -192,6 +188,12 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                 let path = canvas::Path::rectangle(point,size);
                 frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
             };
+
+            /* Draw the app border: */
+            frame.stroke(
+                &canvas::Path::rectangle(Point::ORIGIN, frame.size()),
+                canvas::Stroke::default(),
+            );
         });
 
         use iced::advanced::Renderer as _; 
@@ -203,22 +205,13 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                 renderer.draw_geometry(gridCache);
             },
         );
-
-        /* Draw the app border: */
-/*        
-        frame.stroke(
-            &canvas::Path::rectangle(Point::ORIGIN, frame.size()),
-            canvas::Stroke::default(),
-        );
-
-        vec![gridCache,frame.into_geometry()]
-*/
     }
 
     fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
     {
         match self.hoverState {
-            CursorMode::MOVABLE => if self.amOverlapping { NotAllowed } else { Grab },
+            CursorMode::MOVABLE => Grab,
+            CursorMode::MOVING => if self.amOverlapping { NotAllowed } else { Grabbing },
             CursorMode::RESIZABLE => ResizingHorizontally,
             _ => mouse::Interaction::default()
         }
@@ -269,6 +262,9 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 match self.hoverState {
                     CursorMode::MOVING => {
+                        if self.amOverlapping {
+                            self.cells[self.selectedNote] = self.originalPosition;
+                        }
                         self.hoverState = CursorMode::MOVABLE;
                     }
                     _ => {}         //XXX can I use if let if let else?
