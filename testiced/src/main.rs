@@ -70,7 +70,7 @@ struct Grid {
     numCols: usize,
     rowHeight: f32,
     colWidth: f32,
-    snap: f32,
+    snap: Option<f32>,
 
     cells: Vec<Cell>,
 
@@ -269,6 +269,9 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                     CursorMode::MOVING => {
                         self.moving(*position);
                     }
+                    CursorMode::RESIZING => {
+                        self.resizing(*position);
+                    }
                     _ => {
                         self.mousePosition = *position;
                         self.findNoteForCursor(*position);
@@ -290,6 +293,7 @@ impl<Message> From<Grid> for Element<'_, Message> {
 #[derive(Debug,Default,Clone)]
 enum CursorMode {
     RESIZABLE,
+    RESIZING,
     MOVABLE,
     MOVING,
     #[default] NONE
@@ -365,8 +369,8 @@ impl Grid {
 
         /* Apply snap */
 //FIXME snap on release...  For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
-        if self.snap > 0.0 {
-            selected.col = (selected.col / self.snap).round() * self.snap;
+        if let Some(snap) = self.snap {
+            selected.col = (selected.col / snap).round() * snap;
         }
 
 //XXX its probably floor, but maybe round...
@@ -381,13 +385,80 @@ impl Grid {
         }
 
     //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-        self.amOverlapping = self.overlappingNote().is_some();
+        self.amOverlapping = self.overlappingCell().is_some();
 
         //XXX need clear?
     }
 
-    /* Returns the note index, or -1 */
-    fn overlappingNote(&mut self) -> Option<usize>
+
+
+    /*
+       NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
+       The second one (optional) might allow it to move relative to the bar.
+    */
+    fn resizing(&mut self,pos:Point)
+    {
+    //XXX if changing grid size want the num of pixels to remain constant.
+        let minLength = 10.0 / self.colWidth;
+
+//let neighbour = self.overlappingCell();
+        let selected = &mut self.cells[self.selectedNote];
+
+        let x = pos.x;
+
+    //TODO restrict length to a certain minimum				
+        match self.side {
+            Side::LEFT => {
+                let endCol = selected.col + selected.length;
+                selected.col = x / self.colWidth; 
+
+                /* Apply snap: */
+                if let Some(snap) = self.snap {
+                    selected.col = ((selected.col / snap) * snap).round();
+                }
+
+                let neighbour = self.overlappingCell();
+                let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
+                if selected.col < min {
+                    selected.col = min;
+                }
+
+                selected.length = endCol - selected.col;
+
+                if selected.length < minLength {
+                    selected.length = minLength;
+                    selected.col = endCol - minLength;
+                }
+
+//                redraw();
+            }
+            Side::RIGHT => {
+                selected.length = x / self.colWidth - selected.col;
+
+                /* Apply snap: */
+                let mut endCol = selected.col + selected.length;
+                if let Some(snap) = self.snap {
+                    endCol = ((endCol / snap) * snap).round();
+                    selected.length = endCol - selected.col;
+                }
+
+                let neighbour = self.overlappingCell();
+                let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
+                if selected.col + selected.length > max {
+                    selected.length = max - selected.col;
+                }
+
+                if selected.length < minLength {
+                    selected.length = minLength;
+                }
+
+//                redraw();
+            }
+        }
+        //Right side to change duration...
+    }
+
+    fn overlappingCell(&mut self) -> Option<usize>
     {
         let a = &self.cells[self.selectedNote];
         let aStart = a.col;
