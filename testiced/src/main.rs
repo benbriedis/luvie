@@ -90,7 +90,7 @@ struct Grid {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ButtonPressed(mouse::Button,Point),
+    ButtonPressed(mouse::Button,Point),     //TODO delete now?
     ButtonReleased(mouse::Button),
     MouseMoved(Point)
 }
@@ -177,7 +177,7 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
             for c in self.cells.iter() {
                 //TODO possibly size to be inside grid, although maybe not at start
                 let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight);
-                let size = Size::new(self.colWidth, self.rowHeight);
+                let size = Size::new(c.length * self.colWidth, self.rowHeight);
 
                 let path = canvas::Path::rectangle(point,size);
                 frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
@@ -207,6 +207,7 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
             CursorMode::MOVABLE => Grab,
             CursorMode::MOVING => if self.amOverlapping { NotAllowed } else { Grabbing },
             CursorMode::RESIZABLE => ResizingHorizontally,
+            CursorMode::RESIZING => ResizingHorizontally,
             _ => mouse::Interaction::default()
         }
     }
@@ -237,6 +238,9 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                     CursorMode::MOVABLE => {
                         self.hoverState = CursorMode::MOVING;
                     }
+                    CursorMode::RESIZABLE => {
+                        self.hoverState = CursorMode::RESIZING;
+                    }
                     _ => {
                         if let Some(position) = cursor.position() {
                             /* Add a cell: */
@@ -260,6 +264,9 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                             self.cells[self.selectedNote] = self.originalPosition;
                         }
                         self.hoverState = CursorMode::MOVABLE;
+                    }
+                    CursorMode::RESIZING => {
+                        self.hoverState = CursorMode::RESIZABLE;
                     }
                     _ => {}         //XXX can I use if let if let else?
                 }
@@ -309,7 +316,7 @@ impl Grid {
     fn new() -> Self
     {
         Self {
-            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:0.25,
+            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
             ..Default::default()
         }
     }
@@ -401,61 +408,62 @@ impl Grid {
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / self.colWidth;
 
-//let neighbour = self.overlappingCell();
-        let selected = &mut self.cells[self.selectedNote];
+        let selected = self.cells[self.selectedNote];
+
+        let mut selectedCol = selected.col;
+        let mut selectedLength = selected.length;
+
 
         let x = pos.x;
 
     //TODO restrict length to a certain minimum				
         match self.side {
             Side::LEFT => {
-                let endCol = selected.col + selected.length;
-                selected.col = x / self.colWidth; 
+                let endCol = selectedCol + selectedLength;
+                selectedCol = x / self.colWidth; 
 
                 /* Apply snap: */
                 if let Some(snap) = self.snap {
-                    selected.col = ((selected.col / snap) * snap).round();
+                    selectedCol = (selectedCol / snap).round() * snap;
                 }
 
                 let neighbour = self.overlappingCell();
                 let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
-                if selected.col < min {
-                    selected.col = min;
+                if selectedCol < min {
+                    selectedCol = min;
                 }
 
-                selected.length = endCol - selected.col;
+                selectedLength = endCol - selectedCol;
 
-                if selected.length < minLength {
-                    selected.length = minLength;
-                    selected.col = endCol - minLength;
+                if selectedLength < minLength {
+                    selectedLength = minLength;
+                    selectedCol = endCol - minLength;
                 }
-
-//                redraw();
             }
             Side::RIGHT => {
-                selected.length = x / self.colWidth - selected.col;
+                selectedLength = x / self.colWidth - selectedCol;
 
                 /* Apply snap: */
-                let mut endCol = selected.col + selected.length;
+                let mut endCol = selectedCol + selectedLength;
                 if let Some(snap) = self.snap {
-                    endCol = ((endCol / snap) * snap).round();
-                    selected.length = endCol - selected.col;
+                    endCol = (endCol / snap).round() * snap;
+                    selectedLength = endCol - selectedCol;
                 }
 
                 let neighbour = self.overlappingCell();
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
-                if selected.col + selected.length > max {
-                    selected.length = max - selected.col;
+                if selectedCol + selectedLength > max {
+                    selectedLength = max - selectedCol;
                 }
 
-                if selected.length < minLength {
-                    selected.length = minLength;
+                if selectedLength < minLength {
+                    selectedLength = minLength;
                 }
-
-//                redraw();
             }
         }
-        //Right side to change duration...
+
+        self.cells[self.selectedNote].col = selectedCol;
+        self.cells[self.selectedNote].length = selectedLength;
     }
 
     fn overlappingCell(&mut self) -> Option<usize>
