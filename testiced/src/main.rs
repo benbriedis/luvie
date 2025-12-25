@@ -1,15 +1,17 @@
 #![allow(non_snake_case)]
 
 use iced::widget::{column, row};
-use iced::{ Center, Element };
+use iced::{ Center, Element, Theme };
 use std::fmt::Debug;
 
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
 
 
-
 fn main() -> iced::Result {
-    iced::application(GridApp::default,GridApp::update,GridApp::view) .run()
+    iced::application(GridApp::default,GridApp::update,GridApp::view) 
+    .theme(Theme::Light)
+//    .theme(Theme::custom(Theme::Light, palette))
+    .run()
 }
 
 pub enum Message { }

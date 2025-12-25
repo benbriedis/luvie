@@ -3,15 +3,18 @@
 
     4. Popups with delete and velocity slider, ...
 
-    5. Read colours from themes
 
     6. wrt forbidden drop - cf dropping in last valid position instead
+
+
+    5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
 */
 
 
+use iced::advanced::graphics::geometry::Frame;
 use iced::mouse::{self};
 use iced::widget::canvas::{self,Stroke,stroke,Path};
-use iced::{ Color, Element, Point, Rectangle, Renderer, Size, Length,Vector, Event};
+use iced::{ Color, Element, Point, Rectangle, Renderer, Size, Length,Vector, Event, Theme};
 use iced::advanced::renderer;
 use iced::advanced::widget::{self,Widget};
 use iced::advanced::layout::{self, Layout};
@@ -20,6 +23,7 @@ use iced::advanced::widget::tree::{self, Tree};
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
 use iced::window;
+//use iced::geometry::{Frame};
 
 
 
@@ -66,9 +70,9 @@ pub struct Grid {
     originalPosition: Cell,
 
     hoverState: CursorMode,
-    selectedNote: usize,
+    selectedNote: Option<usize>,
     side:Side,
-    amOverlapping: bool
+    amOverlapping: bool,
 }
 
 #[derive(Default)]
@@ -78,7 +82,8 @@ struct State {
 
 
 //XXX do we need all these generic types?
-impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
+//impl<Message> Widget<Message, Renderer> for Grid
+impl<Message> Widget<Message, Theme, Renderer> for Grid
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -108,12 +113,17 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
         &self,
         tree: &Tree,
         renderer: &mut Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
+// _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
+
+//XXX these extensions arent enough here. Probably just need background + text + custom colours
+let exPalette = theme.extended_palette();
+
         let state = tree.state.downcast_ref::<State>();
 
         let bounds = layout.bounds();
@@ -129,8 +139,8 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
 
                 frame.stroke(&line, Stroke {
                     width: 1.0,
-//                    style: stroke::Style::Solid(palette.secondary.weak.color),
                     style: stroke::Style::Solid(Color::from_rgb8(0x12, 0xee, 0x12)),
+//                    style: stroke::Style::Solid(exPalette.primary.base.color),
                     ..Stroke::default()
                 });
             }
@@ -145,29 +155,29 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                 frame.stroke(&line, Stroke {
                     width: 1.0,
                     style: stroke::Style::Solid(Color::from_rgb8(0xee, 0x12, 0x12)),
+//                    style: stroke::Style::Solid(exPalette.secondary.base.color),
                     ..Stroke::default()
                 });
             }
 
             /* Draw cells: */
             for c in self.cells.iter() {
-                //TODO possibly size to be inside grid, although maybe not at start
-                let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight);
-                let size = Size::new(c.length * self.colWidth, self.rowHeight);
-                let path = canvas::Path::rectangle(point,size);
-                frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
-
-                /* Add the dark line on the left: */
-                let size2 = Size::new(8.0, self.rowHeight);
-                let path2 = canvas::Path::rectangle(point,size2);
-                frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
+                self.drawCell(frame,*c);
             };
 
+            /* Draw selected note last so it sits on top */
+            if let Some(current) = self.selectedNote {
+                self.drawCell(frame,self.cells[current]);
+            }
+
+
             /* Draw the app border: */
+/*            
             frame.stroke(
                 &canvas::Path::rectangle(Point::ORIGIN, frame.size()),
                 canvas::Stroke::default(),
             );
+*/
         });
 
         use iced::advanced::Renderer as _; 
@@ -229,7 +239,7 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                 match self.hoverState {
                     CursorMode::MOVING => {
                         if self.amOverlapping {
-                            self.cells[self.selectedNote] = self.originalPosition;
+                            self.cells[self.selectedNote.unwrap()] = self.originalPosition;
                         }
                         self.hoverState = CursorMode::MOVABLE;
                     }
@@ -285,6 +295,20 @@ impl Grid {
         }
     }
 
+    fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
+    {
+         //TODO possibly size to be inside grid, although maybe not at start
+        let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight);
+        let size = Size::new(c.length * self.colWidth, self.rowHeight);
+        let path = canvas::Path::rectangle(point,size);
+        frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
+
+        /* Add the dark line on the left: */
+        let size2 = Size::new(8.0, self.rowHeight);
+        let path2 = canvas::Path::rectangle(point,size2);
+        frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
+    }
+
     fn findNoteForCursor(&mut self,pos:Point)
     {
         let resizeZone: f32 = 5.0;
@@ -303,18 +327,18 @@ impl Grid {
 
             if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
                 self.hoverState = CursorMode::RESIZABLE;
-                self.selectedNote = i;
+                self.selectedNote = Some(i);
                 self.side = Side::LEFT;
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
                 self.hoverState = CursorMode::RESIZABLE;
-                self.selectedNote = i;
+                self.selectedNote = Some(i);
                 self.side = Side::RIGHT;
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
                 //XXX only required on initial press down
                 self.hoverState = CursorMode::MOVABLE;
-                self.selectedNote = i;
+                self.selectedNote = Some(i);
                 self.movingGrabXOffset = pos.x - n.col * self.colWidth;
                 self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;    //TODO combine these into a Point?
                 self.originalPosition = Cell {row:n.row,col:n.col,length:n.length};
@@ -326,7 +350,7 @@ impl Grid {
 
     fn moving(&mut self,pos:Point)
     {
-        let selected = &mut self.cells[self.selectedNote];
+        let selected = &mut self.cells[self.selectedNote.unwrap()];
 
         selected.col = (pos.x - self.movingGrabXOffset) / self.colWidth; 
 
@@ -355,7 +379,7 @@ impl Grid {
         }
 
     //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-        self.amOverlapping = self.overlappingCell(self.cells[self.selectedNote],Some(self.selectedNote)).is_some();
+        self.amOverlapping = self.overlappingCell(self.cells[self.selectedNote.unwrap()],self.selectedNote).is_some();
 
         //XXX need clear?
     }
@@ -371,7 +395,7 @@ impl Grid {
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / self.colWidth;
 
-        let selected = self.cells[self.selectedNote];
+        let selected = self.cells[self.selectedNote.unwrap()];
 
         let mut selectedCol = selected.col;
         let mut selectedLength = selected.length;
@@ -386,25 +410,18 @@ impl Grid {
                     selectedCol = (selectedCol / snap).round() * snap;
                 }
 
-                let neighbour = self.overlappingCell(self.cells[self.selectedNote],Some(self.selectedNote));
+                let testCell = Cell{row:selected.row,col:selectedCol,length: endCol - selectedCol};
+                let neighbour = self.overlappingCell(testCell,self.selectedNote);
                 let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
                 if selectedCol < min {
                     selectedCol = min;
                 }
 
-//XXX dont allow the "drag over" efect thing
-//XXX cf forbidden icon when dragging over top, but cf first implementing the dark left line
-
                 selectedLength = endCol - selectedCol;
-
                 if selectedLength < minLength {
                     selectedLength = minLength;
                     selectedCol = endCol - minLength;
                 }
-println!("selectedNote: {:?}",self.selectedNote);
-println!("selectedCol: {selectedCol}");
-println!("selectedLength: {selectedLength}");
-
             }
             Side::RIGHT => {
                 selectedLength = pos.x / self.colWidth - selectedCol;
@@ -416,7 +433,8 @@ println!("selectedLength: {selectedLength}");
                     selectedLength = endCol - selectedCol;
                 }
 
-                let neighbour = self.overlappingCell(self.cells[self.selectedNote],Some(self.selectedNote));
+                let testCell = Cell{row:selected.row,col:selectedCol,length: endCol - selectedCol};
+                let neighbour = self.overlappingCell(testCell,self.selectedNote);
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
                 if selectedCol + selectedLength > max {
                     selectedLength = max - selectedCol;
@@ -428,11 +446,8 @@ println!("selectedLength: {selectedLength}");
             }
         }
 
-        self.cells[self.selectedNote].col = selectedCol;
-        self.cells[self.selectedNote].length = selectedLength;
-
-println!("selectedNote: col2: {:?}",self.cells[self.selectedNote].col);
-println!("");
+        self.cells[self.selectedNote.unwrap()].col = selectedCol;
+        self.cells[self.selectedNote.unwrap()].length = selectedLength;
     }
 
     fn overlappingCell(&mut self,a:Cell,selected:Option<usize>) -> Option<usize>
@@ -440,12 +455,7 @@ println!("");
         let aStart = a.col;
         let aEnd = a.col + a.length;
 
-println!("overlappingCell()  selected:{:?}  a:{:?}",selected,a);    
-
         for (i,b) in self.cells.iter().enumerate() {
-
-println!("overlappingCell()  a.row:{:?}  b.row:{:?}",a.row,b.row);    
-
             if let Some(sel) = selected {
                 if sel == i { continue; }
             }
@@ -458,15 +468,14 @@ println!("overlappingCell()  a.row:{:?}  b.row:{:?}",a.row,b.row);
             let bEnd = b.col + b.length;
 
             let firstEnd = if aStart <= bStart { aEnd } else { bEnd };
-            let secondStart = if aStart <= bStart { bStart } else { aStart };
+            let secondStart = if aStart <= bStart { bStart } else { aStart } ;
 
-            if firstEnd > secondStart {
-println!("overlappingCell()  RETURNING:{:?}",i);    
+            if firstEnd > secondStart { //XXX HACK
                 return Some(i);
             }
         }
-println!("overlappingCell()  None");    
         return None;
     }
 }
+
 
