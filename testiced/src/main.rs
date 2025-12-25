@@ -1,13 +1,13 @@
 /* TODO 
     1. Maybe add scrollbars too...
 
-    2. Heavy line on left of the "note"
-    3. Implement move and resize
     4. Popups with delete and velocity slider, ...
 
-    5. Old colours. Read from themes? Really theme extensions I think...
+    5. Read colours from themes
 
-8. cf snap... maybe is better showing it "live"?
+    6. wrt forbidden drop - cf dropping in last valid position instead
+
+    7. Separate app from grid
 */
 
 
@@ -39,6 +39,8 @@ struct Cell {
     length: f32
 }
 
+pub enum Message { }
+
 #[derive(Debug, Default)]
 struct GridApp {
 }
@@ -61,6 +63,9 @@ impl GridApp {
         .into()
     }
 }
+
+
+
 
 
 
@@ -88,11 +93,19 @@ struct Grid {
     amOverlapping: bool
 }
 
-#[derive(Debug, Clone)]
-pub enum Message {
-    ButtonPressed(mouse::Button,Point),     //TODO delete now?
-    ButtonReleased(mouse::Button),
-    MouseMoved(Point)
+#[derive(Debug,Default,Clone)]
+enum CursorMode {
+    RESIZABLE,
+    RESIZING,
+    MOVABLE,
+    MOVING,
+    #[default] NONE
+}
+
+#[derive(Debug,Default)]
+enum Side {
+    #[default] LEFT,
+    RIGHT
 }
 
 #[derive(Default)]
@@ -178,9 +191,13 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
                 //TODO possibly size to be inside grid, although maybe not at start
                 let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight);
                 let size = Size::new(c.length * self.colWidth, self.rowHeight);
-
                 let path = canvas::Path::rectangle(point,size);
                 frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
+
+                /* Add the dark line on the left: */
+                let size2 = Size::new(8.0, self.rowHeight);
+                let path2 = canvas::Path::rectangle(point,size2);
+                frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
             };
 
             /* Draw the app border: */
@@ -201,17 +218,6 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
         );
     }
 
-    fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
-    {
-        match self.hoverState {
-            CursorMode::MOVABLE => Grab,
-            CursorMode::MOVING => if self.amOverlapping { NotAllowed } else { Grabbing },
-            CursorMode::RESIZABLE => ResizingHorizontally,
-            CursorMode::RESIZING => ResizingHorizontally,
-            _ => mouse::Interaction::default()
-        }
-    }
-
     fn update(
         &mut self,
         tree: &mut Tree,
@@ -229,7 +235,7 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
         match &event {
 
             Event::Window(window::Event::RedrawRequested(now)) => {
-                state.cache.clear();
+                state.cache.clear();        //XXX should I be calling clear() or redraw() elsewhere?
                 shell.request_redraw();
             }
 
@@ -249,9 +255,8 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
 
                             let cell = Cell{row,col,length:1.0};
 
-                            if !self.cells.contains(&cell) {
+                            if let None = self.overlappingCell(cell,None) {
                                 self.cells.push(cell);
-            //TODO clear the grid cache??
                             }
                         }
                     }
@@ -288,6 +293,17 @@ impl<Message, Theme > Widget<Message, Theme, Renderer> for Grid
             _ => ()
         }
     }
+
+    fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
+    {
+        match self.hoverState {
+            CursorMode::MOVABLE => Grab,
+            CursorMode::MOVING => if self.amOverlapping { NotAllowed } else { Grabbing },
+            CursorMode::RESIZABLE => ResizingHorizontally,
+            CursorMode::RESIZING => ResizingHorizontally,
+            _ => mouse::Interaction::default()
+        }
+    }
 }
 
 impl<Message> From<Grid> for Element<'_, Message> {
@@ -296,21 +312,6 @@ impl<Message> From<Grid> for Element<'_, Message> {
     }
 }
 
-
-#[derive(Debug,Default,Clone)]
-enum CursorMode {
-    RESIZABLE,
-    RESIZING,
-    MOVABLE,
-    MOVING,
-    #[default] NONE
-}
-
-#[derive(Debug,Default)]
-enum Side {
-    #[default] LEFT,
-    RIGHT
-}
 
 impl Grid {
     fn new() -> Self
@@ -352,7 +353,7 @@ impl Grid {
                 self.hoverState = CursorMode::MOVABLE;
                 self.selectedNote = i;
                 self.movingGrabXOffset = pos.x - n.col * self.colWidth;
-                self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;
+                self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;    //TODO combine these into a Point?
                 self.originalPosition = Cell {row:n.row,col:n.col,length:n.length};
                 /* Move takes precedence over resizing any neighbouring notes */
                 return;
@@ -375,12 +376,11 @@ impl Grid {
         }
 
         /* Apply snap */
-//FIXME snap on release...  For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
+//FIXME For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
         if let Some(snap) = self.snap {
             selected.col = (selected.col / snap).round() * snap;
         }
 
-//XXX its probably floor, but maybe round...
         selected.row = ((pos.y - self.movingGrabYOffset + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
 
         /* Ensure the note stays within Y bounds */
@@ -392,7 +392,7 @@ impl Grid {
         }
 
     //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-        self.amOverlapping = self.overlappingCell().is_some();
+        self.amOverlapping = self.overlappingCell(self.cells[self.selectedNote],Some(self.selectedNote)).is_some();
 
         //XXX need clear?
     }
@@ -413,25 +413,24 @@ impl Grid {
         let mut selectedCol = selected.col;
         let mut selectedLength = selected.length;
 
-
-        let x = pos.x;
-
-    //TODO restrict length to a certain minimum				
         match self.side {
             Side::LEFT => {
                 let endCol = selectedCol + selectedLength;
-                selectedCol = x / self.colWidth; 
+                selectedCol = pos.x / self.colWidth; 
 
                 /* Apply snap: */
                 if let Some(snap) = self.snap {
                     selectedCol = (selectedCol / snap).round() * snap;
                 }
 
-                let neighbour = self.overlappingCell();
+                let neighbour = self.overlappingCell(self.cells[self.selectedNote],Some(self.selectedNote));
                 let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
                 if selectedCol < min {
                     selectedCol = min;
                 }
+
+//XXX dont allow the "drag over" efect thing
+//XXX cf forbidden icon when dragging over top, but cf first implementing the dark left line
 
                 selectedLength = endCol - selectedCol;
 
@@ -439,9 +438,13 @@ impl Grid {
                     selectedLength = minLength;
                     selectedCol = endCol - minLength;
                 }
+println!("selectedNote: {:?}",self.selectedNote);
+println!("selectedCol: {selectedCol}");
+println!("selectedLength: {selectedLength}");
+
             }
             Side::RIGHT => {
-                selectedLength = x / self.colWidth - selectedCol;
+                selectedLength = pos.x / self.colWidth - selectedCol;
 
                 /* Apply snap: */
                 let mut endCol = selectedCol + selectedLength;
@@ -450,7 +453,7 @@ impl Grid {
                     selectedLength = endCol - selectedCol;
                 }
 
-                let neighbour = self.overlappingCell();
+                let neighbour = self.overlappingCell(self.cells[self.selectedNote],Some(self.selectedNote));
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
                 if selectedCol + selectedLength > max {
                     selectedLength = max - selectedCol;
@@ -464,16 +467,27 @@ impl Grid {
 
         self.cells[self.selectedNote].col = selectedCol;
         self.cells[self.selectedNote].length = selectedLength;
+
+println!("selectedNote: col2: {:?}",self.cells[self.selectedNote].col);
+println!("");
     }
 
-    fn overlappingCell(&mut self) -> Option<usize>
+    fn overlappingCell(&mut self,a:Cell,selected:Option<usize>) -> Option<usize>
     {
-        let a = &self.cells[self.selectedNote];
         let aStart = a.col;
         let aEnd = a.col + a.length;
 
+println!("overlappingCell()  selected:{:?}  a:{:?}",selected,a);    
+
         for (i,b) in self.cells.iter().enumerate() {
-            if i == self.selectedNote || b.row != a.row {
+
+println!("overlappingCell()  a.row:{:?}  b.row:{:?}",a.row,b.row);    
+
+            if let Some(sel) = selected {
+                if sel == i { continue; }
+            }
+
+            if b.row != a.row {
                 continue;
             }
 
@@ -484,9 +498,11 @@ impl Grid {
             let secondStart = if aStart <= bStart { bStart } else { aStart };
 
             if firstEnd > secondStart {
+println!("overlappingCell()  RETURNING:{:?}",i);    
                 return Some(i);
             }
         }
+println!("overlappingCell()  None");    
         return None;
     }
 }
