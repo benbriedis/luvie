@@ -112,8 +112,6 @@ impl<Message> Widget<Message, Theme, Renderer> for Grid
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
 
-println!("In draw()");
-
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
 
 //XXX these extensions arent enough here. Probably just need background + text + custom colours
@@ -125,8 +123,9 @@ let exPalette = theme.extended_palette();
 //        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
 
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
-println!("In gridCache()");
-
+            //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
+            //XXX could possibly omit redrawing cells not on the last row too.
+        
             /* Draw the grid horizontal lines: */
             for i in 0..=self.numRows {
                 let line = Path::line(
@@ -299,14 +298,16 @@ impl Grid {
 
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
     {
+        let lineWidth = 1.0;
+
          //TODO possibly size to be inside grid, although maybe not at start
-        let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight);
-        let size = Size::new(c.length * self.colWidth, self.rowHeight);
+        let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight +lineWidth);
+        let size = Size::new(c.length * self.colWidth, self.rowHeight - 2.0 * lineWidth);
         let path = canvas::Path::rectangle(point,size);
         frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
 
         /* Add the dark line on the left: */
-        let size2 = Size::new(8.0, self.rowHeight);
+        let size2 = Size::new(8.0, self.rowHeight - 2.0 * lineWidth);
         let path2 = canvas::Path::rectangle(point,size2);
         frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
     }

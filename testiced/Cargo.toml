@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Ben Briedis <you@example.com>"]
 
-features = ["glow"]
-
 [dependencies]
 iced = { version = "0.14.0", features = ["advanced","canvas"] }
 
@@ -17,11 +15,6 @@ codegen-units = 1 # Helps LTO optimize more effectively (can increase compile ti
 # Together these remove about 3M for the counter application
 #strip = "symbols" # Strip debug symbols and backtrace information
 #panic = "abort"  # Abort on panic instead of unwinding the stack (saves unwinding machinery)
-
-# "wgpu" is Vulkan etc. glow is far far faster to compile and a bit smaller and
-#  0.5Meg smaller for the counter application.
-features = ["glow"]
-
 
 # More suggestions for smaller binaries
 # https://github.com/johnthagen/min-sized-rust
