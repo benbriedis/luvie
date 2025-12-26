@@ -3,10 +3,6 @@
 
     4. Popups with delete and velocity slider, ...
 
-
-    6. wrt forbidden drop - cf dropping in last valid position instead
-
-
     5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
 */
 
@@ -67,7 +63,7 @@ pub struct Grid {
     //TODO replace with a Point
     movingGrabXOffset: f32,
     movingGrabYOffset: f32,
-    originalPosition: Cell,
+    lastPosition: Cell,
 
     hoverState: CursorMode,
     selectedNote: Option<usize>,
@@ -239,7 +235,7 @@ let exPalette = theme.extended_palette();
                 match self.hoverState {
                     CursorMode::MOVING => {
                         if self.amOverlapping {
-                            self.cells[self.selectedNote.unwrap()] = self.originalPosition;
+                            self.cells[self.selectedNote.unwrap()] = self.lastPosition;
                         }
                         self.hoverState = CursorMode::MOVABLE;
                     }
@@ -341,7 +337,7 @@ impl Grid {
                 self.selectedNote = Some(i);
                 self.movingGrabXOffset = pos.x - n.col * self.colWidth;
                 self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;    //TODO combine these into a Point?
-                self.originalPosition = Cell {row:n.row,col:n.col,length:n.length};
+                self.lastPosition = Cell {row:n.row,col:n.col,length:n.length};
                 /* Move takes precedence over resizing any neighbouring notes */
                 return;
             }
@@ -379,9 +375,12 @@ impl Grid {
         }
 
     //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-        self.amOverlapping = self.overlappingCell(self.cells[self.selectedNote.unwrap()],self.selectedNote).is_some();
+        let testCell = self.cells[self.selectedNote.unwrap()];
+        self.amOverlapping = self.overlappingCell(testCell,self.selectedNote).is_some();
 
-        //XXX need clear?
+        if !self.amOverlapping {
+            self.lastPosition = testCell;
+        }
     }
 
 
