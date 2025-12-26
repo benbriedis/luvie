@@ -19,7 +19,6 @@ use iced::advanced::widget::tree::{self, Tree};
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
 use iced::window;
-//use iced::geometry::{Frame};
 
 
 
@@ -76,7 +75,6 @@ struct State {
 
 
 //XXX do we need all these generic types?
-//impl<Message> Widget<Message, Renderer> for Grid
 impl<Message> Widget<Message, Theme, Renderer> for Grid
 {
     fn tag(&self) -> tree::Tag {
@@ -113,6 +111,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Grid
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
+
+println!("In draw()");
+
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
 
 //XXX these extensions arent enough here. Probably just need background + text + custom colours
@@ -124,6 +125,8 @@ let exPalette = theme.extended_palette();
 //        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
 
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
+println!("In gridCache()");
+
             /* Draw the grid horizontal lines: */
             for i in 0..=self.numRows {
                 let line = Path::line(
@@ -199,13 +202,14 @@ let exPalette = theme.extended_palette();
 
         let state = tree.state.downcast_ref::<State>();
 
+        let mut redrawAll = || {
+            state.cache.clear();  
+            shell.request_redraw();
+        };
+
         match &event {
-
-            Event::Window(window::Event::RedrawRequested(now)) => {
-                state.cache.clear();        //XXX should I be calling clear() or redraw() elsewhere?
-                shell.request_redraw();
-            }
-
+//            Event::Window(window::Event::RedrawRequested(now)) => {
+//            }
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 match self.hoverState {
                     CursorMode::MOVABLE => {
@@ -224,6 +228,7 @@ let exPalette = theme.extended_palette();
 
                             if let None = self.overlappingCell(cell,None) {
                                 self.cells.push(cell);
+                                redrawAll();
                             }
                         }
                     }
@@ -234,6 +239,7 @@ let exPalette = theme.extended_palette();
                     CursorMode::MOVING => {
                         if self.amOverlapping {
                             self.cells[self.selectedNote.unwrap()] = self.lastPosition;
+                            redrawAll();
                         }
                         self.hoverState = CursorMode::MOVABLE;
                     }
@@ -247,9 +253,11 @@ let exPalette = theme.extended_palette();
                 match self.hoverState {
                     CursorMode::MOVING => {
                         self.moving(*position);
+                        redrawAll();
                     }
                     CursorMode::RESIZING => {
                         self.resizing(*position);
+                        redrawAll();
                     }
                     _ => {
                         self.mousePosition = *position;
