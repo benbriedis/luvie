@@ -60,9 +60,7 @@ pub struct Grid {
 //XXX the delineate example code has this optional. Maybe don't define if not in the area??
     mousePosition: Point,
 
-    //TODO replace with a Point
-    movingGrabXOffset: f32,
-    movingGrabYOffset: f32,
+    grabPosition: Point,
     lastPosition: Cell,
 
     hoverState: CursorMode,
@@ -335,8 +333,10 @@ impl Grid {
                 //XXX only required on initial press down
                 self.hoverState = CursorMode::MOVABLE;
                 self.selectedNote = Some(i);
-                self.movingGrabXOffset = pos.x - n.col * self.colWidth;
-                self.movingGrabYOffset = pos.y - n.row as f32 * self.rowHeight;    //TODO combine these into a Point?
+                self.grabPosition = Point {
+                    x: pos.x - n.col * self.colWidth,
+                    y: pos.y - n.row as f32 * self.rowHeight
+                };
                 self.lastPosition = Cell {row:n.row,col:n.col,length:n.length};
                 /* Move takes precedence over resizing any neighbouring notes */
                 return;
@@ -348,7 +348,7 @@ impl Grid {
     {
         let selected = &mut self.cells[self.selectedNote.unwrap()];
 
-        selected.col = (pos.x - self.movingGrabXOffset) / self.colWidth; 
+        selected.col = (pos.x - self.grabPosition.x) / self.colWidth; 
 
         /* Ensure the note stays within X bounds */
         if selected.col < 0.0 {
@@ -364,7 +364,7 @@ impl Grid {
             selected.col = (selected.col / snap).round() * snap;
         }
 
-        selected.row = ((pos.y - self.movingGrabYOffset + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
+        selected.row = ((pos.y - self.grabPosition.y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
 
         /* Ensure the note stays within Y bounds */
         if selected.row < 0 {
@@ -432,7 +432,7 @@ impl Grid {
                     selectedLength = endCol - selectedCol;
                 }
 
-                let testCell = Cell{row:selected.row,col:selectedCol,length: endCol - selectedCol};
+                let testCell = Cell{row:selected.row,col:selectedCol,length: selectedLength};
                 let neighbour = self.overlappingCell(testCell,self.selectedNote);
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
                 if selectedCol + selectedLength > max {
