@@ -8,7 +8,7 @@
 
 
 use iced::{
-    Element, Length, Size, Color, Point, Rectangle, Renderer, Vector, Event, Theme,
+    Element, Length, Size, Color, Point, Rectangle, Renderer, Vector, Event, Theme, Task,
     widget::{
         canvas::{self,Stroke,stroke,Path},
     },
@@ -25,6 +25,11 @@ use iced::{
 
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    RightClick
+}
 
 
 #[derive(Debug,Default,Clone,Copy,PartialEq)]
@@ -75,7 +80,7 @@ struct State {
 
 
 //XXX do we need all these generic types?
-impl<Message> Widget<Message, Theme, Renderer> for Grid
+impl Widget<Message, Theme, Renderer> for Grid
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -90,7 +95,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Grid
             width: Length::Shrink,
             height: Length::Shrink,
         }
-    }
+    } 
 
     fn layout(
         &mut self,
@@ -106,10 +111,10 @@ impl<Message> Widget<Message, Theme, Renderer> for Grid
         tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
-        style: &renderer::Style,
+        _style: &renderer::Style,
         layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,    //XXX relationship with layout.bounds?
+        _cursor: mouse::Cursor,
+        _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
 
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
@@ -263,6 +268,11 @@ let exPalette = theme.extended_palette();
                     }
                 }
             }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
+println!("Got right click");                
+                  Task::done(Message::RightClick);
+                  ()
+            }
             _ => ()
         }
     }
@@ -279,12 +289,11 @@ let exPalette = theme.extended_palette();
     }
 }
 
-impl<Message> From<Grid> for Element<'_, Message> {
+impl From<Grid> for Element<'_, Message> {
     fn from(grid: Grid) -> Self {
         Self::new(grid)
     }
 }
-
 
 impl Grid {
     pub fn new() -> Self
@@ -300,6 +309,10 @@ impl Grid {
             side: Side::LEFT,
             amOverlapping: false,
         }
+    }
+
+    pub fn view(&self) -> Element<'_,Message> {
+        Grid::new().into()
     }
 
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
