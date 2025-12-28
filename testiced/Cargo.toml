@@ -6,6 +6,7 @@ authors = ["Ben Briedis <you@example.com>"]
 
 [dependencies]
 iced = { version = "0.14.0", features = ["advanced","canvas"] }
+iced_aw = {version = "0.13.0", features = ["context_menu"] }
 
 [profile.release]
 opt-level = "z"  # Optimize for minimum size ("s" is for size/speed balance)

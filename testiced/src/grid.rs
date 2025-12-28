@@ -7,18 +7,24 @@
 */
 
 
-use iced::advanced::graphics::geometry::Frame;
-use iced::mouse::{self};
-use iced::widget::canvas::{self,Stroke,stroke,Path};
-use iced::{ Color, Element, Point, Rectangle, Renderer, Size, Length,Vector, Event, Theme};
-use iced::advanced::renderer;
-use iced::advanced::widget::{self,Widget};
-use iced::advanced::layout::{self, Layout};
-use iced::advanced::{Clipboard,Shell};
-use iced::advanced::widget::tree::{self, Tree};
+use iced::{
+    Element, Length, Size, Color, Point, Rectangle, Renderer, Vector, Event, Theme,
+    widget::{
+        canvas::{self,Stroke,stroke,Path},
+    },
+    advanced:: {
+        Clipboard,Shell,renderer,
+        layout::{self, Layout},
+        widget::{self,Widget,
+            tree::{self, Tree},
+        },
+        graphics::geometry::Frame,
+    },
+    mouse::{self}
+};
+
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
-
 
 
 #[derive(Debug,Default,Clone,Copy,PartialEq)]
@@ -43,9 +49,6 @@ enum Side {
     RIGHT
 }
 
-
-
-#[derive(Debug,Default)]
 pub struct Grid {
     numRows: usize,
     numCols: usize,
@@ -55,11 +58,9 @@ pub struct Grid {
 
     cells: Vec<Cell>,
 
-//XXX the delineate example code has this optional. Maybe don't define if not in the area??
-    mousePosition: Point,
-
-    grabPosition: Point,
-    lastPosition: Cell,
+    mousePosition: Option<Point>,
+    grabPosition: Option<Point>,
+    lastPosition: Option<Cell>,
 
     hoverState: CursorMode,
     selectedNote: Option<usize>,
@@ -105,10 +106,10 @@ impl<Message> Widget<Message, Theme, Renderer> for Grid
         tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
-        _style: &renderer::Style,
+        style: &renderer::Style,
         layout: Layout<'_>,
-        _cursor: mouse::Cursor,
-        _viewport: &Rectangle,    //XXX relationship with layout.bounds?
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
 
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
@@ -164,7 +165,6 @@ let exPalette = theme.extended_palette();
             if let Some(current) = self.selectedNote {
                 self.drawCell(frame,self.cells[current]);
             }
-
 
             /* Draw the app border: */
 /*            
@@ -236,7 +236,7 @@ let exPalette = theme.extended_palette();
                 match self.hoverState {
                     CursorMode::MOVING => {
                         if self.amOverlapping {
-                            self.cells[self.selectedNote.unwrap()] = self.lastPosition;
+                            self.cells[self.selectedNote.unwrap()] = self.lastPosition.unwrap();
                             redrawAll();
                         }
                         self.hoverState = CursorMode::MOVABLE;
@@ -258,7 +258,7 @@ let exPalette = theme.extended_palette();
                         redrawAll();
                     }
                     _ => {
-                        self.mousePosition = *position;
+                        self.mousePosition = Some(*position);
                         self.findNoteForCursor(*position);
                     }
                 }
@@ -291,7 +291,14 @@ impl Grid {
     {
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
-            ..Default::default()
+            cells: [].to_vec(),
+            mousePosition: None,
+            grabPosition: None,
+            lastPosition: None,
+            hoverState: CursorMode::NONE,
+            selectedNote: None,
+            side: Side::LEFT,
+            amOverlapping: false,
         }
     }
 
@@ -341,11 +348,11 @@ impl Grid {
                 //XXX only required on initial press down
                 self.hoverState = CursorMode::MOVABLE;
                 self.selectedNote = Some(i);
-                self.grabPosition = Point {
+                self.grabPosition = Some(Point {
                     x: pos.x - n.col * self.colWidth,
                     y: pos.y - n.row as f32 * self.rowHeight
-                };
-                self.lastPosition = Cell {row:n.row,col:n.col,length:n.length};
+                });
+                self.lastPosition = Some(Cell {row:n.row,col:n.col,length:n.length});
                 /* Move takes precedence over resizing any neighbouring notes */
                 return;
             }
@@ -356,7 +363,7 @@ impl Grid {
     {
         let selected = &mut self.cells[self.selectedNote.unwrap()];
 
-        selected.col = (pos.x - self.grabPosition.x) / self.colWidth; 
+        selected.col = (pos.x - self.grabPosition.unwrap().x) / self.colWidth; 
 
         /* Ensure the note stays within X bounds */
         if selected.col < 0.0 {
@@ -372,7 +379,7 @@ impl Grid {
             selected.col = (selected.col / snap).round() * snap;
         }
 
-        selected.row = ((pos.y - self.grabPosition.y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
+        selected.row = ((pos.y - self.grabPosition.unwrap().y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
 
         /* Ensure the note stays within Y bounds */
         if selected.row < 0 {
@@ -387,7 +394,7 @@ impl Grid {
         self.amOverlapping = self.overlappingCell(testCell,self.selectedNote).is_some();
 
         if !self.amOverlapping {
-            self.lastPosition = testCell;
+            self.lastPosition = Some(testCell);
         }
     }
 
