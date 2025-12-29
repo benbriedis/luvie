@@ -3,7 +3,7 @@
 use iced_aw::ContextMenu;
 use std::fmt::Debug;
 use iced::{
-    Alignment, Element, Length, Theme, advanced::Widget, alignment::Horizontal, widget::{Button, Container, Row, Text, column, row, slider, space }
+    Alignment, Element, Length, Point, Theme, advanced::Widget, alignment::Horizontal, widget::{Button, Container, Row, Text, column, row, slider, space }
 };
 use crate::grid::{Grid};
 
@@ -30,7 +30,7 @@ pub enum Message {
     Choice2,
     ValueChange(u8),
     CloseContext,
-    RightClick
+    RightClick(Point)
 }
 
 impl GridApp {
@@ -49,9 +49,9 @@ impl GridApp {
             Message::Choice1 => self.contextVisible = false,
             Message::Choice2 => self.contextVisible = false,
             Message::CloseContext => self.contextVisible = false,
-            Message::RightClick => {
-println!("Got right click!");                
-                self.contextVisible = true
+            Message::RightClick(point) => {
+                println!("GOT right click Point coordinates: ({}, {})", point.x, point.y);
+                self.contextVisible = true;
             }
             _ => ()
         }
@@ -60,15 +60,7 @@ println!("Got right click!");
 //TODO move the combined Grid+ContextMenu into a shared widget file
 
     fn view(&self) -> Element<'_, Message> {
-//        let xxx = self.grid.view().map(Message::GridAction).on_press(Message::ButtonClicked);
-//        let xxx = self.grid.view().onRightClick(Message::RightClick);
-       
-/*       
-       column!( [
-           xxx
-       ]).into();    
-*/
-        let grid = Grid::new(Message::RightClick); 
+        let grid = Grid::new(|p: Point| { Message::RightClick(p) }); 
 
         if self.contextVisible {
             ContextMenu::new(grid, || {
@@ -87,8 +79,8 @@ println!("Got right click!");
                             .on_release(Message::CloseContext)
                     ].into()
                 ])
-//                .width(200)
-//                .align_x(Horizontal::Left)
+                .width(200)
+                .align_x(Horizontal::Left)
                 .into()
             })
             .into()

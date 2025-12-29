@@ -66,7 +66,7 @@ pub struct Grid<Message> {
     side:Side,
     amOverlapping: bool,
 
-    onRightClickMsg: Message
+    onRightClick: Message
 }
 
 #[derive(Default)]
@@ -75,7 +75,7 @@ struct State {
 }
 
 
-impl<Message> Widget<Message, Theme, Renderer> for Grid<Message>
+impl<Message:Clone> Widget<Message, Theme, Renderer> for Grid<Message>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -266,6 +266,10 @@ let exPalette = theme.extended_palette();
             //XXX or is using ButtonPressed better?
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
 println!("Got right click in grid.rs");                
+//XXX ummm... cell?
+//                shell.publish(self.onRightClick.clone());
+                shell.publish(self.onRightClick.clone());
+                shell.capture_event();
             }
             _ => ()
         }
@@ -283,14 +287,17 @@ println!("Got right click in grid.rs");
     }
 }
 
-impl<'a,Message:'a> From<Grid<Message>> for Element<'a,Message> {
+impl<'a,Message:'a + Clone> From<Grid<Message>> for Element<'a,Message> {
     fn from(grid: Grid<Message>) -> Self {
         Self::new(grid)
     }
 }
 
-impl<Message> Grid<Message> {
-    pub fn new(rightClickMsg:Message) -> Self
+impl<Message:Clone> Grid<Message> {
+    pub fn new<F>(onRightClick:F) -> Self
+    where
+//        F: FnOnce(Cell) -> Message,
+        F: FnOnce(Point) -> Message,
     {
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
@@ -302,7 +309,8 @@ impl<Message> Grid<Message> {
             selectedNote: None,
             side: Side::LEFT,
             amOverlapping: false,
-            onRightClickMsg: rightClickMsg
+//            onRightClick: onRightClick(Cell{row:1,col:1.0,length:1.0})
+            onRightClick: onRightClick(Point{x:1.0,y:1.0})
         }
     }
 
