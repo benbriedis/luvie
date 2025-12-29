@@ -25,8 +25,15 @@ use iced::{
 
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
-
 use crate::Cell;
+
+#[derive(Clone, Debug)]
+pub enum GridMessage {
+    AddCell(Cell),
+    ModifyCell(usize,Cell),
+    DeleteCell(usize),
+    RightClick(Cell),
+}
 
 #[derive(Debug,Default,Clone)]
 enum CursorMode {
@@ -43,7 +50,7 @@ enum Side {
     RIGHT
 }
 
-pub struct Grid<'a,Message> {
+pub struct Grid<'a> {
     numRows: usize,
     numCols: usize,
     rowHeight: f32,
@@ -57,12 +64,225 @@ pub struct Grid<'a,Message> {
     lastPosition: Option<Cell>,
 
     hoverState: CursorMode,
-    selectedNote: Option<usize>,
+
+
+    selectedCell: Option<usize>,
+    movingCell: Option<Cell>,   //XXX cf renaming wrt selectedCell
+
     side:Side,
     amOverlapping: bool,
-
-    onRightClick: Message
 }
+
+impl<'a> Grid<'a> {
+    pub fn new(cells: &'a Vec<Cell>) -> Self
+    {
+        Self {
+            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
+            cells: cells,
+            mousePosition: None,
+            grabPosition: None,
+            lastPosition: None,
+            hoverState: CursorMode::NONE,
+            selectedCell: None,
+            movingCell: None,
+            side: Side::LEFT,
+            amOverlapping: false
+        }
+    }
+
+    /*
+    pub fn view(&self,cells: &'a Vec<Cell>) -> Element<GridMessage> 
+    {
+        Grid::new(cells).into()
+   //    self.into()
+    }
+    */
+
+    fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
+    {
+        let lineWidth = 1.0;
+
+         //TODO possibly size to be inside grid, although maybe not at start
+        let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight +lineWidth);
+        let size = Size::new(c.length * self.colWidth, self.rowHeight - 2.0 * lineWidth);
+        let path = canvas::Path::rectangle(point,size);
+        frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
+
+        /* Add the dark line on the left: */
+        let size2 = Size::new(8.0, self.rowHeight - 2.0 * lineWidth);
+        let path2 = canvas::Path::rectangle(point,size2);
+        frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
+    }
+
+    fn findNoteForCursor(&mut self,pos:Point)
+    {
+        let resizeZone: f32 = 5.0;
+
+        let row = (pos.y / self.rowHeight).floor() as usize;
+
+        self.hoverState = CursorMode::NONE;
+
+        for (i,n) in self.cells.iter().enumerate() {
+            if n.row != row {
+                continue;
+            }
+
+            let leftEdge = n.col * self.colWidth; 
+            let rightEdge = (n.col + n.length) * self.colWidth;
+
+            if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
+                self.hoverState = CursorMode::RESIZABLE;
+                self.selectedCell = Some(i);
+                self.side = Side::LEFT;
+            }
+            else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
+                self.hoverState = CursorMode::RESIZABLE;
+                self.selectedCell = Some(i);
+                self.side = Side::RIGHT;
+            }
+            else if pos.x >= leftEdge && pos.x <= rightEdge {
+                //XXX only required on initial press down
+                self.hoverState = CursorMode::MOVABLE;
+                self.selectedCell = Some(i);
+                self.grabPosition = Some(Point {
+                    x: pos.x - n.col * self.colWidth,
+                    y: pos.y - n.row as f32 * self.rowHeight
+                });
+                self.lastPosition = Some(Cell {row:n.row,col:n.col,length:n.length});
+                /* Move takes precedence over resizing any neighbouring notes */
+                return;
+            }
+        }
+    }
+
+    fn moving(&mut self,pos:Point)
+    {
+        let mut cell = self.cells[self.selectedCell.unwrap()].clone();
+
+        cell.col = (pos.x - self.grabPosition.unwrap().x) / self.colWidth; 
+
+        /* Ensure the note stays within X bounds */
+        if cell.col < 0.0 {
+            cell.col = 0.0;
+        }
+        if cell.col + cell.length > self.numCols as f32 {
+            cell.col = self.numCols as f32 - cell.length;
+        }
+
+        /* Apply snap */
+//FIXME For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
+        if let Some(snap) = self.snap {
+            cell.col = (cell.col / snap).round() * snap;
+        }
+
+        cell.row = ((pos.y - self.grabPosition.unwrap().y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
+
+        /* Ensure the note stays within Y bounds */
+        if cell.row < 0 {
+            cell.row = 0;
+        }
+        if cell.row >= self.numRows {
+            cell.row = self.numRows - 1;
+        }
+
+    //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
+        let testCell = self.cells[self.selectedCell.unwrap()];
+        self.amOverlapping = self.overlappingCell(testCell,self.selectedCell).is_some();
+
+        if !self.amOverlapping {
+            self.lastPosition = Some(testCell);
+        }
+
+        self.movingCell = Some(cell);
+    }
+
+    /*
+       NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
+       The second one (optional) might allow it to move relative to the bar.
+    */
+    fn resizing(&mut self,pos:Point)
+    {
+    //XXX if changing grid size want the num of pixels to remain constant.
+        let minLength = 10.0 / self.colWidth;
+
+        let mut cell = self.cells[self.selectedCell.unwrap()].clone();
+
+        match self.side {
+            Side::LEFT => {
+                let endCol = cell.col + cell.length;
+                cell.col = pos.x / self.colWidth; 
+
+                /* Apply snap: */
+                if let Some(snap) = self.snap {
+                    cell.col = (cell.col / snap).round() * snap;
+                }
+
+                let testCell = Cell{row:cell.row,col:cell.col,length: endCol - cell.col};
+                let neighbour = self.overlappingCell(testCell,self.selectedCell);
+                let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
+                if cell.col < min {
+                    cell.col = min;
+                }
+
+                cell.length = endCol - cell.col;
+                if cell.length < minLength {
+                    cell.length = minLength;
+                    cell.col = endCol - minLength;
+                }
+            }
+            Side::RIGHT => {
+                cell.length = pos.x / self.colWidth - cell.col;
+
+                /* Apply snap: */
+                let mut endCol = cell.col + cell.length;
+                if let Some(snap) = self.snap {
+                    endCol = (endCol / snap).round() * snap;
+                    cell.length = endCol - cell.col;
+                }
+
+                let testCell = Cell{row:cell.row, col:cell.col, length:cell.length};
+                let neighbour = self.overlappingCell(testCell,self.selectedCell);
+                let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
+                if cell.col + cell.length > max {
+                    cell.length = max - cell.col;
+                }
+
+                if cell.length < minLength {
+                    cell.length = minLength;
+                }
+            }
+        }
+        self.movingCell = Some(cell);
+    }
+
+    fn overlappingCell(&mut self,a:Cell,selected:Option<usize>) -> Option<usize>
+    {
+        let aStart = a.col;
+        let aEnd = a.col + a.length;
+
+        for (i,b) in self.cells.iter().enumerate() {
+            if let Some(sel) = selected {
+                if sel == i { continue; }
+            }
+
+            if b.row != a.row {
+                continue;
+            }
+
+            let bStart = b.col;
+            let bEnd = b.col + b.length;
+
+            let firstEnd = if aStart <= bStart { aEnd } else { bEnd };
+            let secondStart = if aStart <= bStart { bStart } else { aStart } ;
+
+            if firstEnd > secondStart { //XXX HACK
+                return Some(i);
+            }
+        }
+        return None;
+    }
+}
+
 
 #[derive(Default)]
 struct State {
@@ -70,7 +290,7 @@ struct State {
 }
 
 
-impl<'a,Message:Clone> Widget<Message, Theme, Renderer> for Grid<'a,Message>
+impl<'a> Widget<GridMessage, Theme, Renderer> for Grid<'a>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -153,12 +373,16 @@ let exPalette = theme.extended_palette();
 
             /* Draw cells: */
             for c in self.cells.iter() {
-                self.drawCell(frame,*c);
+                if let Some(cell) = self.movingCell {
+                }
+                else {
+                    self.drawCell(frame,*c);
+                }
             };
 
             /* Draw selected note last so it sits on top */
-            if let Some(current) = self.selectedNote {
-                self.drawCell(frame,self.cells[current]);
+            if let Some(cell) = self.movingCell {
+                self.drawCell(frame,cell);
             }
 
             /* Draw the app border: */
@@ -189,7 +413,7 @@ let exPalette = theme.extended_palette();
         cursor: mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
+        shell: &mut Shell<'_, GridMessage>,
         _viewport: &Rectangle,
     ) {
 
@@ -220,33 +444,19 @@ let exPalette = theme.extended_palette();
                             let cell = Cell{row,col,length:1.0};
 
                             if let None = self.overlappingCell(cell,None) {
-                                shell.publish(self.addCell(cell));
-                                shell.capture_event();
+state.cache.clear();  
+                                shell.publish(GridMessage::AddCell(cell));
+shell.capture_event();
                             }
                         }
                     }
-                }
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                match self.hoverState {
-                    CursorMode::MOVING => {
-                        if self.amOverlapping {
-                            self.cells[self.selectedNote.unwrap()] = self.lastPosition.unwrap();
-                            redrawAll();
-                        }
-                        self.hoverState = CursorMode::MOVABLE;
-                    }
-                    CursorMode::RESIZING => {
-                        self.hoverState = CursorMode::RESIZABLE;
-                    }
-                    _ => {}         //XXX can I use if let if let else?
                 }
             }
             Event::Mouse(mouse::Event::CursorMoved{position}) => {
                 match self.hoverState {
                     CursorMode::MOVING => {
                         self.moving(*position);
-                        redrawAll();
+                        redrawAll(); 
                     }
                     CursorMode::RESIZING => {
                         self.resizing(*position);
@@ -257,12 +467,41 @@ let exPalette = theme.extended_palette();
                         self.findNoteForCursor(*position);
                     }
                 }
+
+            }
+//TODO check CPU
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                match self.hoverState {
+                    CursorMode::MOVING => {
+println!("Got moving");
+                        self.hoverState = CursorMode::MOVABLE;
+
+                        if self.amOverlapping {
+                            redrawAll();
+                        }
+                        else {
+state.cache.clear();  
+shell.capture_event();
+//TODO possibly use lastPosition here instead
+                            shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
+                        }
+                    }
+                    CursorMode::RESIZING => {
+                        self.hoverState = CursorMode::RESIZABLE;
+state.cache.clear();  
+shell.capture_event();
+//TODO maybe use something like lastPosition here instead??
+                            shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
+                    }
+                    _ => {}         //XXX can I use if let if let else?
+                }
+                self.movingCell = None;
             }
             //XXX or is using ButtonPressed better?
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
 println!("Got right click in grid.rs");                
-//XXX ummm... cell?
-                shell.publish(self.onRightClick.clone());
+state.cache.clear();  
+                shell.publish(GridMessage::RightClick(Cell{row:1,col:1.0,length:1.0}));  //FIXME
                 shell.capture_event();
             }
             _ => ()
@@ -281,219 +520,9 @@ println!("Got right click in grid.rs");
     }
 }
 
-impl<'a,Message:'a + Clone> From<Grid<'a,Message>> for Element<'a,Message> {
-    fn from(grid: Grid<'a,Message>) -> Self {
+impl<'a> From<Grid<'a>> for Element<'a,GridMessage> {
+    fn from(grid: Grid<'a>) -> Self {
         Self::new(grid)
     }
 }
-
-impl<'a,Message:Clone> Grid<'a,Message> {
-    pub fn new<F>(cells: &'a mut Vec<Cell>,onRightClick:F) -> Self
-    where
-//        F: FnOnce(Cell) -> Message,
-        F: FnOnce(Point) -> Message,
-    {
-        Self {
-            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
-            cells: cells,
-            mousePosition: None,
-            grabPosition: None,
-            lastPosition: None,
-            hoverState: CursorMode::NONE,
-            selectedNote: None,
-            side: Side::LEFT,
-            amOverlapping: false,
-//            onRightClick: onRightClick(Cell{row:1,col:1.0,length:1.0})
-            onRightClick: onRightClick(Point{x:1.0,y:1.0})
-        }
-    }
-
-    fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
-    {
-        let lineWidth = 1.0;
-
-         //TODO possibly size to be inside grid, although maybe not at start
-        let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight +lineWidth);
-        let size = Size::new(c.length * self.colWidth, self.rowHeight - 2.0 * lineWidth);
-        let path = canvas::Path::rectangle(point,size);
-        frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
-
-        /* Add the dark line on the left: */
-        let size2 = Size::new(8.0, self.rowHeight - 2.0 * lineWidth);
-        let path2 = canvas::Path::rectangle(point,size2);
-        frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
-    }
-
-    fn findNoteForCursor(&mut self,pos:Point)
-    {
-        let resizeZone: f32 = 5.0;
-
-        let row = (pos.y / self.rowHeight).floor() as usize;
-
-        self.hoverState = CursorMode::NONE;
-
-        for (i,n) in self.cells.iter().enumerate() {
-            if n.row != row {
-                continue;
-            }
-
-            let leftEdge = n.col * self.colWidth; 
-            let rightEdge = (n.col + n.length) * self.colWidth;
-
-            if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
-                self.hoverState = CursorMode::RESIZABLE;
-                self.selectedNote = Some(i);
-                self.side = Side::LEFT;
-            }
-            else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
-                self.hoverState = CursorMode::RESIZABLE;
-                self.selectedNote = Some(i);
-                self.side = Side::RIGHT;
-            }
-            else if pos.x >= leftEdge && pos.x <= rightEdge {
-                //XXX only required on initial press down
-                self.hoverState = CursorMode::MOVABLE;
-                self.selectedNote = Some(i);
-                self.grabPosition = Some(Point {
-                    x: pos.x - n.col * self.colWidth,
-                    y: pos.y - n.row as f32 * self.rowHeight
-                });
-                self.lastPosition = Some(Cell {row:n.row,col:n.col,length:n.length});
-                /* Move takes precedence over resizing any neighbouring notes */
-                return;
-            }
-        }
-    }
-
-    fn moving(&mut self,pos:Point)
-    {
-        let selected = &mut self.cells[self.selectedNote.unwrap()];
-
-        selected.col = (pos.x - self.grabPosition.unwrap().x) / self.colWidth; 
-
-        /* Ensure the note stays within X bounds */
-        if selected.col < 0.0 {
-            selected.col = 0.0;
-        }
-        if selected.col + selected.length > self.numCols as f32 {
-            selected.col = self.numCols as f32 - selected.length;
-        }
-
-        /* Apply snap */
-//FIXME For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
-        if let Some(snap) = self.snap {
-            selected.col = (selected.col / snap).round() * snap;
-        }
-
-        selected.row = ((pos.y - self.grabPosition.unwrap().y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
-
-        /* Ensure the note stays within Y bounds */
-        if selected.row < 0 {
-            selected.row = 0;
-        }
-        if selected.row >= self.numRows {
-            selected.row = self.numRows - 1;
-        }
-
-    //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-        let testCell = self.cells[self.selectedNote.unwrap()];
-        self.amOverlapping = self.overlappingCell(testCell,self.selectedNote).is_some();
-
-        if !self.amOverlapping {
-            self.lastPosition = Some(testCell);
-        }
-    }
-
-    /*
-       NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
-       The second one (optional) might allow it to move relative to the bar.
-    */
-    fn resizing(&mut self,pos:Point)
-    {
-    //XXX if changing grid size want the num of pixels to remain constant.
-        let minLength = 10.0 / self.colWidth;
-
-        let selected = self.cells[self.selectedNote.unwrap()];
-
-        let mut selectedCol = selected.col;
-        let mut selectedLength = selected.length;
-
-        match self.side {
-            Side::LEFT => {
-                let endCol = selectedCol + selectedLength;
-                selectedCol = pos.x / self.colWidth; 
-
-                /* Apply snap: */
-                if let Some(snap) = self.snap {
-                    selectedCol = (selectedCol / snap).round() * snap;
-                }
-
-                let testCell = Cell{row:selected.row,col:selectedCol,length: endCol - selectedCol};
-                let neighbour = self.overlappingCell(testCell,self.selectedNote);
-                let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
-                if selectedCol < min {
-                    selectedCol = min;
-                }
-
-                selectedLength = endCol - selectedCol;
-                if selectedLength < minLength {
-                    selectedLength = minLength;
-                    selectedCol = endCol - minLength;
-                }
-            }
-            Side::RIGHT => {
-                selectedLength = pos.x / self.colWidth - selectedCol;
-
-                /* Apply snap: */
-                let mut endCol = selectedCol + selectedLength;
-                if let Some(snap) = self.snap {
-                    endCol = (endCol / snap).round() * snap;
-                    selectedLength = endCol - selectedCol;
-                }
-
-                let testCell = Cell{row:selected.row,col:selectedCol,length: selectedLength};
-                let neighbour = self.overlappingCell(testCell,self.selectedNote);
-                let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
-                if selectedCol + selectedLength > max {
-                    selectedLength = max - selectedCol;
-                }
-
-                if selectedLength < minLength {
-                    selectedLength = minLength;
-                }
-            }
-        }
-
-        self.cells[self.selectedNote.unwrap()].col = selectedCol;
-        self.cells[self.selectedNote.unwrap()].length = selectedLength;
-    }
-
-    fn overlappingCell(&mut self,a:Cell,selected:Option<usize>) -> Option<usize>
-    {
-        let aStart = a.col;
-        let aEnd = a.col + a.length;
-
-        for (i,b) in self.cells.iter().enumerate() {
-            if let Some(sel) = selected {
-                if sel == i { continue; }
-            }
-
-            if b.row != a.row {
-                continue;
-            }
-
-            let bStart = b.col;
-            let bEnd = b.col + b.length;
-
-            let firstEnd = if aStart <= bStart { aEnd } else { bEnd };
-            let secondStart = if aStart <= bStart { bStart } else { aStart } ;
-
-            if firstEnd > secondStart { //XXX HACK
-                return Some(i);
-            }
-        }
-        return None;
-    }
-}
-
 

@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use iced::{
     Alignment, Element, Length, Point, Theme, advanced::Widget, alignment::Horizontal, widget::{Button, Container, Row, Text, column, row, slider, space }
 };
-use crate::grid::{Grid};
+use crate::grid::{Grid, GridMessage};
 
 
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
@@ -39,15 +39,24 @@ pub enum Message {
     ValueChange(u8),
     CloseContext,
 
-    AddCell(),
-    MoveCell(),
-    ResizeCell(),
-    DeleteCell(),
-
-    RightClick(Point),
+//    Child(GridMessage)
+    Grid(GridMessage)
 }
 
 impl GridApp {
+    /*
+    fn default() -> Self
+    {
+        GridApp {
+            grid: Grid::new(&cells),
+            cells: Vec::new(),
+            contextVisible: false,
+            velocity: 0
+        }
+    }
+    */
+
+//    fn new(cells:Vec<Cell>) -> GridApp
     fn new() -> GridApp
     {
         GridApp {
@@ -64,16 +73,33 @@ impl GridApp {
             Message::Choice1 => self.contextVisible = false,
             Message::Choice2 => self.contextVisible = false,
             Message::CloseContext => self.contextVisible = false,
+            Message::Grid(message) => {
+println!("Got message from Grid: {:?}",message);                
+                match message {
+                    GridMessage::AddCell(cell) => self.cells.push(cell),
+//                    GridMessage::MoveCell(i,cell) => self.cells[i] = cell,
+                    GridMessage::ModifyCell(i,cell) => {
+                        self.cells[i].col = cell.col;
+                        self.cells[i].row = cell.row;
+                        self.cells[i].length = cell.length;
+                    }
+//                    GridMessage::ResizeCell(i,cell) => self.cells[i] = cell,
+                    GridMessage::RightClick(cell) => self.contextVisible = true,  //TODO use cell
+                    _ => ()
+                }
+            }
 
-            Message::AddCell(cell) => self.cells.push(cell),
-            Message::DeleteCell(i) => (), //TODO
-            Message::MoveCell(i,cell) => (), //TODO copy values in
-            Message::ResizeCell(i,cell) => (),
+/*            
+            GridMessage::AddCell(cell) => self.cells.push(cell),
+            GridMessage::DeleteCell(i) => (), //TODO
+            GridMessage::MoveCell(i,cell) => (), //TODO copy values in
+            GridMessage::ResizeCell(i,cell) => (),
 
-            Message::RightClick(point) => {
+            GridMessage::RightClick(point) => {
                 println!("GOT right click Point coordinates: ({}, {})", point.x, point.y);
                 self.contextVisible = true;
             }
+*/
             _ => ()
         }
     }
@@ -83,7 +109,13 @@ impl GridApp {
 
     fn view(&self) -> Element<'_, Message> {
 println!("Called view()");
-        let grid = Grid::new(&self.cells, |p: Point| { Message::RightClick(p) }); 
+//        let grid = self.grid.view(&self.cells).map(Message::Grid);   //XXX HACK calling new and view with cells...
+//        let grid = Grid::view(&self.cells).map(Message::Grid);   //XXX HACK calling new and view with cells...
+//        let grid = Grid::new(&self.cells).map(Message::Grid);   //XXX HACK calling new and view with cells...
+
+//        let grid = Grid::new(&self.cells).view(&self.cells).map(Message::Grid);   //XXX HACK calling new and view with cells...
+//        let grid = Grid::new(&self.cells).map(Message::Grid);   //XXX HACK calling new and view with cells...
+        let grid = Element::new(Grid::new(&self.cells)).map(Message::Grid);   //XXX HACK calling new and view with cells...
 
         if self.contextVisible {
 println!("Called view()  - in contextVisible");
@@ -110,9 +142,10 @@ println!("Called view()  - in contextVisible");
             .into()
         }
         else {
-println!("Called view() - no contextVisible");
-            grid.into()
+println!("Called view() - no contextVisible cells.length:{}",self.cells.len());
+            grid
         }
     }
 }
 
+//        content.map(Message::Counter)
