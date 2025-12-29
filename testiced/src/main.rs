@@ -18,7 +18,15 @@ fn main() -> iced::Result {
     .run()
 }
 
+#[derive(Debug,Default,Clone,Copy,PartialEq)]
+struct Cell {
+    row: usize,
+    col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
+    length: f32
+}
+
 struct GridApp {
+    cells: Vec<Cell>,
     contextVisible: bool,
     velocity: u8
 }
@@ -30,13 +38,20 @@ pub enum Message {
     Choice2,
     ValueChange(u8),
     CloseContext,
-    RightClick(Point)
+
+    AddCell(),
+    MoveCell(),
+    ResizeCell(),
+    DeleteCell(),
+
+    RightClick(Point),
 }
 
 impl GridApp {
     fn new() -> GridApp
     {
         GridApp {
+            cells: Vec::new(),
             contextVisible: false,
             velocity: 0
         }
@@ -45,10 +60,16 @@ impl GridApp {
     fn update(&mut self, message: Message) {
         match message {
             Message::ButtonClicked => self.contextVisible = true,  //TODO delete
-            Message::ValueChange(value) => self.velocity = value,
+            Message::ValueChange(value) => self.velocity = value,  //XXX => VelocityChange
             Message::Choice1 => self.contextVisible = false,
             Message::Choice2 => self.contextVisible = false,
             Message::CloseContext => self.contextVisible = false,
+
+            Message::AddCell(cell) => self.cells.push(cell),
+            Message::DeleteCell(i) => (), //TODO
+            Message::MoveCell(i,cell) => (), //TODO copy values in
+            Message::ResizeCell(i,cell) => (),
+
             Message::RightClick(point) => {
                 println!("GOT right click Point coordinates: ({}, {})", point.x, point.y);
                 self.contextVisible = true;
@@ -57,12 +78,15 @@ impl GridApp {
         }
     }
 
+//TODO pass in state
 //TODO move the combined Grid+ContextMenu into a shared widget file
 
     fn view(&self) -> Element<'_, Message> {
-        let grid = Grid::new(|p: Point| { Message::RightClick(p) }); 
+println!("Called view()");
+        let grid = Grid::new(&self.cells, |p: Point| { Message::RightClick(p) }); 
 
         if self.contextVisible {
+println!("Called view()  - in contextVisible");
             ContextMenu::new(grid, || {
                 column(vec![
                     iced::widget::button("Choice 1")
@@ -86,6 +110,7 @@ impl GridApp {
             .into()
         }
         else {
+println!("Called view() - no contextVisible");
             grid.into()
         }
     }

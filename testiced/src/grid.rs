@@ -26,12 +26,7 @@ use iced::{
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
 
-#[derive(Debug,Default,Clone,Copy,PartialEq)]
-struct Cell {
-    row: usize,
-    col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
-    length: f32
-}
+use crate::Cell;
 
 #[derive(Debug,Default,Clone)]
 enum CursorMode {
@@ -48,14 +43,14 @@ enum Side {
     RIGHT
 }
 
-pub struct Grid<Message> {
+pub struct Grid<'a,Message> {
     numRows: usize,
     numCols: usize,
     rowHeight: f32,
     colWidth: f32,
     snap: Option<f32>,
 
-    cells: Vec<Cell>,
+    cells: &'a Vec<Cell>,
 
     mousePosition: Option<Point>,
     grabPosition: Option<Point>,
@@ -75,7 +70,7 @@ struct State {
 }
 
 
-impl<Message:Clone> Widget<Message, Theme, Renderer> for Grid<Message>
+impl<'a,Message:Clone> Widget<Message, Theme, Renderer> for Grid<'a,Message>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -225,8 +220,8 @@ let exPalette = theme.extended_palette();
                             let cell = Cell{row,col,length:1.0};
 
                             if let None = self.overlappingCell(cell,None) {
-                                self.cells.push(cell);
-                                redrawAll();
+                                shell.publish(self.addCell(cell));
+                                shell.capture_event();
                             }
                         }
                     }
@@ -267,7 +262,6 @@ let exPalette = theme.extended_palette();
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
 println!("Got right click in grid.rs");                
 //XXX ummm... cell?
-//                shell.publish(self.onRightClick.clone());
                 shell.publish(self.onRightClick.clone());
                 shell.capture_event();
             }
@@ -287,21 +281,21 @@ println!("Got right click in grid.rs");
     }
 }
 
-impl<'a,Message:'a + Clone> From<Grid<Message>> for Element<'a,Message> {
-    fn from(grid: Grid<Message>) -> Self {
+impl<'a,Message:'a + Clone> From<Grid<'a,Message>> for Element<'a,Message> {
+    fn from(grid: Grid<'a,Message>) -> Self {
         Self::new(grid)
     }
 }
 
-impl<Message:Clone> Grid<Message> {
-    pub fn new<F>(onRightClick:F) -> Self
+impl<'a,Message:Clone> Grid<'a,Message> {
+    pub fn new<F>(cells: &'a mut Vec<Cell>,onRightClick:F) -> Self
     where
 //        F: FnOnce(Cell) -> Message,
         F: FnOnce(Point) -> Message,
     {
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
-            cells: [].to_vec(),
+            cells: cells,
             mousePosition: None,
             grabPosition: None,
             lastPosition: None,
@@ -313,13 +307,6 @@ impl<Message:Clone> Grid<Message> {
             onRightClick: onRightClick(Point{x:1.0,y:1.0})
         }
     }
-
-    /*
-    pub fn view(&self) -> Element<'_,Message> {
-//        Grid::new().into()
-        self.into()
-    }
-    */
 
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
     {
@@ -416,8 +403,6 @@ impl<Message:Clone> Grid<Message> {
             self.lastPosition = Some(testCell);
         }
     }
-
-
 
     /*
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
