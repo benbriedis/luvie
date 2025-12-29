@@ -26,12 +26,6 @@ use iced::{
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
 
-#[derive(Debug, Clone)]
-pub enum Message {
-    RightClick
-}
-
-
 #[derive(Debug,Default,Clone,Copy,PartialEq)]
 struct Cell {
     row: usize,
@@ -54,7 +48,7 @@ enum Side {
     RIGHT
 }
 
-pub struct Grid {
+pub struct Grid<Message> {
     numRows: usize,
     numCols: usize,
     rowHeight: f32,
@@ -71,6 +65,8 @@ pub struct Grid {
     selectedNote: Option<usize>,
     side:Side,
     amOverlapping: bool,
+
+    onRightClickMsg: Message
 }
 
 #[derive(Default)]
@@ -79,8 +75,7 @@ struct State {
 }
 
 
-//XXX do we need all these generic types?
-impl Widget<Message, Theme, Renderer> for Grid
+impl<Message> Widget<Message, Theme, Renderer> for Grid<Message>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -268,10 +263,9 @@ let exPalette = theme.extended_palette();
                     }
                 }
             }
+            //XXX or is using ButtonPressed better?
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
-println!("Got right click");                
-                  Task::done(Message::RightClick);
-                  ()
+println!("Got right click in grid.rs");                
             }
             _ => ()
         }
@@ -289,14 +283,14 @@ println!("Got right click");
     }
 }
 
-impl From<Grid> for Element<'_, Message> {
-    fn from(grid: Grid) -> Self {
+impl<'a,Message:'a> From<Grid<Message>> for Element<'a,Message> {
+    fn from(grid: Grid<Message>) -> Self {
         Self::new(grid)
     }
 }
 
-impl Grid {
-    pub fn new() -> Self
+impl<Message> Grid<Message> {
+    pub fn new(rightClickMsg:Message) -> Self
     {
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
@@ -308,12 +302,16 @@ impl Grid {
             selectedNote: None,
             side: Side::LEFT,
             amOverlapping: false,
+            onRightClickMsg: rightClickMsg
         }
     }
 
+    /*
     pub fn view(&self) -> Element<'_,Message> {
-        Grid::new().into()
+//        Grid::new().into()
+        self.into()
     }
+    */
 
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
     {

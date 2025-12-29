@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use iced::{
     Alignment, Element, Length, Theme, advanced::Widget, alignment::Horizontal, widget::{Button, Container, Row, Text, column, row, slider, space }
 };
-use crate::grid::{Grid,Message as GridMessage};
+use crate::grid::{Grid};
 
 
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
@@ -19,7 +19,6 @@ fn main() -> iced::Result {
 }
 
 struct GridApp {
-    grid: Grid,
     contextVisible: bool,
     velocity: u8
 }
@@ -31,14 +30,13 @@ pub enum Message {
     Choice2,
     ValueChange(u8),
     CloseContext,
-    GridAction(GridMessage)
+    RightClick
 }
 
 impl GridApp {
     fn new() -> GridApp
     {
         GridApp {
-            grid: Grid::new(), 
             contextVisible: false,
             velocity: 0
         }
@@ -51,45 +49,53 @@ impl GridApp {
             Message::Choice1 => self.contextVisible = false,
             Message::Choice2 => self.contextVisible = false,
             Message::CloseContext => self.contextVisible = false,
-            Message::GridAction(GridMessage::RightClick) => self.contextVisible = true,
+            Message::RightClick => {
+println!("Got right click!");                
+                self.contextVisible = true
+            }
             _ => ()
         }
     }
 
+//TODO move the combined Grid+ContextMenu into a shared widget file
+
     fn view(&self) -> Element<'_, Message> {
-        let xxx = self.grid.view().map(Message::GridAction).on_press(Message::ButtonClicked);
+//        let xxx = self.grid.view().map(Message::GridAction).on_press(Message::ButtonClicked);
+//        let xxx = self.grid.view().onRightClick(Message::RightClick);
        
 /*       
        column!( [
            xxx
        ]).into();    
 */
-            if self.contextVisible {
-                ContextMenu::new(xxx, || {
-                    column(vec![
-                        iced::widget::button("Choice 1")
-                            .on_press(Message::Choice1)
-                            .into(),
-                        iced::widget::button("Choice 2")
-                            .on_press(Message::Choice2)
-                            .into(),
-                        
-                        row![
-                            "Velocity",
-                            space::horizontal().width(Length::Fixed(8.0)),
-                            slider(0..=255, self.velocity, Message::ValueChange)
-                                .on_release(Message::CloseContext)
-                        ].into()
-                    ])
-    //                .width(200)
-    //                .align_x(Horizontal::Left)
-                    .into()
-                })
+        let grid = Grid::new(Message::RightClick); 
+
+        if self.contextVisible {
+            ContextMenu::new(grid, || {
+                column(vec![
+                    iced::widget::button("Choice 1")
+                        .on_press(Message::Choice1)
+                        .into(),
+                    iced::widget::button("Choice 2")
+                        .on_press(Message::Choice2)
+                        .into(),
+                    
+                    row![
+                        "Velocity",
+                        space::horizontal().width(Length::Fixed(8.0)),
+                        slider(0..=255, self.velocity, Message::ValueChange)
+                            .on_release(Message::CloseContext)
+                    ].into()
+                ])
+//                .width(200)
+//                .align_x(Horizontal::Left)
                 .into()
-            }
-            else {
-                xxx
-            }
+            })
+            .into()
+        }
+        else {
+            grid.into()
+        }
     }
 }
 
