@@ -1,14 +1,14 @@
 /* TODO 
     1. Maybe add scrollbars too...
 
-    4. Popups with delete and velocity slider, ...
-
     5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
+
+    6. If context popup is showing and click elsewhere, dont add note
 */
 
 
 use iced::{
-    Element, Length, Size, Color, Point, Rectangle, Renderer, Vector, Event, Theme, Task,
+    Element, Length, Size, Color, Point, Rectangle, Renderer, Vector, Event, Theme, 
     widget::{
         canvas::{self,Stroke,stroke,Path},
     },
@@ -185,12 +185,10 @@ impl<'a> Grid<'a> {
             cell.row = self.numRows - 1;
         }
 
-    //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-        let testCell = self.cells[self.selectedCell.unwrap()];
-        self.amOverlapping = self.overlappingCell(testCell,self.selectedCell).is_some();
+        self.amOverlapping = self.overlappingCell(cell,self.selectedCell).is_some();
 
         if !self.amOverlapping {
-            self.lastPosition = Some(testCell);
+            self.lastPosition = Some(cell);
         }
 
         self.movingCell = Some(cell);
@@ -240,8 +238,7 @@ impl<'a> Grid<'a> {
                     cell.length = endCol - cell.col;
                 }
 
-                let testCell = Cell{row:cell.row, col:cell.col, length:cell.length};
-                let neighbour = self.overlappingCell(testCell,self.selectedCell);
+                let neighbour = self.overlappingCell(cell,self.selectedCell);
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
                 if cell.col + cell.length > max {
                     cell.length = max - cell.col;
@@ -372,12 +369,13 @@ let exPalette = theme.extended_palette();
             }
 
             /* Draw cells: */
-            for c in self.cells.iter() {
-                if let Some(cell) = self.movingCell {
+            for (i,c) in self.cells.iter().enumerate() {
+                if let Some(selectedCell) = self.selectedCell {
+                    if i == selectedCell {
+                        continue;
+                    }
                 }
-                else {
-                    self.drawCell(frame,*c);
-                }
+                self.drawCell(frame,*c);
             };
 
             /* Draw selected note last so it sits on top */
@@ -473,11 +471,12 @@ shell.capture_event();
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 match self.hoverState {
                     CursorMode::MOVING => {
-println!("Got moving");
                         self.hoverState = CursorMode::MOVABLE;
 
                         if self.amOverlapping {
-                            redrawAll();
+state.cache.clear();  
+shell.capture_event();
+                            shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.lastPosition.unwrap()));
                         }
                         else {
 state.cache.clear();  
