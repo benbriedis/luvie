@@ -417,15 +417,12 @@ let exPalette = theme.extended_palette();
 
         let state = tree.state.downcast_ref::<State>();
 
-        let mut redrawAll = || {
-            state.cache.clear();  
-            shell.request_redraw();
-        };
-
         match &event {
 //            Event::Window(window::Event::RedrawRequested(now)) => {
 //            }
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                shell.capture_event();
+
                 match self.hoverState {
                     CursorMode::MOVABLE => {
                         self.hoverState = CursorMode::MOVING;
@@ -442,9 +439,8 @@ let exPalette = theme.extended_palette();
                             let cell = Cell{row,col,length:1.0};
 
                             if let None = self.overlappingCell(cell,None) {
-state.cache.clear();  
+                                state.cache.clear();  
                                 shell.publish(GridMessage::AddCell(cell));
-shell.capture_event();
                             }
                         }
                     }
@@ -454,11 +450,13 @@ shell.capture_event();
                 match self.hoverState {
                     CursorMode::MOVING => {
                         self.moving(*position);
-                        redrawAll(); 
+                        state.cache.clear();  
+                        shell.request_redraw();
                     }
                     CursorMode::RESIZING => {
                         self.resizing(*position);
-                        redrawAll();
+                        state.cache.clear();  
+                        shell.request_redraw();
                     }
                     _ => {
                         self.mousePosition = Some(*position);
@@ -467,41 +465,33 @@ shell.capture_event();
                 }
 
             }
-//TODO check CPU
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 match self.hoverState {
                     CursorMode::MOVING => {
                         self.hoverState = CursorMode::MOVABLE;
+                        state.cache.clear();  
 
                         if self.amOverlapping {
-state.cache.clear();  
-shell.capture_event();
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.lastPosition.unwrap()));
                         }
                         else {
-state.cache.clear();  
-shell.capture_event();
-//TODO possibly use lastPosition here instead
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
                         }
                     }
                     CursorMode::RESIZING => {
                         self.hoverState = CursorMode::RESIZABLE;
-state.cache.clear();  
-shell.capture_event();
-//TODO maybe use something like lastPosition here instead??
+                            state.cache.clear();  
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
                     }
-                    _ => {}         //XXX can I use if let if let else?
+                    _ => {}
                 }
                 self.movingCell = None;
             }
             //XXX or is using ButtonPressed better?
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
-println!("Got right click in grid.rs");                
-state.cache.clear();  
-                shell.publish(GridMessage::RightClick(Cell{row:1,col:1.0,length:1.0}));  //FIXME
                 shell.capture_event();
+                state.cache.clear();  
+                shell.publish(GridMessage::RightClick(Cell{row:1,col:1.0,length:1.0}));  //FIXME
             }
             _ => ()
         }
