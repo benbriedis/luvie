@@ -32,7 +32,7 @@ pub enum GridMessage {
     AddCell(Cell),
     ModifyCell(usize,Cell),
     DeleteCell(usize),
-    RightClick(Cell),
+    RightClick(usize),
 }
 
 #[derive(Debug,Default,Clone)]
@@ -57,9 +57,9 @@ pub struct Grid<'a> {
     colWidth: f32,
     snap: Option<f32>,
 
+    //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
     cells: &'a Vec<Cell>,
 
-    mousePosition: Option<Point>,
     grabPosition: Option<Point>,
     lastPosition: Option<Cell>,
 
@@ -79,7 +79,6 @@ impl<'a> Grid<'a> {
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
             cells: cells,
-            mousePosition: None,
             grabPosition: None,
             lastPosition: None,
             hoverState: CursorMode::NONE,
@@ -114,9 +113,9 @@ impl<'a> Grid<'a> {
         frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
     }
 
-    fn findNoteForCursor(&mut self,pos:Point)
+    fn findCellForCursor(&mut self,pos:Point)
     {
-        let resizeZone: f32 = 5.0;
+        let resizeZone: f32 = 8.0;
 
         let row = (pos.y / self.rowHeight).floor() as usize;
 
@@ -426,6 +425,8 @@ let exPalette = theme.extended_palette();
                 match self.hoverState {
                     CursorMode::MOVABLE => {
                         self.hoverState = CursorMode::MOVING;
+                        /* Required in case you click on a filled cell without moving it */
+                        self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
                     }
                     CursorMode::RESIZABLE => {
                         self.hoverState = CursorMode::RESIZING;
@@ -440,6 +441,7 @@ let exPalette = theme.extended_palette();
 
                             if let None = self.overlappingCell(cell,None) {
                                 state.cache.clear();  
+//XXX being called when we click out of context menu                                
                                 shell.publish(GridMessage::AddCell(cell));
                             }
                         }
@@ -459,8 +461,7 @@ let exPalette = theme.extended_palette();
                         shell.request_redraw();
                     }
                     _ => {
-                        self.mousePosition = Some(*position);
-                        self.findNoteForCursor(*position);
+                        self.findCellForCursor(*position);
                     }
                 }
 
@@ -475,6 +476,8 @@ let exPalette = theme.extended_palette();
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.lastPosition.unwrap()));
                         }
                         else {
+println!("1: {:?}",self.selectedCell);                            
+println!("2: {:?}",self.movingCell);                            
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
                         }
                     }
@@ -490,8 +493,30 @@ let exPalette = theme.extended_palette();
             //XXX or is using ButtonPressed better?
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
                 shell.capture_event();
-                state.cache.clear();  
-                shell.publish(GridMessage::RightClick(Cell{row:1,col:1.0,length:1.0}));  //FIXME
+
+//XXX probably disable all hoverState checks while popup is open...                        
+
+                match self.hoverState {
+                    //XXX slightly hacky approach? Note that RESIZABLE slightly extends the clickable area. Possibly desirable.
+                    //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
+                    CursorMode::MOVABLE => {
+println!("Right click - MOVABLE");                        
+                        state.cache.clear();  
+
+                        if let Some(selectedCell) = self.selectedCell {
+                            shell.publish(GridMessage::RightClick(selectedCell));
+                        }
+                    }
+                    CursorMode::RESIZABLE => {
+println!("Right click - RESIZABLE");                        
+                        state.cache.clear();  
+
+                        if let Some(selectedCell) = self.selectedCell {
+                            shell.publish(GridMessage::RightClick(selectedCell));
+                        }
+                    }
+                    _ => {}
+                }
             }
             _ => ()
         }
