@@ -1,15 +1,18 @@
 #![allow(non_snake_case)]
 
-use iced_aw::{ContextMenu, card::Status, context_menu, menu};
 use std::fmt::Debug;
 use iced::{
-    Alignment, Background, Border, Color, Element, Length, Padding, Point, Theme, advanced::Widget, alignment::Horizontal, border::Radius, widget::{Button, Container, Row, Text, column, container, row, slider, space }
+    Alignment, Background, Border, Color, Element, Length, Padding, Point, Theme, advanced::Widget, alignment::Horizontal, border::Radius, widget::{Button, Container, Row, Text, center, column, container, mouse_area, opaque, row, slider, space, stack }
 };
 use crate::grid::{Grid, GridMessage};
 
 
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
 
+/*
+    1. Overlay should show near the selected cell.
+    2. Close context menu.
+*/
 
 fn main() -> iced::Result {
     iced::application(GridApp::new,GridApp::update,GridApp::view) 
@@ -34,6 +37,7 @@ struct GridApp {
 
 #[derive(Clone, Debug)]
 pub enum Message {
+    HideContextMenu,
     DeleteCell,
     ValueChange(u8),        //XXX ==> VelocityChange
     CloseContext,           //XXX unused?
@@ -53,8 +57,8 @@ impl GridApp {
     }
 
     fn update(&mut self, message: Message) {
-println!("main GOT MESSAGE: {:?}",message);                
         match message {
+            Message::HideContextMenu => self.contextVisible = true,
             Message::ValueChange(value) => self.velocity = value,  //XXX => VelocityChange
             Message::CloseContext => self.contextVisible = false,
             Message::DeleteCell => {
@@ -69,15 +73,13 @@ println!("main GOT MESSAGE: {:?}",message);
                         self.cells[i].length = cell.length;
                     }
                     GridMessage::RightClick(cellIndex) => {
-println!("main.rs  GOT RightClick");                        
                         self.contextCellIndex = Some(cellIndex);
                         self.contextVisible = true
                     }
                     _ => ()
                 }
             }
-            _ => {
-            }
+            _ => ()
         }
     }
 
@@ -86,13 +88,11 @@ println!("main.rs  GOT RightClick");
     fn view(&self) -> Element<'_, Message> {
         let grid = Element::new(Grid::new(&self.cells)).map(Message::Grid);   //XXX HACK calling new and view with cells...
 
-println!("view()  contextVisible: {}",self.contextVisible);
-
         if self.contextVisible {
 // HACK need to set this when clicking out of context menu to close. This is possibly fragile
 //self.contextVisible = false;
 
-            ContextMenu::new(grid, || {
+            let contextContent = 
                 container(                
                     column(vec![
                         iced::widget::button("Delete")
@@ -118,21 +118,42 @@ println!("view()  contextVisible: {}",self.contextVisible);
                         //border: YYY,
                         ..container::Style::default()
                     }
-                })
-                .into()
-            })
-//XXX there is a 'class()' as well...            
-//XXX this is just the default setting I think
-            .style(|_theme:&iced::Theme, _status: Status | context_menu::Style{
-                background: Background::Color([0.87, 0.87, 0.87, 0.3].into())
-            })
-            .into()
+                });
+
+            context(grid,contextContent,Message::HideContextMenu)
         }
         else {
-println!("Called view() - no contextVisible cells.length:{}",self.cells.len());
             grid
         }
     }
 }
 
-//        content.map(Message::Counter)
+fn context<'a, Message>(
+    base: impl Into<Element<'a, Message>>,
+    content: impl Into<Element<'a, Message>>,
+    on_blur: Message,
+) -> Element<'a, Message>
+where
+    Message: Clone + 'a,
+{
+    stack![
+        base.into(),
+        opaque(
+            mouse_area(center(opaque(content)).style(|_theme| {
+                container::Style {
+                    background: Some(
+                        Color {
+                            a: 0.4,
+                            ..Color::BLACK
+                        }
+                        .into(),
+                    ),
+                    ..container::Style::default()
+                }
+            }))
+            .on_press(on_blur)
+        )
+    ]
+    .into()
+}
+

@@ -4,6 +4,11 @@
     5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
 
     6. If context popup is showing and click elsewhere, dont add note
+
+    7. Double click on note - cursor should go back to hand cursor:
+       Grid::new() called
+
+    8. Intermittant bug - occasionally moving a note causes it to disappear (reappears on adding another note)
 */
 
 
@@ -35,13 +40,14 @@ pub enum GridMessage {
     RightClick(usize),
 }
 
-#[derive(Debug,Default,Clone)]
+#[derive(Debug,Default,Clone,PartialEq)]
 enum CursorMode {
+    #[default] INIT,  /* ie don't know the mode yet */
     RESIZABLE,
     RESIZING,
     MOVABLE,
     MOVING,
-    #[default] NONE
+    POINTER
 }
 
 #[derive(Debug,Default)]
@@ -76,26 +82,19 @@ pub struct Grid<'a> {
 impl<'a> Grid<'a> {
     pub fn new(cells: &'a Vec<Cell>) -> Self
     {
+println!("Called Grid::new()");        
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
             cells: cells,
             grabPosition: None,
             lastPosition: None,
-            hoverState: CursorMode::NONE,
+            hoverState: CursorMode::INIT,
             selectedCell: None,
             movingCell: None,
             side: Side::LEFT,
             amOverlapping: false
         }
     }
-
-    /*
-    pub fn view(&self,cells: &'a Vec<Cell>) -> Element<GridMessage> 
-    {
-        Grid::new(cells).into()
-   //    self.into()
-    }
-    */
 
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
     {
@@ -119,7 +118,7 @@ impl<'a> Grid<'a> {
 
         let row = (pos.y / self.rowHeight).floor() as usize;
 
-        self.hoverState = CursorMode::NONE;
+        self.hoverState = CursorMode::POINTER;
 
         for (i,n) in self.cells.iter().enumerate() {
             if n.row != row {
@@ -322,6 +321,7 @@ impl<'a> Widget<GridMessage, Theme, Renderer> for Grid<'a>
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
+println!("GRID draw()");        
 
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
 
@@ -333,7 +333,11 @@ let exPalette = theme.extended_palette();
         let bounds = layout.bounds();
 //        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
 
+
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
+
+
+
             //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
             //XXX could possibly omit redrawing cells not on the last row too.
         
@@ -366,6 +370,9 @@ let exPalette = theme.extended_palette();
                     ..Stroke::default()
                 });
             }
+
+println!("draw() cache -  selectedCell {:?}:",self.selectedCell);
+println!("draw() cache -    movingCell {:?}:",self.movingCell);
 
             /* Draw cells: */
             for (i,c) in self.cells.iter().enumerate() {
@@ -413,13 +420,29 @@ let exPalette = theme.extended_palette();
         shell: &mut Shell<'_, GridMessage>,
         _viewport: &Rectangle,
     ) {
-
         let state = tree.state.downcast_ref::<State>();
+
+        /* 
+            THINK update() has to be called before the first call to draw() as self in draw is 
+            immutable and cursor etc are unavailable in new().
+        */
+
+        if self.hoverState == CursorMode::INIT {
+println!("GRID update() GOT INIT");        
+            if let Some(pos) = cursor.position() {
+println!("GRID update() calling findCellForCursor");        
+                self.findCellForCursor(pos);
+
+//                state.cache.clear();  
+//                shell.request_redraw();
+            }
+        }
 
         match &event {
 //            Event::Window(window::Event::RedrawRequested(now)) => {
 //            }
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+println!("Got Button Left click");                
                 shell.capture_event();
 
                 match self.hoverState {
@@ -440,6 +463,7 @@ let exPalette = theme.extended_palette();
                             let cell = Cell{row,col,length:1.0};
 
                             if let None = self.overlappingCell(cell,None) {
+println!("Got Button Left click - sending AddCell");                
                                 state.cache.clear();  
 //XXX being called when we click out of context menu                                
                                 shell.publish(GridMessage::AddCell(cell));
@@ -469,22 +493,21 @@ let exPalette = theme.extended_palette();
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 match self.hoverState {
                     CursorMode::MOVING => {
-                        self.hoverState = CursorMode::MOVABLE;
                         state.cache.clear();  
 
                         if self.amOverlapping {
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.lastPosition.unwrap()));
                         }
                         else {
-println!("1: {:?}",self.selectedCell);                            
-println!("2: {:?}",self.movingCell);                            
                             shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
                         }
+                        self.hoverState = CursorMode::MOVABLE;
+println!("Set hoverState to MOVABLE");                        
                     }
                     CursorMode::RESIZING => {
+                        state.cache.clear();  
+                        shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
                         self.hoverState = CursorMode::RESIZABLE;
-                            state.cache.clear();  
-                            shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
                     }
                     _ => {}
                 }
@@ -494,21 +517,10 @@ println!("2: {:?}",self.movingCell);
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
                 shell.capture_event();
 
-//XXX probably disable all hoverState checks while popup is open...                        
-
                 match self.hoverState {
                     //XXX slightly hacky approach? Note that RESIZABLE slightly extends the clickable area. Possibly desirable.
                     //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
-                    CursorMode::MOVABLE => {
-println!("Right click - MOVABLE");                        
-                        state.cache.clear();  
-
-                        if let Some(selectedCell) = self.selectedCell {
-                            shell.publish(GridMessage::RightClick(selectedCell));
-                        }
-                    }
-                    CursorMode::RESIZABLE => {
-println!("Right click - RESIZABLE");                        
+                    CursorMode::MOVABLE | CursorMode::RESIZABLE => {
                         state.cache.clear();  
 
                         if let Some(selectedCell) = self.selectedCell {
@@ -525,6 +537,7 @@ println!("Right click - RESIZABLE");
     fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
     {
         match self.hoverState {
+            CursorMode::INIT => mouse::Interaction::Help,  //XXX shouldnt actually be shown
             CursorMode::MOVABLE => Grab,
             CursorMode::MOVING => if self.amOverlapping { NotAllowed } else { Grabbing },
             CursorMode::RESIZABLE => ResizingHorizontally,
