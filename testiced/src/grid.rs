@@ -13,19 +13,11 @@
 
 
 use iced::{
-    Element, Length, Size, Color, Point, Rectangle, Renderer, Vector, Event, Theme, 
-    widget::{
-        canvas::{self,Stroke,stroke,Path},
-    },
-    advanced:: {
-        Clipboard,Shell,renderer,
-        layout::{self, Layout},
-        widget::{self,Widget,
+    Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, advanced:: {
+        Clipboard, Shell, graphics::geometry::Frame, layout::{self, Layout}, renderer, widget::{self,Widget,
             tree::{self, Tree},
-        },
-        graphics::geometry::Frame,
-    },
-    mouse::{self}
+        }
+    }, mouse::{self}, widget::canvas::{self, Path, Stroke, stroke}
 };
 
 use std::fmt::Debug;
@@ -40,20 +32,35 @@ pub enum GridMessage {
     RightClick(usize),
 }
 
-#[derive(Debug,Default,Clone,PartialEq)]
-enum CursorMode {
-    #[default] INIT,  /* ie don't know the mode yet */
-    RESIZABLE,
-    RESIZING,
-    MOVABLE,
-    MOVING,
-    POINTER
-}
-
-#[derive(Debug,Default)]
+#[derive(Debug,Default,Clone,Copy,PartialEq)]
 enum Side {
     #[default] LEFT,
     RIGHT
+}
+
+#[derive(Debug,Default,Clone,Copy,PartialEq)]
+struct ResizeData {
+    cellIndex: usize,
+    side: Side,
+    testCell: Cell
+}
+
+#[derive(Debug,Default,Clone,Copy,PartialEq)]
+struct MoveData {
+    cellIndex: usize,
+    grabPosition: Point,
+    lastValid: Cell,
+    testCell: Cell
+}
+
+#[derive(Debug,Default,Clone,Copy,PartialEq)]
+enum CursorMode {
+    #[default] INIT,  /* ie don't know the mode yet */
+    POINTER,
+    RESIZABLE(ResizeData),
+    RESIZING(ResizeData),
+    MOVABLE(MoveData),
+    MOVING(MoveData),
 }
 
 pub struct Grid<'a> {
@@ -66,16 +73,8 @@ pub struct Grid<'a> {
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
     cells: &'a Vec<Cell>,
 
-    grabPosition: Option<Point>,
-    lastPosition: Option<Cell>,
+    mode: CursorMode,
 
-    hoverState: CursorMode,
-
-
-    selectedCell: Option<usize>,
-    movingCell: Option<Cell>,   //XXX cf renaming wrt selectedCell
-
-    side:Side,
     amOverlapping: bool,
 }
 
@@ -86,12 +85,7 @@ println!("Called Grid::new()");
         Self {
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
             cells: cells,
-            grabPosition: None,
-            lastPosition: None,
-            hoverState: CursorMode::INIT,
-            selectedCell: None,
-            movingCell: None,
-            side: Side::LEFT,
+            mode: CursorMode::INIT,
             amOverlapping: false
         }
     }
@@ -118,7 +112,7 @@ println!("Called Grid::new()");
 
         let row = (pos.y / self.rowHeight).floor() as usize;
 
-        self.hoverState = CursorMode::POINTER;
+        self.mode = CursorMode::POINTER;
 
         for (i,n) in self.cells.iter().enumerate() {
             if n.row != row {
@@ -128,36 +122,45 @@ println!("Called Grid::new()");
             let leftEdge = n.col * self.colWidth; 
             let rightEdge = (n.col + n.length) * self.colWidth;
 
+//TODO consider converting to a true function now            
             if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
-                self.hoverState = CursorMode::RESIZABLE;
-                self.selectedCell = Some(i);
-                self.side = Side::LEFT;
+                self.mode = CursorMode::RESIZABLE(ResizeData {
+                    cellIndex: i,
+                    side: Side::LEFT,
+                    testCell: Cell {row:n.row,col:n.col,length:n.length}
+                });
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
-                self.hoverState = CursorMode::RESIZABLE;
-                self.selectedCell = Some(i);
-                self.side = Side::RIGHT;
+                self.mode = CursorMode::RESIZABLE(ResizeData {
+                    cellIndex: i,
+                    side: Side::RIGHT,
+                    testCell: Cell {row:n.row,col:n.col,length:n.length}
+                });
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
-                //XXX only required on initial press down
-                self.hoverState = CursorMode::MOVABLE;
-                self.selectedCell = Some(i);
-                self.grabPosition = Some(Point {
+                let grabPos = Point {
                     x: pos.x - n.col * self.colWidth,
                     y: pos.y - n.row as f32 * self.rowHeight
+                };
+                self.mode = CursorMode::MOVABLE(MoveData { 
+                    cellIndex: i,
+                    grabPosition: grabPos,
+                    lastValid: Cell {row:n.row,col:n.col,length:n.length},
+                    testCell: Cell {row:n.row,col:n.col,length:n.length}
                 });
-                self.lastPosition = Some(Cell {row:n.row,col:n.col,length:n.length});
+
                 /* Move takes precedence over resizing any neighbouring notes */
                 return;
             }
         }
     }
 
-    fn moving(&mut self,pos:Point)
+    fn moving(&mut self,data:&mut MoveData,pos:Point)
     {
-        let mut cell = self.cells[self.selectedCell.unwrap()].clone();
+//        let mut cell = self.cells[data.cellIndex].clone();
+        let cell = &mut data.testCell;
 
-        cell.col = (pos.x - self.grabPosition.unwrap().x) / self.colWidth; 
+        cell.col = (pos.x - data.grabPosition.x) / self.colWidth; 
 
         /* Ensure the note stays within X bounds */
         if cell.col < 0.0 {
@@ -173,7 +176,7 @@ println!("Called Grid::new()");
             cell.col = (cell.col / snap).round() * snap;
         }
 
-        cell.row = ((pos.y - self.grabPosition.unwrap().y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
+        cell.row = ((pos.y - data.grabPosition.y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
 
         /* Ensure the note stays within Y bounds */
         if cell.row < 0 {
@@ -183,27 +186,29 @@ println!("Called Grid::new()");
             cell.row = self.numRows - 1;
         }
 
-        self.amOverlapping = self.overlappingCell(cell,self.selectedCell).is_some();
+        self.amOverlapping = self.overlappingCell(&cell,Some(data.cellIndex)).is_some();
 
         if !self.amOverlapping {
-            self.lastPosition = Some(cell);
+            data.lastValid = cell.clone();
         }
+println!("moving()  col: {:?}",cell.col);
 
-        self.movingCell = Some(cell);
+//        data.testCell = cell;
     }
 
     /*
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
        The second one (optional) might allow it to move relative to the bar.
     */
-    fn resizing(&mut self,pos:Point)
+    fn resizing(&mut self,data:&mut ResizeData,pos:Point)
     {
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / self.colWidth;
 
-        let mut cell = self.cells[self.selectedCell.unwrap()].clone();
+//        let mut cell = self.cells[data.cellIndex].clone();
+        let cell = &mut data.testCell;
 
-        match self.side {
+        match data.side {
             Side::LEFT => {
                 let endCol = cell.col + cell.length;
                 cell.col = pos.x / self.colWidth; 
@@ -214,7 +219,7 @@ println!("Called Grid::new()");
                 }
 
                 let testCell = Cell{row:cell.row,col:cell.col,length: endCol - cell.col};
-                let neighbour = self.overlappingCell(testCell,self.selectedCell);
+                let neighbour = self.overlappingCell(&testCell,Some(data.cellIndex));
                 let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
                 if cell.col < min {
                     cell.col = min;
@@ -236,7 +241,7 @@ println!("Called Grid::new()");
                     cell.length = endCol - cell.col;
                 }
 
-                let neighbour = self.overlappingCell(cell,self.selectedCell);
+                let neighbour = self.overlappingCell(&cell,Some(data.cellIndex));
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
                 if cell.col + cell.length > max {
                     cell.length = max - cell.col;
@@ -247,21 +252,24 @@ println!("Called Grid::new()");
                 }
             }
         }
-        self.movingCell = Some(cell);
+//XXX cf options... turn cell into a reference? Turn mehtod into a pure function?        
+//        data.testCell = cell;
     }
 
-    fn overlappingCell(&mut self,a:Cell,selected:Option<usize>) -> Option<usize>
+    fn overlappingCell(&mut self,a:&Cell,selected:Option<usize>) -> Option<usize>
     {
         let aStart = a.col;
         let aEnd = a.col + a.length;
 
         for (i,b) in self.cells.iter().enumerate() {
             if let Some(sel) = selected {
-                if sel == i { continue; }
+                if sel == i {
+                    continue; 
+                }
             }
 
             if b.row != a.row {
-                continue;
+                continue; 
             }
 
             let bStart = b.col;
@@ -321,8 +329,6 @@ impl<'a> Widget<GridMessage, Theme, Renderer> for Grid<'a>
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
-println!("GRID draw()");        
-
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
 
 //XXX these extensions arent enough here. Probably just need background + text + custom colours
@@ -335,8 +341,6 @@ let exPalette = theme.extended_palette();
 
 
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
-
-
 
             //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
             //XXX could possibly omit redrawing cells not on the last row too.
@@ -371,22 +375,22 @@ let exPalette = theme.extended_palette();
                 });
             }
 
-println!("draw() cache -  selectedCell {:?}:",self.selectedCell);
-println!("draw() cache -    movingCell {:?}:",self.movingCell);
-
             /* Draw cells: */
             for (i,c) in self.cells.iter().enumerate() {
-                if let Some(selectedCell) = self.selectedCell {
-                    if i == selectedCell {
-                        continue;
+                if let CursorMode::MOVING(ref data) = self.mode {
+                    if i != data.cellIndex {
+                        self.drawCell(frame,*c);
                     }
                 }
-                self.drawCell(frame,*c);
+                else {
+                    self.drawCell(frame,*c);
+                }
             };
 
             /* Draw selected note last so it sits on top */
-            if let Some(cell) = self.movingCell {
-                self.drawCell(frame,cell);
+            if let CursorMode::MOVING(ref data) = self.mode {
+println!("draw()  MOVING  testCell: {:?}",data.testCell);                
+                self.drawCell(frame,data.testCell);
             }
 
             /* Draw the app border: */
@@ -427,7 +431,7 @@ println!("draw() cache -    movingCell {:?}:",self.movingCell);
             immutable and cursor etc are unavailable in new().
         */
 
-        if self.hoverState == CursorMode::INIT {
+        if self.mode == CursorMode::INIT {
 println!("GRID update() GOT INIT");        
             if let Some(pos) = cursor.position() {
 println!("GRID update() calling findCellForCursor");        
@@ -445,14 +449,14 @@ println!("GRID update() calling findCellForCursor");
 println!("Got Button Left click");                
                 shell.capture_event();
 
-                match self.hoverState {
-                    CursorMode::MOVABLE => {
-                        self.hoverState = CursorMode::MOVING;
+                match self.mode {
+                    CursorMode::MOVABLE(data) => {
+                        self.mode = CursorMode::MOVING(data);
                         /* Required in case you click on a filled cell without moving it */
-                        self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
+                        //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
                     }
-                    CursorMode::RESIZABLE => {
-                        self.hoverState = CursorMode::RESIZING;
+                    CursorMode::RESIZABLE(data) => {
+                        self.mode = CursorMode::RESIZING(data);
                     }
                     _ => {
                         if let Some(position) = cursor.position() {
@@ -462,7 +466,7 @@ println!("Got Button Left click");
 
                             let cell = Cell{row,col,length:1.0};
 
-                            if let None = self.overlappingCell(cell,None) {
+                            if let None = self.overlappingCell(&cell,None) {
 println!("Got Button Left click - sending AddCell");                
                                 state.cache.clear();  
 //XXX being called when we click out of context menu                                
@@ -473,14 +477,14 @@ println!("Got Button Left click - sending AddCell");
                 }
             }
             Event::Mouse(mouse::Event::CursorMoved{position}) => {
-                match self.hoverState {
-                    CursorMode::MOVING => {
-                        self.moving(*position);
+                match &self.mode {
+                    CursorMode::MOVING(mut data) => {
+                        self.moving(&mut data,*position);
                         state.cache.clear();  
                         shell.request_redraw();
                     }
-                    CursorMode::RESIZING => {
-                        self.resizing(*position);
+                    CursorMode::RESIZING(mut data) => {
+                        self.resizing(&mut data,*position);
                         state.cache.clear();  
                         shell.request_redraw();
                     }
@@ -491,41 +495,41 @@ println!("Got Button Left click - sending AddCell");
 
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                match self.hoverState {
-                    CursorMode::MOVING => {
+                match self.mode {
+                    CursorMode::MOVING(data) => {
                         state.cache.clear();  
 
                         if self.amOverlapping {
-                            shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.lastPosition.unwrap()));
+                            shell.publish(GridMessage::ModifyCell(data.cellIndex,data.lastValid));
                         }
                         else {
-                            shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
+                            shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
                         }
-                        self.hoverState = CursorMode::MOVABLE;
+                        self.mode = CursorMode::MOVABLE(data);
 println!("Set hoverState to MOVABLE");                        
                     }
-                    CursorMode::RESIZING => {
+                    CursorMode::RESIZING(data) => {
                         state.cache.clear();  
-                        shell.publish(GridMessage::ModifyCell(self.selectedCell.unwrap(),self.movingCell.unwrap()));
-                        self.hoverState = CursorMode::RESIZABLE;
+                        shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
+                        self.mode = CursorMode::RESIZABLE(data);
                     }
                     _ => {}
                 }
-                self.movingCell = None;
             }
             //XXX or is using ButtonPressed better?
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
                 shell.capture_event();
 
-                match self.hoverState {
+                match &self.mode {
                     //XXX slightly hacky approach? Note that RESIZABLE slightly extends the clickable area. Possibly desirable.
                     //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
-                    CursorMode::MOVABLE | CursorMode::RESIZABLE => {
+                    CursorMode::MOVABLE(data)  => {
                         state.cache.clear();  
-
-                        if let Some(selectedCell) = self.selectedCell {
-                            shell.publish(GridMessage::RightClick(selectedCell));
-                        }
+                        shell.publish(GridMessage::RightClick(data.cellIndex));
+                    }
+                    CursorMode::RESIZABLE(data) => {
+                        state.cache.clear();  
+                        shell.publish(GridMessage::RightClick(data.cellIndex));
                     }
                     _ => {}
                 }
@@ -536,12 +540,12 @@ println!("Set hoverState to MOVABLE");
 
     fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
     {
-        match self.hoverState {
+        match &self.mode {
             CursorMode::INIT => mouse::Interaction::Help,  //XXX shouldnt actually be shown
-            CursorMode::MOVABLE => Grab,
-            CursorMode::MOVING => if self.amOverlapping { NotAllowed } else { Grabbing },
-            CursorMode::RESIZABLE => ResizingHorizontally,
-            CursorMode::RESIZING => ResizingHorizontally,
+            CursorMode::MOVABLE(_) => Grab,
+            CursorMode::MOVING(_) => if self.amOverlapping { NotAllowed } else { Grabbing },
+            CursorMode::RESIZABLE(_) => ResizingHorizontally,
+            CursorMode::RESIZING(_) => ResizingHorizontally,
             _ => mouse::Interaction::default()
         }
     }

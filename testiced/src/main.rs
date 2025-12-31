@@ -10,6 +10,8 @@ use crate::grid::{Grid, GridMessage};
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
 
 /*
+    TODO
+    0. Why 2 clicks to open the context menu the first time?
     1. Overlay should show near the selected cell.
     2. Close context menu.
 */
