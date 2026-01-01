@@ -4,11 +4,6 @@
     5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
 
     6. If context popup is showing and click elsewhere, dont add note
-
-    7. Double click on note - cursor should go back to hand cursor:
-       Grid::new() called
-
-    8. Intermittant bug - occasionally moving a note causes it to disappear (reappears on adding another note)
 */
 
 
@@ -42,7 +37,7 @@ enum Side {
 struct ResizeData {
     cellIndex: usize,
     side: Side,
-    testCell: Cell
+    workingCell: Cell
 }
 
 #[derive(Debug,Default,Clone,PartialEq)]
@@ -50,7 +45,7 @@ struct MoveData {
     cellIndex: usize,
     grabPosition: Point,
     lastValid: Cell,
-    testCell: Cell,
+    workingCell: Cell,
     amOverlapping: bool,
 }
 
@@ -125,14 +120,14 @@ println!("Called Grid::new()");
                 self.mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::LEFT,
-                    testCell: Cell {row:n.row,col:n.col,length:n.length}
+                    workingCell: Cell {row:n.row,col:n.col,length:n.length}
                 });
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
                 self.mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::RIGHT,
-                    testCell: Cell {row:n.row,col:n.col,length:n.length}
+                    workingCell: Cell {row:n.row,col:n.col,length:n.length}
                 });
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
@@ -144,7 +139,7 @@ println!("Called Grid::new()");
                     cellIndex: i,
                     grabPosition: grabPos,
                     lastValid: Cell {row:n.row,col:n.col,length:n.length},
-                    testCell: Cell {row:n.row,col:n.col,length:n.length},
+                    workingCell: Cell {row:n.row,col:n.col,length:n.length},
                     amOverlapping: false
                 });
 
@@ -160,7 +155,7 @@ println!("Called Grid::new()");
             return;
         };
 
-        let cell = &mut data.testCell;
+        let cell = &mut data.workingCell;
 
         cell.col = (pos.x - data.grabPosition.x) / self.colWidth; 
 
@@ -208,7 +203,7 @@ println!("Called Grid::new()");
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / self.colWidth;
 
-        let cell = &mut data.testCell;
+        let cell = &mut data.workingCell;
 
         match data.side {
             Side::LEFT => {
@@ -377,19 +372,26 @@ let exPalette = theme.extended_palette();
 
             /* Draw cells: */
             for (i,c) in self.cells.iter().enumerate() {
-                if let CursorMode::MOVING(ref data) = self.mode {
-                    if i != data.cellIndex {
-                        self.drawCell(frame,*c);
+                match self.mode {
+                    CursorMode::MOVING(ref data) => {
+                        if i != data.cellIndex {
+                            self.drawCell(frame,*c);
+                        }
                     }
-                }
-                else {
-                    self.drawCell(frame,*c);
+                    CursorMode::RESIZING(ref data) => {
+                        if i != data.cellIndex {
+                            self.drawCell(frame,*c);
+                        }
+                    }
+                    _ => self.drawCell(frame,*c)
                 }
             };
 
             /* Draw selected note last so it sits on top */
-            if let CursorMode::MOVING(ref data) = self.mode {
-                self.drawCell(frame,data.testCell);
+            match self.mode {
+                CursorMode::MOVING(ref data) => self.drawCell(frame,data.workingCell),
+                CursorMode::RESIZING(ref data) => self.drawCell(frame,data.workingCell),
+                _ => ()
             }
 
             /* Draw the app border: */
@@ -498,13 +500,13 @@ let exPalette = theme.extended_palette();
                             shell.publish(GridMessage::ModifyCell(data.cellIndex,data.lastValid));
                         }
                         else {
-                            shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
+                            shell.publish(GridMessage::ModifyCell(data.cellIndex,data.workingCell));
                         }
                         self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
                     }
                     CursorMode::RESIZING(data) => {
                         state.cache.clear();  
-                        shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
+                        shell.publish(GridMessage::ModifyCell(data.cellIndex,data.workingCell));
                         self.mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                     }
                     _ => {}

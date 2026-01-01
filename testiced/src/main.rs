@@ -2,7 +2,10 @@
 
 use std::fmt::Debug;
 use iced::{
-    Alignment, Background, Border, Color, Element, Length, Padding, Point, Theme, advanced::Widget, alignment::Horizontal, border::Radius, widget::{Button, Container, Row, Text, center, column, container, mouse_area, opaque, row, slider, space, stack }
+    Background, Color, Element, Length, Theme, alignment::Horizontal, 
+    widget::{
+        center, column, container, mouse_area, opaque, row, slider, space, stack 
+    }
 };
 use crate::grid::{Grid, GridMessage};
 
@@ -11,7 +14,6 @@ mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look 
 
 /*
     TODO
-    0. Why 2 clicks to open the context menu the first time?
     1. Overlay should show near the selected cell.
     2. Close context menu.
 */
