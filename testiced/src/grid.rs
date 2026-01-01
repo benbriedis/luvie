@@ -2,8 +2,6 @@
     1. Maybe add scrollbars too...
 
     5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
-
-    6. If context popup is showing and click elsewhere, dont add note
 */
 
 
@@ -17,7 +15,7 @@ use iced::{
 
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
-use crate::Cell;
+use crate::{Cell, GridSettings};
 
 #[derive(Clone, Debug)]
 pub enum GridMessage {
@@ -60,11 +58,7 @@ enum CursorMode {
 }
 
 pub struct Grid<'a> {
-    numRows: usize,
-    numCols: usize,
-    rowHeight: f32,
-    colWidth: f32,
-    snap: Option<f32>,
+    settings: &'a GridSettings,
 
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
     cells: &'a Vec<Cell>,
@@ -73,11 +67,11 @@ pub struct Grid<'a> {
 }
 
 impl<'a> Grid<'a> {
-    pub fn new(cells: &'a Vec<Cell>) -> Self
+    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
     {
 println!("Called Grid::new()");        
         Self {
-            numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
+            settings,
             cells: cells,
             mode: CursorMode::INIT,
         }
@@ -85,25 +79,27 @@ println!("Called Grid::new()");
 
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
     {
+        let s = self.settings;
         let lineWidth = 1.0;
 
          //TODO possibly size to be inside grid, although maybe not at start
-        let point = Point::new(c.col as f32 * self.colWidth, c.row as f32 * self.rowHeight +lineWidth);
-        let size = Size::new(c.length * self.colWidth, self.rowHeight - 2.0 * lineWidth);
+        let point = Point::new(c.col as f32 * s.colWidth, c.row as f32 * s.rowHeight +lineWidth);
+        let size = Size::new(c.length * s.colWidth, s.rowHeight - 2.0 * lineWidth);
         let path = canvas::Path::rectangle(point,size);
         frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
 
         /* Add the dark line on the left: */
-        let size2 = Size::new(8.0, self.rowHeight - 2.0 * lineWidth);
+        let size2 = Size::new(8.0, s.rowHeight - 2.0 * lineWidth);
         let path2 = canvas::Path::rectangle(point,size2);
         frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
     }
 
     fn findCellForCursor(&mut self,pos:Point)
     {
+        let s = self.settings;
         let resizeZone: f32 = 8.0;
 
-        let row = (pos.y / self.rowHeight).floor() as usize;
+        let row = (pos.y / s.rowHeight).floor() as usize;
 
         self.mode = CursorMode::POINTER;
 
@@ -112,8 +108,8 @@ println!("Called Grid::new()");
                 continue;
             }
 
-            let leftEdge = n.col * self.colWidth; 
-            let rightEdge = (n.col + n.length) * self.colWidth;
+            let leftEdge = n.col * s.colWidth; 
+            let rightEdge = (n.col + n.length) * s.colWidth;
 
 //TODO consider converting to a true function now            
             if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
@@ -132,8 +128,8 @@ println!("Called Grid::new()");
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
                 let grabPos = Point {
-                    x: pos.x - n.col * self.colWidth,
-                    y: pos.y - n.row as f32 * self.rowHeight
+                    x: pos.x - n.col * s.colWidth,
+                    y: pos.y - n.row as f32 * s.rowHeight
                 };
                 self.mode = CursorMode::MOVABLE(MoveData { 
                     cellIndex: i,
@@ -155,32 +151,33 @@ println!("Called Grid::new()");
             return;
         };
 
+        let s = self.settings;
         let cell = &mut data.workingCell;
 
-        cell.col = (pos.x - data.grabPosition.x) / self.colWidth; 
+        cell.col = (pos.x - data.grabPosition.x) / s.colWidth; 
 
         /* Ensure the note stays within X bounds */
         if cell.col < 0.0 {
             cell.col = 0.0;
         }
-        if cell.col + cell.length > self.numCols as f32 {
-            cell.col = self.numCols as f32 - cell.length;
+        if cell.col + cell.length > s.numCols as f32 {
+            cell.col = s.numCols as f32 - cell.length;
         }
 
         /* Apply snap */
 //FIXME For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
-        if let Some(snap) = self.snap {
+        if let Some(snap) = s.snap {
             cell.col = (cell.col / snap).round() * snap;
         }
 
-        cell.row = ((pos.y - data.grabPosition.y + self.rowHeight/2.0) / self.rowHeight).floor() as usize;
+        cell.row = ((pos.y - data.grabPosition.y + s.rowHeight/2.0) / s.rowHeight).floor() as usize;
 
         /* Ensure the note stays within Y bounds */
         if cell.row < 0 {
             cell.row = 0;
         }
-        if cell.row >= self.numRows {
-            cell.row = self.numRows - 1;
+        if cell.row >= s.numRows {
+            cell.row = s.numRows - 1;
         }
 
         data.amOverlapping = overlappingCell(self.cells,&cell,Some(data.cellIndex)).is_some();
@@ -200,18 +197,20 @@ println!("Called Grid::new()");
             return;
         };
 
+        let s = self.settings;
+
     //XXX if changing grid size want the num of pixels to remain constant.
-        let minLength = 10.0 / self.colWidth;
+        let minLength = 10.0 / s.colWidth;
 
         let cell = &mut data.workingCell;
 
         match data.side {
             Side::LEFT => {
                 let endCol = cell.col + cell.length;
-                cell.col = pos.x / self.colWidth; 
+                cell.col = pos.x / s.colWidth; 
 
                 /* Apply snap: */
-                if let Some(snap) = self.snap {
+                if let Some(snap) = s.snap {
                     cell.col = (cell.col / snap).round() * snap;
                 }
 
@@ -229,17 +228,17 @@ println!("Called Grid::new()");
                 }
             }
             Side::RIGHT => {
-                cell.length = pos.x / self.colWidth - cell.col;
+                cell.length = pos.x / s.colWidth - cell.col;
 
                 /* Apply snap: */
                 let mut endCol = cell.col + cell.length;
-                if let Some(snap) = self.snap {
+                if let Some(snap) = s.snap {
                     endCol = (endCol / snap).round() * snap;
                     cell.length = endCol - cell.col;
                 }
 
                 let neighbour = overlappingCell(self.cells,&cell,Some(data.cellIndex));
-                let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
+                let max = if let Some(n) = neighbour { self.cells[n].col } else { s.numCols as f32 };
                 if cell.col + cell.length > max {
                     cell.length = max - cell.col;
                 }
@@ -311,7 +310,8 @@ impl<'a> Widget<GridMessage, Theme, Renderer> for Grid<'a>
         _renderer: &Renderer,
         _limits: &layout::Limits,
     ) -> layout::Node {
-        layout::Node::new(Size::new(self.numCols as f32 * self.colWidth, self.numRows as f32 * self.rowHeight))
+        let s = self.settings;
+        layout::Node::new(Size::new(s.numCols as f32 * s.colWidth, s.numRows as f32 * s.rowHeight))
     }
 
     fn draw(
@@ -324,6 +324,7 @@ impl<'a> Widget<GridMessage, Theme, Renderer> for Grid<'a>
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
+        let s = self.settings;
 // _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
 
 //XXX these extensions arent enough here. Probably just need background + text + custom colours
@@ -341,10 +342,10 @@ let exPalette = theme.extended_palette();
             //XXX could possibly omit redrawing cells not on the last row too.
         
             /* Draw the grid horizontal lines: */
-            for i in 0..=self.numRows {
+            for i in 0..=s.numRows {
                 let line = Path::line(
-                    Point {x: 0.0, y: i as f32 * self.rowHeight},
-                    Point {x: self.numCols as f32 * self.colWidth, y: i as f32 * self.rowHeight}
+                    Point {x: 0.0, y: i as f32 * s.rowHeight},
+                    Point {x: s.numCols as f32 * s.colWidth, y: i as f32 * s.rowHeight}
                 );
 
                 frame.stroke(&line, Stroke {
@@ -356,10 +357,10 @@ let exPalette = theme.extended_palette();
             }
 
             /* Draw the grid vertical lines: */
-            for i in 0..=self.numCols {
+            for i in 0..=s.numCols {
                 let line = Path::line(
-                    Point {x: i as f32 * self.colWidth, y: 0.0},
-                    Point {x: i as f32 * self.colWidth, y: self.numRows as f32 * self.rowHeight}
+                    Point {x: i as f32 * s.colWidth, y: 0.0},
+                    Point {x: i as f32 * s.colWidth, y: s.numRows as f32 * s.rowHeight}
                 );
 
                 frame.stroke(&line, Stroke {
@@ -426,6 +427,7 @@ let exPalette = theme.extended_palette();
         _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_ref::<State>();
+        let s = self.settings;
 
         /* 
             THINK update() has to be called before the first call to draw() as self in draw is 
@@ -459,8 +461,8 @@ let exPalette = theme.extended_palette();
                     _ => {
                         if let Some(position) = cursor.position() {
                             /* Add a cell: */
-                            let row = (position.y / self.rowHeight).floor() as usize;
-                            let col = (position.x / self.colWidth).floor() as f32;
+                            let row = (position.y / s.rowHeight).floor() as usize;
+                            let col = (position.x / s.colWidth).floor() as f32;
 
                             let cell = Cell{row,col,length:1.0};
 
