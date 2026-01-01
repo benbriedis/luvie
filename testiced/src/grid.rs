@@ -154,9 +154,12 @@ println!("Called Grid::new()");
         }
     }
 
-    fn moving(&self,data:&mut MoveData,pos:Point)
+    pub fn moving(&mut self,pos:Point)
     {
-//        let mut cell = self.cells[data.cellIndex].clone();
+        let CursorMode::MOVING(ref mut data) = self.mode else {
+            return;
+        };
+
         let cell = &mut data.testCell;
 
         cell.col = (pos.x - data.grabPosition.x) / self.colWidth; 
@@ -185,26 +188,26 @@ println!("Called Grid::new()");
             cell.row = self.numRows - 1;
         }
 
-        data.amOverlapping = self.overlappingCell(&cell,Some(data.cellIndex)).is_some();
+        data.amOverlapping = overlappingCell(self.cells,&cell,Some(data.cellIndex)).is_some();
 
         if !data.amOverlapping {
             data.lastValid = cell.clone();
         }
-println!("moving()  col: {:?}",cell.col);
-
-//        data.testCell = cell;
     }
 
     /*
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
        The second one (optional) might allow it to move relative to the bar.
     */
-    fn resizing(&self,data:&mut ResizeData,pos:Point)
+    fn resizing(&mut self,pos:Point)
     {
+        let CursorMode::RESIZING(ref mut data) = self.mode else {
+            return;
+        };
+
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / self.colWidth;
 
-//        let mut cell = self.cells[data.cellIndex].clone();
         let cell = &mut data.testCell;
 
         match data.side {
@@ -218,7 +221,7 @@ println!("moving()  col: {:?}",cell.col);
                 }
 
                 let testCell = Cell{row:cell.row,col:cell.col,length: endCol - cell.col};
-                let neighbour = self.overlappingCell(&testCell,Some(data.cellIndex));
+                let neighbour = overlappingCell(self.cells,&testCell,Some(data.cellIndex));
                 let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
                 if cell.col < min {
                     cell.col = min;
@@ -240,7 +243,7 @@ println!("moving()  col: {:?}",cell.col);
                     cell.length = endCol - cell.col;
                 }
 
-                let neighbour = self.overlappingCell(&cell,Some(data.cellIndex));
+                let neighbour = overlappingCell(self.cells,&cell,Some(data.cellIndex));
                 let max = if let Some(n) = neighbour { self.cells[n].col } else { self.numCols as f32 };
                 if cell.col + cell.length > max {
                     cell.length = max - cell.col;
@@ -251,38 +254,36 @@ println!("moving()  col: {:?}",cell.col);
                 }
             }
         }
-//XXX cf options... turn cell into a reference? Turn mehtod into a pure function?        
-//        data.testCell = cell;
     }
+}
 
-    fn overlappingCell(&self,a:&Cell,selected:Option<usize>) -> Option<usize>
-    {
-        let aStart = a.col;
-        let aEnd = a.col + a.length;
+fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<usize>
+{
+    let aStart = a.col;
+    let aEnd = a.col + a.length;
 
-        for (i,b) in self.cells.iter().enumerate() {
-            if let Some(sel) = selected {
-                if sel == i {
-                    continue; 
-                }
-            }
-
-            if b.row != a.row {
+    for (i,b) in cells.iter().enumerate() {
+        if let Some(sel) = selected {
+            if sel == i {
                 continue; 
             }
-
-            let bStart = b.col;
-            let bEnd = b.col + b.length;
-
-            let firstEnd = if aStart <= bStart { aEnd } else { bEnd };
-            let secondStart = if aStart <= bStart { bStart } else { aStart } ;
-
-            if firstEnd > secondStart { //XXX HACK
-                return Some(i);
-            }
         }
-        return None;
+
+        if b.row != a.row {
+            continue; 
+        }
+
+        let bStart = b.col;
+        let bEnd = b.col + b.length;
+
+        let firstEnd = if aStart <= bStart { aEnd } else { bEnd };
+        let secondStart = if aStart <= bStart { bStart } else { aStart } ;
+
+        if firstEnd > secondStart { //XXX HACK
+            return Some(i);
+        }
     }
+    return None;
 }
 
 
@@ -388,7 +389,6 @@ let exPalette = theme.extended_palette();
 
             /* Draw selected note last so it sits on top */
             if let CursorMode::MOVING(ref data) = self.mode {
-println!("draw()  MOVING  testCell: {:?}",data.testCell);                
                 self.drawCell(frame,data.testCell);
             }
 
@@ -431,9 +431,7 @@ println!("draw()  MOVING  testCell: {:?}",data.testCell);
         */
 
         if self.mode == CursorMode::INIT {
-println!("GRID update() GOT INIT");        
             if let Some(pos) = cursor.position() {
-println!("GRID update() calling findCellForCursor");        
                 self.findCellForCursor(pos);
 
 //                state.cache.clear();  
@@ -445,7 +443,6 @@ println!("GRID update() calling findCellForCursor");
 //            Event::Window(window::Event::RedrawRequested(now)) => {
 //            }
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-println!("Got Button Left click");                
                 shell.capture_event();
 
                 match &self.mode {
@@ -465,8 +462,7 @@ println!("Got Button Left click");
 
                             let cell = Cell{row,col,length:1.0};
 
-                            if let None = self.overlappingCell(&cell,None) {
-println!("Got Button Left click - sending AddCell");                
+                            if let None = overlappingCell(self.cells,&cell,None) {
                                 state.cache.clear();  
 //XXX being called when we click out of context menu                                
                                 shell.publish(GridMessage::AddCell(cell));
@@ -477,13 +473,13 @@ println!("Got Button Left click - sending AddCell");
             }
             Event::Mouse(mouse::Event::CursorMoved{position}) => {
                 match &mut self.mode {
-                    CursorMode::MOVING(ref mut data) => {
-                        self.moving(&mut data,*position);
+                    CursorMode::MOVING(_) => {
+                        self.moving(*position);
                         state.cache.clear();  
                         shell.request_redraw();
                     }
                     CursorMode::RESIZING(ref mut data) => {
-                        self.resizing(&mut data,*position);
+                        self.resizing(*position);
                         state.cache.clear();  
                         shell.request_redraw();
                     }
@@ -505,7 +501,6 @@ println!("Got Button Left click - sending AddCell");
                             shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
                         }
                         self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
-println!("Set hoverState to MOVABLE");                        
                     }
                     CursorMode::RESIZING(data) => {
                         state.cache.clear();  
