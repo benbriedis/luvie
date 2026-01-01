@@ -32,28 +32,29 @@ pub enum GridMessage {
     RightClick(usize),
 }
 
-#[derive(Debug,Default,Clone,Copy,PartialEq)]
+#[derive(Debug,Default,Clone,PartialEq)]
 enum Side {
     #[default] LEFT,
     RIGHT
 }
 
-#[derive(Debug,Default,Clone,Copy,PartialEq)]
+#[derive(Debug,Default,Clone,PartialEq)]
 struct ResizeData {
     cellIndex: usize,
     side: Side,
     testCell: Cell
 }
 
-#[derive(Debug,Default,Clone,Copy,PartialEq)]
+#[derive(Debug,Default,Clone,PartialEq)]
 struct MoveData {
     cellIndex: usize,
     grabPosition: Point,
     lastValid: Cell,
-    testCell: Cell
+    testCell: Cell,
+    amOverlapping: bool,
 }
 
-#[derive(Debug,Default,Clone,Copy,PartialEq)]
+#[derive(Debug,Default,Clone,PartialEq)]
 enum CursorMode {
     #[default] INIT,  /* ie don't know the mode yet */
     POINTER,
@@ -74,8 +75,6 @@ pub struct Grid<'a> {
     cells: &'a Vec<Cell>,
 
     mode: CursorMode,
-
-    amOverlapping: bool,
 }
 
 impl<'a> Grid<'a> {
@@ -86,7 +85,6 @@ println!("Called Grid::new()");
             numRows: 8, numCols:20, rowHeight:30.0, colWidth:40.0,snap:Some(0.25 as f32),
             cells: cells,
             mode: CursorMode::INIT,
-            amOverlapping: false
         }
     }
 
@@ -146,7 +144,8 @@ println!("Called Grid::new()");
                     cellIndex: i,
                     grabPosition: grabPos,
                     lastValid: Cell {row:n.row,col:n.col,length:n.length},
-                    testCell: Cell {row:n.row,col:n.col,length:n.length}
+                    testCell: Cell {row:n.row,col:n.col,length:n.length},
+                    amOverlapping: false
                 });
 
                 /* Move takes precedence over resizing any neighbouring notes */
@@ -155,7 +154,7 @@ println!("Called Grid::new()");
         }
     }
 
-    fn moving(&mut self,data:&mut MoveData,pos:Point)
+    fn moving(&self,data:&mut MoveData,pos:Point)
     {
 //        let mut cell = self.cells[data.cellIndex].clone();
         let cell = &mut data.testCell;
@@ -186,9 +185,9 @@ println!("Called Grid::new()");
             cell.row = self.numRows - 1;
         }
 
-        self.amOverlapping = self.overlappingCell(&cell,Some(data.cellIndex)).is_some();
+        data.amOverlapping = self.overlappingCell(&cell,Some(data.cellIndex)).is_some();
 
-        if !self.amOverlapping {
+        if !data.amOverlapping {
             data.lastValid = cell.clone();
         }
 println!("moving()  col: {:?}",cell.col);
@@ -200,7 +199,7 @@ println!("moving()  col: {:?}",cell.col);
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
        The second one (optional) might allow it to move relative to the bar.
     */
-    fn resizing(&mut self,data:&mut ResizeData,pos:Point)
+    fn resizing(&self,data:&mut ResizeData,pos:Point)
     {
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / self.colWidth;
@@ -256,7 +255,7 @@ println!("moving()  col: {:?}",cell.col);
 //        data.testCell = cell;
     }
 
-    fn overlappingCell(&mut self,a:&Cell,selected:Option<usize>) -> Option<usize>
+    fn overlappingCell(&self,a:&Cell,selected:Option<usize>) -> Option<usize>
     {
         let aStart = a.col;
         let aEnd = a.col + a.length;
@@ -449,14 +448,14 @@ println!("GRID update() calling findCellForCursor");
 println!("Got Button Left click");                
                 shell.capture_event();
 
-                match self.mode {
+                match &self.mode {
                     CursorMode::MOVABLE(data) => {
-                        self.mode = CursorMode::MOVING(data);
+                        self.mode = CursorMode::MOVING(data.clone());
                         /* Required in case you click on a filled cell without moving it */
                         //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
                     }
                     CursorMode::RESIZABLE(data) => {
-                        self.mode = CursorMode::RESIZING(data);
+                        self.mode = CursorMode::RESIZING(data.clone());
                     }
                     _ => {
                         if let Some(position) = cursor.position() {
@@ -477,13 +476,13 @@ println!("Got Button Left click - sending AddCell");
                 }
             }
             Event::Mouse(mouse::Event::CursorMoved{position}) => {
-                match &self.mode {
-                    CursorMode::MOVING(mut data) => {
+                match &mut self.mode {
+                    CursorMode::MOVING(ref mut data) => {
                         self.moving(&mut data,*position);
                         state.cache.clear();  
                         shell.request_redraw();
                     }
-                    CursorMode::RESIZING(mut data) => {
+                    CursorMode::RESIZING(ref mut data) => {
                         self.resizing(&mut data,*position);
                         state.cache.clear();  
                         shell.request_redraw();
@@ -495,23 +494,23 @@ println!("Got Button Left click - sending AddCell");
 
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                match self.mode {
+                match &self.mode {
                     CursorMode::MOVING(data) => {
                         state.cache.clear();  
 
-                        if self.amOverlapping {
+                        if data.amOverlapping {
                             shell.publish(GridMessage::ModifyCell(data.cellIndex,data.lastValid));
                         }
                         else {
                             shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
                         }
-                        self.mode = CursorMode::MOVABLE(data);
+                        self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
 println!("Set hoverState to MOVABLE");                        
                     }
                     CursorMode::RESIZING(data) => {
                         state.cache.clear();  
                         shell.publish(GridMessage::ModifyCell(data.cellIndex,data.testCell));
-                        self.mode = CursorMode::RESIZABLE(data);
+                        self.mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                     }
                     _ => {}
                 }
@@ -543,7 +542,7 @@ println!("Set hoverState to MOVABLE");
         match &self.mode {
             CursorMode::INIT => mouse::Interaction::Help,  //XXX shouldnt actually be shown
             CursorMode::MOVABLE(_) => Grab,
-            CursorMode::MOVING(_) => if self.amOverlapping { NotAllowed } else { Grabbing },
+            CursorMode::MOVING(data) => if data.amOverlapping { NotAllowed } else { Grabbing },
             CursorMode::RESIZABLE(_) => ResizingHorizontally,
             CursorMode::RESIZING(_) => ResizingHorizontally,
             _ => mouse::Interaction::default()
