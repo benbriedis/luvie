@@ -2,14 +2,15 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Length, Point, Theme, alignment::Horizontal, widget::{
+    Background, Color, Element, Length::{self, Fill}, Point, Theme, alignment::Horizontal, widget::{
         column, container, mouse_area, opaque, pin, row, slider, space, stack
     }
 };
-use crate::grid::{Grid, GridMessage};
+use crate::{contextMenuPopup::ContextMenuPopup, grid::{Grid, GridMessage}};
 
 
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
+mod contextMenuPopup;
 
 /*
     TODO
@@ -110,6 +111,12 @@ impl GridApp {
 
     fn view(&self) -> Element<'_, Message> {
         let grid = Element::new(Grid::new(&self.settings,&self.cells)).map(Message::Grid);   //XXX HACK calling new and view with cells...
+
+//XXX cf 'center()'
+        let outer = container(grid)
+            .width(Length::Fill)
+            .height(Length::Fill);
+
         if self.contextVisible {
             let contextContent = 
                 container(                
@@ -139,12 +146,15 @@ impl GridApp {
                     }
                 });
 
-            let pos = popupPosition(&self.settings,&self.cells[self.contextCellIndex.unwrap()]);
-
-            context(grid,contextContent,Message::HideContextMenu,pos)
+            let cell = self.cells[self.contextCellIndex.unwrap()];
+            let pos = Point{
+                x: cell.col * self.settings.colWidth,
+                y: cell.row as f32 * self.settings.rowHeight
+            };
+            context(outer,contextContent,Message::HideContextMenu,pos)
         }
         else {
-            grid
+            outer.into()
         }
     }
 }
@@ -158,11 +168,26 @@ fn context<'a, Message>(
 where
     Message: Clone + 'a,
 {
+//TODO integrate more of this into the popup code?
+    let contextPopup = ContextMenuPopup::new(
+        pos,
+200.0, // width, FIXME
+
+        container(
+            opaque(
+                content
+            )
+        )
+    );
+
+
     stack![
         base.into(),
         opaque(
             mouse_area(
                 container(
+                    contextPopup
+/*                    
                     pin(
                         container(
                             opaque(
@@ -171,6 +196,7 @@ where
                         )
                     )
                     .x(pos.x).y(pos.y)
+*/
                 )
                 .style(|_theme| {      //TODO extend to entire app I think
                     container::Style {
