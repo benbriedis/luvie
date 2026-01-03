@@ -2,8 +2,8 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Length::{self, Fill}, Point, Theme, alignment::Horizontal, widget::{
-        column, container, mouse_area, opaque, pin, row, slider, space, stack
+    Background, Color, Element, Length::{self}, Point, Theme, alignment::Horizontal, widget::{
+        column, container, mouse_area, opaque, row, slider, space, stack
     }
 };
 use crate::{contextMenuPopup::ContextMenuPopup, grid::{Grid, GridMessage}};
@@ -151,7 +151,7 @@ impl GridApp {
                 x: cell.col * self.settings.colWidth,
                 y: cell.row as f32 * self.settings.rowHeight
             };
-            context(outer,contextContent,Message::HideContextMenu,pos)
+            context(outer,contextContent,Message::HideContextMenu,&self.settings,pos)
         }
         else {
             outer.into()
@@ -163,6 +163,7 @@ fn context<'a, Message>(
     base: impl Into<Element<'a, Message>>,
     content: impl Into<Element<'a, Message>>,
     on_blur: Message,
+    settings: &GridSettings,
     pos: Point
 ) -> Element<'a, Message>
 where
@@ -171,7 +172,8 @@ where
 //TODO integrate more of this into the popup code?
     let contextPopup = ContextMenuPopup::new(
         pos,
-200.0, // width, FIXME
+        settings.popupWidth,
+        settings.rowHeight,
 
         container(
             opaque(
@@ -180,23 +182,12 @@ where
         )
     );
 
-
     stack![
         base.into(),
         opaque(
             mouse_area(
                 container(
                     contextPopup
-/*                    
-                    pin(
-                        container(
-                            opaque(
-                                content
-                            )
-                        )
-                    )
-                    .x(pos.x).y(pos.y)
-*/
                 )
                 .style(|_theme| {      //TODO extend to entire app I think
                     container::Style {
@@ -215,34 +206,5 @@ where
         )
     ]
     .into()
-}
-
-fn popupPosition(settings:&GridSettings, cell:&Cell) -> Point
-{
-    let verticalPadding = 4.0;
-//TODO probably need to account from internal padding of popup    
-    let sidePadding = 30.0;
-
-    let cellX = cell.col * settings.colWidth;
-    let cellY = cell.row as f32 * settings.rowHeight;
-
-    // TODO calculate?
-    let height = 85.0;
-
-    /* Place above if place, otherwise below */
-    let placeAbove = cellY >= (height + verticalPadding);
-    let y = if placeAbove {
-        cellY - height - verticalPadding
-    } 
-    else {
-        cellY + settings.rowHeight + verticalPadding
-    };
-
-    /* Use cell LHS if there is space, otherwise get as close as possible */
-    let maxX = settings.numCols as f32 * settings.colWidth - settings.popupWidth - sidePadding;
-    let x = if cellX > maxX { maxX } else { cellX };
-    let x = if x < sidePadding { sidePadding } else { x };
-
-    Point{x,y}
 }
 

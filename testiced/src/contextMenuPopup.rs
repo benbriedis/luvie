@@ -1,36 +1,35 @@
 
 use iced::{
-    Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, advanced:: {
-        Clipboard, Shell, layout::{self, Layout}, renderer, widget::{self,Widget,
-        }
-    }, mouse::{self}, overlay
+    Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, advanced:: {
+        Clipboard, Shell, renderer, 
+        layout::{self, Layout}, 
+        widget::{self,Widget}
+    }, 
+    mouse::{self}
 };
 
 
 //XXX maybe even hard code in some of these generic parameters?
-//pub struct ContextMenuPopup<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
-pub struct ContextMenuPopup<'a, Message, Theme, Renderer >
-//where
-    //Renderer: Renderer,
+pub struct ContextMenuPopup<'a, Message>
 {
-    content: Element<'a, Message, Theme, Renderer>,
+    content: Element<'a, Message>,
     desiredPosition: Point,
     position: Point,
-    width: f32
+    width: f32,
+    rowHeight: f32
 }
 
-//TODO delete some generic prameters
-impl<'a, Message, Theme, Renderer> ContextMenuPopup<'a, Message, Theme, Renderer>
-//where
-    //Renderer: core::Renderer,
+//TODO replace Message with local messages?
+impl<'a, Message> ContextMenuPopup<'a, Message>
 {
-    pub fn new(desiredPosition:Point,width:f32,content: impl Into<Element<'a, Message, Theme, Renderer>>) -> Self 
+    pub fn new(desiredPosition:Point,width:f32,rowHeight:f32,content: impl Into<Element<'a, Message>>) -> Self 
     {
         Self {
             content: content.into(),
             desiredPosition, 
             position: desiredPosition,
-            width 
+            width,
+            rowHeight
         }
     }
 
@@ -49,9 +48,7 @@ impl<'a, Message, Theme, Renderer> ContextMenuPopup<'a, Message, Theme, Renderer
             pos.y - height - verticalPadding
         } 
         else {
-//FIXME HACK            
-            pos.y + 30.0 + verticalPadding
-//            pos.y + settings.rowHeight + verticalPadding
+            pos.y + self.rowHeight + verticalPadding
         };
 
         /* Use cell LHS if there is space, otherwise get as close as possible */
@@ -63,52 +60,23 @@ impl<'a, Message, Theme, Renderer> ContextMenuPopup<'a, Message, Theme, Renderer
     }
 }
 
-impl<Message, Theme> Widget<Message, Theme, Renderer>
-    for ContextMenuPopup<'_, Message, Theme, Renderer>
-//where
-//    Renderer: core::Renderer,
+impl<Message> Widget<Message, Theme, Renderer> for ContextMenuPopup<'_, Message>
 {
-//TODO delete?    
-    fn tag(&self) -> widget::tree::Tag {
-        self.content.as_widget().tag()
-    }
+//    fn tag(&self) -> widget::tree::Tag { self.content.as_widget().tag() }
 
-    fn state(&self) -> widget::tree::State {
-        self.content.as_widget().state()
-    }
+//    fn state(&self) -> widget::tree::State { self.content.as_widget().state() }
 
-    fn children(&self) -> Vec<widget::Tree> {
-        self.content.as_widget().children()
-    }
+    fn children(&self) -> Vec<widget::Tree> { self.content.as_widget().children() }
 
-    fn diff(&self, tree: &mut widget::Tree) {
-        self.content.as_widget().diff(tree);
-    }
+//XXX required for slider
+    fn diff(&self, tree: &mut widget::Tree) { self.content.as_widget().diff(tree); }
 
-    fn size(&self) -> Size<Length> 
-    {
-        Size {width: Length::Fill, height: Length::Fill}
-    }
+    fn size(&self) -> Size<Length> { Size {width: Length::Fill, height: Length::Fill} }
 
-    fn layout(&mut self,tree: &mut widget::Tree,renderer: &Renderer,limits: &layout::Limits) -> layout::Node
-    {
-        self.position = self.popupPosition(limits.max(), self.desiredPosition);
-
-        let node = self.content.as_widget_mut()
-            .layout(tree, renderer, &layout::Limits::new(Size::ZERO, limits.max()))
-            .move_to(self.position);
-
-        layout::Node::with_children(limits.max(), vec![node])
-    }
 
     fn operate(&mut self,tree: &mut widget::Tree,layout: Layout<'_>,renderer: &Renderer,operation: &mut dyn widget::Operation) 
     {
-        self.content.as_widget_mut().operate(
-            tree,
-            layout.children().next().unwrap(),
-            renderer,
-            operation,
-        );
+        self.content.as_widget_mut().operate(tree, layout.children().next().unwrap(), renderer, operation);
     }
 
     fn update(&mut self,tree: &mut widget::Tree,event: &Event,layout: Layout<'_>,cursor: mouse::Cursor,
@@ -118,13 +86,13 @@ impl<Message, Theme> Widget<Message, Theme, Renderer>
             cursor,renderer,clipboard,shell, viewport);
     }
 
+/*
     fn mouse_interaction(&self,tree: &widget::Tree,layout: Layout<'_>,cursor: mouse::Cursor,
         viewport: &Rectangle,renderer: &Renderer) -> mouse::Interaction 
     {
-        self.content.as_widget().mouse_interaction(tree,layout.children().next().unwrap(), cursor,
-            viewport, renderer
-        )
+        self.content.as_widget().mouse_interaction(tree,layout.children().next().unwrap(), cursor, viewport, renderer)
     }
+*/
 
     fn draw(&self,tree: &widget::Tree,renderer: &mut Renderer,theme: &Theme,style: &renderer::Style,
         layout: Layout<'_>, cursor: mouse::Cursor, viewport: &Rectangle) 
@@ -137,26 +105,30 @@ impl<Message, Theme> Widget<Message, Theme, Renderer>
         }
     }
 
+    /*
     fn overlay<'b>(&'b mut self,tree: &'b mut widget::Tree,layout: Layout<'b>,renderer: &Renderer,
         viewport: &Rectangle, translation: Vector,) -> Option<overlay::Element<'b, Message, Theme, Renderer>> 
     {
-        self.content.as_widget_mut().overlay(tree, layout.children().next().unwrap(),
-            renderer,viewport, translation
-        )
+        self.content.as_widget_mut().overlay(tree, layout.children().next().unwrap(), renderer,viewport, translation)
+    }
+    */
+
+
+    fn layout(&mut self,tree: &mut widget::Tree,renderer: &Renderer,limits: &layout::Limits) -> layout::Node
+    {
+        self.position = self.popupPosition(limits.max(), self.desiredPosition);
+
+        let node = self.content.as_widget_mut()
+            .layout(tree, renderer, &layout::Limits::new(Size::ZERO, limits.max()))
+            .move_to(self.position);
+
+        layout::Node::with_children(limits.max(), vec![node])
     }
 }
 
-impl<'a, Message, Theme> From<ContextMenuPopup<'a, Message, Theme, Renderer>>
-    for Element<'a, Message, Theme, Renderer>
-where
-    Message: 'a,
-    Theme: 'a,
-//    Renderer: core::Renderer + 'a,
-//    Renderer: 'a,
+impl<'a, Message:'a> From<ContextMenuPopup<'a, Message>> for Element<'a, Message>
 {
-    fn from(
-        popup: ContextMenuPopup<'a, Message, Theme, Renderer>,
-    ) -> Element<'a, Message, Theme, Renderer> {
+    fn from(popup: ContextMenuPopup<'a, Message>) -> Self {
         Element::new(popup)
     }
 }
