@@ -1,12 +1,12 @@
 
 use iced::{
-    Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, advanced:: {
-        Clipboard, Shell, renderer, 
-        layout::{self, Layout}, 
-        widget::{self,Widget}
+    Renderer, Element, Event, Length, Point, Rectangle, Size, Theme, 
+    advanced::{
+        Clipboard, Shell, layout::{self, Layout}, renderer, widget::{self,Widget},
     }, 
     mouse::{self}
 };
+
 
 
 //XXX maybe even hard code in some of these generic parameters?
@@ -62,10 +62,6 @@ impl<'a, Message> ContextMenuPopup<'a, Message>
 
 impl<Message> Widget<Message, Theme, Renderer> for ContextMenuPopup<'_, Message>
 {
-//    fn tag(&self) -> widget::tree::Tag { self.content.as_widget().tag() }
-
-//    fn state(&self) -> widget::tree::State { self.content.as_widget().state() }
-
     fn children(&self) -> Vec<widget::Tree> { self.content.as_widget().children() }
 
 //XXX required for slider
@@ -86,33 +82,16 @@ impl<Message> Widget<Message, Theme, Renderer> for ContextMenuPopup<'_, Message>
             cursor,renderer,clipboard,shell, viewport);
     }
 
-/*
-    fn mouse_interaction(&self,tree: &widget::Tree,layout: Layout<'_>,cursor: mouse::Cursor,
-        viewport: &Rectangle,renderer: &Renderer) -> mouse::Interaction 
-    {
-        self.content.as_widget().mouse_interaction(tree,layout.children().next().unwrap(), cursor, viewport, renderer)
-    }
-*/
-
     fn draw(&self,tree: &widget::Tree,renderer: &mut Renderer,theme: &Theme,style: &renderer::Style,
         layout: Layout<'_>, cursor: mouse::Cursor, viewport: &Rectangle) 
     {
         let bounds = layout.bounds();
 
         if let Some(clipped_viewport) = bounds.intersection(viewport) {
-            self.content.as_widget().draw(tree, renderer, theme, style, layout.children().next().unwrap(),
-                cursor, &clipped_viewport);
+            self.content.as_widget()
+                .draw(tree, renderer, theme, style, layout.children().next().unwrap(),cursor, &clipped_viewport);
         }
     }
-
-    /*
-    fn overlay<'b>(&'b mut self,tree: &'b mut widget::Tree,layout: Layout<'b>,renderer: &Renderer,
-        viewport: &Rectangle, translation: Vector,) -> Option<overlay::Element<'b, Message, Theme, Renderer>> 
-    {
-        self.content.as_widget_mut().overlay(tree, layout.children().next().unwrap(), renderer,viewport, translation)
-    }
-    */
-
 
     fn layout(&mut self,tree: &mut widget::Tree,renderer: &Renderer,limits: &layout::Limits) -> layout::Node
     {

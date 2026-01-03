@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Length::{self}, Point, Theme, alignment::Horizontal, widget::{
+    Background, Color, Element, Length::{self}, Point, Theme, alignment::Horizontal, border::{Radius, radius}, widget::{
         column, container, mouse_area, opaque, row, slider, space, stack
     }
 };
@@ -140,7 +140,7 @@ impl GridApp {
                 .style(|_theme| {
                     container::Style {
                         background: Some(Background::Color([1.0,1.0,1.0,1.0].into())),
-//                        border: border::color(palette.background.strong.color).width(1)
+                        border: iced::Border {color:Color{r:0.6,g:0.6,b:0.8,a:1.0}, width:2.0, radius:radius(0.1) },
                         //border: YYY,
                         ..container::Style::default()
                     }
@@ -189,18 +189,6 @@ where
                 container(
                     contextPopup
                 )
-                .style(|_theme| {      //TODO extend to entire app I think
-                    container::Style {
-                        background: Some(
-                            Color {
-                                a: 0.4,
-                                ..Color::BLACK
-                            }
-                            .into(),
-                        ),
-                        ..container::Style::default()
-                    }
-                })
             )
             .on_press(on_blur)
         )
