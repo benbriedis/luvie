@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Length::{self}, Point, Theme, alignment::Horizontal, border::{Radius, radius}, widget::{
+    Background, Color, Element, Length::{self}, Point, Theme, alignment::Horizontal, border::{radius}, widget::{
         column, container, mouse_area, opaque, row, slider, space, stack
     }
 };
@@ -12,11 +12,6 @@ use crate::{contextMenuPopup::ContextMenuPopup, grid::{Grid, GridMessage}};
 mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
 mod contextMenuPopup;
 
-/*
-    TODO
-    1. Close context menu... maybe just add click away + maybe remove darkness?
-    2. Extend out 'Delete' button. Add hoover over highlighting
-*/
 
 fn main() -> iced::Result {
     iced::application(GridApp::new,GridApp::update,GridApp::view) 
@@ -84,11 +79,13 @@ impl GridApp {
 
     fn update(&mut self, message: Message) {
         match message {
-            Message::HideContextMenu => self.contextVisible = true,
+            Message::HideContextMenu => self.contextVisible = false,
             Message::ValueChange(value) => self.velocity = value,  //XXX => VelocityChange
             Message::CloseContext => self.contextVisible = false,
             Message::DeleteCell => {
-                self.contextVisible = false
+                self.cells.remove(self.contextCellIndex.unwrap());
+                self.contextCellIndex = None;
+                self.contextVisible = false;
             }
             Message::Grid(message) => {
                 match message {
@@ -100,7 +97,7 @@ impl GridApp {
                     }
                     GridMessage::RightClick(cellIndex) => {
                         self.contextCellIndex = Some(cellIndex);
-                        self.contextVisible = true
+                        self.contextVisible = true;
                     }
                     _ => ()
                 }

@@ -8,19 +8,25 @@ use iced::{
 };
 
 
+#[derive(Clone, Debug)]
+pub enum PopupMessage {
+    Close
+}
 
-pub struct ContextMenuPopup<'a, Message>
+
+pub struct ContextMenuPopup<'a>
 {
-    content: Element<'a, Message>,
+    content: Element<'a, PopupMessage>,
     desiredPosition: Point,
     position: Point,
     width: f32,
     rowHeight: f32
 }
 
-impl<'a, Message> ContextMenuPopup<'a, Message>
+//TODO replace Message with local messages?
+impl<'a> ContextMenuPopup<'a>
 {
-    pub fn new(desiredPosition:Point,width:f32,rowHeight:f32,content: impl Into<Element<'a, Message>>) -> Self 
+    pub fn new(desiredPosition:Point,width:f32,rowHeight:f32,content: impl Into<Element<'a, PopupMessage>>) -> Self 
     {
         Self {
             content: content.into(),
@@ -58,7 +64,7 @@ impl<'a, Message> ContextMenuPopup<'a, Message>
     }
 }
 
-impl<Message> Widget<Message, Theme, Renderer> for ContextMenuPopup<'_, Message>
+impl Widget<PopupMessage, Theme, Renderer> for ContextMenuPopup<'_>
 {
     fn children(&self) -> Vec<widget::Tree> { self.content.as_widget().children() }
 
@@ -74,10 +80,18 @@ impl<Message> Widget<Message, Theme, Renderer> for ContextMenuPopup<'_, Message>
     }
 
     fn update(&mut self,tree: &mut widget::Tree,event: &Event,layout: Layout<'_>,cursor: mouse::Cursor,
-        renderer: &Renderer,clipboard: &mut dyn Clipboard,shell: &mut Shell<'_, Message>, viewport: &Rectangle) 
+        renderer: &Renderer,clipboard: &mut dyn Clipboard,shell: &mut Shell<'_, PopupMessage>, viewport: &Rectangle) 
     {
+        /* Given the children first dibs on events */
         self.content.as_widget_mut().update(tree,event,layout.children().next().unwrap(),
             cursor,renderer,clipboard,shell, viewport);
+
+//XXX maybe close if click is outside popup
+        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event {
+println!("Popup  got left click");            
+            shell.capture_event();
+            shell.publish(PopupMessage::Close);
+        }
     }
 
     fn draw(&self,tree: &widget::Tree,renderer: &mut Renderer,theme: &Theme,style: &renderer::Style,
@@ -103,9 +117,8 @@ impl<Message> Widget<Message, Theme, Renderer> for ContextMenuPopup<'_, Message>
     }
 }
 
-impl<'a, Message:'a> From<ContextMenuPopup<'a, Message>> for Element<'a, Message>
-{
-    fn from(popup: ContextMenuPopup<'a, Message>) -> Self {
+impl<'a> From<ContextMenuPopup<'a>> for Element<'a, PopupMessage> {
+    fn from(popup: ContextMenuPopup<'a>) -> Self {
         Element::new(popup)
     }
 }

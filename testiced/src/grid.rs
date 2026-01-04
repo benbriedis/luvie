@@ -1,12 +1,8 @@
 /* TODO 
     1. Maybe add scrollbars too...
 
-    5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example
-
-
-    - Hidden cells are being created outside the grid on click
-
-    - Extend the overlay over the whole window
+    5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example.
+       Lean into composition where possible...
 */
 
 
@@ -454,8 +450,6 @@ let exPalette = theme.extended_palette();
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 shell.capture_event();
 
-println!("grid.rs GOT left click");
-
                 match &self.mode {
                     CursorMode::MOVABLE(data) => {
                         self.mode = CursorMode::MOVING(data.clone());
@@ -466,10 +460,7 @@ println!("grid.rs GOT left click");
                         self.mode = CursorMode::RESIZING(data.clone());
                     }
                     _ => {
-println!("grid.rs GOT left click -- 1");
-
                         if let Some(position) = cursor.position() {
-println!("grid.rs GOT left click -- 2");
                             /* Add a cell: */
                             let row = (position.y / s.rowHeight).floor() as usize;
                             let col = (position.x / s.colWidth).floor() as f32;
@@ -485,7 +476,6 @@ println!("grid.rs GOT left click -- 2");
                                 }
                             }
                         }
-println!("grid.rs GOT left click -- 3");
                     }
                 }
             }
