@@ -2,8 +2,11 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Length::{self}, Point, Theme, alignment::Horizontal, border::{radius}, widget::{
-        column, container, mouse_area, opaque, row, slider, space, stack
+    Background, Color, Element, Length::{self}, Point, Theme, 
+    alignment::Horizontal, 
+    border::radius, 
+    widget::{
+        Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
 use crate::{contextMenuPopup::ContextMenuPopup, grid::{Grid, GridMessage}};
@@ -109,10 +112,15 @@ impl GridApp {
     fn view(&self) -> Element<'_, Message> {
         let grid = Element::new(Grid::new(&self.settings,&self.cells)).map(Message::Grid);   //XXX HACK calling new and view with cells...
 
-//XXX cf 'center()'
-        let outer = container(grid)
-            .width(Length::Fill)
-            .height(Length::Fill);
+        let outer = Scrollable::with_direction(
+            container(grid),
+            Direction::Both {
+                vertical: Scrollbar::new(),
+                horizontal: Scrollbar::new(),
+            },
+        )
+        .width(Length::Fill)
+        .height(Length::Fill);
 
         if self.contextVisible {
             let contextContent = 
@@ -155,6 +163,8 @@ impl GridApp {
         }
     }
 }
+
+//XXX cf function and parameter names here...
 
 fn context<'a, Message>(
     base: impl Into<Element<'a, Message>>,

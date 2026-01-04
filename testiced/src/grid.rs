@@ -1,7 +1,5 @@
 /* TODO 
-    1. Maybe add scrollbars too...
-
-    5. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example.
+    1. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example.
        Lean into composition where possible...
 */
 
@@ -70,7 +68,6 @@ pub struct Grid<'a> {
 impl<'a> Grid<'a> {
     pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
     {
-println!("Called Grid::new()");        
         Self {
             settings,
             cells: cells,
