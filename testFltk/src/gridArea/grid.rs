@@ -1,20 +1,7 @@
-/* TODO 
-    1. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example.
-       Lean into composition where possible...
-*/
-
-
-use iced::{
-    Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, Vector, advanced:: {
-        Clipboard, Shell, graphics::geometry::Frame, layout::{self, Layout}, renderer, widget::{self,Widget,
-            tree::{self, Tree},
-        }
-    }, mouse::{self}, widget::canvas::{self, Path, Stroke, stroke}
-};
-
 use std::fmt::Debug;
-use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
-use crate::{Cell, CellMessage, GridSettings, gridArea::GridAreaMessage};
+use fltk::{draw, enums::{self, FrameType,*}, prelude::*, widget::Widget,*};
+use crate::{Cell, GridSettings};
+
 
 #[derive(Debug,Default,Clone,PartialEq)]
 enum Side {
@@ -32,7 +19,7 @@ struct ResizeData {
 #[derive(Debug,Default,Clone,PartialEq)]
 struct MoveData {
     cellIndex: usize,
-    grabPosition: Point,
+//    grabPosition: Point,
     lastValid: Cell,
     workingCell: Cell,
     amOverlapping: bool,
@@ -48,25 +35,61 @@ enum CursorMode {
     MOVING(MoveData),
 }
 
-pub struct Grid<'a> {
-    settings: &'a GridSettings,
+//pub struct Grid<'a> {
+pub struct Grid {
+  //  settings: &'a GridSettings,
 
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
-    cells: &'a Vec<Cell>,
+  //  cells: &'a Vec<Cell>,
 
-    mode: CursorMode,
+//    mode: CursorMode,
+
+//NEW:
+    /* Extending this: */
+    widget: Widget
 }
 
-impl<'a> Grid<'a> {
-    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
-    {
+//impl<'a> Grid<'a> {
+impl Grid {
+//    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
+    pub fn new() -> Self
+    {   
+        let mut widget = Widget::default(); //XXX can we use Box here instead?
+//        let mut widget = Widget::new(10,10 , 50, 50 , "HERE I AM");
+        widget.set_frame(FrameType::FlatBox);  //XXX just use regular Box?
+        //widget.widget_resize(10,10 ,50 ,50);
+        widget.set_color(enums::Color::White);
+//        let color = Rc::new(RefCell::new(Color::Red));
+
+        widget.draw(|w| {
+//            draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
+            draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
+
+            draw::set_draw_color(Color::from_u32(0xffffff)); // for the text
+            draw::set_font(enums::Font::Helvetica, 12);
+//            draw::draw_text2(&w.label(), w.x(), w.y(), w.w(), w.h(), w.align());
+            draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
+
+//                fltk::draw::set_draw_color(*color.borrow());
+        });
+
+        Self {
+            widget
+        }
+/*        
         Self {
             settings,
             cells: cells,
             mode: CursorMode::INIT,
         }
+*/
     }
+}    
 
+//fltk::widget_extends!(Grid, group::Pack, p);
+fltk::widget_extends!(Grid, Widget, widget);
+
+/*
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
     {
         let s = self.settings;
@@ -78,7 +101,7 @@ impl<'a> Grid<'a> {
         let path = canvas::Path::rectangle(point,size);
         frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
 
-        /* Add the dark line on the left: */
+        / * Add the dark line on the left: * /
         let size2 = Size::new(8.0, s.rowHeight - 2.0 * lineWidth);
         let path2 = canvas::Path::rectangle(point,size2);
         frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
@@ -129,7 +152,7 @@ impl<'a> Grid<'a> {
                     amOverlapping: false
                 });
 
-                /* Move takes precedence over resizing any neighbouring notes */
+                / * Move takes precedence over resizing any neighbouring notes * /
                 return;
             }
         }
@@ -146,7 +169,7 @@ impl<'a> Grid<'a> {
 
         cell.col = (pos.x - data.grabPosition.x) / s.colWidth; 
 
-        /* Ensure the note stays within X bounds */
+        / * Ensure the note stays within X bounds * /
         if cell.col < 0.0 {
             cell.col = 0.0;
         }
@@ -154,7 +177,7 @@ impl<'a> Grid<'a> {
             cell.col = s.numCols as f32 - cell.length;
         }
 
-        /* Apply snap */
+        / * Apply snap * /
 //FIXME For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
         if let Some(snap) = s.snap {
             cell.col = (cell.col / snap).round() * snap;
@@ -162,7 +185,7 @@ impl<'a> Grid<'a> {
 
         cell.row = ((pos.y - data.grabPosition.y + s.rowHeight/2.0) / s.rowHeight).floor() as usize;
 
-        /* Ensure the note stays within Y bounds */
+        / * Ensure the note stays within Y bounds * /
         if cell.row < 0 {
             cell.row = 0;
         }
@@ -177,10 +200,10 @@ impl<'a> Grid<'a> {
         }
     }
 
-    /*
+    / *
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
        The second one (optional) might allow it to move relative to the bar.
-    */
+    * /
     fn resizing(&mut self,pos:Point)
     {
         let CursorMode::RESIZING(ref mut data) = self.mode else {
@@ -199,7 +222,7 @@ impl<'a> Grid<'a> {
                 let endCol = cell.col + cell.length;
                 cell.col = pos.x / s.colWidth; 
 
-                /* Apply snap: */
+                / * Apply snap: * /
                 if let Some(snap) = s.snap {
                     cell.col = (cell.col / snap).round() * snap;
                 }
@@ -331,7 +354,7 @@ let exPalette = theme.extended_palette();
             //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
             //XXX could possibly omit redrawing cells not on the last row too.
         
-            /* Draw the grid horizontal lines: */
+            / * Draw the grid horizontal lines: * /
             for i in 0..=s.numRows {
                 let line = Path::line(
                     Point {x: 0.0, y: i as f32 * s.rowHeight},
@@ -346,7 +369,7 @@ let exPalette = theme.extended_palette();
                 });
             }
 
-            /* Draw the grid vertical lines: */
+            / * Draw the grid vertical lines: * /
             for i in 0..=s.numCols {
                 let line = Path::line(
                     Point {x: i as f32 * s.colWidth, y: 0.0},
@@ -361,7 +384,7 @@ let exPalette = theme.extended_palette();
                 });
             }
 
-            /* Draw cells: */
+            / * Draw cells: * /
             for (i,c) in self.cells.iter().enumerate() {
                 match self.mode {
                     CursorMode::MOVING(ref data) => {
@@ -378,20 +401,20 @@ let exPalette = theme.extended_palette();
                 }
             };
 
-            /* Draw selected note last so it sits on top */
+            / * Draw selected note last so it sits on top * /
             match self.mode {
                 CursorMode::MOVING(ref data) => self.drawCell(frame,data.workingCell),
                 CursorMode::RESIZING(ref data) => self.drawCell(frame,data.workingCell),
                 _ => ()
             }
 
-            /* Draw the app border: */
-/*            
+            / * Draw the app border: * /
+/ *            
             frame.stroke(
                 &canvas::Path::rectangle(Point::ORIGIN, frame.size()),
                 canvas::Stroke::default(),
             );
-*/
+* /
         });
 
         use iced::advanced::Renderer as _; 
@@ -419,10 +442,10 @@ let exPalette = theme.extended_palette();
         let state = tree.state.downcast_ref::<State>();
         let s = self.settings;
 
-        /* 
+        / * 
             THINK update() has to be called before the first call to draw() as self in draw is 
             immutable and cursor etc are unavailable in new().
-        */
+        * /
 
         if self.mode == CursorMode::INIT {
             if let Some(pos) = cursor.position() {
@@ -442,7 +465,7 @@ let exPalette = theme.extended_palette();
                 match &self.mode {
                     CursorMode::MOVABLE(data) => {
                         self.mode = CursorMode::MOVING(data.clone());
-                        /* Required in case you click on a filled cell without moving it */
+                        / * Required in case you click on a filled cell without moving it * /
                         //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
                     }
                     CursorMode::RESIZABLE(data) => {
@@ -450,13 +473,13 @@ let exPalette = theme.extended_palette();
                     }
                     _ => {
                         if let Some(position) = cursor.position() {
-                            /* Add a cell: */
+                            / * Add a cell: * /
                             let row = (position.y / s.rowHeight).floor() as usize;
                             let col = (position.x / s.colWidth).floor() as f32;
 
                             let cell = Cell{row,col,length:1.0};
 
-                            /* NOTE in future if the min values are > 0 then min contraints will need to be added */
+                            / * NOTE in future if the min values are > 0 then min contraints will need to be added * /
                             if position.x < s.colWidth * s.numCols as f32 && position.y < s.rowHeight * s.numRows as f32 {
                                 if let None = overlappingCell(self.cells,&cell,None) {
                                     state.cache.clear();  
@@ -548,4 +571,5 @@ impl<'a> From<Grid<'a>> for Element<'a,GridAreaMessage> {
         Self::new(grid)
     }
 }
+*/
 

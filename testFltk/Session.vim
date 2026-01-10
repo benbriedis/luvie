@@ -14,14 +14,18 @@ else
   set shortmess=aoO
 endif
 badd +16 Cargo.toml
-badd +48 src/main.rs
-badd +35 ~/programming/luvie/testiced/src/gridArea.rs
+badd +8 src/main.rs
 badd +108 ~/programming/luvie/testiced/src/grid.rs
 badd +147 ~/programming/luvie/testiced/src/main.rs
-badd +337 ~/programming/luvie/testui/grid.cpp
+badd +241 ~/programming/luvie/testui/grid.cpp
 badd +27 ~/programming/luvie/testui/main.cpp
-badd +9 src/grid.rs
-badd +12 src/gridArea.rs
+badd +56 src/grid.rs
+badd +1 src/gridArea.rs
+badd +58 ~/programming/luvie/testui/grid.hpp
+badd +29 src/customBox.rs
+badd +118 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fltk-1.5.22/src/valuator.rs
+badd +597 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fltk-1.5.22/src/group.rs
+badd +24 ~/programming/luvie/testFltk/src/gridArea/grid.rs
 argglobal
 %argdel
 $argadd Cargo.toml
@@ -44,7 +48,7 @@ set winminwidth=0
 set winwidth=1
 wincmd =
 argglobal
-balt ~/programming/luvie/testiced/src/gridArea.rs
+balt src/customBox.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -55,19 +59,19 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 12 - ((11 * winheight(0) + 20) / 40)
+let s:l = 31 - ((30 * winheight(0) + 20) / 40)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 12
-normal! 014|
+keepjumps 31
+normal! 021|
 wincmd w
 argglobal
-if bufexists(fnamemodify("src/grid.rs", ":p")) | buffer src/grid.rs | else | edit src/grid.rs | endif
+if bufexists(fnamemodify("~/programming/luvie/testFltk/src/gridArea/grid.rs", ":p")) | buffer ~/programming/luvie/testFltk/src/gridArea/grid.rs | else | edit ~/programming/luvie/testFltk/src/gridArea/grid.rs | endif
 if &buftype ==# 'terminal'
-  silent file src/grid.rs
+  silent file ~/programming/luvie/testFltk/src/gridArea/grid.rs
 endif
-balt src/main.rs
+balt src/grid.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -78,12 +82,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 9 - ((8 * winheight(0) + 20) / 40)
+let s:l = 24 - ((23 * winheight(0) + 20) / 40)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 9
-normal! 032|
+keepjumps 24
+normal! 0
 wincmd w
 2wincmd w
 wincmd =
@@ -102,7 +106,6 @@ if filereadable(s:sx)
 endif
 let &g:so = s:so_save | let &g:siso = s:siso_save
 set hlsearch
-nohlsearch
 doautoall SessionLoadPost
 unlet SessionLoad
 " vim: set ft=vim :

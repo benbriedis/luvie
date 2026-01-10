@@ -3,9 +3,9 @@
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 use fltk_theme::{ColorTheme, SchemeType, ThemeType, WidgetScheme, WidgetTheme, color_themes};
 
-use crate::{customBox::CustomBox};
+use crate::{customBox::CustomBox, gridArea::createGridArea};
 
-//mod gridArea;
+mod gridArea;
 mod customBox;
 
 #[derive(Debug,Default,Clone,Copy,PartialEq)]
@@ -67,10 +67,10 @@ fn main() {
 
 //    let mut but_dec = GridArea::default()
 //    let mut but_dec = GridArea::new();
-//    createGridArea();
+    createGridArea();
 
 
-    CustomBox::new(10,10, 100, 20,"mySlider" );
+//    CustomBox::new(10,10, 100, 20,"mySlider" );
 
 
     wind.make_resizable(true);
