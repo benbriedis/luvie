@@ -1,0 +1,45 @@
+
+
+pidstat -C to_do_list 1 -T ALL
+
+masonry to_do_list:
+  when typing in text CPU around 110%
+  when cursor blinking CPU around 110%
+  when wiggling cursor around on top CPU around 10%
+  when doing nothing <1%
+  
+iced todos:
+  when typing in text CPU around 35%
+  when cursor blinking CPU around 1%  
+  when wiggling cursor around on top CPU around 13%
+  when doing nothing <1%
+
+floem todos:
+  when typing in text CPU around 28%
+  when cursor blinking CPU around 5%
+  when wiggling cursor around on top CPU around 10%
+  when doing nothing (still has a blinking cursor) 5%
+
+zng calculator:
+  when typing in text - 3 CPUs involved, one up newar 90%
+  when cursor blinking: N/A
+  when wiggling cursor:
+  when doing nothing <1%
+
+FLTK editor example (C++ version, no Rust bindings):
+  when typing in text CPU around 1.5%
+  when cursor blinking: doesn't blink
+  when wiggling cursor around on top CPU around 1.5%
+  when doing nothing <1%
+  
+gedit (presumably GTK):
+  when typing in text CPU around 3%
+  when cursor blinking CPU around 0.5%
+  when wiggling cursor around on top CPU around 4%
+  when doing nothing <1%
+  
+(having an option to disable cursor blinking is good!)  
+ 
+
+
+

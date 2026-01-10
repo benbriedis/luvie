@@ -1,0 +1,24 @@
+[package]
+name = "fltkui"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ben Briedis <you@example.com>"]
+
+[dependencies]
+fltk = "^1.5"
+fltk-theme = "0.7.9"
+
+#[profile.release]
+#opt-level = "z"  # Optimize for minimum size ("s" is for size/speed balance)
+#lto = true     # Using "thin" may save a little compilation time
+#codegen-units = 1 # Helps LTO optimize more effectively (can increase compile time)
+
+# Together these remove about 3M for the counter application
+#strip = "symbols" # Strip debug symbols and backtrace information
+#panic = "abort"  # Abort on panic instead of unwinding the stack (saves unwinding machinery)
+
+# More suggestions for smaller binaries
+# https://github.com/johnthagen/min-sized-rust
+
+# Maybe speed up compilation? Or is Rust using this already? Note that I think 'lto = true' disables parallel linking
+# https://github.com/rui314/mold
