@@ -39,6 +39,18 @@ struct GridApp {
     1. Implement a "sweep" or "rapid" / "rapid add" mode for quickly adding or removing notes.
 */
 
+//XXX do we really have to use static? Fltk's draw() function is requiring it
+static cells:Vec<Cell> = Vec::new();
+
+static settings: GridSettings = GridSettings {
+    numRows: 8,
+    numCols: 20, 
+    rowHeight: 30.0, 
+    colWidth: 40.0,
+    snap: Some(0.25),
+    popupWidth: 200.0
+};
+
 fn main() {
 //    let app = app::App::default().with_scheme(app::Scheme::Gtk);
     let app = app::App::default().with_scheme(app::Scheme::Oxy);
@@ -71,6 +83,7 @@ fn main() {
 
 //XXX or use builder??
 
+/*    
     let settings = GridSettings {
         numRows: 8,
         numCols: 20, 
@@ -81,6 +94,8 @@ fn main() {
     };
 
     let cells = Vec::new();
+*/
+
 
 //    let mut but_dec = GridArea::default()
 //    let mut but_dec = GridArea::new();
