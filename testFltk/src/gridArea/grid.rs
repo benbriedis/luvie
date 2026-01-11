@@ -35,24 +35,21 @@ enum CursorMode {
     MOVING(MoveData),
 }
 
-//pub struct Grid<'a> {
-pub struct Grid {
-  //  settings: &'a GridSettings,
+pub struct Grid<'a> {
+    settings: &'a GridSettings,
 
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
-  //  cells: &'a Vec<Cell>,
+    cells: &'a Vec<Cell>,
 
-//    mode: CursorMode,
+    mode: CursorMode,
 
 //NEW:
     /* Extending this: */
     widget: Widget
 }
 
-//impl<'a> Grid<'a> {
-impl Grid {
-//    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
-    pub fn new() -> Self
+impl<'a> Grid<'a> {
+    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
     {   
         let mut widget = Widget::default(); //XXX can we use Box here instead?
 //        let mut widget = Widget::new(10,10 , 50, 50 , "HERE I AM");
@@ -74,20 +71,15 @@ impl Grid {
         });
 
         Self {
+            settings,
+            cells,
+            mode: CursorMode::INIT,
             widget
         }
-/*        
-        Self {
-            settings,
-            cells: cells,
-            mode: CursorMode::INIT,
-        }
-*/
     }
 }    
 
-//fltk::widget_extends!(Grid, group::Pack, p);
-fltk::widget_extends!(Grid, Widget, widget);
+fltk::widget_extends!(Grid<'_>, Widget, widget);
 
 /*
     fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)

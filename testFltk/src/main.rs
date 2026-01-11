@@ -65,9 +65,21 @@ fn main() {
 
 //XXX or use builder??
 
+    let settings = GridSettings {
+        numRows: 8,
+        numCols: 20, 
+        rowHeight: 30.0, 
+        colWidth: 40.0,
+        snap: Some(0.25),
+        popupWidth: 200.0
+    };
+
+    let cells = Vec::new();
+
 //    let mut but_dec = GridArea::default()
 //    let mut but_dec = GridArea::new();
-    createGridArea();
+    createGridArea(&settings,&cells);
+//pub fn createGridArea<'a>(settings:&'a GridSettings, cells: &'a Vec<Cell>) 
 
 
 //    CustomBox::new(10,10, 100, 20,"mySlider" );
@@ -79,3 +91,4 @@ fn main() {
     /* Event handling */
     app.run().unwrap();
 }
+
