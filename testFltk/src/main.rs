@@ -74,10 +74,10 @@ fn main() {
     let settings = GridSettings {
         numRows: 8,
         numCols: 20, 
-        rowHeight: 30, 
-        colWidth: 40,
+        rowHeight: 30.0, 
+        colWidth: 40.0,
         snap: Some(0.25),
-        popupWidth: 200
+        popupWidth: 200.0
     };
 
     let cells = Vec::new();
