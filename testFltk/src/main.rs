@@ -11,10 +11,12 @@ mod customBox;
 #[derive(Debug,Default,Clone,Copy,PartialEq)]
 struct Cell {
     row: usize,
+//XXX possibly best leaving Cell as f32
     col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
     length: f32
 }
 
+/* Using f32 and usize to be independent of Fltk at this level and to allow for high precision graphics in future */
 struct GridSettings {
     numRows: usize,
     numCols: usize,
@@ -32,6 +34,10 @@ struct GridApp {
     velocity: u8
 }
 
+/*
+    TODO
+    1. Implement a "sweep" or "rapid" / "rapid add" mode for quickly adding or removing notes.
+*/
 
 fn main() {
 //    let app = app::App::default().with_scheme(app::Scheme::Gtk);
@@ -68,10 +74,10 @@ fn main() {
     let settings = GridSettings {
         numRows: 8,
         numCols: 20, 
-        rowHeight: 30.0, 
-        colWidth: 40.0,
+        rowHeight: 30, 
+        colWidth: 40,
         snap: Some(0.25),
-        popupWidth: 200.0
+        popupWidth: 200
     };
 
     let cells = Vec::new();

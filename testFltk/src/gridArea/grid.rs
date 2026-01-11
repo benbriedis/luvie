@@ -2,6 +2,12 @@ use std::fmt::Debug;
 use fltk::{draw, enums::{self, FrameType,*}, prelude::*, widget::Widget,*};
 use crate::{Cell, GridSettings};
 
+/* NOTE Fltk's use of i32 is a legacy, so I only use convert types to it at the very last moment */
+#[derive(Debug,Default,Clone,PartialEq)]
+struct Point {
+    x: f32,
+    y: f32
+}
 
 #[derive(Debug,Default,Clone,PartialEq)]
 enum Side {
@@ -19,7 +25,7 @@ struct ResizeData {
 #[derive(Debug,Default,Clone,PartialEq)]
 struct MoveData {
     cellIndex: usize,
-//    grabPosition: Point,
+    grabPosition: Point,
     lastValid: Cell,
     workingCell: Cell,
     amOverlapping: bool,
@@ -43,7 +49,7 @@ pub struct Grid<'a> {
 
     mode: CursorMode,
 
-//NEW:
+//NEW XXX: Q: do we need this in self?
     /* Extending this: */
     widget: Widget
 }
@@ -77,26 +83,24 @@ impl<'a> Grid<'a> {
             widget
         }
     }
-}    
 
-fltk::widget_extends!(Grid<'_>, Widget, widget);
-
-/*
-    fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
+    fn drawCell(&self,c: Cell)
     {
         let s = self.settings;
         let lineWidth = 1.0;
 
          //TODO possibly size to be inside grid, although maybe not at start
-        let point = Point::new(c.col as f32 * s.colWidth, c.row as f32 * s.rowHeight +lineWidth);
-        let size = Size::new(c.length * s.colWidth, s.rowHeight - 2.0 * lineWidth);
-        let path = canvas::Path::rectangle(point,size);
-        frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
+        let x = (c.col * s.colWidth).round() as i32;
+        let y = (c.row as f32 * s.rowHeight + lineWidth).round() as i32;
+        let width = (c.length * s.colWidth).round() as i32;
+        let height = (s.rowHeight - 2.0 * lineWidth).round() as i32;
+        draw::set_draw_color(Color::from_rgb(0x12, 0x93, 0xD8));
+        draw::draw_rectf(x,y,width,height);
 
-        / * Add the dark line on the left: * /
-        let size2 = Size::new(8.0, s.rowHeight - 2.0 * lineWidth);
-        let path2 = canvas::Path::rectangle(point,size2);
-        frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
+        /* Add the dark line on the left: */
+        let height = (s.rowHeight - 2.0 * lineWidth).round() as i32;
+        draw::set_draw_color(Color::from_rgb(0x12, 0x60, 0x90));
+        draw::draw_rectf(x,y,8,height);
     }
 
     fn findCellForCursor(&mut self,pos:Point)
@@ -104,7 +108,7 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
         let s = self.settings;
         let resizeZone: f32 = 8.0;
 
-        let row = (pos.y / s.rowHeight).floor() as usize;
+        let row = (pos.y as f32 / s.rowHeight).floor() as usize;
 
         self.mode = CursorMode::POINTER;
 
@@ -117,21 +121,21 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
             let rightEdge = (n.col + n.length) * s.colWidth;
 
 //TODO consider converting to a true function now            
-            if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
+            if leftEdge - pos.x as f32 <= resizeZone && pos.x as f32 - leftEdge <= resizeZone {
                 self.mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::LEFT,
                     workingCell: Cell {row:n.row,col:n.col,length:n.length}
                 });
             }
-            else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
+            else if rightEdge - pos.x as f32 <= resizeZone && pos.x - rightEdge <= resizeZone {
                 self.mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::RIGHT,
                     workingCell: Cell {row:n.row,col:n.col,length:n.length}
                 });
             }
-            else if pos.x >= leftEdge && pos.x <= rightEdge {
+            else if pos.x as f32 >= leftEdge && pos.x as f32 <= rightEdge {
                 let grabPos = Point {
                     x: pos.x - n.col * s.colWidth,
                     y: pos.y - n.row as f32 * s.rowHeight
@@ -144,7 +148,7 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
                     amOverlapping: false
                 });
 
-                / * Move takes precedence over resizing any neighbouring notes * /
+                /* Move takes precedence over resizing any neighbouring notes */
                 return;
             }
         }
@@ -161,7 +165,7 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
 
         cell.col = (pos.x - data.grabPosition.x) / s.colWidth; 
 
-        / * Ensure the note stays within X bounds * /
+        /* Ensure the note stays within X bounds */
         if cell.col < 0.0 {
             cell.col = 0.0;
         }
@@ -169,7 +173,7 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
             cell.col = s.numCols as f32 - cell.length;
         }
 
-        / * Apply snap * /
+        /* Apply snap */
 //FIXME For moves consider snapping on end if we picked it up closer to the end that the start (or having a mode)       
         if let Some(snap) = s.snap {
             cell.col = (cell.col / snap).round() * snap;
@@ -177,7 +181,7 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
 
         cell.row = ((pos.y - data.grabPosition.y + s.rowHeight/2.0) / s.rowHeight).floor() as usize;
 
-        / * Ensure the note stays within Y bounds * /
+        /* Ensure the note stays within Y bounds */
         if cell.row < 0 {
             cell.row = 0;
         }
@@ -192,10 +196,10 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
         }
     }
 
-    / *
+    /*
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
        The second one (optional) might allow it to move relative to the bar.
-    * /
+    */
     fn resizing(&mut self,pos:Point)
     {
         let CursorMode::RESIZING(ref mut data) = self.mode else {
@@ -214,7 +218,7 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
                 let endCol = cell.col + cell.length;
                 cell.col = pos.x / s.colWidth; 
 
-                / * Apply snap: * /
+                /* Apply snap: */
                 if let Some(snap) = s.snap {
                     cell.col = (cell.col / snap).round() * snap;
                 }
@@ -254,7 +258,10 @@ fltk::widget_extends!(Grid<'_>, Widget, widget);
             }
         }
     }
-}
+}    
+
+fltk::widget_extends!(Grid<'_>, Widget, widget); //XXX better here or at bottom?
+
 
 fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<usize>
 {
@@ -286,39 +293,12 @@ fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<us
 }
 
 
-#[derive(Default)]
-struct State {
-    cache: canvas::Cache,
-}
+//        layout::Node::new(Size::new(s.numCols as f32 * s.colWidth, s.numRows as f32 * s.rowHeight))
 
+/*
 
 impl<'a> Widget<GridAreaMessage, Theme, Renderer> for Grid<'a>
 {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<State>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(State::default())
-    }
-
-    fn size(&self) -> Size<Length> {
-        Size {
-            width: Length::Shrink,
-            height: Length::Shrink,
-        }
-    } 
-
-    fn layout(
-        &mut self,
-        _tree: &mut widget::Tree,
-        _renderer: &Renderer,
-        _limits: &layout::Limits,
-    ) -> layout::Node {
-        let s = self.settings;
-        layout::Node::new(Size::new(s.numCols as f32 * s.colWidth, s.numRows as f32 * s.rowHeight))
-    }
-
     fn draw(
         &self,
         tree: &Tree,
@@ -558,10 +538,5 @@ let exPalette = theme.extended_palette();
     }
 }
 
-impl<'a> From<Grid<'a>> for Element<'a,GridAreaMessage> {
-    fn from(grid: Grid<'a>) -> Self {
-        Self::new(grid)
-    }
-}
 */
 
