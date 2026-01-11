@@ -68,6 +68,7 @@ fn main() {
         .with_size(160, 200)
         .center_screen()
         .with_label("Counter");
+/*
     let mut frame = Frame::default()
         .with_size(100, 40)
         .center_of(&wind)
@@ -80,6 +81,7 @@ fn main() {
         .size_of(&frame)
         .below_of(&frame, 0)
         .with_label("-");
+*/
 
 //XXX or use builder??
 

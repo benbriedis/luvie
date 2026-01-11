@@ -54,60 +54,51 @@ pub struct Grid {
     widget: Widget
 }
 
-fn draw2(w: &Widget) 
-//    fn draw(&self,w:XXX)
-{
-//      draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
-    draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
-
-    draw::set_draw_color(Color::from_u32(0xffffff)); // for the text
-    draw::set_font(enums::Font::Helvetica, 12);
-//            draw::draw_text2(&w.label(), w.x(), w.y(), w.w(), w.h(), w.align());
-    draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
-
-//      fltk::draw::set_draw_color(*color.borrow());
-}
-
 
 impl Grid {
+
+//TODO to cope with the static lifetime maybe use multiple owners? eg
+//        let color = Rc::new(RefCell::new(Color::Red));
+
     pub fn new<'a:'static>(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
 //    pub fn new(settings:&GridSettings, cells: &Vec<Cell>) -> Self
     {   
-        let mut widget = Widget::default(); //XXX can we use Box here instead?
-//        let mut widget = Widget::new(10,10 , 50, 50 , "HERE I AM");
-        widget.set_frame(FrameType::FlatBox);  //XXX just use regular Box?
-        //widget.widget_resize(10,10 ,50 ,50);
-        widget.set_color(enums::Color::White);
-//        let color = Rc::new(RefCell::new(Color::Red));
+        let width = (settings.numCols as f32 * settings.colWidth).round() as i32;
+        let height = (settings.numRows as f32 * settings.rowHeight).round() as i32;
 
-/*        
-        let myself = Self {
-            settings,
-            cells,
-            mode: CursorMode::INIT,
-            widget
-        };
-*/
+        let mut widget = Widget::new(0,0,width,height,None); //XXX can we use Box here instead?
+//        let mut widget = Widget::default(); //XXX can we use Box here instead?
+//        widget.set_frame(FrameType::FlatBox);  //XXX do we want anything like this?
 
         widget.draw(|_w| {       //XXX is w = widget, = Grid, or other?
-//            myself.draw1(w);
-//            draw2(w);
             draw(settings,cells,CursorMode::INIT);
-
-/*            
-//            draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
-            draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
-
-            draw::set_draw_color(Color::from_u32(0xffffff)); // for the text
-            draw::set_font(enums::Font::Helvetica, 12);
-//            draw::draw_text2(&w.label(), w.x(), w.y(), w.w(), w.h(), w.align());
-            draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
-
-//                fltk::draw::set_draw_color(*color.borrow());
-*/
         });
 
-//        myself
+        widget.handle(|b, ev| match ev {
+            Event::Enter => {
+                println!("GOT Enter");
+                true
+            },
+            Event::Push => {
+                println!("GOT Push");
+
+                /*
+                if b.value() {
+                    b.set_align(Align::Left | Align::Inside);
+                } else {
+                    b.set_align(Align::Right | Align::Inside);
+                }
+                */
+                app::redraw();
+                true
+            }
+//            _ => false,
+            _ => {
+                println!("GOT other event ev:{ev:?}");
+                false
+            }
+        });
+
 //XXX do we need to store all of these?        
         Self {
 //            settings,
@@ -115,24 +106,6 @@ impl Grid {
             mode: CursorMode::INIT,
             widget
         }
-    }
-
-//                fn draw<F: FnMut(&mut Self) + 'static>(&mut self, cb: F) {
-
-//    fn draw<F: FnMut(&mut Self)>(&mut self, cb: F) 
-//    fn draw<F: FnMut(&mut Self) + 'static>(&self, cb: F) 
-    fn draw1(&self, w: &Widget) 
-//    fn draw(&self,w:XXX)
-    {
-//      draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
-        draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
-
-        draw::set_draw_color(Color::from_u32(0xffffff)); // for the text
-        draw::set_font(enums::Font::Helvetica, 12);
-//            draw::draw_text2(&w.label(), w.x(), w.y(), w.w(), w.h(), w.align());
-        draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
-
-//      fltk::draw::set_draw_color(*color.borrow());
     }
 
     fn findCellForCursor(&mut self,settings:&GridSettings,cells:&Vec<Cell>, pos:Point)
@@ -327,21 +300,11 @@ fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<us
 fn draw(settings:&GridSettings,cells:&Vec<Cell>,mode:CursorMode) 
 {
     let s = settings;
-// _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
-
-//XXX these extensions arent enough here. Probably just need background + text + custom colours
-//let exPalette = theme.extended_palette();
-
-//    let state = tree.state.downcast_ref::<State>();
-
-//    let bounds = layout.bounds();
-//        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
-
 
 //TODO cache this? or parts?
 
-        //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
-        //XXX could possibly omit redrawing cells not on the last row too.
+    //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
+    //XXX could possibly omit redrawing cells not on the last row too.
     
     /* Draw the grid horizontal lines: */
     for i in 0..=s.numRows {
@@ -409,144 +372,142 @@ fn drawCell(settings:&GridSettings,c:Cell)
 //        layout::Node::new(Size::new(s.numCols as f32 * s.colWidth, s.numRows as f32 * s.rowHeight))
 
 /*
+fn update(
+    &mut self,
+    tree: &mut Tree,
+    event: &Event,
+    _layout: Layout<'_>,
+    cursor: mouse::Cursor,
+    _renderer: &Renderer,
+    _clipboard: &mut dyn Clipboard,
+    shell: &mut Shell<'_, GridAreaMessage>,
+    _viewport: &Rectangle,
+) {
+    let state = tree.state.downcast_ref::<State>();
+    let s = self.settings;
 
-impl<'a> Widget<GridAreaMessage, Theme, Renderer> for Grid<'a>
-{
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        _layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, GridAreaMessage>,
-        _viewport: &Rectangle,
-    ) {
-        let state = tree.state.downcast_ref::<State>();
-        let s = self.settings;
+    / * 
+        THINK update() has to be called before the first call to draw() as self in draw is 
+        immutable and cursor etc are unavailable in new().
+    * /
 
-        / * 
-            THINK update() has to be called before the first call to draw() as self in draw is 
-            immutable and cursor etc are unavailable in new().
-        * /
-
-        if self.mode == CursorMode::INIT {
-            if let Some(pos) = cursor.position() {
-                self.findCellForCursor(pos);
+    if self.mode == CursorMode::INIT {
+        if let Some(pos) = cursor.position() {
+            self.findCellForCursor(pos);
 
 //                state.cache.clear();  
 //                shell.request_redraw();
-            }
         }
+    }
 
-        match &event {
+    match &event {
 //            Event::Window(window::Event::RedrawRequested(now)) => {
 //            }
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                shell.capture_event();
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+            shell.capture_event();
 
-                match &self.mode {
-                    CursorMode::MOVABLE(data) => {
-                        self.mode = CursorMode::MOVING(data.clone());
-                        / * Required in case you click on a filled cell without moving it * /
-                        //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
-                    }
-                    CursorMode::RESIZABLE(data) => {
-                        self.mode = CursorMode::RESIZING(data.clone());
-                    }
-                    _ => {
-                        if let Some(position) = cursor.position() {
-                            / * Add a cell: * /
-                            let row = (position.y / s.rowHeight).floor() as usize;
-                            let col = (position.x / s.colWidth).floor() as f32;
+            match &self.mode {
+                CursorMode::MOVABLE(data) => {
+                    self.mode = CursorMode::MOVING(data.clone());
+                    / * Required in case you click on a filled cell without moving it * /
+                    //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
+                }
+                CursorMode::RESIZABLE(data) => {
+                    self.mode = CursorMode::RESIZING(data.clone());
+                }
+                _ => {
+                    if let Some(position) = cursor.position() {
+                        / * Add a cell: * /
+                        let row = (position.y / s.rowHeight).floor() as usize;
+                        let col = (position.x / s.colWidth).floor() as f32;
 
-                            let cell = Cell{row,col,length:1.0};
+                        let cell = Cell{row,col,length:1.0};
 
-                            / * NOTE in future if the min values are > 0 then min contraints will need to be added * /
-                            if position.x < s.colWidth * s.numCols as f32 && position.y < s.rowHeight * s.numRows as f32 {
-                                if let None = overlappingCell(self.cells,&cell,None) {
-                                    state.cache.clear();  
-   //XXX being called when we click out of context menu                                
-                                    shell.publish(GridAreaMessage::Cells(CellMessage::AddCell(cell)));
-                                }
+                        / * NOTE in future if the min values are > 0 then min contraints will need to be added * /
+                        if position.x < s.colWidth * s.numCols as f32 && position.y < s.rowHeight * s.numRows as f32 {
+                            if let None = overlappingCell(self.cells,&cell,None) {
+                                state.cache.clear();  
+//XXX being called when we click out of context menu                                
+                                shell.publish(GridAreaMessage::Cells(CellMessage::AddCell(cell)));
                             }
                         }
                     }
                 }
             }
-            Event::Mouse(mouse::Event::CursorMoved{position}) => {
-                match &mut self.mode {
-                    CursorMode::MOVING(_) => {
-                        self.moving(*position);
-                        state.cache.clear();  
-                        shell.request_redraw();
-                    }
-                    CursorMode::RESIZING(ref mut data) => {
-                        self.resizing(*position);
-                        state.cache.clear();  
-                        shell.request_redraw();
-                    }
-                    _ => {
-                        self.findCellForCursor(*position);
-                    }
+        }
+        Event::Mouse(mouse::Event::CursorMoved{position}) => {
+            match &mut self.mode {
+                CursorMode::MOVING(_) => {
+                    self.moving(*position);
+                    state.cache.clear();  
+                    shell.request_redraw();
                 }
-
+                CursorMode::RESIZING(ref mut data) => {
+                    self.resizing(*position);
+                    state.cache.clear();  
+                    shell.request_redraw();
+                }
+                _ => {
+                    self.findCellForCursor(*position);
+                }
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                match &self.mode {
-                    CursorMode::MOVING(data) => {
-                        state.cache.clear();  
 
-                        if data.amOverlapping {
-                            shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.lastValid)));
+        }
+        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+            match &self.mode {
+                CursorMode::MOVING(data) => {
+                    state.cache.clear();  
+
+                    if data.amOverlapping {
+                        shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.lastValid)));
 //                            shell.publish(CellMessage::ModifyCell(data.cellIndex,data.lastValid));
-                        }
-                        else {
-                            shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
-                        }
-                        self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
                     }
-                    CursorMode::RESIZING(data) => {
-                        state.cache.clear();  
+                    else {
                         shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
-                        self.mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                     }
-                    _ => {}
+                    self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
                 }
-            }
-            //XXX or is using ButtonPressed better?
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
-                shell.capture_event();
-
-                match &self.mode {
-                    //XXX slightly hacky approach? Note that RESIZABLE slightly extends the clickable area. Possibly desirable.
-                    //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
-                    CursorMode::MOVABLE(data)  => {
-                        state.cache.clear();  
-                        shell.publish(GridAreaMessage::RightClick(data.cellIndex));
-                    }
-                    CursorMode::RESIZABLE(data) => {
-                        state.cache.clear();  
-                        shell.publish(GridAreaMessage::RightClick(data.cellIndex));
-                    }
-                    _ => {}
+                CursorMode::RESIZING(data) => {
+                    state.cache.clear();  
+                    shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
+                    self.mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                 }
+                _ => {}
             }
-            _ => ()
         }
+        //XXX or is using ButtonPressed better?
+        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Right)) => {
+            shell.capture_event();
+
+            match &self.mode {
+                //XXX slightly hacky approach? Note that RESIZABLE slightly extends the clickable area. Possibly desirable.
+                //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
+                CursorMode::MOVABLE(data)  => {
+                    state.cache.clear();  
+                    shell.publish(GridAreaMessage::RightClick(data.cellIndex));
+                }
+                CursorMode::RESIZABLE(data) => {
+                    state.cache.clear();  
+                    shell.publish(GridAreaMessage::RightClick(data.cellIndex));
+                }
+                _ => {}
+            }
+        }
+        _ => ()
     }
+}
+*/
 
-    fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
-    {
-        match &self.mode {
-            CursorMode::INIT => mouse::Interaction::Help,  //XXX shouldnt actually be shown
-            CursorMode::MOVABLE(_) => Grab,
-            CursorMode::MOVING(data) => if data.amOverlapping { NotAllowed } else { Grabbing },
-            CursorMode::RESIZABLE(_) => ResizingHorizontally,
-            CursorMode::RESIZING(_) => ResizingHorizontally,
-            _ => mouse::Interaction::default()
-        }
+/*
+fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
+{
+    match &self.mode {
+        CursorMode::INIT => mouse::Interaction::Help,  //XXX shouldnt actually be shown
+        CursorMode::MOVABLE(_) => Grab,
+        CursorMode::MOVING(data) => if data.amOverlapping { NotAllowed } else { Grabbing },
+        CursorMode::RESIZABLE(_) => ResizingHorizontally,
+        CursorMode::RESIZING(_) => ResizingHorizontally,
+        _ => mouse::Interaction::default()
     }
 }
 
