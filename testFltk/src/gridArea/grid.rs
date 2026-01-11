@@ -41,11 +41,11 @@ enum CursorMode {
     MOVING(MoveData),
 }
 
-pub struct Grid<'a> {
-    settings: &'a GridSettings,
+pub struct Grid {
+//    settings: &'a GridSettings,
 
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
-    cells: &'a Vec<Cell>,
+//    cells: &'a Vec<Cell>,
 
     mode: CursorMode,
 
@@ -54,8 +54,24 @@ pub struct Grid<'a> {
     widget: Widget
 }
 
-impl<'a> Grid<'a> {
-    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
+fn draw2(w: &Widget) 
+//    fn draw(&self,w:XXX)
+{
+//      draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
+    draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
+
+    draw::set_draw_color(Color::from_u32(0xffffff)); // for the text
+    draw::set_font(enums::Font::Helvetica, 12);
+//            draw::draw_text2(&w.label(), w.x(), w.y(), w.w(), w.h(), w.align());
+    draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
+
+//      fltk::draw::set_draw_color(*color.borrow());
+}
+
+
+impl Grid {
+    pub fn new<'a:'static>(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
+//    pub fn new(settings:&GridSettings, cells: &Vec<Cell>) -> Self
     {   
         let mut widget = Widget::default(); //XXX can we use Box here instead?
 //        let mut widget = Widget::new(10,10 , 50, 50 , "HERE I AM");
@@ -64,7 +80,21 @@ impl<'a> Grid<'a> {
         widget.set_color(enums::Color::White);
 //        let color = Rc::new(RefCell::new(Color::Red));
 
-        widget.draw(|w| {
+/*        
+        let myself = Self {
+            settings,
+            cells,
+            mode: CursorMode::INIT,
+            widget
+        };
+*/
+
+        widget.draw(|_w| {       //XXX is w = widget, = Grid, or other?
+//            myself.draw1(w);
+//            draw2(w);
+            draw(settings,cells,CursorMode::INIT);
+
+/*            
 //            draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
             draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
 
@@ -74,45 +104,47 @@ impl<'a> Grid<'a> {
             draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
 
 //                fltk::draw::set_draw_color(*color.borrow());
+*/
         });
 
+//        myself
+//XXX do we need to store all of these?        
         Self {
-            settings,
-            cells,
+//            settings,
+//            cells,
             mode: CursorMode::INIT,
             widget
         }
     }
 
-    fn drawCell(&self,c: Cell)
+//                fn draw<F: FnMut(&mut Self) + 'static>(&mut self, cb: F) {
+
+//    fn draw<F: FnMut(&mut Self)>(&mut self, cb: F) 
+//    fn draw<F: FnMut(&mut Self) + 'static>(&self, cb: F) 
+    fn draw1(&self, w: &Widget) 
+//    fn draw(&self,w:XXX)
     {
-        let s = self.settings;
-        let lineWidth = 1.0;
+//      draw::draw_box(w.frame(), w.x(), w.y(), w.w(), w.h(), w.color());
+        draw::draw_box(w.frame(), 10, 10, 100, 50,enums::Color::Red );  //NOTE theme is setting this colour
 
-         //TODO possibly size to be inside grid, although maybe not at start
-        let x = (c.col * s.colWidth).round() as i32;
-        let y = (c.row as f32 * s.rowHeight + lineWidth).round() as i32;
-        let width = (c.length * s.colWidth).round() as i32;
-        let height = (s.rowHeight - 2.0 * lineWidth).round() as i32;
-        draw::set_draw_color(Color::from_rgb(0x12, 0x93, 0xD8));
-        draw::draw_rectf(x,y,width,height);
+        draw::set_draw_color(Color::from_u32(0xffffff)); // for the text
+        draw::set_font(enums::Font::Helvetica, 12);
+//            draw::draw_text2(&w.label(), w.x(), w.y(), w.w(), w.h(), w.align());
+        draw::draw_text2("HERE I AM", 10, 10, 100, 50, w.align());
 
-        /* Add the dark line on the left: */
-        let height = (s.rowHeight - 2.0 * lineWidth).round() as i32;
-        draw::set_draw_color(Color::from_rgb(0x12, 0x60, 0x90));
-        draw::draw_rectf(x,y,8,height);
+//      fltk::draw::set_draw_color(*color.borrow());
     }
 
-    fn findCellForCursor(&mut self,pos:Point)
+    fn findCellForCursor(&mut self,settings:&GridSettings,cells:&Vec<Cell>, pos:Point)
     {
-        let s = self.settings;
+        let s = settings;
         let resizeZone: f32 = 8.0;
 
         let row = (pos.y as f32 / s.rowHeight).floor() as usize;
 
         self.mode = CursorMode::POINTER;
 
-        for (i,n) in self.cells.iter().enumerate() {
+        for (i,n) in cells.iter().enumerate() {
             if n.row != row {
                 continue;
             }
@@ -154,13 +186,13 @@ impl<'a> Grid<'a> {
         }
     }
 
-    pub fn moving(&mut self,pos:Point)
+    pub fn moving(&mut self,settings:&GridSettings,cells:&Vec<Cell>,pos:Point)
     {
         let CursorMode::MOVING(ref mut data) = self.mode else {
             return;
         };
 
-        let s = self.settings;
+        let s = settings;
         let cell = &mut data.workingCell;
 
         cell.col = (pos.x - data.grabPosition.x) / s.colWidth; 
@@ -189,7 +221,7 @@ impl<'a> Grid<'a> {
             cell.row = s.numRows - 1;
         }
 
-        data.amOverlapping = overlappingCell(self.cells,&cell,Some(data.cellIndex)).is_some();
+        data.amOverlapping = overlappingCell(cells,&cell,Some(data.cellIndex)).is_some();
 
         if !data.amOverlapping {
             data.lastValid = cell.clone();
@@ -200,13 +232,13 @@ impl<'a> Grid<'a> {
        NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
        The second one (optional) might allow it to move relative to the bar.
     */
-    fn resizing(&mut self,pos:Point)
+    fn resizing(&mut self,settings:&GridSettings,cells:&Vec<Cell>,pos:Point)
     {
         let CursorMode::RESIZING(ref mut data) = self.mode else {
             return;
         };
 
-        let s = self.settings;
+        let s = settings;
 
     //XXX if changing grid size want the num of pixels to remain constant.
         let minLength = 10.0 / s.colWidth;
@@ -224,8 +256,8 @@ impl<'a> Grid<'a> {
                 }
 
                 let testCell = Cell{row:cell.row,col:cell.col,length: endCol - cell.col};
-                let neighbour = overlappingCell(self.cells,&testCell,Some(data.cellIndex));
-                let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
+                let neighbour = overlappingCell(cells,&testCell,Some(data.cellIndex));
+                let min = if let Some(n) = neighbour { cells[n].col + cells[n].length } else { 0.0 };
                 if cell.col < min {
                     cell.col = min;
                 }
@@ -246,8 +278,8 @@ impl<'a> Grid<'a> {
                     cell.length = endCol - cell.col;
                 }
 
-                let neighbour = overlappingCell(self.cells,&cell,Some(data.cellIndex));
-                let max = if let Some(n) = neighbour { self.cells[n].col } else { s.numCols as f32 };
+                let neighbour = overlappingCell(cells,&cell,Some(data.cellIndex));
+                let max = if let Some(n) = neighbour { cells[n].col } else { s.numCols as f32 };
                 if cell.col + cell.length > max {
                     cell.length = max - cell.col;
                 }
@@ -260,7 +292,7 @@ impl<'a> Grid<'a> {
     }
 }    
 
-fltk::widget_extends!(Grid<'_>, Widget, widget); //XXX better here or at bottom?
+fltk::widget_extends!(Grid, Widget, widget); //XXX better here or at bottom?
 
 
 fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<usize>
@@ -292,6 +324,87 @@ fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<us
     return None;
 }
 
+fn draw(settings:&GridSettings,cells:&Vec<Cell>,mode:CursorMode) 
+{
+    let s = settings;
+// _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
+
+//XXX these extensions arent enough here. Probably just need background + text + custom colours
+//let exPalette = theme.extended_palette();
+
+//    let state = tree.state.downcast_ref::<State>();
+
+//    let bounds = layout.bounds();
+//        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
+
+
+//TODO cache this? or parts?
+
+        //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
+        //XXX could possibly omit redrawing cells not on the last row too.
+    
+    /* Draw the grid horizontal lines: */
+    for i in 0..=s.numRows {
+        let y = (i as f32 * s.rowHeight).round() as i32;
+        let endX = (s.numCols as f32 * s.colWidth).round() as i32;
+        draw::set_draw_color(Color::from_rgb(0x12, 0xee, 0x12));
+        draw::draw_line(0, y, endX, y);
+    }
+
+    /* Draw the grid vertical lines: */
+    for i in 0..=s.numCols {
+        let x = (i as f32 * s.colWidth).round() as i32;
+        let endY = (s.numRows as f32 * s.rowHeight).round() as i32;
+        draw::set_draw_color(Color::from_rgb(0xee, 0x12, 0x12));
+        draw::draw_line(x, 0, x, endY);
+    }
+
+    /* Draw cells: */
+    for (i,c) in cells.iter().enumerate() {
+        match mode {
+            CursorMode::MOVING(ref data) => {
+                if i != data.cellIndex {
+                    drawCell(settings,*c);
+                }
+            }
+            CursorMode::RESIZING(ref data) => {
+                if i != data.cellIndex {
+                    drawCell(settings,*c);
+                }
+            }
+            _ => drawCell(settings,*c)
+        }
+    };
+
+    /* Draw selected note last so it sits on top */
+    match mode {
+        CursorMode::MOVING(ref data) => drawCell(settings,data.workingCell),
+        CursorMode::RESIZING(ref data) => drawCell(settings,data.workingCell),
+        _ => ()
+    }
+
+    // TODO maybe draw an app
+}
+
+fn drawCell(settings:&GridSettings,c:Cell)
+{
+    let s = settings;
+    let lineWidth = 1.0;
+
+     //TODO possibly size to be inside grid, although maybe not at start
+    let x = (c.col * s.colWidth).round() as i32;
+    let y = (c.row as f32 * s.rowHeight + lineWidth).round() as i32;
+    let width = (c.length * s.colWidth).round() as i32;
+    let height = (s.rowHeight - 2.0 * lineWidth).round() as i32;
+    draw::set_draw_color(Color::from_rgb(0x12, 0x93, 0xD8));
+    draw::draw_rectf(x,y,width,height);
+
+    /* Add the dark line on the left: */
+    let height = (s.rowHeight - 2.0 * lineWidth).round() as i32;
+    draw::set_draw_color(Color::from_rgb(0x12, 0x60, 0x90));
+    draw::draw_rectf(x,y,8,height);
+}
+
 
 //        layout::Node::new(Size::new(s.numCols as f32 * s.colWidth, s.numRows as f32 * s.rowHeight))
 
@@ -299,107 +412,6 @@ fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<us
 
 impl<'a> Widget<GridAreaMessage, Theme, Renderer> for Grid<'a>
 {
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        _style: &renderer::Style,
-        layout: Layout<'_>,
-        _cursor: mouse::Cursor,
-        _viewport: &Rectangle,    //XXX relationship with layout.bounds?
-    ) {
-        let s = self.settings;
-// _style: Style { text_color: Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } }
-
-//XXX these extensions arent enough here. Probably just need background + text + custom colours
-let exPalette = theme.extended_palette();
-
-        let state = tree.state.downcast_ref::<State>();
-
-        let bounds = layout.bounds();
-//        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
-
-
-        let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
-
-            //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
-            //XXX could possibly omit redrawing cells not on the last row too.
-        
-            / * Draw the grid horizontal lines: * /
-            for i in 0..=s.numRows {
-                let line = Path::line(
-                    Point {x: 0.0, y: i as f32 * s.rowHeight},
-                    Point {x: s.numCols as f32 * s.colWidth, y: i as f32 * s.rowHeight}
-                );
-
-                frame.stroke(&line, Stroke {
-                    width: 1.0,
-                    style: stroke::Style::Solid(Color::from_rgb8(0x12, 0xee, 0x12)),
-//                    style: stroke::Style::Solid(exPalette.primary.base.color),
-                    ..Stroke::default()
-                });
-            }
-
-            / * Draw the grid vertical lines: * /
-            for i in 0..=s.numCols {
-                let line = Path::line(
-                    Point {x: i as f32 * s.colWidth, y: 0.0},
-                    Point {x: i as f32 * s.colWidth, y: s.numRows as f32 * s.rowHeight}
-                );
-
-                frame.stroke(&line, Stroke {
-                    width: 1.0,
-                    style: stroke::Style::Solid(Color::from_rgb8(0xee, 0x12, 0x12)),
-//                    style: stroke::Style::Solid(exPalette.secondary.base.color),
-                    ..Stroke::default()
-                });
-            }
-
-            / * Draw cells: * /
-            for (i,c) in self.cells.iter().enumerate() {
-                match self.mode {
-                    CursorMode::MOVING(ref data) => {
-                        if i != data.cellIndex {
-                            self.drawCell(frame,*c);
-                        }
-                    }
-                    CursorMode::RESIZING(ref data) => {
-                        if i != data.cellIndex {
-                            self.drawCell(frame,*c);
-                        }
-                    }
-                    _ => self.drawCell(frame,*c)
-                }
-            };
-
-            / * Draw selected note last so it sits on top * /
-            match self.mode {
-                CursorMode::MOVING(ref data) => self.drawCell(frame,data.workingCell),
-                CursorMode::RESIZING(ref data) => self.drawCell(frame,data.workingCell),
-                _ => ()
-            }
-
-            / * Draw the app border: * /
-/ *            
-            frame.stroke(
-                &canvas::Path::rectangle(Point::ORIGIN, frame.size()),
-                canvas::Stroke::default(),
-            );
-* /
-        });
-
-        use iced::advanced::Renderer as _; 
-        renderer.with_translation(
-            Vector::new(bounds.x, bounds.y),
-
-            |renderer| {
-                use iced::advanced::graphics::geometry::Renderer as _;  
-                renderer.draw_geometry(gridCache);
-            },
-        );
-    }
-
     fn update(
         &mut self,
         tree: &mut Tree,
