@@ -14,14 +14,18 @@ else
   set shortmess=aoO
 endif
 badd +83 src/main.rs
-badd +6 src/gridArea.rs
-badd +276 src/gridArea/grid.rs
-badd +251 ~/programming/luvie/testui/grid.cpp
+badd +70 src/gridArea/grid.rs
+badd +104 ~/programming/luvie/testui/grid.cpp
+badd +0 Cargo.toml
+badd +924 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fltk-1.5.22/src/macros/widget.rs
+badd +490 ~/programming/luvie/testiced/src/gridArea/grid.rs
+badd +57 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fltk-1.5.22/src/app/event.rs
 argglobal
 %argdel
 $argadd Cargo.toml
 edit src/gridArea/grid.rs
 argglobal
+balt ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/fltk-1.5.22/src/app/event.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -32,12 +36,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 276 - ((39 * winheight(0) + 20) / 40)
+let s:l = 70 - ((12 * winheight(0) + 20) / 40)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 276
-normal! 013|
+keepjumps 70
+normal! 065|
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
