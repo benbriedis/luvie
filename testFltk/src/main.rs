@@ -3,7 +3,7 @@
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 use fltk_theme::{ColorTheme, SchemeType, ThemeType, WidgetScheme, WidgetTheme, color_themes};
 
-use crate::{customBox::CustomBox, gridArea::createGridArea};
+use crate::{customBox::CustomBox, gridArea::{GridArea}};
 
 mod gridArea;
 mod customBox;
@@ -98,10 +98,18 @@ fn main() {
     let cells = Vec::new();
 */
 
+    let onAddCell = move |cellIndex| {
+        let numCells = cells.len();
+        println!("Got onAddCell cellIndex:{cellIndex:?} numCells:{numCells}");
+    };
 
-//    let mut but_dec = GridArea::default()
-//    let mut but_dec = GridArea::new();
-    createGridArea(&settings,&cells);
+    let onModifyCell = move |cellIndex,cell| {
+        let numCells = cells.len();
+        println!("Got right click cellIndex:{cellIndex} numCells:{numCells}");
+    };
+
+    GridArea::new(&settings,&cells,onAddCell,onModifyCell);
+
 //pub fn createGridArea<'a>(settings:&'a GridSettings, cells: &'a Vec<Cell>) 
 
 

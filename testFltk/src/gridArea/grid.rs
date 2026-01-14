@@ -63,15 +63,17 @@ impl Grid {
 //TODO to cope with the static lifetime maybe use multiple owners? eg
 //        let color = Rc::new(RefCell::new(Color::Red));
 
-    pub fn new<'a:'static,F>(
+    pub fn new<'a:'static,F1,F2,F3>(
         settings:&'a GridSettings,
         cells: &'a Vec<Cell>,
-        addCell: &'a fn(&Cell),
-        modifyCell: &'a fn(cellIndex:usize,&mut Cell),
-        rightClick: &'a F
+        addCell: F1,
+        modifyCell: F2,
+        rightClick: F3
     ) -> Self
     where
-        F: Fn(usize)
+        F1: Fn(&Cell),
+        F2: Fn(usize,&mut Cell),
+        F3: Fn(usize)
     {   
         let width = (settings.numCols as f32 * settings.colWidth).round() as i32;
         let height = (settings.numRows as f32 * settings.rowHeight).round() as i32;
@@ -398,13 +400,15 @@ fn resizing(settings:&GridSettings,cells:&Vec<Cell>,mode: &mut CursorMode)
     }
 }
 
-fn handleEvent<F>(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode,event:Event,
-    addCell: &fn(&Cell),
-    modifyCell: &fn(cellIndex:usize,&mut Cell),
-    rightClick: F
+fn handleEvent<F1,F2,F3>(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode,event:Event,
+    addCell: F1,
+    modifyCell: F2,
+    rightClick: F3
 ) -> bool
 where
-    F: Fn(usize)
+    F1: Fn(&Cell),
+    F2: Fn(usize,&mut Cell),
+    F3: Fn(usize)
 {
     let s = settings;
 
