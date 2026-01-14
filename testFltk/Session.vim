@@ -13,16 +13,14 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +83 src/main.rs
-badd +70 src/gridArea/grid.rs
+badd +115 src/main.rs
+badd +524 src/gridArea/grid.rs
 badd +104 ~/programming/luvie/testui/grid.cpp
-badd +33 ~/programming/luvie/testFltk/src/gridArea.rs
-badd +260 ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/boxed.rs
-badd +0 Cargo.toml
+badd +27 ~/programming/luvie/testFltk/src/gridArea.rs
 argglobal
 %argdel
 $argadd Cargo.toml
-edit src/gridArea/grid.rs
+edit src/main.rs
 let s:save_splitbelow = &splitbelow
 let s:save_splitright = &splitright
 set splitbelow splitright
@@ -39,32 +37,9 @@ set winminheight=0
 set winheight=1
 set winminwidth=0
 set winwidth=1
-exe 'vert 1resize ' . ((&columns * 92 + 92) / 185)
-exe 'vert 2resize ' . ((&columns * 92 + 92) / 185)
+exe 'vert 1resize ' . ((&columns * 79 + 92) / 185)
+exe 'vert 2resize ' . ((&columns * 105 + 92) / 185)
 argglobal
-balt ~/programming/luvie/testFltk/src/gridArea.rs
-setlocal foldmethod=manual
-setlocal foldexpr=0
-setlocal foldmarker={{{,}}}
-setlocal foldignore=#
-setlocal foldlevel=0
-setlocal foldminlines=1
-setlocal foldnestmax=20
-setlocal foldenable
-silent! normal! zE
-let &fdl = &fdl
-let s:l = 70 - ((24 * winheight(0) + 21) / 42)
-if s:l < 1 | let s:l = 1 | endif
-keepjumps exe s:l
-normal! zt
-keepjumps 70
-normal! 02|
-wincmd w
-argglobal
-if bufexists(fnamemodify("~/programming/luvie/testFltk/src/gridArea.rs", ":p")) | buffer ~/programming/luvie/testFltk/src/gridArea.rs | else | edit ~/programming/luvie/testFltk/src/gridArea.rs | endif
-if &buftype ==# 'terminal'
-  silent file ~/programming/luvie/testFltk/src/gridArea.rs
-endif
 balt src/gridArea/grid.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
@@ -76,16 +51,39 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 33 - ((32 * winheight(0) + 21) / 42)
+let s:l = 124 - ((39 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 33
-normal! 09|
+keepjumps 124
+normal! 0
+wincmd w
+argglobal
+if bufexists(fnamemodify("src/gridArea/grid.rs", ":p")) | buffer src/gridArea/grid.rs | else | edit src/gridArea/grid.rs | endif
+if &buftype ==# 'terminal'
+  silent file src/gridArea/grid.rs
+endif
+balt ~/programming/luvie/testFltk/src/gridArea.rs
+setlocal foldmethod=manual
+setlocal foldexpr=0
+setlocal foldmarker={{{,}}}
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldenable
+silent! normal! zE
+let &fdl = &fdl
+let s:l = 524 - ((25 * winheight(0) + 21) / 42)
+if s:l < 1 | let s:l = 1 | endif
+keepjumps exe s:l
+normal! zt
+keepjumps 524
+normal! 08|
 wincmd w
 2wincmd w
-exe 'vert 1resize ' . ((&columns * 92 + 92) / 185)
-exe 'vert 2resize ' . ((&columns * 92 + 92) / 185)
+exe 'vert 1resize ' . ((&columns * 79 + 92) / 185)
+exe 'vert 2resize ' . ((&columns * 105 + 92) / 185)
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

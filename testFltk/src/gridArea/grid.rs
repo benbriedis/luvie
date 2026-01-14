@@ -53,8 +53,7 @@ pub struct Grid {
 
 //NEW XXX: Q: do we need this in self?
     /* Extending this: */
-//    widget: Widget
-
+    widget: Widget
 }
 
 
@@ -71,9 +70,9 @@ impl Grid {
         rightClick: F3
     ) -> Self
     where
-        F1: Fn(&Cell),
-        F2: Fn(usize,&mut Cell),
-        F3: Fn(usize)
+        F1: Fn(Cell) + 'static,
+        F2: Fn(usize,&mut Cell) + 'static,
+        F3: Fn(usize) + 'static
     {   
         let width = (settings.numCols as f32 * settings.colWidth).round() as i32;
         let height = (settings.numRows as f32 * settings.rowHeight).round() as i32;
@@ -85,46 +84,29 @@ impl Grid {
         let mode1 = Rc::new(RefCell::new(CursorMode::INIT));
         let mode2 = Rc::clone(&mode1);
 
+//XXX appears to more of a 'setDraw'...
         widget.draw(move |_w| {       //XXX is w = widget, = Grid, or other?
             draw(settings,cells,&mode1.borrow());
         });
-//XXX appears to more of a 'setDraw'...
 
         widget.handle(move |_this, ev| {
             handleEvent(settings,cells,&mut mode2.borrow_mut(),ev,
-                addCell,
-                modifyCell,
-                rightClick
+                &addCell,
+                &modifyCell,
+                &rightClick
             )
         });
-
-//XXX do we need to store all of these?        
-//        Self {
-//            settings,
-//            cells,
-//            mode
-//            widget
-//        }
 
         Self {
 //            settings,
 //            cells,
-//            mode: Rc::new(RefCell::new(CursorMode::INIT)),
-//            widget
+//            mode,
+//          addCell,
+//          modifyCell,
+//          rightCell,
+            widget
         }
     }
-
-//Copied from ext slider    
-/*    
-    pub fn setCallback<F: 'static + FnMut(&mut Self)>(&mut self, mut cb: F) {
-        let mut widget = self.clone();
-        self.widget.set_callback(move |_| {
-            cb(&mut widget);
-            app::redraw();
-        });
-    }
-*/
-
 }    
 
 fltk::widget_extends!(Grid, Widget, widget); //XXX better here or at bottom?
@@ -401,12 +383,12 @@ fn resizing(settings:&GridSettings,cells:&Vec<Cell>,mode: &mut CursorMode)
 }
 
 fn handleEvent<F1,F2,F3>(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode,event:Event,
-    addCell: F1,
-    modifyCell: F2,
-    rightClick: F3
+    addCell: &F1,
+    modifyCell: &F2,
+    rightClick: &F3
 ) -> bool
 where
-    F1: Fn(&Cell),
+    F1: Fn(Cell),
     F2: Fn(usize,&mut Cell),
     F3: Fn(usize)
 {
@@ -451,7 +433,7 @@ where
                         if curX < s.colWidth * s.numCols as f32 && curY < s.rowHeight * s.numRows as f32 {
                             if let None = overlappingCell(cells,&cell,None) {
                                 //state.cache.clear();  
-                                addCell(&cell);
+                                addCell(cell);
                             }
                         }
                     }

@@ -98,20 +98,19 @@ fn main() {
     let cells = Vec::new();
 */
 
-    let onAddCell = move |cellIndex| {
+    let onAddCell = move |cell:Cell| {
         let numCells = cells.len();
-        println!("Got onAddCell cellIndex:{cellIndex:?} numCells:{numCells}");
+        println!("Got onAddCell cell.length:{:?} numCells:{numCells}",cell.length);
     };
 
-    let onModifyCell = move |cellIndex,cell| {
+    let onModifyCell = move |cellIndex:usize,cell:&mut Cell| {
         let numCells = cells.len();
         println!("Got right click cellIndex:{cellIndex} numCells:{numCells}");
     };
 
+
+
     GridArea::new(&settings,&cells,onAddCell,onModifyCell);
-
-//pub fn createGridArea<'a>(settings:&'a GridSettings, cells: &'a Vec<Cell>) 
-
 
 //    CustomBox::new(10,10, 100, 20,"mySlider" );
 

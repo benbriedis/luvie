@@ -17,8 +17,8 @@ impl<'a> GridArea<'a> {
         modifyCell: F2
     ) -> Self
     where
-        F1: Fn(&Cell),
-        F2: Fn(usize,&mut Cell),
+        F1: Fn(Cell) + 'static,
+        F2: Fn(usize,&mut Cell) + 'static,
     {   
         let onRightClick = move |cellIndex| {
             let numCells = cells.len();
