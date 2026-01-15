@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::{cell::RefCell, rc::Rc};
+
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 use fltk_theme::{ColorTheme, SchemeType, ThemeType, WidgetScheme, WidgetTheme, color_themes};
 
@@ -40,9 +42,10 @@ struct GridApp {
 */
 
 //XXX do we really have to use static? Fltk's draw() function is requiring it
-static cells:Vec<Cell> = Vec::new();
 
-static settings: GridSettings = GridSettings {
+static cells_rc_refcell:Rc<RefCell<Vec<Cell>>> = Rc::new(RefCell::new(Vec::new()));
+
+static SETTINGS: GridSettings = GridSettings {
     numRows: 8,
     numCols: 20, 
     rowHeight: 30.0, 
@@ -98,19 +101,42 @@ fn main() {
     let cells = Vec::new();
 */
 
+/*
     let onAddCell = move |cell:Cell| {
-        let numCells = cells.len();
+        let numCells = CELLS.len();
         println!("Got onAddCell cell.length:{:?} numCells:{numCells}",cell.length);
+        CELLS.push(cell);
+    };
+*/
+
+    let onAddCell = {
+        let cells_clone = Rc::clone(&cells_rc_refcell);
+        move |cell: Cell| {
+            let mut cells = cells_clone.borrow_mut(); // Get mutable borrow at runtime
+            println!("Got onAddCell");
+            cells.push(cell);
+        }
     };
 
+    /*
     let onModifyCell = move |cellIndex:usize,cell:&mut Cell| {
-        let numCells = cells.len();
+        let numCells = CELLS.len();
         println!("Got right click cellIndex:{cellIndex} numCells:{numCells}");
     };
+    */
 
+    let onModifyCell = {
+        let cells_clone = Rc::clone(&cells_rc_refcell);
+        move |cellIndex: usize, cell: &mut Cell| { // Note: cell:&mut Cell is tricky here
+            let mut cells = cells_clone.borrow_mut();
+            println!("Got right click");
+            // cells[cellIndex] = cell; // Or update in place
+            // You'll need to manage lifetimes carefully when passing &mut Cell
+        }
+    };
 
-
-    GridArea::new(&settings,&cells,onAddCell,onModifyCell);
+//XXX why are we cloning this thing?
+    GridArea::new(&SETTINGS,&cells_rc_refcell,onAddCell,onModifyCell);
 
 //    CustomBox::new(10,10, 100, 20,"mySlider" );
 
