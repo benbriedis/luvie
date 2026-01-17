@@ -2,14 +2,16 @@ use crate::{Cell, GridSettings, gridArea::grid::Grid};
 
 mod grid;
 
-pub struct GridArea<'a> {
+pub struct GridArea<'a> 
+{
     cells: &'a Vec<Cell>,
 
 //XXX sort out this shitty name issue
-    grid2: Grid,
+    grid2: Grid<'a>,
 }
 
-impl<'a:'static> GridArea<'a> {
+impl<'a:'static> GridArea<'a> 
+{
 /*    
     pub fn new(
         cells: &'a Vec<Cell>,
@@ -22,7 +24,7 @@ impl<'a:'static> GridArea<'a> {
     ) -> Self
     where
         F1: Fn(Cell) + 'static,
-        F2: Fn(usize,Cell) + 'static,
+        F2: Fn(usize,Cell) + 'static
     {   
         let onRightClick = move |cellIndex| {
             let numCells = cells.len();
