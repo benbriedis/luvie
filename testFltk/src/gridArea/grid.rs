@@ -57,6 +57,8 @@ pub struct Grid {
 }
 
 
+//TODO use self more if possible
+
 impl Grid {
 
 //TODO to cope with the static lifetime maybe use multiple owners? eg
@@ -85,12 +87,13 @@ impl Grid {
         let mode2 = Rc::clone(&mode1);
 
 //XXX appears to more of a 'setDraw'...
-        widget.draw(move |_w| {       //XXX is w = widget, = Grid, or other?
-            draw(settings,cells,&mode1.borrow());
+        widget.draw(move |this| {       //XXX is w = widget, = Grid, or other?
+//XXX MAYBE remove this from here if widget_extends does a similar job            
+            draw(this,settings,cells,&mode1.borrow());
         });
 
-        widget.handle(move |_this, ev| {
-            handleEvent(settings,cells,&mut mode2.borrow_mut(),ev,
+        widget.handle(move |this, ev| {
+            handleEvent(this,settings,cells,&mut mode2.borrow_mut(),ev,
                 &addCell,
                 &modifyCell,
                 &rightClick
@@ -98,12 +101,6 @@ impl Grid {
         });
 
         Self {
-//            settings,
-//            cells,
-//            mode,
-//          addCell,
-//          modifyCell,
-//          rightCell,
             widget
         }
     }
@@ -141,7 +138,7 @@ fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<us
     return None;
 }
 
-fn draw(settings:&GridSettings,cells:&Vec<Cell>,mode:&CursorMode) 
+fn draw(widget:&mut Widget,settings:&GridSettings,cells:&Vec<Cell>,mode:&CursorMode) 
 {
     let s = settings;
 
@@ -191,6 +188,16 @@ fn draw(settings:&GridSettings,cells:&Vec<Cell>,mode:&CursorMode)
     }
 
     // TODO maybe draw an app
+
+/* Set the cursor display: */
+match mode {
+    CursorMode::POINTER => widget.window().unwrap().set_cursor(Cursor::Arrow),
+    CursorMode::MOVABLE(ref data) => widget.window().unwrap().set_cursor(Cursor::Hand),
+    CursorMode::MOVING(ref data) => widget.window().unwrap().set_cursor(Cursor::Hand),
+    CursorMode::RESIZING(ref data) => widget.window().unwrap().set_cursor(Cursor::Arrow),
+    _ => ()
+};
+
 }
 
 fn drawCell(settings:&GridSettings,c:Cell)
@@ -270,7 +277,7 @@ fn findCellForCursor(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMod
     }
 }
 
-pub fn moving(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode)
+pub fn moving(widget:&mut Widget,settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode)
 {
     let CursorMode::MOVING(ref mut data) = mode else {
         return;
@@ -313,6 +320,11 @@ pub fn moving(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode)
     if !data.amOverlapping {
         data.lastValid = cell.clone();
     }
+
+//	fltk::app::set_cursor(if data.amOverlapping {Cursor::Wait} else {Cursor::Hand}); 
+//	widget.set_cursor(if data.amOverlapping {Cursor::Wait} else {Cursor::Hand}); 
+    //XXX maybe just draw on cursor change? Do we have to redraw everything?
+//	redraw();
 }
 
 /*
@@ -382,7 +394,7 @@ fn resizing(settings:&GridSettings,cells:&Vec<Cell>,mode: &mut CursorMode)
     }
 }
 
-fn handleEvent<F1,F2,F3>(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode,event:Event,
+fn handleEvent<F1,F2,F3>(widget:&mut Widget,settings:&GridSettings,cells:&Vec<Cell>,mode:&mut CursorMode,event:Event,
     addCell: &F1,
     modifyCell: &F2,
     rightClick: &F3
@@ -408,13 +420,47 @@ where
 
 //TODO chop this up
     match event {
+        Event::Enter => true,
+
+        Event::Move => {
+            //XXX can this here?
+            findCellForCursor(settings,cells,mode);
+println!("Got Event::Move  mode:{mode:?}");            
+app::redraw();  //XXX dont do this all the time
+            true
+        }
+		Event::Drag => {
+            match mode {
+                //XXX call this here too?
+                //    findCellForCursor(settings,cells,mode);
+
+                CursorMode::MOVING(_) => {
+println!("Am moving2");                    
+                    moving(widget,settings,cells,mode);
+                    //state.cache.clear();  
+                    app::redraw();  //TODO check required
+                    true
+                }
+                CursorMode::RESIZING(ref mut data) => {
+                    resizing(settings,cells,mode);
+                    //state.cache.clear();  
+                    app::redraw();  //TODO check required
+                    true
+                }
+                _ => false
+            }
+        }
+
         Event::Push => {
             if app::event_button() == MouseButton::Left as i32 {
+println!("Got Push");                
                 match &mode {
                     CursorMode::MOVABLE(data) => {
+println!("Got Push - was MOVABLE, setting MOVING");                
                         *mode = CursorMode::MOVING(data.clone());
                         /* Required in case you click on a filled cell without moving it */
                         //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
+//app::redraw();  //XXX dont do this all the time
                     }
                     CursorMode::RESIZABLE(data) => {
                         *mode = CursorMode::RESIZING(data.clone());
@@ -444,24 +490,6 @@ where
             else {
                 false
             }
-        }
-        Event::Move => {
-            match mode {
-                CursorMode::MOVING(_) => {
-                    moving(settings,cells,mode);
-                    //state.cache.clear();  
-                    app::redraw();  //TODO check required
-                }
-                CursorMode::RESIZING(ref mut data) => {
-                    resizing(settings,cells,mode);
-                    //state.cache.clear();  
-                    app::redraw();  //TODO check required
-                }
-                _ => {
-                    findCellForCursor(settings,cells,mode);
-                }
-            };
-            true
         }
         Event::Released => {
 //TODO chop this up:

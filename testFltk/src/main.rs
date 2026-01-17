@@ -1,11 +1,9 @@
 #![allow(non_snake_case)]
 
-use std::{cell::{Ref, RefCell}, rc::Rc, sync::Mutex};
+use fltk::{app, prelude::*, window::Window};
+use fltk_theme::{ColorTheme, SchemeType, WidgetScheme, color_themes};
 
-use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
-use fltk_theme::{ColorTheme, SchemeType, ThemeType, WidgetScheme, WidgetTheme, color_themes};
-
-use crate::{customBox::CustomBox, gridArea::{GridArea}};
+use crate::{gridArea::{GridArea}};
 
 mod gridArea;
 mod customBox;
@@ -41,31 +39,9 @@ struct GridApp {
     1. Implement a "sweep" or "rapid" / "rapid add" mode for quickly adding or removing notes.
 */
 
-/* A global variable for a single-threaded environment: */
-/*
-thread_local! {
-    static CELLS: RefCell<Vec<Cell>> = RefCell::new(Vec::new());
-}
-*/
+static mut cells: Vec<Cell> = Vec::new();
 
-//static CELLS: RefCell<Vec<Cell>> = RefCell::new(Vec::new());
-//static CELLS: Mutex<Vec<Cell>> = Mutex::new(Vec::new());
-
-static mut CELLS: Vec<Cell> = Vec::new();
-
-//XXX required? inline?
-/*
-fn getCells() -> Vec<Cell> {
-    CELLS.with(|item| item.borrow().clone())
-}
-
-fn getCells2() -> Ref<'static,Vec<Cell>> {
-    CELLS.with(|item| item.borrow())
-}
-*/
-
-
-static SETTINGS: GridSettings = GridSettings {
+static settings: GridSettings = GridSettings {
     numRows: 8,
     numCols: 20, 
     rowHeight: 30.0, 
@@ -91,6 +67,7 @@ fn main() {
         .with_size(160, 200)
         .center_screen()
         .with_label("Counter");
+
 /*
     let mut frame = Frame::default()
         .with_size(100, 40)
@@ -121,38 +98,24 @@ fn main() {
     let cells = Vec::new();
 */
 
-    /*
-    let onAddCell = |cell:Cell| {
-        CELLS.with_borrow_mut(|cells| {
-            let numCells = cells.len();
-            println!("Got onAddCell cell.length:{:?} numCells:{numCells}",cell.length);
-            cells.push(cell);
-        })
-    };
-    */
-
     let onAddCell = |cell:Cell| {
         unsafe {
-            let numCells = CELLS.len();
+            let numCells = cells.len();
             println!("Got onAddCell cell:{:?} numCells:{numCells}",cell);
-            CELLS.push(cell);
+            cells.push(cell);
         };
     };
 
     let onModifyCell = |cellIndex: usize, cell: Cell| {
         unsafe {
-            let numCells = CELLS.len();
+            let numCells = cells.len();
             println!("Got numCells: {numCells}");
-            CELLS[cellIndex] = cell; 
+            cells[cellIndex] = cell; 
         };
     };
 
-//TODO cf Box::leak( ) + manual free option 
-//TODO cf unsafe
-//TODO cf fltk-rs libraries and examples
-
     unsafe {
-        GridArea::new(&SETTINGS,&CELLS,onAddCell,onModifyCell);
+        GridArea::new(&settings,&cells,onAddCell,onModifyCell);
     };
 
 //    CustomBox::new(10,10, 100, 20,"mySlider" );
