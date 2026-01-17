@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::{Ref, RefCell}, rc::Rc, sync::Mutex};
 
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
 use fltk_theme::{ColorTheme, SchemeType, ThemeType, WidgetScheme, WidgetTheme, color_themes};
@@ -41,9 +41,29 @@ struct GridApp {
     1. Implement a "sweep" or "rapid" / "rapid add" mode for quickly adding or removing notes.
 */
 
-//XXX do we really have to use static? Fltk's draw() function is requiring it
+/* A global variable for a single-threaded environment: */
+/*
+thread_local! {
+    static CELLS: RefCell<Vec<Cell>> = RefCell::new(Vec::new());
+}
+*/
 
-static cells_rc_refcell:Rc<RefCell<Vec<Cell>>> = Rc::new(RefCell::new(Vec::new()));
+//static CELLS: RefCell<Vec<Cell>> = RefCell::new(Vec::new());
+//static CELLS: Mutex<Vec<Cell>> = Mutex::new(Vec::new());
+
+static mut CELLS: Vec<Cell> = Vec::new();
+
+//XXX required? inline?
+/*
+fn getCells() -> Vec<Cell> {
+    CELLS.with(|item| item.borrow().clone())
+}
+
+fn getCells2() -> Ref<'static,Vec<Cell>> {
+    CELLS.with(|item| item.borrow())
+}
+*/
+
 
 static SETTINGS: GridSettings = GridSettings {
     numRows: 8,
@@ -101,42 +121,39 @@ fn main() {
     let cells = Vec::new();
 */
 
-/*
-    let onAddCell = move |cell:Cell| {
-        let numCells = CELLS.len();
-        println!("Got onAddCell cell.length:{:?} numCells:{numCells}",cell.length);
-        CELLS.push(cell);
-    };
-*/
-
-    let onAddCell = {
-        let cells_clone = Rc::clone(&cells_rc_refcell);
-        move |cell: Cell| {
-            let mut cells = cells_clone.borrow_mut(); // Get mutable borrow at runtime
-            println!("Got onAddCell");
-            cells.push(cell);
-        }
-    };
-
     /*
-    let onModifyCell = move |cellIndex:usize,cell:&mut Cell| {
-        let numCells = CELLS.len();
-        println!("Got right click cellIndex:{cellIndex} numCells:{numCells}");
+    let onAddCell = |cell:Cell| {
+        CELLS.with_borrow_mut(|cells| {
+            let numCells = cells.len();
+            println!("Got onAddCell cell.length:{:?} numCells:{numCells}",cell.length);
+            cells.push(cell);
+        })
     };
     */
 
-    let onModifyCell = {
-        let cells_clone = Rc::clone(&cells_rc_refcell);
-        move |cellIndex: usize, cell: &mut Cell| { // Note: cell:&mut Cell is tricky here
-            let mut cells = cells_clone.borrow_mut();
-            println!("Got right click");
-            // cells[cellIndex] = cell; // Or update in place
-            // You'll need to manage lifetimes carefully when passing &mut Cell
-        }
+    let onAddCell = |cell:Cell| {
+        unsafe {
+            let numCells = CELLS.len();
+            println!("Got onAddCell cell:{:?} numCells:{numCells}",cell);
+            CELLS.push(cell);
+        };
     };
 
-//XXX why are we cloning this thing?
-    GridArea::new(&SETTINGS,&cells_rc_refcell,onAddCell,onModifyCell);
+    let onModifyCell = |cellIndex: usize, cell: Cell| {
+        unsafe {
+            let numCells = CELLS.len();
+            println!("Got numCells: {numCells}");
+            CELLS[cellIndex] = cell; 
+        };
+    };
+
+//TODO cf Box::leak( ) + manual free option 
+//TODO cf unsafe
+//TODO cf fltk-rs libraries and examples
+
+    unsafe {
+        GridArea::new(&SETTINGS,&CELLS,onAddCell,onModifyCell);
+    };
 
 //    CustomBox::new(10,10, 100, 20,"mySlider" );
 

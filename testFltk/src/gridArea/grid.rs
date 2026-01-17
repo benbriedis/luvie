@@ -71,7 +71,7 @@ impl Grid {
     ) -> Self
     where
         F1: Fn(Cell) + 'static,
-        F2: Fn(usize,&mut Cell) + 'static,
+        F2: Fn(usize,Cell) + 'static,
         F3: Fn(usize) + 'static
     {   
         let width = (settings.numCols as f32 * settings.colWidth).round() as i32;
@@ -389,7 +389,7 @@ fn handleEvent<F1,F2,F3>(settings:&GridSettings,cells:&Vec<Cell>,mode:&mut Curso
 ) -> bool
 where
     F1: Fn(Cell),
-    F2: Fn(usize,&mut Cell),
+    F2: Fn(usize,Cell),
     F3: Fn(usize)
 {
     let s = settings;
@@ -434,6 +434,7 @@ where
                             if let None = overlappingCell(cells,&cell,None) {
                                 //state.cache.clear();  
                                 addCell(cell);
+                                app::redraw();  //TODO check required
                             }
                         }
                     }
@@ -473,11 +474,11 @@ where
 
                         if data.amOverlapping {
                            // shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.lastValid)));
-                            modifyCell(data.cellIndex,&mut data.lastValid);
+                            modifyCell(data.cellIndex,data.lastValid);
                         }
                         else {
                             //shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
-                            modifyCell(data.cellIndex,&mut data.workingCell);
+                            modifyCell(data.cellIndex,data.workingCell);
                         }
                         *mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
                         true
@@ -485,7 +486,7 @@ where
                     CursorMode::RESIZING(data) => {
                         //state.cache.clear();  
                         //shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
-                        modifyCell(data.cellIndex,&mut data.workingCell);
+                        modifyCell(data.cellIndex,data.workingCell);
                         *mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                         true
                     }
