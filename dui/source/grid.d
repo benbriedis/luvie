@@ -1,6 +1,15 @@
 import dlangui;
 import std.stdio;
 
+struct GridSettings {
+    int numRows = 10;
+    int numCols = 20;
+    int rowHeight = 20;
+    int colWidth = 30;
+    float snap = 0.25;  //OPTIONAL
+    int popupWidth = 300;
+}
+
 
 class Grid : CanvasWidget {
 
@@ -25,14 +34,13 @@ writeln("In grid this()");
 
 		onDrawListener = delegate(CanvasWidget canvas, DrawBuf buf, Rect rc) {
 //XXX can remove some redraws due to cursor moves			
-writeln("In grid this() - onDrawListener");
 
-			buf.fill(0xFFFFFF);
+			this.draw(buf);
+
 			int x = rc.left;
 			int y = rc.top;
 
-			for (int i = 0; i < 40; i+=3)
-				buf.drawLine(Point(x+200 + i * 4, y+290), Point(x+150 + i * 7, y+420 + i * 2), 0x008000 + i * 5);
+writeln("In grid this() - onDrawListener x:",x,"y:",y);
 
 			buf.fillRect(Rect(x+20, y+20, x+150, y+200), 0x80FF80);
 /*
@@ -62,5 +70,81 @@ writeln("In grid this() - onDrawListener");
 */				
 		};
     }
+
+//ColorDrawBuf _drawBuf;
+
+	void draw(DrawBuf buf)
+	{
+		GridSettings s;
+
+/*
+_drawBuf = new ColorDrawBuf(_fullScrollableArea.width, _fullScrollableArea.height);
+
+buf.drawFragment(_clientRect.left, _clientRect.top, _drawBuf, 
+				 Rect(_visibleScrollableArea.left, _visibleScrollableArea.top, 
+					  _visibleScrollableArea.left + _clientRect.width, _visibleScrollableArea.top + _clientRect.height));
+*/
+
+
+//        let s = self.settings;
+
+		buf.fill(0xFFFFFF);
+
+    //TODO cache this? or parts?
+
+        //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
+        //XXX could possibly omit redrawing cells not on the last row too.
+        
+        /* Draw the grid horizontal lines: */
+        for (int i = 0; i<= s.numRows; i++) {
+            int y = i * s.rowHeight;
+            int endX = s.numCols * s.colWidth;
+			buf.drawLine(Point(0, y), Point(endX, y), 0x12ee12);
+        }
+
+        /* Draw the grid vertical lines: */
+        for (int i = 0; i <= s.numCols; i++) {
+            int x = i * s.colWidth;
+            int endY = s.numRows * s.rowHeight;
+			buf.drawLine(Point(x, 0), Point(x, endY), 0xee1212);
+        }
+
+/*			
+        / * Draw cells: * /
+        for (i,c) in self.cells.iter().enumerate() {
+            match self.mode {
+                CursorMode::MOVING(ref data) => {
+                    if i != data.cellIndex {
+                        self.drawCell(*c);
+                    }
+                }
+                CursorMode::RESIZING(ref data) => {
+                    if i != data.cellIndex {
+                        self.drawCell(*c);
+                    }
+                }
+                _ => self.drawCell(*c)
+            }
+        };
+
+        / * Draw selected note last so it sits on top * /
+        match self.mode {
+            CursorMode::MOVING(ref data) => self.drawCell(data.workingCell),
+            CursorMode::RESIZING(ref data) => self.drawCell(data.workingCell),
+            _ => ()
+        }
+
+        // TODO maybe draw an app
+
+		 / * Set the cursor display: * /
+		match self.mode {
+			CursorMode::POINTER => self.widget.window().unwrap().set_cursor(Cursor::Arrow),
+			CursorMode::MOVABLE(ref data) => self.widget.window().unwrap().set_cursor(Cursor::Hand),
+			CursorMode::MOVING(ref data) => self.widget.window().unwrap().set_cursor(Cursor::Hand),
+			CursorMode::RESIZING(ref data) => self.widget.window().unwrap().set_cursor(Cursor::Arrow),
+			_ => ()
+		}
+*/
+	}
 }	
 
