@@ -1,13 +1,14 @@
 use crate::{Cell, GridSettings, gridArea::grid::Grid};
+use grid::gridImpl::GridImpl;
 
-mod grid;
+pub mod grid;
 
 pub struct GridArea<'a> 
 {
     cells: &'a Vec<Cell>,
 
 //XXX sort out this shitty name issue
-    grid2: Grid<'a>,
+    grid2: Grid,
 }
 
 impl<'a:'static> GridArea<'a> 
@@ -31,7 +32,8 @@ impl<'a:'static> GridArea<'a>
             println!("Got right click cellIndex:{cellIndex} numCells:{numCells}");
         };
 
-        let grid = Grid::new(settings, cells,addCell,modifyCell,onRightClick);
+        let gridImpl = GridImpl::new(&settings,&cells,addCell,modifyCell,onRightClick);
+        let grid = Grid::new(&settings,gridImpl);
 
         Self {
             cells,

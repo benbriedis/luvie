@@ -3,7 +3,7 @@
 use fltk::{app, prelude::*, window::Window};
 use fltk_theme::{ColorTheme, SchemeType, WidgetScheme, color_themes};
 
-use crate::{gridArea::{GridArea}};
+use gridArea::GridArea;
 
 mod gridArea;
 mod customBox;
@@ -98,6 +98,8 @@ fn main() {
     let cells = Vec::new();
 */
 
+//XXX is unsafe still the best way?
+    
     let onAddCell = |cell:Cell| {
         unsafe {
             let numCells = cells.len();
