@@ -39,12 +39,12 @@ impl Grid
 //        let mode2 = Rc::clone(&mode1);
 
 //XXX appears to more of a 'setDraw'...
-        widget.draw(|this| { 
+        widget.draw(move |_this| { 
             gridImpl.draw();
         });
 
-        widget.handle(|this, ev| {
-            (mut gridImpl).handleEvent(ev)
+        widget.handle(move |_this, ev| {
+            gridImpl.handleEvent(ev)
         });
 
         Self { widget }
