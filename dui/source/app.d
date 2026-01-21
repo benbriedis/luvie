@@ -1,5 +1,6 @@
 import dlangui;
 import grid;
+import std.stdio;
 
 mixin APP_ENTRY_POINT;
 
@@ -9,18 +10,10 @@ extern (C) int UIAppMain(string[] args) {
 		null, WindowFlag.Resizable, 300, 300
 	);
 
-
-
-
 	auto vlayout = new VerticalLayout();
 	vlayout.margins = 20;
 	vlayout.padding = 10;
 	vlayout.backgroundColor = 0xFFFFC0;
-	vlayout.addChild(new TextWidget(null, "First text item"d));
-	vlayout.addChild(new TextWidget(null, "Second text item"d));
-	vlayout.addChild(new TextWidget(null, "Third text item"d));
-	vlayout.addChild(new CheckBox(null, "Check box text"d));
-	vlayout.addChild(new ImageTextButton(null, "dialog-ok", "Check box text"d));
 
 	auto buttons = new HorizontalLayout();
 	auto btn1 = new Button(null, "Ok"d);
@@ -49,6 +42,13 @@ extern (C) int UIAppMain(string[] args) {
 		window.close();
 		return true;
 	};
+
+/*		
+	grid.onClick = delegate(Widget src) {
+		writeln("onClick");
+	};
+*/		
+	grid.click = delegate (Widget w) { writeln("grid.click")  ; return true; };
 
     window.mainWidget = vlayout;
 
