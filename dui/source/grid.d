@@ -1,5 +1,9 @@
 import dlangui;
 import std.stdio;
+import std.typecons;
+import std.math.rounding;
+//import std.math.traits : isNaN;
+//import std.math;
 
 struct GridSettings {
     int numRows = 10;
@@ -10,6 +14,38 @@ struct GridSettings {
     int popupWidth = 300;
 }
 
+struct Cell {
+    int row;
+//XXX possibly best leaving Cell as f32
+    float col;       //XXX awkward name given type. Might be the best we have for the moment though
+    float length;
+}
+
+enum Side { LEFT, RIGHT }
+
+struct ResizeData {
+    int cellIndex;
+    Side side;
+    Cell workingCell;
+}
+
+struct MoveData {
+    int cellIndex;
+    Point grabPosition;
+    Cell lastValid;
+    Cell workingCell;
+    bool amOverlapping;
+}
+
+enum CursorModeType { Init, Pointer, Movable, Moving, Resizable, Resizing }
+
+struct CursorMode {
+    CursorModeType type;
+    union {
+		ResizeData resizeData;
+		MoveData moveData;
+    }
+}
 
 class Grid : CanvasWidget 
 {
@@ -20,6 +56,10 @@ class Grid : CanvasWidget
 
         bool _needRepaint = true;
         Point[8] _directionVectors;
+
+
+//	mode = CursorMode::MOVING(data.clone());
+		CursorMode mode;
     }
 
     ColorDrawBuf drawBuffer;
@@ -53,6 +93,7 @@ writeln("in handleClick");
 	override bool onMouseEvent(MouseEvent event) {
 		if (event.action == MouseAction.ButtonDown && event.button == MouseButton.Left) {
 writeln("onMouseEvent - LEFT BUTTON DOWN");		
+			this.leftButtonDown(&event);
 			return true;
 		}
 //		if (event.action == MouseAction.FocusOut && _dragging) {
@@ -79,6 +120,65 @@ writeln("onMouseEvent - CANCEL ");
 		return false;
 	}
 
+	void leftButtonDown(MouseEvent* event)
+	{
+        GridSettings* s = this.settings;
+
+		if (this.mode.type == CursorModeType.Movable) {
+writeln!("Got Push - was MOVABLE, setting MOVING");                
+			this.mode.type = CursorModeType.Moving;
+			this.mode.moveData = this.mode.moveData;
+
+			/* Required in case you click on a filled cell without moving it */
+			//self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
+//app::redraw();  //XXX dont do this all the time
+		}
+		else if (this.mode.type == CursorModeType.Resizable) {
+			this.mode.type = CursorModeType.Resizing;
+			this.mode.resizeData = this.mode.resizingData;
+		}
+		else {
+			/* Add a cell: */
+			int row = floor(event.y / s.rowHeight);
+			int col = floor(event.x / s.colWidth);
+
+			Cell cell = {row,col,length:1.0};
+
+			if (event.x < s.colWidth * s.numCols && event.y < s.rowHeight * s.numRows) {
+				if (this.overlappingCell(cell,null) != null) {
+					//state.cache.clear();  
+					this.addCell(cell);
+					this.redraw();  //TODO check required
+				}
+			}
+		}
+	}
+
+//XXX is Cell* a the best way to pass data through?
+    Nullable!int overlappingCell(Cell* a,Nullable!int selected) 
+    {
+        float aStart = a.col;
+        float aEnd = a.col + a.length;
+
+		foreach (i, b; this.cells) {	
+            if (!selected.isNull) 
+                if (sel == i) 
+                    continue; 
+
+            if (b.row != a.row) 
+                continue; 
+
+            float bStart = b.col;
+            float bEnd = b.col + b.length;
+
+            float firstEnd = aStart <= bStart ? aEnd : bEnd;
+            float secondStart = aStart <= bStart ? bStart : aStart;
+
+            if (firstEnd > secondStart) //XXX HACK
+                return i;
+        }
+        return null;
+    }
 /*
     bool onClick(Widget source)
 	{
