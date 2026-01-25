@@ -49,6 +49,7 @@ where
     F2: Fn(usize,Cell) + 'a,
     F3: Fn(usize) + 'a
 {
+
 //XXX settings could be owned here
     settings: &'a GridSettings,
 

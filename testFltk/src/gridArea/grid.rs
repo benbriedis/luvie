@@ -5,23 +5,34 @@ use crate::{Cell, GridSettings};
 pub mod gridImpl;
 
 
-pub struct Grid
+pub struct Grid<F1,F2,F3>
+where
+    F1: Fn(Cell) + 'static,
+    F2: Fn(usize,Cell) + 'static,
+    F3: Fn(usize) + 'static
 {
-    widget: Widget
+    widget: Widget,
+    gridImpl: GridImpl<'static,F1,F2,F3>
 }
 
 
 //TODO use self more if possible
 
-impl Grid
+//TODO consider re-cobining grid + gridImpl
+
+impl<F1,F2,F3> Grid<F1,F2,F3>
+where
+    F1: Fn(Cell) + 'static,
+    F2: Fn(usize,Cell) + 'static,
+    F3: Fn(usize) + 'static
 {
 
 //TODO to cope with the static lifetime maybe use multiple owners? eg
 //        let color = Rc::new(RefCell::new(Color::Red));
 
-    pub fn new<'a:'static,F1,F2,F3>(
-        settings: &'a GridSettings,
-        gridImpl: GridImpl<'a,F1,F2,F3>
+    pub fn new(
+        settings: &'static GridSettings,
+        mut gridImpl: GridImpl<'static,F1,F2,F3>
     ) -> Self
     where
         F1: Fn(Cell) + 'static,
@@ -39,15 +50,19 @@ impl Grid
 //        let mode2 = Rc::clone(&mode1);
 
 //XXX appears to more of a 'setDraw'...
-        widget.draw(move |_this| { 
-            gridImpl.draw();
+// fn draw<F: FnMut(&mut Self) + 'static>(&mut self, cb: F) {
+
+        widget.draw(|_this| { 
+            (&gridImpl).draw();
         });
 
-        widget.handle(move |_this, ev| {
-            gridImpl.handleEvent(ev)
+// fn handle<F: FnMut(&mut Self, $crate::enums::Event) -> bool + 'static>(&mut self, cb: F) {
+//commenting out 'addCell' SEEMS to help: Fn(Cell) + 'a
+        widget.handle(|_this, ev| {
+            (&mut gridImpl).handleEvent(ev)
         });
 
-        Self { widget }
+        Self { widget, gridImpl }
     }
 }    
 

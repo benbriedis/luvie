@@ -1,8 +1,19 @@
+module app;
+
 import dlangui;
 import grid;
 import std.stdio;
 
+
 mixin APP_ENTRY_POINT;
+
+struct Cell {
+    int row;
+//XXX possibly best leaving Cell as f32
+    float col;       //XXX awkward name given type. Might be the best we have for the moment though
+    float length;
+}
+
 
 extern (C) int UIAppMain(string[] args) {
 	Window window = Platform.instance.createWindow(
@@ -25,7 +36,14 @@ extern (C) int UIAppMain(string[] args) {
 
 	vlayout.addChild(buttons);
 
-	auto grid = new Grid();
+	Cell[] cells = new Cell[0];
+
+	auto addCellHandler = delegate(Cell cell) {
+		cells ~= cell;
+writeln("Adding cell #num:",cells.length);		
+	};
+
+	auto grid = new Grid(cells,addCellHandler);
 	vlayout.addChild(grid);
 
 //Connect method or ~= operator will append new handler to list of existing handlers.

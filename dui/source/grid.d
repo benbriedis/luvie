@@ -4,6 +4,7 @@ import std.typecons;
 import std.math.rounding;
 //import std.math.traits : isNaN;
 //import std.math;
+import app;
 
 struct GridSettings {
     int numRows = 10;
@@ -12,13 +13,6 @@ struct GridSettings {
     int colWidth = 50;
     float snap = 0.25;  //OPTIONAL
     int popupWidth = 300;
-}
-
-struct Cell {
-    int row;
-//XXX possibly best leaving Cell as f32
-    float col;       //XXX awkward name given type. Might be the best we have for the moment though
-    float length;
 }
 
 enum Side { LEFT, RIGHT }
@@ -47,6 +41,15 @@ struct CursorMode {
     }
 }
 
+/*	
+	In D, objects are always passed by reference by default when using class types, while struct types are passed by value
+*/
+
+alias AddCellHandler = void delegate(Cell cell);   //XXX ref? copy?
+
+
+//XXX why are D syntatic errors not showing in Neovim?
+
 class Grid : CanvasWidget 
 {
     private {
@@ -60,13 +63,21 @@ class Grid : CanvasWidget
 
 //	mode = CursorMode::MOVING(data.clone());
 		CursorMode mode;
+		GridSettings settings;
+//XXX vec? also ref?	
+		Cell[] cells;
+		AddCellHandler addCellHandler;
     }
 
     ColorDrawBuf drawBuffer;
 //   protected Ref!ColorDrawBuf texture;
 
-    this() {
+    this(Cell[] cells,AddCellHandler addCellHandler) {
         super("My grid");
+
+		this.cells = cells;
+		this.addCellHandler = addCellHandler;
+
 //        clickable = true;
 //        focusable = true;
 //        trackHover = true;
@@ -93,7 +104,7 @@ writeln("in handleClick");
 	override bool onMouseEvent(MouseEvent event) {
 		if (event.action == MouseAction.ButtonDown && event.button == MouseButton.Left) {
 writeln("onMouseEvent - LEFT BUTTON DOWN");		
-			this.leftButtonDown(&event);
+			leftButtonDown(&event);
 			return true;
 		}
 //		if (event.action == MouseAction.FocusOut && _dragging) {
@@ -122,48 +133,53 @@ writeln("onMouseEvent - CANCEL ");
 
 	void leftButtonDown(MouseEvent* event)
 	{
-        GridSettings* s = this.settings;
+        GridSettings s = settings;  //XXX is this going to copy?
 
-		if (this.mode.type == CursorModeType.Movable) {
-writeln!("Got Push - was MOVABLE, setting MOVING");                
-			this.mode.type = CursorModeType.Moving;
-			this.mode.moveData = this.mode.moveData;
+		if (mode.type == CursorModeType.Movable) {
+writeln("Got Push - was MOVABLE, setting MOVING");                
+			mode.type = CursorModeType.Moving;
 
 			/* Required in case you click on a filled cell without moving it */
 			//self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
 //app::redraw();  //XXX dont do this all the time
 		}
-		else if (this.mode.type == CursorModeType.Resizable) {
-			this.mode.type = CursorModeType.Resizing;
-			this.mode.resizeData = this.mode.resizingData;
+		else if (mode.type == CursorModeType.Resizable) {
+			mode.type = CursorModeType.Resizing;
 		}
 		else {
 			/* Add a cell: */
-			int row = floor(event.y / s.rowHeight);
-			int col = floor(event.x / s.colWidth);
+			int row = cast(int) floor(event.y / cast(float) s.rowHeight);
+			int col = cast(int) floor(event.x / cast(float) s.colWidth);
 
 			Cell cell = {row,col,length:1.0};
 
 			if (event.x < s.colWidth * s.numCols && event.y < s.rowHeight * s.numRows) {
-				if (this.overlappingCell(cell,null) != null) {
+				if (overlappingCell(&cell,-1) < 0) {
+//BUG can add multiple cells to one cell
+
 					//state.cache.clear();  
-					this.addCell(cell);
-					this.redraw();  //TODO check required
+					addCellHandler(cell);
+
+//	void draw(DrawBuf buf,Rect rc)
+//					draw();  //TODO check required. ALSO is draw() the correct call to use?
 				}
 			}
 		}
 	}
 
 //XXX is Cell* a the best way to pass data through?
-    Nullable!int overlappingCell(Cell* a,Nullable!int selected) 
+	/* 
+		selected = -1 means ????
+		Returns -1 if no overlapping cell.
+	*/
+    int overlappingCell(Cell* a,int selected) 
     {
         float aStart = a.col;
         float aEnd = a.col + a.length;
 
 		foreach (i, b; this.cells) {	
-            if (!selected.isNull) 
-                if (sel == i) 
-                    continue; 
+            if (selected == i) 
+                continue; 
 
             if (b.row != a.row) 
                 continue; 
@@ -175,9 +191,9 @@ writeln!("Got Push - was MOVABLE, setting MOVING");
             float secondStart = aStart <= bStart ? bStart : aStart;
 
             if (firstEnd > secondStart) //XXX HACK
-                return i;
+                return cast(int)i;
         }
-        return null;
+        return -1;
     }
 /*
     bool onClick(Widget source)
@@ -191,7 +207,8 @@ writeln!("Got Push - was MOVABLE, setting MOVING");
 
 	void draw(DrawBuf buf,Rect rc)
 	{
-		GridSettings s;
+writeln("Called draw()");		
+        GridSettings s = settings;   //XXX ref?
 
 		drawBuffer.fill(0xFFFFFF);
 
@@ -214,27 +231,21 @@ writeln!("Got Push - was MOVABLE, setting MOVING");
 			drawBuffer.drawLine(Point(x, 0), Point(x, endY), 0xee1212);
         }
 
-        buf.drawFragment(rc.left, rc.top, drawBuffer, 
-			Rect(0,0,400,400));
+        buf.drawFragment(rc.left, rc.top, drawBuffer, Rect(0,0,400,400));
+
+        /* Draw cells: */
+		foreach (i, c; this.cells) {	
+			if (mode.type == CursorModeType.Moving) {
+				if (i != mode.moveData.cellIndex) 
+					drawCell(c);
+			}
+			else if (mode.type == CursorModeType.Resizing) {
+                if (i != mode.resizeData.cellIndex) 
+                    drawCell(c);
+			}
+		}
 
 /*			
-        / * Draw cells: * /
-        for (i,c) in self.cells.iter().enumerate() {
-            match self.mode {
-                CursorMode::MOVING(ref data) => {
-                    if i != data.cellIndex {
-                        self.drawCell(*c);
-                    }
-                }
-                CursorMode::RESIZING(ref data) => {
-                    if i != data.cellIndex {
-                        self.drawCell(*c);
-                    }
-                }
-                _ => self.drawCell(*c)
-            }
-        };
-
         / * Draw selected note last so it sits on top * /
         match self.mode {
             CursorMode::MOVING(ref data) => self.drawCell(data.workingCell),
@@ -253,6 +264,27 @@ writeln!("Got Push - was MOVABLE, setting MOVING");
 			_ => ()
 		}
 */
+	}
+		
+
+	void drawCell(Cell c)
+	{
+		auto s = settings;
+		float lineWidth = 1.0;
+
+		 //TODO possibly size to be inside grid, although maybe not at start
+		int x = cast(int) round(c.col * s.colWidth);
+		int y = cast(int) round(c.row * s.rowHeight + lineWidth);
+		int width = cast(int) (c.length * s.colWidth).round();
+		int height = cast(int) round(s.rowHeight - 2.0 * lineWidth);
+
+//Rect a = Rect(1,1,1,1);
+
+//XXX NB fillGradientRect(), drawFrame(), drawRescaled(), drawFocusRect() are interesting
+		drawBuffer.drawRect(Rect(x,y,width,height),0x1293D8);
+
+		/* Add the dark line on the left: */
+		drawBuffer.drawRect(Rect(x,y,8,height),0x126090);
 	}
 }	
 
