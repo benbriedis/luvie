@@ -1,0 +1,15 @@
+
+3. Better Alternatives to Static Linking
+
+Because static linking GTK is difficult, the industry standard for distributing GTK apps without relying on system libraries is to use bundling technologies: 
+
+    AppImage (Linux): Packages all libraries inside a single executable.
+
+    Flatpak/Snap: Ensures the app brings its own runtime.
+
+    Windows Bundle: Simply place the necessary DLLs in the same directory as your executable. 
+
+Summary Recommendation:
+
+    Use FLTK for a tiny, statically linked GUI.
+    Use AppImage to distribute a "static-like" GTK application

@@ -1,0 +1,11 @@
+AI Summary
+
+Library		Primary Use Case				Performance
+===============================================================
+Skia		General Purpose/App Engine		Very High (GPU)      - Used by Chrome, Android, Flutter & Firefox
+Blend2D		High-Quality Vector				Very High (CPU/JIT)
+Rive		Real-time Animated Vectors		Extremely High
+Cairo		Document/UI Rendering			Medium/High
+NanoVG		Lightweight UI					High (OpenGL)
+
+TIGR		Simple, small					Low

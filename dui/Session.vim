@@ -3,7 +3,7 @@ let s:so_save = &g:so | let s:siso_save = &g:siso | setg so=0 siso=0 | setl so=-
 let v:this_session=expand("<sfile>:p")
 silent only
 silent tabonly
-cd ~/programming/luvie
+cd ~/programming/luvie/dui
 if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
@@ -13,17 +13,13 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +244 testiced/src/main.rs
-badd +63 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/iced_core-0.14.0/src/renderer.rs
-badd +6 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/iced_core-0.14.0/src/background.rs
-badd +298 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/iced_widget-0.14.2/src/rule.rs
-badd +29 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/iced_core-0.14.0/src/element.rs
-badd +18 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/iced_renderer-0.14.0/src/lib.rs
+badd +40 source/grid.d
+badd +252 ~/programming/luvie/testFltk/src/gridArea/grid/gridImpl.rs
+badd +20 ~/programming/luvie/testFltk/src/main.rs
 argglobal
 %argdel
-edit testiced/src/main.rs
+edit source/grid.d
 argglobal
-balt ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/iced_core-0.14.0/src/renderer.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -34,12 +30,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 244 - ((48 * winheight(0) + 25) / 50)
+let s:l = 40 - ((12 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 244
-normal! 038|
+keepjumps 40
+normal! 056|
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

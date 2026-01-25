@@ -1,9 +1,8 @@
 #include "grid.hpp"
 #include "FL/Enumerations.H"
-#include "outerGrid.hpp"
+#include "popup.hpp"
 #include <cstdio>
 #include <ranges>
-#include <iostream>
 #include <algorithm>
 #include <cmath>
 #include <FL/fl_draw.H>
@@ -17,8 +16,22 @@
 
 using std::vector;
 
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap) : 
-	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),
+// Callback function for menu items
+/*
+void menu_callback(Fl_Widget* w, void* user_data) {
+    Fl_Menu_Button* menu_button = static_cast<Fl_Menu_Button*>(w);
+    const Fl_Menu_Item* chosen_item = menu_button->mvalue(); // Get the chosen item
+    if (chosen_item) {
+        fl_alert("Selected: %s", chosen_item->label());
+    }
+}
+*/
+
+//Fl_Menu_Button mb(0,0,100000,100000);
+
+
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) : 
+	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
 	hoverState(NONE),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { 
@@ -90,7 +103,9 @@ int MyGrid::handle(int event)
 		case FL_PUSH: 
 			if (Fl::event_button() == FL_RIGHT_MOUSE) 
 				//XXX is a callback desirable here?
-				((OuterGrid*)parent())->popup.popup();
+//XXX add position				
+//				((OuterGrid*)parent())->popup.show();
+				popup.show();
 			return 1;
 
 		case FL_DRAG: 
@@ -105,8 +120,8 @@ int MyGrid::handle(int event)
 		case FL_RELEASE:
 			if (hoverState==MOVING && amOverlapping) {
 				// TODO maybe drift back or fade out and in note
-				notes[selectedNote].row = pickupPoint.row;
-				notes[selectedNote].col = pickupPoint.col;
+				notes[selectedNote].row = originalPosition.row;
+				notes[selectedNote].col = originalPosition.col;
 				redraw();
 			}
 
@@ -120,7 +135,7 @@ int MyGrid::handle(int event)
 
 		/* We want mouse events to change the cursor */
 		case FL_ENTER: 
-			return 1;
+			return 1;		// non-zero = we want mouse events
 
 		/*
 		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving 
@@ -265,7 +280,7 @@ void MyGrid::findNoteForCursor()
 			selectedNote = i;
 			movingGrabXOffset = x - n.col * colWidth;
 			movingGrabYOffset = y - n.row * rowHeight;
-			pickupPoint = {n.row,n.col};
+			originalPosition = {n.row,n.col};
 
 			window()->cursor(FL_CURSOR_HAND); 
 //			window()->cursor(FL_CURSOR_CROSS); 
