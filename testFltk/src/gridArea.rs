@@ -1,42 +1,31 @@
-use crate::{Cell, GridSettings, gridArea::grid::Grid};
-use grid::gridImpl::GridImpl;
+use crate::{GridState, gridArea::grid::Grid};
 
 pub mod grid;
 
-pub struct GridArea<'a> 
+pub struct GridArea
 {
-    cells: &'a Vec<Cell>,
-
 //XXX sort out this shitty name issue
     grid2: Grid,
 }
 
-impl<'a:'static> GridArea<'a> 
+impl GridArea
 {
 /*    
     pub fn new(
         cells: &'a Vec<Cell>,
 */
-    pub fn new<F1,F2>(
-        settings:&'a GridSettings,
-        cells: &'a Vec<Cell>,
-        addCell: F1,
-        modifyCell: F2
+    pub fn new(
+        gridState: &GridState,
     ) -> Self
-    where
-        F1: Fn(Cell) + 'static,
-        F2: Fn(usize,Cell) + 'static
     {   
         let onRightClick = move |cellIndex| {
-            let numCells = cells.len();
-            println!("Got right click cellIndex:{cellIndex} numCells:{numCells}");
+            //TODO call gridState.removeCell() to delete an item
         };
 
-        let gridImpl = GridImpl::new(&settings,&cells,addCell,modifyCell,onRightClick);
-        let grid = Grid::new(&settings,gridImpl);
+        let grid = Grid::new(gridState,onRightClick);
+        Grid::init(grid);
 
         Self {
-            cells,
             grid2: grid,
         }
     }

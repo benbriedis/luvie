@@ -1,7 +1,10 @@
 #![allow(non_snake_case)]
 
+extern crate lazy_static;
+
 use fltk::{app, prelude::*, window::Window};
 use fltk_theme::{ColorTheme, SchemeType, WidgetScheme, color_themes};
+use std::sync::Mutex;
 
 use gridArea::GridArea;
 
@@ -16,39 +19,77 @@ struct Cell {
     length: f32
 }
 
-/* Using f32 and usize to be independent of Fltk at this level and to allow for high precision graphics in future */
-struct GridSettings {
-    numRows: usize,
-    numCols: usize,
-    rowHeight: f32,
-    colWidth: f32,
-    snap: Option<f32>,
-    popupWidth: f32
-}
-
-struct GridApp {
-    settings: GridSettings,
-    cells: Vec<Cell>,
-    contextVisible: bool,
-    contextCellIndex: Option<usize>,
-    velocity: u8
-}
 
 /*
     TODO
     1. Implement a "sweep" or "rapid" / "rapid add" mode for quickly adding or removing notes.
 */
 
-static mut cells: Vec<Cell> = Vec::new();
+//TODO move to separate file
+/* This is the publicly viewable state. The Grid widget will have private state too. */
+struct GridState {
+    /* Settings. These can be changed by outside agents in time. */
+    /* Using f32 and usize to be independent of Fltk at this level and to allow for high precision graphics in future */
+    numRows: usize,
+    numCols: usize,
+    rowHeight: f32,
+    colWidth: f32,
+    snap: Option<f32>,
+    popupWidth: f32,
 
-static settings: GridSettings = GridSettings {
-    numRows: 8,
-    numCols: 20, 
-    rowHeight: 30.0, 
-    colWidth: 40.0,
-    snap: Some(0.25),
-    popupWidth: 200.0
-};
+    cells: Vec<Cell>
+}
+
+//TODO rename to GridInterface / GridControl / ... ?
+impl GridState {
+    fn new() -> Self {
+        Self {
+            numRows: 8,
+            numCols: 20, 
+            rowHeight: 30.0, 
+            colWidth: 40.0,
+            snap: Some(0.25),
+            popupWidth: 200.0,
+
+            cells: Vec::new() 
+        }
+    }
+
+    fn addCell(cell:Cell)
+    {
+        let mut cells = CELLS.lock().unwrap();
+        cells.cells.push(cell);
+    }
+
+    fn modifyCell(index: usize, cell: Cell) 
+    {
+        let mut cells = CELLS.lock().unwrap();
+        cells.cells[index] = cell; 
+    }
+
+    fn removeCell(index: usize) 
+    {
+        let mut cells = CELLS.lock().unwrap();
+        cells.cells.remove(index);
+    }
+
+    fn getCell(index: usize) -> Cell
+    {
+        let cells = CELLS.lock().unwrap();
+        cells.cells[index]
+    }
+
+    fn cellIterator() -> impl Iterator<Item = &Cell>
+    {
+        let cells = CELLS.lock().unwrap();
+        cells.cells.iter()
+    }
+}
+
+lazy_static::lazy_static! {
+    static ref CELLS: Mutex<GridState> = Mutex::new(GridState::new());
+}
+
 
 fn main() {
 //    let app = app::App::default().with_scheme(app::Scheme::Gtk);
@@ -68,60 +109,8 @@ fn main() {
         .center_screen()
         .with_label("Counter");
 
-/*
-    let mut frame = Frame::default()
-        .with_size(100, 40)
-        .center_of(&wind)
-        .with_label("0");
-    let mut but_inc = Button::default()
-        .size_of(&frame)
-        .above_of(&frame, 0)
-        .with_label("+");
-    let mut but_dec = Button::default()
-        .size_of(&frame)
-        .below_of(&frame, 0)
-        .with_label("-");
-*/
-
-//XXX or use builder??
-
-/*    
-    let settings = GridSettings {
-        numRows: 8,
-        numCols: 20, 
-        rowHeight: 30.0, 
-        colWidth: 40.0,
-        snap: Some(0.25),
-        popupWidth: 200.0
-    };
-
-    let cells = Vec::new();
-*/
-
-//XXX is unsafe still the best way?
-    
-    let onAddCell = |cell:Cell| {
-        unsafe {
-            let numCells = cells.len();
-            println!("Got onAddCell cell:{:?} numCells:{numCells}",cell);
-            cells.push(cell);
-        };
-    };
-
-    let onModifyCell = |cellIndex: usize, cell: Cell| {
-        unsafe {
-            let numCells = cells.len();
-            println!("Got numCells: {numCells}");
-            cells[cellIndex] = cell; 
-        };
-    };
-
-    unsafe {
-        GridArea::new(&settings,&cells,onAddCell,onModifyCell);
-    };
-
-//    CustomBox::new(10,10, 100, 20,"mySlider" );
-
+    let gridState = GridState::new();
+    GridArea::new(&gridState);
 
     wind.make_resizable(true);
     wind.end();
