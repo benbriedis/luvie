@@ -14,7 +14,7 @@ use iced::{
 
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
-use crate::{Cell, CellMessage, GridSettings, gridArea::GridAreaMessage};
+use crate::{Cell, CellMessage, GridSettings, Message, gridArea::GridAreaMessage};
 
 #[derive(Debug,Default,Clone,PartialEq)]
 enum Side {
@@ -48,7 +48,9 @@ enum CursorMode {
     MOVING(MoveData),
 }
 
-pub struct Grid<'a> {
+//XXX MAY wish to rename back to Grid... 
+//    Helps emphasise that any data passed in should be immutable.
+pub struct GridView<'a> {
     settings: &'a GridSettings,
 
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
@@ -57,7 +59,7 @@ pub struct Grid<'a> {
     mode: CursorMode,
 }
 
-impl<'a> Grid<'a> {
+impl<'a> GridView<'a> {
     pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
     {
         Self {
@@ -277,7 +279,7 @@ struct State {
 }
 
 
-impl<'a> Widget<GridAreaMessage, Theme, Renderer> for Grid<'a>
+impl<'a> Widget<Message, Theme, Renderer> for GridView<'a>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -413,7 +415,7 @@ let exPalette = theme.extended_palette();
         cursor: mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, GridAreaMessage>,
+        shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_ref::<State>();
@@ -461,7 +463,7 @@ let exPalette = theme.extended_palette();
                                 if let None = overlappingCell(self.cells,&cell,None) {
                                     state.cache.clear();  
    //XXX being called when we click out of context menu                                
-                                    shell.publish(GridAreaMessage::Cells(CellMessage::AddCell(cell)));
+                                    shell.publish(Message::Cells(CellMessage::Add(cell)));
                                 }
                             }
                         }
@@ -492,17 +494,16 @@ let exPalette = theme.extended_palette();
                         state.cache.clear();  
 
                         if data.amOverlapping {
-                            shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.lastValid)));
-//                            shell.publish(CellMessage::ModifyCell(data.cellIndex,data.lastValid));
+                            shell.publish(Message::Cells(CellMessage::Modify(data.cellIndex,data.lastValid)));
                         }
                         else {
-                            shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
+                            shell.publish(Message::Cells(CellMessage::Modify(data.cellIndex,data.workingCell)));
                         }
                         self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
                     }
                     CursorMode::RESIZING(data) => {
                         state.cache.clear();  
-                        shell.publish(GridAreaMessage::Cells(CellMessage::ModifyCell(data.cellIndex,data.workingCell)));
+                        shell.publish(Message::Cells(CellMessage::Modify(data.cellIndex,data.workingCell)));
                         self.mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                     }
                     _ => {}
@@ -517,11 +518,11 @@ let exPalette = theme.extended_palette();
                     //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
                     CursorMode::MOVABLE(data)  => {
                         state.cache.clear();  
-                        shell.publish(GridAreaMessage::RightClick(data.cellIndex));
+                        shell.publish(Message::GridArea(GridAreaMessage::RightClick(data.cellIndex)));
                     }
                     CursorMode::RESIZABLE(data) => {
                         state.cache.clear();  
-                        shell.publish(GridAreaMessage::RightClick(data.cellIndex));
+                        shell.publish(Message::GridArea(GridAreaMessage::RightClick(data.cellIndex)));
                     }
                     _ => {}
                 }
@@ -543,8 +544,8 @@ let exPalette = theme.extended_palette();
     }
 }
 
-impl<'a> From<Grid<'a>> for Element<'a,GridAreaMessage> {
-    fn from(grid: Grid<'a>) -> Self {
+impl<'a> From<GridView<'a>> for Element<'a,Message> {
+    fn from(grid: GridView<'a>) -> Self {
         Self::new(grid)
     }
 }

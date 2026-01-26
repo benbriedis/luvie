@@ -2,112 +2,98 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Event, Length::{self}, Point, Rectangle, Renderer, Theme, advanced::{Clipboard, Layout, Shell, widget::Tree}, alignment::Horizontal, border::radius, mouse, widget::{
+    Background, Color, Element, Length::{self}, Point, Theme, 
+    alignment::Horizontal, 
+    border::radius, 
+    widget::{
         Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
-use crate::{Cell, CellMessage, contextMenuPopup::ContextMenuPopup, grid::{Grid, GridMessage}};
+use crate::{Cell, CellMessage, GridSettings, Message, gridArea::{contextMenuPopup::ContextMenuPopup, grid::GridView}};
 
 
-mod grid;  //NOTE this does NOT say this file is in 'grid'. Rather it says look in 'grid.rs' for a 'grid' module.
+mod grid;
 mod contextMenuPopup;
 
 
-fn main() -> iced::Result {
-    iced::application(GridApp::new,GridApp::update,GridApp::view) 
-    .theme(Theme::Light)
-//    .theme(Theme::custom(Theme::Light, palette))
-    .run()
-}
-
-pub struct GridSettings {
-    numRows: usize,
-    numCols: usize,
-    rowHeight: f32,
-    colWidth: f32,
-    snap: Option<f32>,
-    popupWidth: f32
-}
-
-struct GridApp {
-    settings: &GridSettings,
-    cells: &Vec<Cell>,
+//TODO consider recombining this with GridArea later if possible
+#[derive(Default)]
+pub struct GridAreaState {
     contextVisible: bool,
+//XXX do we really need?    
     contextCellIndex: Option<usize>,
-    velocity: u8
+}
+
+
+pub struct GridAreaView<'a> {
+//XXX do we really need both of these?    
+    settings: &'a GridSettings,
+    cells: &'a Vec<Cell>,
 }
 
 #[derive(Clone, Debug)]
 pub enum GridAreaMessage {
     HideContextMenu,
-    CloseContext,           //XXX unused?
+    DeleteCell,
     RightClick(usize),
-    Cells(CellMessage)
+    CloseContext           //XXX unused?
 }
 
-impl GridApp {
+/*
+    NOTE that GridArea is not a widget, but it is widget-like. It defines its own 
+    messages, update and view functions and these are called manually from the application
+    in a slightly clumsy fashion.
+*/
+
+//XXX Could it be converted into a proper widget? Needs to respond to messages coming
+//    to it I guess...
+
+//XXX MAY wish to rename back to GridArea... 
+//    Helps emphasise that any data passed in should be immutable.
+//    NOTE though it contains 'update' (for the moment - could be separated).
+impl<'a> GridAreaView<'a> {
 
 //TODO move the combined Grid+ContextMenu into a shared widget file
 
-    fn new(settings:&GridSettings,cells:&Vec<Cell>) -> GridApp
+    pub fn new(settings:&'a GridSettings,cells:&'a Vec<Cell>) -> Self
     {
-        GridApp {settings,cells,
-            contextVisible: false,
-            contextCellIndex: None,
-            velocity: 0
+        Self {
+            settings,
+            cells
         }
     }
 
-//    fn update(&mut self, message: GridAreaMessage) {
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        _layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, GridAreaMessage>,
-        _viewport: &Rectangle,
-    ) {
-
-//TODO look at event and shell. Can we get the child messages from either? Do we need to access children()?
-//     eg see contextMenuPopup.rs which uses 'content'
-
-//ALT: buy into the whole Elm thing... can have an app-level update method
-        
+    pub fn update(state:&mut GridAreaState, message: Message) {
         match message {
-            GridAreaMessage::HideContextMenu => self.contextVisible = false,
-//            GridAreaMessage::ValueChange(value) => self.velocity = value,  //XXX => VelocityChange
-            GridAreaMessage::CloseContext => self.contextVisible = false,
-            GridAreaMessage::RightClick(cellIndex) => {
-                self.contextCellIndex = Some(cellIndex);
-                self.contextVisible = true;
-            }
-            GridAreaMessage::Cells(msg) => {
-                match msg {
-//XXX cf mapping these messages from GridAreaMessage to CellMessage instead                    
-                    CellMessage::DeleteCell => {
-//                        self.cells.remove(self.contextCellIndex.unwrap());
-                        self.contextCellIndex = None;
-                        self.contextVisible = false;
+            Message::Cells(message) => {
+                match message {
+                    CellMessage::Delete(i) =>  {
+                        state.contextCellIndex = None;
+                        state.contextVisible = false;
+                    }
+                    _ => ()
+                }
+            },
 
-                        shell.publish(GridAreaMessage::Cells(CellMessage::DeleteCell(cell)));
+            Message::GridArea(message) => {
+                match message {
+                    GridAreaMessage::HideContextMenu => state.contextVisible = false,
+//TODO put this in the Cell instead
+//                    GridAreaMessage::ValueChange(value) => self.velocity = value,  //XXX => VelocityChange
+                    GridAreaMessage::CloseContext => state.contextVisible = false,
+
+                    GridAreaMessage::RightClick(cellIndex) => {
+                        state.contextCellIndex = Some(cellIndex);
+                        state.contextVisible = true;
                     }
-//TODO try publishing these to be handled by parent                    
-                    CellMessage::AddCell(cell) => self.cells.push(cell),
-                    CellMessage::ModifyCell(i,cell) => {
-                        self.cells[i].col = cell.col;
-                        self.cells[i].row = cell.row;
-                        self.cells[i].length = cell.length;
-                    }
+                    _ => ()
                 }
             }
         }
     }
 
-    fn view(&self) -> Element<'_, GridAreaMessage> {
-        let grid = Element::new(Grid::new(&self.settings,&self.cells)).map(GridAreaMessage::Grid);   //XXX HACK calling new and view with cells...
+    pub fn view(&self, state: &'a GridAreaState) -> Element<'a, Message> {
+        let grid = Element::new(GridView::new(self.settings,self.cells));
 
         let outer = Scrollable::with_direction(
             container(grid),
@@ -119,19 +105,21 @@ impl GridApp {
         .width(Length::Fill)
         .height(Length::Fill);
 
-        if self.contextVisible {
+        if state.contextVisible {
             let contextContent = 
                 container(                
                     column(vec![
                         iced::widget::button("Delete")
-                            .on_press(GridAreaMessage::DeleteCell)
+                            .on_press(Message::Cells(CellMessage::Delete(state.contextCellIndex.unwrap())))
                             .into(),
                         
                         row![
                             "Velocity",
                             space::horizontal().width(Length::Fixed(8.0)),
-                            slider(0..=255, self.velocity, GridAreaMessage::ValueChange)
+/*                            
+                            slider(0..=255, self.velocity, Message::ValueChange)
                                 .on_release(GridAreaMessage::CloseContext)
+*/
                         ].into()
                     ])
                     .spacing(10)
@@ -148,12 +136,12 @@ impl GridApp {
                     }
                 });
 
-            let cell = self.cells[self.contextCellIndex.unwrap()];
+            let cell = self.cells[state.contextCellIndex.unwrap()];
             let pos = Point{
                 x: cell.col * self.settings.colWidth,
                 y: cell.row as f32 * self.settings.rowHeight
             };
-            context(outer,contextContent,GridAreaMessage::HideContextMenu,&self.settings,pos)
+            context(outer,contextContent,Message::GridArea(GridAreaMessage::HideContextMenu),&self.settings,pos)
         }
         else {
             outer.into()
