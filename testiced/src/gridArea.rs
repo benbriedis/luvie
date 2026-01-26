@@ -41,10 +41,11 @@ pub enum GridAreaMessage {
     NOTE that GridArea is not a widget, but it is widget-like. It defines its own 
     messages, update and view functions and these are called manually from the application
     in a slightly clumsy fashion.
+
+    Could it be converted into a proper widget? Needs to respond to messages coming
+    to it from above I guess, or else capture the ones coming up... Likely to be hard.
 */
 
-//XXX Could it be converted into a proper widget? Needs to respond to messages coming
-//    to it from above I guess...
 
 impl<'a> GridArea<'a> 
 {

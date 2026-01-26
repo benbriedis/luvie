@@ -134,7 +134,6 @@ impl<'a> Grid<'a> {
                 return mode;
             }
         }
-
         mode
     }
 
