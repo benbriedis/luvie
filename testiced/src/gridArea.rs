@@ -15,7 +15,6 @@ mod grid;
 mod contextMenuPopup;
 
 
-//TODO consider recombining this with GridArea later if possible
 #[derive(Default)]
 pub struct GridAreaState {
     contextVisible: bool,
@@ -23,7 +22,6 @@ pub struct GridAreaState {
 }
 
 pub struct GridArea<'a> {
-//XXX do we really need both of these?    
     settings: &'a GridSettings,
     cells: &'a Cells,
 }
@@ -37,9 +35,9 @@ pub enum GridAreaMessage {
 }
 
 /*
-    NOTE that GridArea is not a widget, but it is widget-like. It defines its own 
-    messages, update and view functions and these are called manually from the application
-    in a slightly clumsy fashion.
+    NOTE that GridArea is not a true custom widget (although I guess it is "by composition" as Iced would say). 
+    It defines its own messages, update and view functions and these are called manually from the application
+    in a clumsy fashion.
 
     Could it be converted into a proper widget? Needs to respond to messages coming
     to it from above I guess, or else capture the ones coming up... Likely to be hard.
@@ -123,8 +121,6 @@ impl<'a> GridArea<'a>
         }
     }
 }
-
-//XXX cf function and parameter names here...
 
 fn context<'a, Message>(
     base: impl Into<Element<'a, Message>>,

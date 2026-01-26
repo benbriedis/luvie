@@ -38,7 +38,10 @@ pub enum Message {
 struct GridApp {
     settings: GridSettings,
     cells: Cells,
-    /* Need to keep state of immediate children to work with Elm pattern */
+    /*
+       Need to keep state of immediate children to work with Elm pattern. 
+       Could Widget state / tree state somehow be used for this instead?
+    */
     gridAreaState: GridAreaState,
 }
 
@@ -63,10 +66,9 @@ impl GridApp
     }
 
     fn update(&mut self, message: Message) {
-        match message {
-            Message::Cells(message) => cells::update(&mut self.cells, message),
-            _ => ()
-        }
+       if let Message::Cells(msg) = message {
+            cells::update(&mut self.cells, msg);
+       }
        gridArea::update(&mut self.gridAreaState,message);
     }
 
