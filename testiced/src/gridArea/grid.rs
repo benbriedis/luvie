@@ -14,7 +14,7 @@ use iced::{
 
 use std::fmt::Debug;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
-use crate::{Cell, CellMessage, GridSettings, Message, gridArea::GridAreaMessage};
+use crate::{ CellMessage, GridSettings, Message, cells::{Cell,Cells}, gridArea::GridAreaMessage};
 
 #[derive(Debug,Default,Clone,PartialEq)]
 enum Side {
@@ -51,7 +51,7 @@ enum CursorMode {
 pub struct Grid<'a> {
     settings: &'a GridSettings,
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
-    cells: &'a Vec<Cell>,
+    cells: &'a Cells,
     mode: CursorMode,
 }
 
@@ -60,7 +60,7 @@ impl<'a> Grid<'a> {
         Grid is basically a view and will be called whenever state changes,
         hence the state here is not mutable.
     */
-    pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
+    pub fn new(settings:&'a GridSettings, cells: &'a Cells) -> Self
     {
         Self {
             settings,
@@ -241,7 +241,7 @@ impl<'a> Grid<'a> {
     }
 }
 
-fn overlappingCell(cells:&Vec<Cell>,a:&Cell,selected:Option<usize>) -> Option<usize>
+fn overlappingCell(cells:&Cells,a:&Cell,selected:Option<usize>) -> Option<usize>
 {
     let aStart = a.col;
     let aEnd = a.col + a.length;

@@ -1,4 +1,3 @@
-#![allow(non_snake_case)]
 
 use std::{fmt::Debug};
 use iced::{
@@ -9,7 +8,7 @@ use iced::{
         Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
-use crate::{Cell, CellMessage, GridSettings, Message, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
+use crate::{CellMessage, GridSettings, Message, cells::{Cell,Cells}, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
 
 
 mod grid;
@@ -26,7 +25,7 @@ pub struct GridAreaState {
 pub struct GridArea<'a> {
 //XXX do we really need both of these?    
     settings: &'a GridSettings,
-    cells: &'a Vec<Cell>,
+    cells: &'a Cells,
 }
 
 #[derive(Clone, Debug)]
@@ -53,7 +52,7 @@ impl<'a> GridArea<'a>
         GridArea is basically a view and will be called whenever state changes,
         hence the state here is not mutable.
     */
-    pub fn new(settings:&'a GridSettings,cells:&'a Vec<Cell>) -> Self
+    pub fn new(settings:&'a GridSettings,cells:&'a Cells) -> Self
     {
         Self {
             settings,
@@ -89,7 +88,7 @@ impl<'a> GridArea<'a>
                             "Velocity",
                             space::horizontal().width(Length::Fixed(8.0)),
                             slider(0..=255, 
-                                cell.velocity, 
+                                cell.velocity,
                                 move |value| {
                                     let mut newCell = cell;
                                     newCell.velocity = value;

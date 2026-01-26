@@ -4,10 +4,11 @@ use std::{fmt::Debug};
 use iced::{
     Element, Length, Theme, widget::{Scrollable, container, scrollable::{Direction, Scrollbar}} 
 };
-use crate::gridArea::{GridArea, GridAreaMessage, GridAreaState};
+use crate::{cells::{CellMessage, Cells}, gridArea::{GridArea, GridAreaMessage, GridAreaState}};
 
 
 mod gridArea;
+mod cells;
 
 
 fn main() -> iced::Result {
@@ -19,14 +20,6 @@ fn main() -> iced::Result {
 
 //TODO maybe put cell stuff into its own Cell ADT file. Ditto for GridAreaState
 
-#[derive(Debug,Default,Clone,Copy,PartialEq)]
-pub struct Cell {
-    row: usize,
-    col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
-    length: f32,
-    velocity: u8
-}
-
 pub struct GridSettings {
     numRows: usize,
     numCols: usize,
@@ -34,13 +27,6 @@ pub struct GridSettings {
     colWidth: f32,
     snap: Option<f32>,
     popupWidth: f32
-}
-
-#[derive(Clone, Debug, Copy)]
-pub enum CellMessage {
-    Add(Cell),
-    Modify(usize,Cell),
-    Delete(usize)
 }
 
 #[derive(Clone, Debug)]
@@ -51,7 +37,7 @@ pub enum Message {
 
 struct GridApp {
     settings: GridSettings,
-    cells: Vec<Cell>,
+    cells: Cells,
     /* Need to keep state of immediate children to work with Elm pattern */
     gridAreaState: GridAreaState,
 }
@@ -78,13 +64,7 @@ impl GridApp
 
     fn update(&mut self, message: Message) {
         match message {
-            Message::Cells(message) => {
-                match message {
-                    CellMessage::Add(cell) => self.cells.push(cell),
-                    CellMessage::Modify(i,cell) => self.cells[i] = cell,
-                    CellMessage::Delete(i) => { self.cells.remove(i); }
-                }
-            }
+            Message::Cells(message) => cells::update(&mut self.cells, message),
             _ => ()
         }
        gridArea::update(&mut self.gridAreaState,message);
