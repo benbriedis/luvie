@@ -9,7 +9,7 @@ use iced::{
         Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
-use crate::{Cell, CellMessage, GridSettings, Message, gridArea::{contextMenuPopup::ContextMenuPopup, grid::GridView}};
+use crate::{Cell, CellMessage, GridSettings, Message, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
 
 
 mod grid;
@@ -23,7 +23,7 @@ pub struct GridAreaState {
     contextCellIndex: Option<usize>,
 }
 
-pub struct GridAreaView<'a> {
+pub struct GridArea<'a> {
 //XXX do we really need both of these?    
     settings: &'a GridSettings,
     cells: &'a Vec<Cell>,
@@ -46,11 +46,12 @@ pub enum GridAreaMessage {
 //XXX Could it be converted into a proper widget? Needs to respond to messages coming
 //    to it from above I guess...
 
-//XXX MAY wish to rename back to GridArea... 
-//    Helps emphasise that any data passed in should be immutable.
-//    NOTE though it contains 'update' (for the moment - could be separated).
-impl<'a> GridAreaView<'a> 
+impl<'a> GridArea<'a> 
 {
+    /*
+        GridArea is basically a view and will be called whenever state changes,
+        hence the state here is not mutable.
+    */
     pub fn new(settings:&'a GridSettings,cells:&'a Vec<Cell>) -> Self
     {
         Self {
@@ -59,35 +60,8 @@ impl<'a> GridAreaView<'a>
         }
     }
 
-    pub fn update(state:&mut GridAreaState, message: Message) {
-        match message {
-            Message::Cells(message) => {
-                match message {
-                    CellMessage::Delete(_) =>  {
-                        state.contextCellIndex = None;
-                        state.contextVisible = false;
-                    }
-                    _ => ()
-                }
-            },
-
-            Message::GridArea(message) => {
-                match message {
-                    GridAreaMessage::HideContextMenu => state.contextVisible = false,
-                    GridAreaMessage::CloseContext => state.contextVisible = false,
-
-                    GridAreaMessage::RightClick(cellIndex) => {
-                        state.contextCellIndex = Some(cellIndex);
-                        state.contextVisible = true;
-                    }
-                    _ => ()
-                }
-            }
-        }
-    }
-
     pub fn view(&self, state: &'a GridAreaState) -> Element<'a, Message> {
-        let grid = Element::new(GridView::new(self.settings,self.cells));
+        let grid = Element::new(Grid::new(self.settings,self.cells));
 
         let outer = Scrollable::with_direction(
             container(grid),
@@ -187,5 +161,32 @@ where
         )
     ]
     .into()
+}
+
+pub fn update(state:&mut GridAreaState, message: Message) {
+    match message {
+        Message::Cells(message) => {
+            match message {
+                CellMessage::Delete(_) =>  {
+                    state.contextCellIndex = None;
+                    state.contextVisible = false;
+                }
+                _ => ()
+            }
+        },
+
+        Message::GridArea(message) => {
+            match message {
+                GridAreaMessage::HideContextMenu => state.contextVisible = false,
+                GridAreaMessage::CloseContext => state.contextVisible = false,
+
+                GridAreaMessage::RightClick(cellIndex) => {
+                    state.contextCellIndex = Some(cellIndex);
+                    state.contextVisible = true;
+                }
+                _ => ()
+            }
+        }
+    }
 }
 

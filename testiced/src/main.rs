@@ -4,7 +4,7 @@ use std::{fmt::Debug};
 use iced::{
     Element, Length, Theme, widget::{Scrollable, container, scrollable::{Direction, Scrollbar}} 
 };
-use crate::gridArea::{GridAreaView, GridAreaMessage, GridAreaState};
+use crate::gridArea::{GridArea, GridAreaMessage, GridAreaState};
 
 
 mod gridArea;
@@ -87,11 +87,11 @@ impl GridApp
             }
             _ => ()
         }
-        GridAreaView::update(&mut self.gridAreaState,message);
+       gridArea::update(&mut self.gridAreaState,message);
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let gridArea = GridAreaView::new(&self.settings,&self.cells);
+        let gridArea = GridArea::new(&self.settings,&self.cells);
         let grid = gridArea.view(&self.gridAreaState);
 
         Scrollable::with_direction(

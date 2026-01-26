@@ -48,16 +48,18 @@ enum CursorMode {
     MOVING(MoveData),
 }
 
-//XXX MAY wish to rename back to Grid... 
-//    Helps emphasise that any data passed in should be immutable.
-pub struct GridView<'a> {
+pub struct Grid<'a> {
     settings: &'a GridSettings,
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
     cells: &'a Vec<Cell>,
     mode: CursorMode,
 }
 
-impl<'a> GridView<'a> {
+impl<'a> Grid<'a> {
+    /*
+        Grid is basically a view and will be called whenever state changes,
+        hence the state here is not mutable.
+    */
     pub fn new(settings:&'a GridSettings, cells: &'a Vec<Cell>) -> Self
     {
         Self {
@@ -84,14 +86,14 @@ impl<'a> GridView<'a> {
         frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
     }
 
-    fn findCellForCursor(&mut self,pos:Point)
+    fn findCellForCursor(&self,pos:Point) -> CursorMode
     {
         let s = self.settings;
         let resizeZone: f32 = 8.0;
 
         let row = (pos.y / s.rowHeight).floor() as usize;
 
-        self.mode = CursorMode::POINTER;
+        let mut mode = CursorMode::POINTER;
 
         for (i,n) in self.cells.iter().enumerate() {
             if n.row != row {
@@ -101,16 +103,15 @@ impl<'a> GridView<'a> {
             let leftEdge = n.col * s.colWidth; 
             let rightEdge = (n.col + n.length) * s.colWidth;
 
-//TODO consider converting to a true function now            
             if leftEdge - pos.x <= resizeZone && pos.x - leftEdge <= resizeZone {
-                self.mode = CursorMode::RESIZABLE(ResizeData {
+                mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::LEFT,
                     workingCell: *n
                 });
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
-                self.mode = CursorMode::RESIZABLE(ResizeData {
+                mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::RIGHT,
                     workingCell: *n
@@ -121,7 +122,7 @@ impl<'a> GridView<'a> {
                     x: pos.x - n.col * s.colWidth,
                     y: pos.y - n.row as f32 * s.rowHeight
                 };
-                self.mode = CursorMode::MOVABLE(MoveData { 
+                mode = CursorMode::MOVABLE(MoveData { 
                     cellIndex: i,
                     grabPosition: grabPos,
                     lastValid: *n,
@@ -130,9 +131,11 @@ impl<'a> GridView<'a> {
                 });
 
                 /* Move takes precedence over resizing any neighbouring notes */
-                return;
+                return mode;
             }
         }
+
+        mode
     }
 
     pub fn moving(&mut self,pos:Point)
@@ -275,7 +278,7 @@ struct State {
 }
 
 
-impl<'a> Widget<Message, Theme, Renderer> for GridView<'a>
+impl<'a> Widget<Message, Theme, Renderer> for Grid<'a>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -424,7 +427,7 @@ let exPalette = theme.extended_palette();
 
         if self.mode == CursorMode::INIT {
             if let Some(pos) = cursor.position() {
-                self.findCellForCursor(pos);   //FIXME convert to pure function
+                self.mode = self.findCellForCursor(pos); 
 //                state.cache.clear();  
 //                shell.request_redraw();
             }
@@ -478,7 +481,7 @@ let exPalette = theme.extended_palette();
                         shell.request_redraw();
                     }
                     _ => {
-                        self.findCellForCursor(*position);
+                        self.mode = self.findCellForCursor(*position);
                     }
                 }
 
@@ -539,8 +542,8 @@ let exPalette = theme.extended_palette();
     }
 }
 
-impl<'a> From<GridView<'a>> for Element<'a,Message> {
-    fn from(grid: GridView<'a>) -> Self {
+impl<'a> From<Grid<'a>> for Element<'a,Message> {
+    fn from(grid: Grid<'a>) -> Self {
         Self::new(grid)
     }
 }
