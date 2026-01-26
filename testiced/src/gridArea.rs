@@ -34,7 +34,7 @@ pub enum GridAreaMessage {
     HideContextMenu,
     DeleteCell,
     RightClick(usize),
-    CloseContext           //XXX unused?
+    CloseContext 
 }
 
 /*
@@ -74,8 +74,6 @@ impl<'a> GridAreaView<'a>
             Message::GridArea(message) => {
                 match message {
                     GridAreaMessage::HideContextMenu => state.contextVisible = false,
-//TODO put this in the Cell instead
-//                    GridAreaMessage::ValueChange(value) => self.velocity = value,  //XXX => VelocityChange
                     GridAreaMessage::CloseContext => state.contextVisible = false,
 
                     GridAreaMessage::RightClick(cellIndex) => {
@@ -102,6 +100,9 @@ impl<'a> GridAreaView<'a>
         .height(Length::Fill);
 
         if state.contextVisible {
+            let index = state.contextCellIndex.unwrap();
+            let cell = self.cells[index];
+
             let contextContent = 
                 container(                
                     column(vec![
@@ -112,10 +113,14 @@ impl<'a> GridAreaView<'a>
                         row![
                             "Velocity",
                             space::horizontal().width(Length::Fixed(8.0)),
-/*                            
-                            slider(0..=255, self.velocity, Message::ValueChange)
-                                .on_release(GridAreaMessage::CloseContext)
-*/
+                            slider(0..=255, 
+                                cell.velocity, 
+                                move |value| {
+                                    let mut newCell = cell;
+                                    newCell.velocity = value;
+                                    Message::Cells(CellMessage::Modify(index,newCell))
+                                })
+                                .on_release(Message::GridArea(GridAreaMessage::CloseContext))
                         ].into()
                     ])
                     .spacing(10)

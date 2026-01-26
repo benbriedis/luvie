@@ -23,7 +23,8 @@ fn main() -> iced::Result {
 pub struct Cell {
     row: usize,
     col: f32,       //XXX awkward name given type. Might be the best we have for the moment though
-    length: f32
+    length: f32,
+    velocity: u8
 }
 
 pub struct GridSettings {

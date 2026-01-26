@@ -106,14 +106,14 @@ impl<'a> GridView<'a> {
                 self.mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::LEFT,
-                    workingCell: Cell {row:n.row,col:n.col,length:n.length}
+                    workingCell: *n
                 });
             }
             else if rightEdge - pos.x <= resizeZone && pos.x - rightEdge <= resizeZone {
                 self.mode = CursorMode::RESIZABLE(ResizeData {
                     cellIndex: i,
                     side: Side::RIGHT,
-                    workingCell: Cell {row:n.row,col:n.col,length:n.length}
+                    workingCell: *n
                 });
             }
             else if pos.x >= leftEdge && pos.x <= rightEdge {
@@ -124,8 +124,8 @@ impl<'a> GridView<'a> {
                 self.mode = CursorMode::MOVABLE(MoveData { 
                     cellIndex: i,
                     grabPosition: grabPos,
-                    lastValid: Cell {row:n.row,col:n.col,length:n.length},
-                    workingCell: Cell {row:n.row,col:n.col,length:n.length},
+                    lastValid: *n,
+                    workingCell: *n,
                     amOverlapping: false
                 });
 
@@ -201,7 +201,8 @@ impl<'a> GridView<'a> {
                     cell.col = (cell.col / snap).round() * snap;
                 }
 
-                let testCell = Cell{row:cell.row,col:cell.col,length: endCol - cell.col};
+                let testCell = Cell{length: endCol - cell.col, ..*cell};
+
                 let neighbour = overlappingCell(self.cells,&testCell,Some(data.cellIndex));
                 let min = if let Some(n) = neighbour { self.cells[n].col + self.cells[n].length } else { 0.0 };
                 if cell.col < min {
@@ -423,8 +424,7 @@ let exPalette = theme.extended_palette();
 
         if self.mode == CursorMode::INIT {
             if let Some(pos) = cursor.position() {
-                self.findCellForCursor(pos);
-
+                self.findCellForCursor(pos);   //FIXME convert to pure function
 //                state.cache.clear();  
 //                shell.request_redraw();
             }
@@ -438,7 +438,7 @@ let exPalette = theme.extended_palette();
 
                 match &self.mode {
                     CursorMode::MOVABLE(data) => {
-                        self.mode = CursorMode::MOVING(data.clone());
+                        self.mode = CursorMode::MOVING(data.clone());     //XXX implement copy instead?
                         /* Required in case you click on a filled cell without moving it */
                         //self.movingCell = Some(self.cells[self.selectedCell.unwrap()]);
                     }
@@ -451,7 +451,7 @@ let exPalette = theme.extended_palette();
                             let row = (position.y / s.rowHeight).floor() as usize;
                             let col = (position.x / s.colWidth).floor() as f32;
 
-                            let cell = Cell{row,col,length:1.0};
+                            let cell = Cell{row,col,length:1.0,velocity:100};
 
                             /* NOTE in future if the min values are > 0 then min contraints will need to be added */
                             if position.x < s.colWidth * s.numCols as f32 && position.y < s.rowHeight * s.numRows as f32 {
