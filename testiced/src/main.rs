@@ -51,16 +51,12 @@ pub enum Message {
 struct GridApp {
     settings: GridSettings,
     cells: Vec<Cell>,
-
-    //IDEA here is to keep a reference to store child state, but define
-    //     it in the child.
+    /* Need to keep state of immediate children to work with Elm pattern */
     gridAreaState: GridAreaState,
 }
 
-impl GridApp {
-
-//TODO move the combined Grid+ContextMenu into a shared widget file
-
+impl GridApp 
+{
     fn new() -> Self
     {
         let settings = GridSettings {
@@ -81,14 +77,11 @@ impl GridApp {
 
     fn update(&mut self, message: Message) {
         match message {
-//TODO add GridAreaMessage() => call inside GridArea            
-
             Message::Cells(message) => {
                 match message {
-                    CellMessage::Add(cell) => { self.cells.push(cell); }, //XXX brackets?
-                    CellMessage::Modify(i,cell) => { self.cells[i] = cell; },
-                    CellMessage::Delete(i) =>  {self.cells.remove(i); } ,
-                    _ => ()
+                    CellMessage::Add(cell) => self.cells.push(cell),
+                    CellMessage::Modify(i,cell) => self.cells[i] = cell,
+                    CellMessage::Delete(i) => { self.cells.remove(i); }
                 }
             }
             _ => ()
@@ -97,12 +90,8 @@ impl GridApp {
     }
 
     fn view(&self) -> Element<'_, Message> {
-
-//XXX cd GridArea --> GridAreaView        
         let gridArea = GridAreaView::new(&self.settings,&self.cells);
         let grid = gridArea.view(&self.gridAreaState);
-
-//        let grid = Element::new(Grid::new(&self.settings,&self.cells)).map(Message::Grid);   //XXX HACK calling new and view with cells...
 
         Scrollable::with_direction(
             container(grid),

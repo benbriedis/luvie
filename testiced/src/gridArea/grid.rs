@@ -52,10 +52,8 @@ enum CursorMode {
 //    Helps emphasise that any data passed in should be immutable.
 pub struct GridView<'a> {
     settings: &'a GridSettings,
-
     //XXX cells should really refer to the notes or patterns. Cells are the intersections of rows and cols.
     cells: &'a Vec<Cell>,
-
     mode: CursorMode,
 }
 
@@ -164,10 +162,7 @@ impl<'a> GridView<'a> {
 
         cell.row = ((pos.y - data.grabPosition.y + s.rowHeight/2.0) / s.rowHeight).floor() as usize;
 
-        /* Ensure the note stays within Y bounds */
-        if cell.row < 0 {
-            cell.row = 0;
-        }
+        /* Ensure the note stays within Y bounds. NOTE the type requires >= 0. */
         if cell.row >= s.numRows {
             cell.row = s.numRows - 1;
         }
@@ -477,7 +472,7 @@ let exPalette = theme.extended_palette();
                         state.cache.clear();  
                         shell.request_redraw();
                     }
-                    CursorMode::RESIZING(ref mut data) => {
+                    CursorMode::RESIZING(_) => {
                         self.resizing(*position);
                         state.cache.clear();  
                         shell.request_redraw();

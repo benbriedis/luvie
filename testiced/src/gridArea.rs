@@ -20,10 +20,8 @@ mod contextMenuPopup;
 #[derive(Default)]
 pub struct GridAreaState {
     contextVisible: bool,
-//XXX do we really need?    
     contextCellIndex: Option<usize>,
 }
-
 
 pub struct GridAreaView<'a> {
 //XXX do we really need both of these?    
@@ -46,15 +44,13 @@ pub enum GridAreaMessage {
 */
 
 //XXX Could it be converted into a proper widget? Needs to respond to messages coming
-//    to it I guess...
+//    to it from above I guess...
 
 //XXX MAY wish to rename back to GridArea... 
 //    Helps emphasise that any data passed in should be immutable.
 //    NOTE though it contains 'update' (for the moment - could be separated).
-impl<'a> GridAreaView<'a> {
-
-//TODO move the combined Grid+ContextMenu into a shared widget file
-
+impl<'a> GridAreaView<'a> 
+{
     pub fn new(settings:&'a GridSettings,cells:&'a Vec<Cell>) -> Self
     {
         Self {
@@ -67,7 +63,7 @@ impl<'a> GridAreaView<'a> {
         match message {
             Message::Cells(message) => {
                 match message {
-                    CellMessage::Delete(i) =>  {
+                    CellMessage::Delete(_) =>  {
                         state.contextCellIndex = None;
                         state.contextVisible = false;
                     }
@@ -154,7 +150,7 @@ impl<'a> GridAreaView<'a> {
 fn context<'a, Message>(
     base: impl Into<Element<'a, Message>>,
     content: impl Into<Element<'a, Message>>,
-    on_blur: Message,
+    onBlur: Message,
     settings: &GridSettings,
     pos: Point
 ) -> Element<'a, Message>
@@ -182,7 +178,7 @@ where
                     contextPopup
                 )
             )
-            .on_press(on_blur)
+            .on_press(onBlur)
         )
     ]
     .into()
