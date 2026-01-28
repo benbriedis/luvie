@@ -110,6 +110,7 @@ impl<'a> GridArea<'a>
                 });
 
             let cell = self.cells[state.contextCellIndex.unwrap()];
+println!("gridArea-view cell: {:?}",cell);            
             let pos = Point{
                 x: cell.col * self.settings.colWidth,
                 y: cell.row as f32 * self.settings.rowHeight

@@ -1,6 +1,10 @@
 /* TODO 
     1. Read colours from themes. The loading_spinners/src/circular.rs example has a full on example.
        Lean into composition where possible...
+
+    MINOR BUGS:
+    1. Occasionally get a question mark cursor appearing briefly
+    2. Clicking a dragging a cell quickly over another can sometime leave a small gap.
 */
 
 
@@ -11,8 +15,8 @@ use iced::{
         }
     }, mouse::{self}, widget::canvas::{self, Path, Stroke, stroke}
 };
-
 use std::fmt::Debug;
+use std::ops::Sub;
 use mouse::Interaction::{Grab,Grabbing,ResizingHorizontally,NotAllowed};
 use crate::{ CellMessage, GridSettings, Message, cells::{Cell,Cells}, gridArea::GridAreaMessage};
 
@@ -69,20 +73,23 @@ impl<'a> Grid<'a> {
         }
     }
 
-    fn drawCell(&self,frame:&mut Frame<Renderer>,c: Cell)
+    fn drawCell(&self,frame:&mut Frame<Renderer>,origin:Point, c: Cell)
     {
+        let point = |x:f32,y:f32| Point {x: origin.x + x, y: origin.y + y};
+//        let point = |x:f32,y:f32| Point {x, y};
+
         let s = self.settings;
         let lineWidth = 1.0;
 
          //TODO possibly size to be inside grid, although maybe not at start
-        let point = Point::new(c.col as f32 * s.colWidth, c.row as f32 * s.rowHeight +lineWidth);
+        let point = point(c.col as f32 * s.colWidth, c.row as f32 * s.rowHeight +lineWidth);
         let size = Size::new(c.length * s.colWidth, s.rowHeight - 2.0 * lineWidth);
-        let path = canvas::Path::rectangle(point,size);
+        let path = Path::rectangle(point,size);
         frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
 
         /* Add the dark line on the left: */
         let size2 = Size::new(8.0, s.rowHeight - 2.0 * lineWidth);
-        let path2 = canvas::Path::rectangle(point,size2);
+        let path2 = Path::rectangle(point,size2);
         frame.fill(&path2, Color::from_rgb8(0x12, 0x60, 0x90));
     }
 
@@ -311,7 +318,7 @@ impl<'a> Widget<Message, Theme, Renderer> for Grid<'a>
         theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
-        _cursor: mouse::Cursor,
+        cursor: mouse::Cursor,
         _viewport: &Rectangle,    //XXX relationship with layout.bounds?
     ) {
         let s = self.settings;
@@ -327,6 +334,10 @@ let exPalette = theme.extended_palette();
 
 
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
+            let origin = layout.position();
+println!("origin: {:?}",origin);
+
+            let point = |x:f32,y:f32| Point{x: x, y: y};
 
             //XXX in theory only need to draw the horizontal lines once so long as the cells sit inside them 
             //XXX could possibly omit redrawing cells not on the last row too.
@@ -334,8 +345,8 @@ let exPalette = theme.extended_palette();
             /* Draw the grid horizontal lines: */
             for i in 0..=s.numRows {
                 let line = Path::line(
-                    Point {x: 0.0, y: i as f32 * s.rowHeight},
-                    Point {x: s.numCols as f32 * s.colWidth, y: i as f32 * s.rowHeight}
+                    point(0.0, i as f32 * s.rowHeight),
+                    point(s.numCols as f32 * s.colWidth, i as f32 * s.rowHeight)
                 );
 
                 frame.stroke(&line, Stroke {
@@ -349,8 +360,8 @@ let exPalette = theme.extended_palette();
             /* Draw the grid vertical lines: */
             for i in 0..=s.numCols {
                 let line = Path::line(
-                    Point {x: i as f32 * s.colWidth, y: 0.0},
-                    Point {x: i as f32 * s.colWidth, y: s.numRows as f32 * s.rowHeight}
+                    point(i as f32 * s.colWidth, 0.0),
+                    point(i as f32 * s.colWidth, s.numRows as f32 * s.rowHeight)
                 );
 
                 frame.stroke(&line, Stroke {
@@ -366,22 +377,31 @@ let exPalette = theme.extended_palette();
                 match self.mode {
                     CursorMode::MOVING(ref data) => {
                         if i != data.cellIndex {
-                            self.drawCell(frame,*c);
+                            self.drawCell(frame,origin,*c);
                         }
                     }
                     CursorMode::RESIZING(ref data) => {
                         if i != data.cellIndex {
-                            self.drawCell(frame,*c);
+                            self.drawCell(frame,origin,*c);
                         }
                     }
-                    _ => self.drawCell(frame,*c)
+                    _ => self.drawCell(frame,origin,*c)
+//FIXME remove
+/*                    
+                    _ => {
+                        let pnt = point(c.col as f32 * s.colWidth, c.row as f32 * s.rowHeight +1.0);
+                        let size = Size::new(c.length * s.colWidth, s.rowHeight - 2.0 * 1.0);
+                        let path = Path::rectangle(pnt,size);
+                        frame.fill(&path, Color::from_rgb8(0x12, 0x93, 0xD8));
+                    }
+*/
                 }
             };
 
             /* Draw selected note last so it sits on top */
             match self.mode {
-                CursorMode::MOVING(ref data) => self.drawCell(frame,data.workingCell),
-                CursorMode::RESIZING(ref data) => self.drawCell(frame,data.workingCell),
+                CursorMode::MOVING(ref data) => self.drawCell(frame,origin,data.workingCell),
+                CursorMode::RESIZING(ref data) => self.drawCell(frame,origin,data.workingCell),
                 _ => ()
             }
 
@@ -409,13 +429,18 @@ let exPalette = theme.extended_palette();
         &mut self,
         tree: &mut Tree,
         event: &Event,
-        _layout: Layout<'_>,
+        layout: Layout<'_>,
         cursor: mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+//println!("grid - update - layout.position:{:?}",layout.position());                
+
+        let point = |x:f32,y:f32| Point {x: x - layout.position().x, y: y - layout.position().y};
+
+
         let state = tree.state.downcast_ref::<State>();
         let s = self.settings;
 
@@ -426,7 +451,8 @@ let exPalette = theme.extended_palette();
 
         if self.mode == CursorMode::INIT {
             if let Some(pos) = cursor.position() {
-                self.mode = self.findCellForCursor(pos); 
+                self.mode = self.findCellForCursor(point(pos.x,pos.y));
+
 //                state.cache.clear();  
 //                shell.request_redraw();
             }
@@ -436,6 +462,7 @@ let exPalette = theme.extended_palette();
 //            Event::Window(window::Event::RedrawRequested(now)) => {
 //            }
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+
                 shell.capture_event();
 
                 match &self.mode {
@@ -448,15 +475,19 @@ let exPalette = theme.extended_palette();
                         self.mode = CursorMode::RESIZING(data.clone());
                     }
                     _ => {
-                        if let Some(position) = cursor.position() {
+                        if let Some(pos) = cursor.position() {
+                            let p = point(pos.x,pos.y);
+    
+println!("Clicked left mouse button p: {}",p);
+
                             /* Add a cell: */
-                            let row = (position.y / s.rowHeight).floor() as usize;
-                            let col = (position.x / s.colWidth).floor() as f32;
+                            let row = (p.y / s.rowHeight).floor() as usize;
+                            let col = (p.x / s.colWidth).floor() as f32;
 
                             let cell = Cell{row,col,length:1.0,velocity:100};
 
                             /* NOTE in future if the min values are > 0 then min contraints will need to be added */
-                            if position.x < s.colWidth * s.numCols as f32 && position.y < s.rowHeight * s.numRows as f32 {
+                            if p.x < s.colWidth * s.numCols as f32 && p.y < s.rowHeight * s.numRows as f32 {
                                 if let None = overlappingCell(self.cells,&cell,None) {
                                     state.cache.clear();  
    //XXX being called when we click out of context menu                                

@@ -36,8 +36,11 @@ pub enum Message {
 }
 
 struct GridApp {
-    settings: GridSettings,
-    cells: Cells,
+    settings1: GridSettings,
+    cells1: Cells,
+
+    settings2: GridSettings,
+    cells2: Cells,
     /*
        Need to keep state of immediate children to work with Elm pattern. 
        Could Widget state / tree state somehow be used for this instead?
@@ -49,7 +52,16 @@ impl GridApp
 {
     fn new() -> Self
     {
-        let settings = GridSettings {
+        let settings1 = GridSettings {
+            numRows: 8,
+            numCols: 20, 
+            rowHeight: 30.0, 
+            colWidth: 40.0,
+            snap: Some(0.25),
+            popupWidth: 200.0
+        };
+
+        let settings2 = GridSettings {
             numRows: 8,
             numCols: 20, 
             rowHeight: 30.0, 
@@ -59,28 +71,32 @@ impl GridApp
         };
 
         Self {
-            settings,
-            cells: Vec::new(),
+            settings1,
+            cells1: Vec::new(),
+
+            settings2,
+            cells2: Vec::new(),
+
             gridAreaState: GridAreaState::default()
         }
     }
 
     fn update(&mut self, message: Message) {
        if let Message::Cells(msg) = message {
-            cells::update(&mut self.cells, msg);
+            cells::update(&mut self.cells1, msg);
        }
        gridArea::update(&mut self.gridAreaState,message);
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let gridArea = GridArea::new(&self.settings,&self.cells);
+        let gridArea = GridArea::new(&self.settings1,&self.cells1);
         let grid = gridArea.view(&self.gridAreaState);
 
-        let gridArea2 = GridArea::new(&self.settings,&self.cells);
+        let gridArea2 = GridArea::new(&self.settings2,&self.cells2);
         let grid2 = gridArea2.view(&self.gridAreaState);
 
         // -1.0 hack to prevent weird bug
-        let gridHeight = self.settings.numRows as f32 * self.settings.rowHeight - 1.0; 
+        let gridHeight = self.settings1.numRows as f32 * self.settings1.rowHeight - 1.0; 
         println!("Height: {}",gridHeight);
 
         column![
