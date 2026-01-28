@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Element, Length, Theme, widget::{Scrollable, container, scrollable::{Direction, Scrollbar}} 
+    Element, Length, Theme, widget::{Scrollable, column, container, scrollable::{Direction, Scrollbar}} 
 };
 use crate::{cells::{CellMessage, Cells}, gridArea::{GridArea, GridAreaMessage, GridAreaState}};
 
@@ -76,15 +76,37 @@ impl GridApp
         let gridArea = GridArea::new(&self.settings,&self.cells);
         let grid = gridArea.view(&self.gridAreaState);
 
-        Scrollable::with_direction(
-            container(grid),
-            Direction::Both {
-                vertical: Scrollbar::new(),
-                horizontal: Scrollbar::new(),
-            },
-        )
+        let gridArea2 = GridArea::new(&self.settings,&self.cells);
+        let grid2 = gridArea2.view(&self.gridAreaState);
+
+        // -1.0 hack to prevent weird bug
+        let gridHeight = self.settings.numRows as f32 * self.settings.rowHeight - 1.0; 
+        println!("Height: {}",gridHeight);
+
+        column![
+            Scrollable::with_direction(
+                container(grid),
+                Direction::Both {
+                    vertical: Scrollbar::new(),
+                    horizontal: Scrollbar::new(),
+                },
+            )
+            .width(Length::Fill)
+            .height(gridHeight),
+
+
+            Scrollable::with_direction(
+                container(grid2),
+                Direction::Both {
+                    vertical: Scrollbar::new(),
+                    horizontal: Scrollbar::new(),
+                },
+            )
+            .width(Length::Fill)
+            .height(gridHeight)
+        ]
+        .spacing(30)
         .width(Length::Fill)
-        .height(Length::Fill)
         .into()
     }
 }
