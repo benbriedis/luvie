@@ -1,14 +1,14 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Background, Color, Element, Length::{self}, Point, Theme, 
+    Background, Color, Element, Length::{self}, Point,  
     alignment::Horizontal, 
     border::radius, 
     widget::{
         Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
-use crate::{CellMessage, GridSettings, Message, cells::{Cell,Cells}, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
+use crate::{CellMessage, GridSettings, Message, cells::Cells, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
 
 
 mod grid;
@@ -26,10 +26,11 @@ pub struct GridArea<'a> {
     cells: &'a Cells,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum GridAreaMessage {
+    Cells(CellMessage),
+//    DeleteCell,
     HideContextMenu,
-    DeleteCell,
     RightClick(usize),
     CloseContext 
 }
@@ -58,9 +59,10 @@ impl<'a> GridArea<'a>
         }
     }
 
-    pub fn view(&self, state: &'a GridAreaState) -> Element<'a, Message> {
+    pub fn view(&self, state: &'a GridAreaState) -> Element<'a, GridAreaMessage> {
         let grid = Element::new(Grid::new(self.settings,self.cells));
 
+println!("settings:{:?}:",self.settings);
         let outer = Scrollable::with_direction(
             container(grid),
             Direction::Both {
@@ -71,6 +73,15 @@ impl<'a> GridArea<'a>
         .width(Length::Fill)
         .height(Length::Fill);
 
+/*        
+   //XXX why only 1 grid shown when the scrollbars are omitted?
+
+        let outer = container(grid)
+            .width(Length::Fill)
+            .height(Length::Fill);
+//        let outer = grid;
+*/        
+
         if state.contextVisible {
             let index = state.contextCellIndex.unwrap();
             let cell = self.cells[index];
@@ -79,7 +90,7 @@ impl<'a> GridArea<'a>
                 container(                
                     column(vec![
                         iced::widget::button("Delete")
-                            .on_press(Message::Cells(CellMessage::Delete(state.contextCellIndex.unwrap())))
+                            .on_press(GridAreaMessage::Cells(CellMessage::Delete(state.contextCellIndex.unwrap())))
                             .into(),
                         
                         row![
@@ -90,9 +101,9 @@ impl<'a> GridArea<'a>
                                 move |value| {
                                     let mut newCell = cell;
                                     newCell.velocity = value;
-                                    Message::Cells(CellMessage::Modify(index,newCell))
+                                    GridAreaMessage::Cells(CellMessage::Modify(index,newCell))
                                 })
-                                .on_release(Message::GridArea(GridAreaMessage::CloseContext))
+                                .on_release(GridAreaMessage::CloseContext)
                         ].into()
                     ])
                     .spacing(10)
@@ -115,7 +126,7 @@ println!("gridArea-view cell: {:?}",cell);
                 x: cell.col * self.settings.colWidth,
                 y: cell.row as f32 * self.settings.rowHeight
             };
-            context(outer,contextContent,Message::GridArea(GridAreaMessage::HideContextMenu),&self.settings,pos)
+            context(outer,contextContent,GridAreaMessage::HideContextMenu,&self.settings,pos)
         }
         else {
             outer.into()
@@ -123,15 +134,15 @@ println!("gridArea-view cell: {:?}",cell);
     }
 }
 
-fn context<'a, Message>(
-    base: impl Into<Element<'a, Message>>,
-    content: impl Into<Element<'a, Message>>,
-    onBlur: Message,
+fn context<'a, GridAreaMessage>(
+    base: impl Into<Element<'a, GridAreaMessage>>,
+    content: impl Into<Element<'a, GridAreaMessage>>,
+    onBlur: GridAreaMessage,
     settings: &GridSettings,
     pos: Point
-) -> Element<'a, Message>
+) -> Element<'a, GridAreaMessage>
 where
-    Message: Clone + 'a,
+    GridAreaMessage: Clone + 'a,
 {
 //TODO integrate more of this into the popup code?
     let contextPopup = ContextMenuPopup::new(
@@ -160,9 +171,9 @@ where
     .into()
 }
 
-pub fn update(state:&mut GridAreaState, message: Message) {
+pub fn update(state:&mut GridAreaState, message: GridAreaMessage) {
     match message {
-        Message::Cells(message) => {
+        GridAreaMessage::Cells(message) => {
             match message {
                 CellMessage::Delete(_) =>  {
                     state.contextCellIndex = None;
@@ -172,18 +183,13 @@ pub fn update(state:&mut GridAreaState, message: Message) {
             }
         },
 
-        Message::GridArea(message) => {
-            match message {
-                GridAreaMessage::HideContextMenu => state.contextVisible = false,
-                GridAreaMessage::CloseContext => state.contextVisible = false,
-
-                GridAreaMessage::RightClick(cellIndex) => {
-                    state.contextCellIndex = Some(cellIndex);
-                    state.contextVisible = true;
-                }
-                _ => ()
-            }
+        GridAreaMessage::HideContextMenu => state.contextVisible = false,
+        GridAreaMessage::CloseContext => state.contextVisible = false,
+        GridAreaMessage::RightClick(cellIndex) => {
+            state.contextCellIndex = Some(cellIndex);
+            state.contextVisible = true;
         }
+        _ => ()
     }
 }
 

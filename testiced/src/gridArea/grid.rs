@@ -284,7 +284,7 @@ struct State {
 }
 
 
-impl<'a> Widget<Message, Theme, Renderer> for Grid<'a>
+impl<'a> Widget<GridAreaMessage, Theme, Renderer> for Grid<'a>
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State>()
@@ -308,6 +308,11 @@ impl<'a> Widget<Message, Theme, Renderer> for Grid<'a>
         _limits: &layout::Limits,
     ) -> layout::Node {
         let s = self.settings;
+//    println!("layout() self: {:?}",self);
+    println!("layout() tree: {:?}",_tree);
+//    println!("layout() renderer: {:?}",_renderer);
+    println!("layout() limits: {:?}",_limits);
+    println!("");
         layout::Node::new(Size::new(s.numCols as f32 * s.colWidth, s.numRows as f32 * s.rowHeight))
     }
 
@@ -331,6 +336,16 @@ let exPalette = theme.extended_palette();
 
         let bounds = layout.bounds();
 //        let style = theme.style(&self.class, self.status.unwrap_or(Status::Active));
+
+//println!("view() self: {:?}",self);
+println!("view() tree: {:?}",tree);
+//println!("view() renderer: {:?}",renderer);
+println!("view() cursor: {:?}",cursor);
+
+println!("view() bounds: {:?}",bounds);
+println!("view() layout: {:?}",layout);
+println!("view() viewport: {:?}",_viewport);
+println!("");
 
 
         let gridCache = state.cache.draw(renderer, layout.bounds().size(), |frame| {
@@ -433,7 +448,7 @@ println!("origin: {:?}",origin);
         cursor: mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
+        shell: &mut Shell<'_, GridAreaMessage>,
         _viewport: &Rectangle,
     ) {
 //println!("grid - update - layout.position:{:?}",layout.position());                
@@ -491,7 +506,7 @@ println!("Clicked left mouse button p: {}",p);
                                 if let None = overlappingCell(self.cells,&cell,None) {
                                     state.cache.clear();  
    //XXX being called when we click out of context menu                                
-                                    shell.publish(Message::Cells(CellMessage::Add(cell)));
+                                    shell.publish(GridAreaMessage::Cells(CellMessage::Add(cell)));
                                 }
                             }
                         }
@@ -522,16 +537,16 @@ println!("Clicked left mouse button p: {}",p);
                         state.cache.clear();  
 
                         if data.amOverlapping {
-                            shell.publish(Message::Cells(CellMessage::Modify(data.cellIndex,data.lastValid)));
+                            shell.publish(GridAreaMessage::Cells(CellMessage::Modify(data.cellIndex,data.lastValid)));
                         }
                         else {
-                            shell.publish(Message::Cells(CellMessage::Modify(data.cellIndex,data.workingCell)));
+                            shell.publish(GridAreaMessage::Cells(CellMessage::Modify(data.cellIndex,data.workingCell)));
                         }
                         self.mode = CursorMode::MOVABLE(data.clone()); //XXX can clone() be avoided here?
                     }
                     CursorMode::RESIZING(data) => {
                         state.cache.clear();  
-                        shell.publish(Message::Cells(CellMessage::Modify(data.cellIndex,data.workingCell)));
+                        shell.publish(GridAreaMessage::Cells(CellMessage::Modify(data.cellIndex,data.workingCell)));
                         self.mode = CursorMode::RESIZABLE(data.clone());  //XXX can clone() be avoided here?
                     }
                     _ => {}
@@ -546,11 +561,11 @@ println!("Clicked left mouse button p: {}",p);
                     //    Only using MOVABLE would slightly shrink clickable are. Undesirable.
                     CursorMode::MOVABLE(data)  => {
                         state.cache.clear();  
-                        shell.publish(Message::GridArea(GridAreaMessage::RightClick(data.cellIndex)));
+                        shell.publish(GridAreaMessage::RightClick(data.cellIndex));
                     }
                     CursorMode::RESIZABLE(data) => {
                         state.cache.clear();  
-                        shell.publish(Message::GridArea(GridAreaMessage::RightClick(data.cellIndex)));
+                        shell.publish(GridAreaMessage::RightClick(data.cellIndex));
                     }
                     _ => {}
                 }
@@ -572,7 +587,7 @@ println!("Clicked left mouse button p: {}",p);
     }
 }
 
-impl<'a> From<Grid<'a>> for Element<'a,Message> {
+impl<'a> From<Grid<'a>> for Element<'a,GridAreaMessage> {
     fn from(grid: Grid<'a>) -> Self {
         Self::new(grid)
     }
