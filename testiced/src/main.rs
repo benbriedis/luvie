@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug};
 use iced::{
-    Element, Length, Theme, widget::{Scrollable, column, container, scrollable::{Direction, Scrollbar}} 
+    Element, Length, Theme, widget::{column, container} 
 };
 use crate::{cells::{CellMessage, Cells}, gridArea::{GridArea, GridAreaMessage, GridAreaState}};
 
@@ -106,10 +106,8 @@ impl GridApp
         let gridArea1 = GridArea::new(&self.settings1,&self.cells1);
         let grid1 = gridArea1.view(&self.gridAreaState1).map(|msg| { 
             match msg {
-                GridAreaMessage::Cells(msg2) => {
-                    Message::Cells1(msg2)
-                }
-                _ => Message::GridArea1(msg)
+                GridAreaMessage::Cells(msg2) => Message::Cells1(msg2),
+                 _ => Message::GridArea1(msg)
             }
         });
 
@@ -119,9 +117,7 @@ impl GridApp
         let gridArea2 = GridArea::new(&self.settings2,&self.cells2);
         let grid2 = gridArea2.view(&self.gridAreaState2).map(|msg| {
             match msg {
-                GridAreaMessage::Cells(msg2) => {
-                    Message::Cells2(msg2)
-                }
+                GridAreaMessage::Cells(msg2) => Message::Cells2(msg2),
                 _ => Message::GridArea2(msg)
             }
         });

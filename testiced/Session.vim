@@ -13,15 +13,17 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +81 src/main.rs
-badd +171 ~/programming/luvie/testiced/src/gridArea.rs
-badd +325 ~/programming/luvie/testiced/src/gridArea/grid.rs
+badd +40 src/main.rs
+badd +163 ~/programming/luvie/testiced/src/gridArea.rs
+badd +32 ~/programming/luvie/testiced/src/gridArea/grid.rs
 badd +19 ~/programming/luvie/testiced/src/cells.rs
+badd +34 src/gridArea/grid/gridCalcs.rs
+badd +22 src/gridArea/grid/gridUpdate.rs
 argglobal
 %argdel
-edit src/main.rs
+edit src/gridArea/grid/gridUpdate.rs
 argglobal
-balt ~/programming/luvie/testiced/src/gridArea.rs
+balt ~/programming/luvie/testiced/src/gridArea/grid.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -32,12 +34,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 81 - ((0 * winheight(0) + 21) / 42)
+let s:l = 22 - ((11 * winheight(0) + 20) / 40)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 81
-normal! 023|
+keepjumps 22
+normal! 0
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

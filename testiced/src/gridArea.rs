@@ -8,7 +8,7 @@ use iced::{
         Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
-use crate::{CellMessage, GridSettings, Message, cells::Cells, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
+use crate::{CellMessage, GridSettings, cells::Cells, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
 
 
 mod grid;
@@ -62,7 +62,6 @@ impl<'a> GridArea<'a>
     pub fn view(&self, state: &'a GridAreaState) -> Element<'a, GridAreaMessage> {
         let grid = Element::new(Grid::new(self.settings,self.cells));
 
-println!("settings:{:?}:",self.settings);
         let outer = Scrollable::with_direction(
             container(grid),
             Direction::Both {
@@ -121,7 +120,6 @@ println!("settings:{:?}:",self.settings);
                 });
 
             let cell = self.cells[state.contextCellIndex.unwrap()];
-println!("gridArea-view cell: {:?}",cell);            
             let pos = Point{
                 x: cell.col * self.settings.colWidth,
                 y: cell.row as f32 * self.settings.rowHeight
@@ -172,6 +170,9 @@ where
 }
 
 pub fn update(state:&mut GridAreaState, message: GridAreaMessage) {
+
+println!("gridArea  update()  message: {:?}",message);    
+
     match message {
         GridAreaMessage::Cells(message) => {
             match message {
