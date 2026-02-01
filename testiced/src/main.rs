@@ -66,10 +66,10 @@ impl GridApp
         };
 
         let settings2 = GridSettings {
-            numRows: 7,
-            numCols: 18, 
+            numRows: 8,
+            numCols: 20, 
             rowHeight: 35.0, 
-            colWidth: 45.0,
+            colWidth: 50.0,
             snap: Some(0.25),
             popupWidth: 250.0
         };
