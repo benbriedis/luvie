@@ -98,7 +98,7 @@ impl GridApp
             gridArea::update(&mut self.gridAreaState1,msg);
         }
         if let Message::GridArea2(msg) = message {
-            gridArea::update(&mut self.gridAreaState1,msg);
+            gridArea::update(&mut self.gridAreaState2,msg);
         }
     }
 
@@ -106,7 +106,7 @@ impl GridApp
         let gridArea1 = GridArea::new(&self.settings1,&self.cells1);
         let grid1 = gridArea1.view(&self.gridAreaState1).map(|msg| { 
             match msg {
-                GridAreaMessage::Cells(msg2) => Message::Cells1(msg2),
+                GridAreaMessage::Cells(msgB) => Message::Cells1(msgB),
                  _ => Message::GridArea1(msg)
             }
         });
@@ -117,14 +117,17 @@ impl GridApp
         let gridArea2 = GridArea::new(&self.settings2,&self.cells2);
         let grid2 = gridArea2.view(&self.gridAreaState2).map(|msg| {
             match msg {
-                GridAreaMessage::Cells(msg2) => Message::Cells2(msg2),
+                GridAreaMessage::Cells(msgC) => Message::Cells2(msgC),
                 _ => Message::GridArea2(msg)
             }
         });
 
         // -1.0 hack to prevent weird bug
-        let gridHeight = self.settings1.numRows as f32 * self.settings1.rowHeight - 1.0; 
-        println!("Height: {}",gridHeight);
+        let gridHeight1 = self.settings1.numRows as f32 * self.settings1.rowHeight - 1.0; 
+        println!("Height: {}",gridHeight1);
+
+        let gridHeight2 = self.settings2.numRows as f32 * self.settings2.rowHeight - 1.0; 
+        println!("Height: {}",gridHeight2);
 
         column![
 /*            
@@ -147,8 +150,8 @@ impl GridApp
                 .width(Length::Fill)
                 .height(gridHeight),
 */
-            container(grid1).width(Length::Fill).height(gridHeight),
-            container(grid2).width(Length::Fill).height(gridHeight),
+            container(grid1).width(Length::Fill).height(gridHeight1),
+            container(grid2).width(Length::Fill).height(gridHeight2),
         ]
         .spacing(30)
         .width(Length::Fill)

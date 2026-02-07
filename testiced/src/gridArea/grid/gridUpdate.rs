@@ -27,8 +27,8 @@ pub fn gridUpdate(grid: &mut Grid, state: &State, event: &Event, layout: Layout<
     if grid.mode == CursorMode::INIT {
         if let Some(pos) = cursor.position() {
             grid.mode = findCellForCursor(&grid,translate(pos.x,pos.y));
-//                state.cache.clear();  
-//                shell.request_redraw();
+                state.cache.clear();  
+                shell.request_redraw();
         }
     }
 

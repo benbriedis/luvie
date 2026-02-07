@@ -29,10 +29,8 @@ pub struct GridArea<'a> {
 #[derive(Clone, Copy, Debug)]
 pub enum GridAreaMessage {
     Cells(CellMessage),
-//    DeleteCell,
     HideContextMenu,
-    RightClick(usize),
-    CloseContext 
+    RightClick(usize)
 }
 
 /*
@@ -82,53 +80,62 @@ impl<'a> GridArea<'a>
 */        
 
         if state.contextVisible {
+            /* 
+                The cells length check is necessary as the cell delete message is currently run
+                before the menu hide message. There may be a better way to arrange these messages.
+            */
             let index = state.contextCellIndex.unwrap();
-            let cell = self.cells[index];
 
-            let contextContent = 
-                container(                
-                    column(vec![
-                        iced::widget::button("Delete")
-                            .on_press(GridAreaMessage::Cells(CellMessage::Delete(state.contextCellIndex.unwrap())))
-                            .into(),
-                        
-                        row![
-                            "Velocity",
-                            space::horizontal().width(Length::Fixed(8.0)),
-                            slider(0..=255, 
-                                cell.velocity,
-                                move |value| {
-                                    let mut newCell = cell;
-                                    newCell.velocity = value;
-                                    GridAreaMessage::Cells(CellMessage::Modify(index,newCell))
-                                })
-                                .on_release(GridAreaMessage::CloseContext)
-                        ].into()
-                    ])
-                    .spacing(10)
-                    .width(self.settings.popupWidth)
-                    .align_x(Horizontal::Left)
-                )                
-                .padding(10)
-                .style(|_theme| {
-                    container::Style {
-                        background: Some(Background::Color([1.0,1.0,1.0,1.0].into())),
-                        border: iced::Border {color:Color{r:0.6,g:0.6,b:0.8,a:1.0}, width:2.0, radius:radius(0.1) },
-                        //border: YYY,
-                        ..container::Style::default()
-                    }
-                });
-
-            let cell = self.cells[state.contextCellIndex.unwrap()];
-            let pos = Point{
-                x: cell.col * self.settings.colWidth,
-                y: cell.row as f32 * self.settings.rowHeight
-            };
-            context(outer,contextContent,GridAreaMessage::HideContextMenu,&self.settings,pos)
+            if index > self.cells.len() {
+                self.displayContextMenu(state,index,&self.cells[index])
+            }
         }
         else {
             outer.into()
         }
+    }
+
+    fn displayContextMenu(&self,state: &'a GridAreaState,index:usize,cell:&Cell)
+    {
+        let contextContent = 
+            container(                
+                column(vec![
+                    iced::widget::button("Delete")
+                        .on_press(GridAreaMessage::Cells(CellMessage::Delete(state.contextCellIndex.unwrap())))
+                        .into(),
+                    
+                    row![
+                        "Velocity",
+                        space::horizontal().width(Length::Fixed(8.0)),
+                        slider(0..=255, 
+                            cell.velocity,
+                            move |value| {
+                                let mut newCell = cell;
+                                newCell.velocity = value;
+                                GridAreaMessage::Cells(CellMessage::Modify(index,newCell))
+                            })
+                            .on_release(GridAreaMessage::HideContextMenu)
+                    ].into()
+                ])
+                .spacing(10)
+                .width(self.settings.popupWidth)
+                .align_x(Horizontal::Left)
+            )                
+            .padding(10)
+            .style(|_theme| {
+                container::Style {
+                    background: Some(Background::Color([1.0,1.0,1.0,1.0].into())),
+                    border: iced::Border {color:Color{r:0.6,g:0.6,b:0.8,a:1.0}, width:2.0, radius:radius(0.1) },
+                    //border: YYY,
+                    ..container::Style::default()
+                }
+            });
+
+        let pos = Point{
+            x: cell.col * self.settings.colWidth,
+            y: cell.row as f32 * self.settings.rowHeight
+        };
+        context(outer,contextContent,GridAreaMessage::HideContextMenu,&self.settings,pos)
     }
 }
 
@@ -170,9 +177,6 @@ where
 }
 
 pub fn update(state:&mut GridAreaState, message: GridAreaMessage) {
-
-println!("gridArea  update()  message: {:?}",message);    
-
     match message {
         GridAreaMessage::Cells(message) => {
             match message {
@@ -185,7 +189,7 @@ println!("gridArea  update()  message: {:?}",message);
         },
 
         GridAreaMessage::HideContextMenu => state.contextVisible = false,
-        GridAreaMessage::CloseContext => state.contextVisible = false,
+
         GridAreaMessage::RightClick(cellIndex) => {
             state.contextCellIndex = Some(cellIndex);
             state.contextVisible = true;
