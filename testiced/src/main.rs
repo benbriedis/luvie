@@ -87,11 +87,15 @@ impl GridApp
     }
 
     fn update(&mut self, message: Message) {
-//FIXME switch between 1 and 2        
+//XXX switch
+
         if let Message::Cells1(msg) = message {
+            /* Close the context menu BEFORE deleting a cell - cant show controls for a non-existent cell */
+            gridArea::update(&mut self.gridAreaState1,GridAreaMessage::Cells(msg));
             cells::update(&mut self.cells1, msg);
         }
         if let Message::Cells2(msg) = message {
+            gridArea::update(&mut self.gridAreaState2,GridAreaMessage::Cells(msg));
             cells::update(&mut self.cells2, msg);
         }
         if let Message::GridArea1(msg) = message {

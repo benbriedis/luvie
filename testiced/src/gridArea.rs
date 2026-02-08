@@ -42,6 +42,7 @@ pub enum GridAreaMessage {
     to it from above I guess, or else capture the ones coming up... Likely to be hard.
 */
 
+//TODO show velocity control get lighter or darker as it is being dragged
 
 impl<'a> GridArea<'a> 
 {
@@ -80,14 +81,8 @@ impl<'a> GridArea<'a>
 */        
 
         if state.contextVisible {
-            /* 
-                The cells length check is necessary as the cell delete message is currently run
-                before the menu hide message. There may be a better way to arrange these messages.
-            */
             if let Some(index) = state.contextCellIndex {
-                if self.cells.len() > index {
-                    return self.displayContextMenu(state,outer.into(),index,&self.cells[index])
-                }
+                return self.displayContextMenu(state,outer.into(),index,&self.cells[index])
             }
         }
         outer.into()
@@ -176,10 +171,13 @@ where
 }
 
 pub fn update(state:&mut GridAreaState, message: GridAreaMessage) {
+println!("gridArea.rs  update() - 0");  
     match message {
         GridAreaMessage::Cells(message) => {
+println!("gridArea.rs  update() - 1");  
             match message {
                 CellMessage::Delete(_) =>  {
+println!("gridArea.rs  update()   In Delete()");                    
                     state.contextCellIndex = None;
                     state.contextVisible = false;
                 }
