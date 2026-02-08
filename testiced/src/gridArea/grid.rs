@@ -162,7 +162,7 @@ let exPalette = theme.extended_palette();
     fn mouse_interaction(&self,_tree: &Tree,_layout: Layout<'_>,_cursor: mouse::Cursor,_viewport: &Rectangle,_renderer: &Renderer) -> mouse::Interaction 
     {
         match &self.mode {
-            CursorMode::INIT => mouse::Interaction::Help,  //XXX shouldnt actually be shown
+            CursorMode::INIT => mouse::Interaction::None,
             CursorMode::MOVABLE(_) => Grab,
             CursorMode::MOVING(data) => if data.amOverlapping { NotAllowed } else { Grabbing },
             CursorMode::RESIZABLE(_) => ResizingHorizontally,

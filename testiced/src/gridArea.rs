@@ -8,7 +8,7 @@ use iced::{
         Scrollable, column, container, mouse_area, opaque, row, scrollable::{Direction, Scrollbar}, slider, space, stack 
     }
 };
-use crate::{CellMessage, GridSettings, cells::Cells, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
+use crate::{CellMessage, GridSettings, cells::{Cell, Cells}, gridArea::{contextMenuPopup::ContextMenuPopup, grid::Grid}};
 
 
 mod grid;
@@ -84,18 +84,17 @@ impl<'a> GridArea<'a>
                 The cells length check is necessary as the cell delete message is currently run
                 before the menu hide message. There may be a better way to arrange these messages.
             */
-            let index = state.contextCellIndex.unwrap();
-
-            if index > self.cells.len() {
-                self.displayContextMenu(state,index,&self.cells[index])
+            if let Some(index) = state.contextCellIndex {
+                if self.cells.len() > index {
+                    return self.displayContextMenu(state,outer.into(),index,&self.cells[index])
+                }
             }
         }
-        else {
-            outer.into()
-        }
+        outer.into()
     }
 
-    fn displayContextMenu(&self,state: &'a GridAreaState,index:usize,cell:&Cell)
+    fn displayContextMenu(&self,state: &'a GridAreaState,outer:Element<'a,GridAreaMessage>,index:usize,cell:&'a Cell) 
+        -> Element<'a, GridAreaMessage>
     {
         let contextContent = 
             container(                
@@ -110,7 +109,7 @@ impl<'a> GridArea<'a>
                         slider(0..=255, 
                             cell.velocity,
                             move |value| {
-                                let mut newCell = cell;
+                                let mut newCell = cell.clone();
                                 newCell.velocity = value;
                                 GridAreaMessage::Cells(CellMessage::Modify(index,newCell))
                             })
@@ -194,7 +193,6 @@ pub fn update(state:&mut GridAreaState, message: GridAreaMessage) {
             state.contextCellIndex = Some(cellIndex);
             state.contextVisible = true;
         }
-        _ => ()
     }
 }
 

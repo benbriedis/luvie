@@ -13,17 +13,18 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +40 src/main.rs
-badd +163 ~/programming/luvie/testiced/src/gridArea.rs
-badd +32 ~/programming/luvie/testiced/src/gridArea/grid.rs
-badd +19 ~/programming/luvie/testiced/src/cells.rs
-badd +34 src/gridArea/grid/gridCalcs.rs
-badd +22 src/gridArea/grid/gridUpdate.rs
+badd +93 ~/programming/luvie/testiced/src/gridArea.rs
+badd +42 ~/programming/luvie/testiced/src/gridArea/grid.rs
+badd +42 ~/programming/luvie/testiced/src/gridArea/grid/gridDraw.rs
+badd +42 ~/programming/luvie/testiced/src/gridArea/grid/gridCalcs.rs
+badd +21 ~/programming/luvie/testiced/src/cells.rs
+badd +31 src/gridArea/grid/gridUpdate.rs
+badd +111 src/gridArea/contextMenuPopup.rs
 argglobal
 %argdel
-edit src/gridArea/grid/gridUpdate.rs
+edit ~/programming/luvie/testiced/src/gridArea.rs
 argglobal
-balt ~/programming/luvie/testiced/src/gridArea/grid.rs
+balt ~/programming/luvie/testiced/src/cells.rs
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -34,12 +35,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 22 - ((11 * winheight(0) + 20) / 40)
+let s:l = 93 - ((18 * winheight(0) + 21) / 42)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 22
-normal! 0
+keepjumps 93
+normal! 014|
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
