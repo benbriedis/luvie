@@ -5,6 +5,7 @@
 #include "grid.hpp"
 #include "popup.hpp"
 
+//XXX notes ==> cells
 
 int main(int argc, char **argv) {
 	Fl_Window window(700, 600);

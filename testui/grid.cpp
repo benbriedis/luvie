@@ -33,6 +33,8 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 
 //FIXME clicking before or after cell creates an overlapping cell 
 
+//FIXME leading front line narrows when putting next to another cell
+
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) : 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
@@ -107,20 +109,11 @@ int MyGrid::handle(int event)
 	if (popup.visible())
 		return 0;
 
-std::cout << "In MyGrid::handle()" << std::endl;
-
 	switch (event) {
 		case FL_PUSH: 
 			if (Fl::event_button() == FL_RIGHT_MOUSE) {
 				//XXX is a callback desirable here?
-//XXX add position				
-//				((OuterGrid*)parent())->popup.show();
-
-
-				printf("PUSH RIGHT  row: %d   col: %lf \n", originalPosition.row,  originalPosition.col);
-				printf("PUSH RIGHT  selectedNote: %d\n", selectedNote);
-
-				popup.open(selectedNote,notes);
+				popup.open(selectedNote,&notes,this);
 				popup.show();
 			}
 			return 1;

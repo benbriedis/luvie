@@ -9,6 +9,7 @@
 #include "FL/fl_ask.H"
 #include <iostream>
 #include <iterator>
+#include "grid.hpp"
 
 /*
    TODO 
@@ -48,15 +49,6 @@ Fl_Menu_Item menutable[] = {
 	{"button",FL_F+4, 0, 0, FL_MENU_TOGGLE},
 	{0}
 };
-
-inline void Popup::deleteCallbackI() {
-	std::cout << "Button clicked!  selected: " << selected << std::endl;
-//    slider.value(intinput.ivalue());
-}
-
-static void deleteCallback(Fl_Widget*, void* v) {
-	((Popup*)v)->deleteCallbackI();
-}
 
 
 //XXX are we sure window is the one to use?
@@ -102,42 +94,15 @@ flex->margin(10,10,10,10);
 
 	end();
 
-    deleteItem->callback(deleteCallback,this);
-/*
-    deleteItem->callback([](Fl_Widget *w, void *me) {
+	deleteItem->callback([](Fl_Widget *w, void *me) {
+		Popup* me2 = (Popup*)me;
 
-//XXX maybe used same code for calculating the cell used by move & resize??
-//XXX can we get the cursor position?
-//XXX IDEALLY calculate cell BEFORE displaying the window! so we can position it. Translate the Rust code for this.
+		me2->notes->erase(me2->notes->begin() + me2->selected);
+		me2->hide();
+//XXX if not required can remove link to grid		
+//		me2->grid->redraw();
+	}, this);
 
-      // Popup* popupInstance = static_cast<Popup*>(u);
-	//	Popup* popupInstance = reinterpret_cast<Popup*>(u);
-
-std::cout << "HERE1" << std::endl;
-		Fl_Button* cb = dynamic_cast<Fl_Button*>(w);
-std::cout << "HERE2" << std::endl;
-		Popup* self = reinterpret_cast<Popup*>(me);
-std::cout << "HERE3" << std::endl;
-
-		std::cout << "Button clicked!  w: " << w << std::endl;
-		std::cout << "Button clicked!  cb: " << cb << std::endl;
-		std::cout << "Button clicked!  self: " << self << std::endl;
-
-
-//		std::cout << "Button clicked!  selected: " << self->selected << std::endl;
-std::cout << "HERE4" << std::endl;
-        fl_alert("Button clicked!");
-    });
-*/	
-
-
-	/*
-o->callback(
-    [](Fl_Widget *w, void *that){
-        reinterpret_cast<Controller*>(that)->nextStep(w);
-    }
-,this);
-*/
 
 //	Fl::grab(this);
 //TODO use Fl::grab(0) to disable	
@@ -145,10 +110,11 @@ o->callback(
 
 
 
-void Popup::open(int mySelected,std::vector<Note> myNotes) 
+void Popup::open(int mySelected,std::vector<Note>* myNotes,MyGrid* myGrid) 
 { 
 	selected = mySelected;
 	notes = myNotes;
+	grid = myGrid;
 	show();
 }
 

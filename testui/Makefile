@@ -6,6 +6,7 @@ CC = g++-13
 FLTK_CONFIG = ../deps/installation/bin/fltk-config
 #XXX not sure I want to use  -std=gnu++23
 CXXFLAGS = `$(FLTK_CONFIG) --cxxflags` -std=c++23 -std=gnu++23 -fmodules-ts -g
+#CXXFLAGS = `$(FLTK_CONFIG) --cxxflags` -std=c++23 -std=gnu++23 -g
 LDFLAGS = `$(FLTK_CONFIG) --ldflags` `$(FLTK_CONFIG) --libs`
 
 TARGET = main

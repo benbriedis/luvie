@@ -3,17 +3,18 @@
 
 #include "cell.hpp"
 #include "FL/Fl_Window.H"
+//#include "grid.hpp"
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Flex.H>
+
+class MyGrid;
 
 class Popup : public Fl_Window {
 
 public:
 	Popup();
 
-	void open(int selected,std::vector<Note> notes);
-
-  inline void deleteCallbackI();
+	void open(int selected,std::vector<Note>* notes,MyGrid* grid);
 
 protected:	
 
@@ -23,7 +24,8 @@ protected:
 private:
 //XXX maybe move into outerGrid.hpp...	
 	int selected;
-	std::vector<Note> notes;
+	std::vector<Note>* notes;
+	MyGrid* grid;
 };
 
 #endif
