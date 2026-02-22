@@ -5,6 +5,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 #include <vector>
+#include "cell.hpp"
 #include "grid.hpp"
 
 /* The group is required so we can support multiple widgets. */

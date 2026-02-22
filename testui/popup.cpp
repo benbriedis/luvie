@@ -1,11 +1,28 @@
-
 #include "popup.hpp"
 #include "FL/Enumerations.H"
+#include "FL/Fl.H"
+#include "FL/Fl_Box.H"
 #include "FL/Fl_Window.H"
 #include "FL/Fl_Flex.H"
 #include "FL/Fl_Button.H"
 #include "FL/Fl_Slider.H"
+#include "FL/fl_ask.H"
 #include <iostream>
+#include <iterator>
+
+/*
+   TODO 
+   1. look for pretty slider
+   2. when overlapping keep the last legal position
+   3. Remove grey colour
+   4. Look for or create 'orbidden' cursor icon
+   5. Prettier buttons
+
+   6. Copy popup postioning code over from the Iced version.
+
+   7. Prevent creation of items inderneith the popup
+*/
+
 
 
 // Callback function for menu items
@@ -32,18 +49,36 @@ Fl_Menu_Item menutable[] = {
 	{0}
 };
 
+inline void Popup::deleteCallbackI() {
+	std::cout << "Button clicked!  selected: " << selected << std::endl;
+//    slider.value(intinput.ivalue());
+}
+
+static void deleteCallback(Fl_Widget*, void* v) {
+	((Popup*)v)->deleteCallbackI();
+}
+
 
 //XXX are we sure window is the one to use?
 
-Popup::Popup() : 
-    Fl_Window(0,0,0,0)
-{
+Popup::Popup() : Fl_Window(0,0,0,0)
+{       
+//Fl_Box *frame = new Fl_Box(0, 0, 0, 0);
+//frame->box(FL_ENGRAVED_BOX);
+
 	//XXX haven't been able to size the flex up from its contents. Its meant to be possible...
 	//    The children heights are being calculated from the flex box, not the other way around.
 	Fl_Flex *flex = new Fl_Flex(0,0,150,100);
 
+flex->box(FL_BORDER_BOX);
+
     flex->begin();
-	Fl_Button *deleteItem = new Fl_Button(0, 0, 0, 0, "Delete");  //XXX remove new?
+	flex->gap(10);
+	Fl_Button *deleteItem = new Fl_Button(0, 0, 40, 30, "Delete");  //XXX remove new?
+
+
+//XXX NOT WORKING
+ flex->fixed(deleteItem, 40); 
 
 	//XXX cf a "value" slider instead
 	Fl_Slider *slider = new Fl_Slider(0, 0, 150, 30, "Vel");
@@ -51,11 +86,108 @@ Popup::Popup() :
     slider->box(FL_FLAT_BOX);
 	slider->bounds(0.0,1.0);
 	slider->value(0.5);
+
+//XXX NOT WORKING
+ flex->fixed(deleteItem, 30); 
+
+flex->margin(10,10,10,10);
+
 	//flex->resizable(NULL);
     flex->end();
 
+
 	resize(0,0,flex->w(),flex->h());  //XXX couldnt get resizable to work
 	//resizable(flex);
+
+
 	end();
+
+    deleteItem->callback(deleteCallback,this);
+/*
+    deleteItem->callback([](Fl_Widget *w, void *me) {
+
+//XXX maybe used same code for calculating the cell used by move & resize??
+//XXX can we get the cursor position?
+//XXX IDEALLY calculate cell BEFORE displaying the window! so we can position it. Translate the Rust code for this.
+
+      // Popup* popupInstance = static_cast<Popup*>(u);
+	//	Popup* popupInstance = reinterpret_cast<Popup*>(u);
+
+std::cout << "HERE1" << std::endl;
+		Fl_Button* cb = dynamic_cast<Fl_Button*>(w);
+std::cout << "HERE2" << std::endl;
+		Popup* self = reinterpret_cast<Popup*>(me);
+std::cout << "HERE3" << std::endl;
+
+		std::cout << "Button clicked!  w: " << w << std::endl;
+		std::cout << "Button clicked!  cb: " << cb << std::endl;
+		std::cout << "Button clicked!  self: " << self << std::endl;
+
+
+//		std::cout << "Button clicked!  selected: " << self->selected << std::endl;
+std::cout << "HERE4" << std::endl;
+        fl_alert("Button clicked!");
+    });
+*/	
+
+
+	/*
+o->callback(
+    [](Fl_Widget *w, void *that){
+        reinterpret_cast<Controller*>(that)->nextStep(w);
+    }
+,this);
+*/
+
+//	Fl::grab(this);
+//TODO use Fl::grab(0) to disable	
 }
+
+
+
+void Popup::open(int mySelected,std::vector<Note> myNotes) 
+{ 
+	selected = mySelected;
+	notes = myNotes;
+	show();
+}
+
+
+
+/*
+void Popup::draw() 
+{
+	Fl_Window::draw();
+	fl_color(FL_RED);
+	fl_line_style(FL_SOLID, 3);
+	// We draw it slightly inside to ensure it's visible
+	fl_rect(1, 1, w() - 2, h() - 2);
+	fl_line_style(0);  
+
+	/ *
+        Fl_Window::draw();
+
+        auto borderColor = FL_RED;
+        auto bgColor = FL_WHITE;
+        auto outPad = 5;  // Outer padding
+        auto bThick = 4;  // Border thickness
+        auto inPad = 5;   // Inner padding
+
+        // 1. Draw outer background (padding)
+        fl_color(bgColor);
+        fl_rectf(0, 0, w(), h());
+
+        // 2. Draw border
+        fl_color(borderColor);
+        fl_rectf(outPad, outPad, w() - 2*outPad, h() - 2*outPad);
+
+        // 3. Draw inner background
+        fl_color(FL_WHITE); // Or your inner content color
+        fl_rectf(outPad + bThick, outPad + bThick, 
+                 w() - 2*(outPad + bThick), h() - 2*(outPad + bThick));
+
+        Fl_Window::draw();
+* /		
+}
+*/
 

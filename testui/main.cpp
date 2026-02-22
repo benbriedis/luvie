@@ -13,13 +13,13 @@ int main(int argc, char **argv) {
 	/* Auto-adding child widgets fouls up. Silly feature anyway. */
 	window.end();
 
-	Popup popup{};
+	std::vector<Note> notes(0);
 
+	Popup popup{};
 //TODO position... 
 
 	window.add(popup);
 
-	std::vector<Note> notes(0);
 	MyGrid grid(notes,10,15,30,40,0.25,popup);
 	window.add(grid);
 

@@ -2,6 +2,7 @@
 #define GRID_HPP
 
 #include "popup.hpp"
+#include "cell.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 
@@ -20,11 +21,6 @@ enum Side {
    It would probably be best to have a single source of truth and store notes as beat and maybe pitch.
    Consider using a facade to map these to row, col and length - used here.
 */
-typedef struct {
-	int row;
-	float col;  //XXX will want velocity + anything else? (parameters that can evolve etc)
-	float length;
-} Note;
 
 typedef struct {
 	int row;

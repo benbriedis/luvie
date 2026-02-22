@@ -1,7 +1,9 @@
 #include "grid.hpp"
+#include "cell.hpp"
 #include "FL/Enumerations.H"
 #include "popup.hpp"
 #include <cstdio>
+#include <iostream>
 #include <ranges>
 #include <algorithm>
 #include <cmath>
@@ -28,6 +30,8 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 */
 
 //Fl_Menu_Button mb(0,0,100000,100000);
+
+//FIXME clicking before or after cell creates an overlapping cell 
 
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) : 
@@ -97,15 +101,28 @@ void MyGrid::draw()
 
 int MyGrid::handle(int event) 
 {
+
 //damage() call may be  useful. Also cf double buffering (and scrolling)
+
+	if (popup.visible())
+		return 0;
+
+std::cout << "In MyGrid::handle()" << std::endl;
 
 	switch (event) {
 		case FL_PUSH: 
-			if (Fl::event_button() == FL_RIGHT_MOUSE) 
+			if (Fl::event_button() == FL_RIGHT_MOUSE) {
 				//XXX is a callback desirable here?
 //XXX add position				
 //				((OuterGrid*)parent())->popup.show();
+
+
+				printf("PUSH RIGHT  row: %d   col: %lf \n", originalPosition.row,  originalPosition.col);
+				printf("PUSH RIGHT  selectedNote: %d\n", selectedNote);
+
+				popup.open(selectedNote,notes);
 				popup.show();
+			}
 			return 1;
 
 		case FL_DRAG: 
@@ -146,7 +163,8 @@ int MyGrid::handle(int event)
 			return 0; 
 		}
 		default:
-			return Fl_Widget::handle(event);
+//			return Fl_Widget::handle(event);
+			return 0;
 	}
 }
 

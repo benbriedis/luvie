@@ -1,4 +1,5 @@
 #include "outerGrid.hpp"
+#include "cell.hpp"
 #include <FL/Fl_Menu_Button.H>
 #include <vector>
 #include <cstdio>
