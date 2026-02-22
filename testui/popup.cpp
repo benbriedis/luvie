@@ -21,7 +21,7 @@
 
    6. Copy popup postioning code over from the Iced version.
 
-   7. Prevent creation of items inderneith the popup
+   7. Prevent creation of items underneith the popup
 */
 
 
@@ -54,7 +54,9 @@ Fl_Menu_Item menutable[] = {
 //XXX are we sure window is the one to use?
 
 Popup::Popup() : Fl_Window(0,0,0,0)
-{       
+{   
+	width = 200;
+
 //Fl_Box *frame = new Fl_Box(0, 0, 0, 0);
 //frame->box(FL_ENGRAVED_BOX);
 
@@ -115,9 +117,19 @@ void Popup::open(int mySelected,std::vector<Note>* myNotes,MyGrid* myGrid)
 	selected = mySelected;
 	notes = myNotes;
 	grid = myGrid;
+
+Note cell = (*notes)[mySelected];
+
+Point desiredPosition = new Point(cell.col * grid->colWidth,cell.row * grid->rowHeight);
+
+//    fn layout(&mut self,tree: &mut widget::Tree,renderer: &Renderer,limits: &layout::Limits) -> layout::Node
+position = popupPosition(limits.max(), desiredPosition);
+
+//TODO set to position...
+
+
 	show();
 }
-
 
 
 /*
@@ -156,4 +168,29 @@ void Popup::draw()
 * /		
 }
 */
+
+
+
+Point2 Popup::popupPosition(Size size, Point2 pos) 
+{
+	float verticalPadding = 4.0;
+	//TODO probably need to account from internal padding of popup    
+	float sidePadding = 30.0;
+
+	// TODO calculate?
+	float height = 85.0;
+
+	/* Place above if place, otherwise below */
+	bool placeAbove = pos.y >= (height + verticalPadding);
+
+	float y = placeAbove ? pos.y - height - verticalPadding : pos.y + grid->rowHeight + verticalPadding;
+
+	/* Use cell LHS if there is space, otherwise get as close as possible */
+	float maxX = size.width - width - sidePadding;
+
+	float x = pos.x > maxX ? maxX : pos.x;
+	x = x < sidePadding ? sidePadding : x;
+
+	return Point2(x,y);
+}
 

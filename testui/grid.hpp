@@ -33,12 +33,15 @@ public:
 	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup);
 
 
-private:
 	/* Grid parameters */
+//XXX should be raised...
 	int numRows;
 	int numCols;
+
 	int rowHeight;
 	int colWidth;
+
+private:
 	float snap;
 	Popup& popup;
 

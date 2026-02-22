@@ -13,21 +13,21 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +123 grid.cpp
+badd +80 grid.cpp
 badd +21 main.cpp
-badd +57 grid.hpp
+badd +41 grid.hpp
 badd +17 outerGrid.hpp
 badd +34 outerGrid.cpp
 badd +334 ~/programming/luvie/deps/installation/include/FL/Fl_Widget.H
-badd +20 popup.hpp
-badd +94 popup.cpp
+badd +25 popup.hpp
+badd +196 popup.cpp
 badd +462 ~/programming/luvie/deps/installation/include/FL/Fl_Window.H
 badd +14 cell.hpp
-badd +13 Makefile
+badd +5 Makefile
 argglobal
 %argdel
 $argadd grid.cpp
-edit Makefile
+edit popup.hpp
 let s:save_splitbelow = &splitbelow
 let s:save_splitright = &splitright
 set splitbelow splitright
@@ -44,10 +44,10 @@ set winminheight=0
 set winheight=1
 set winminwidth=0
 set winwidth=1
-exe 'vert 1resize ' . ((&columns * 92 + 92) / 185)
-exe 'vert 2resize ' . ((&columns * 92 + 92) / 185)
+exe 'vert 1resize ' . ((&columns * 71 + 92) / 185)
+exe 'vert 2resize ' . ((&columns * 113 + 92) / 185)
 argglobal
-balt popup.cpp
+balt grid.hpp
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -58,17 +58,17 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 13 - ((12 * winheight(0) + 20) / 40)
+let s:l = 47 - ((39 * winheight(0) + 20) / 40)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 13
+keepjumps 47
 normal! 0
 wincmd w
 argglobal
-if bufexists(fnamemodify("popup.hpp", ":p")) | buffer popup.hpp | else | edit popup.hpp | endif
+if bufexists(fnamemodify("popup.cpp", ":p")) | buffer popup.cpp | else | edit popup.cpp | endif
 if &buftype ==# 'terminal'
-  silent file popup.hpp
+  silent file popup.cpp
 endif
 balt grid.hpp
 setlocal foldmethod=manual
@@ -81,16 +81,16 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 20 - ((19 * winheight(0) + 20) / 40)
+let s:l = 196 - ((34 * winheight(0) + 20) / 40)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 20
-normal! 021|
+keepjumps 196
+normal! 0
 wincmd w
 2wincmd w
-exe 'vert 1resize ' . ((&columns * 92 + 92) / 185)
-exe 'vert 2resize ' . ((&columns * 92 + 92) / 185)
+exe 'vert 1resize ' . ((&columns * 71 + 92) / 185)
+exe 'vert 2resize ' . ((&columns * 113 + 92) / 185)
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

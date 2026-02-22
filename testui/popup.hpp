@@ -9,8 +9,19 @@
 
 class MyGrid;
 
-class Popup : public Fl_Window {
+typedef struct {
+    int width;
+    int height;
+} Size;
 
+typedef struct {
+    int x;
+    int y;
+} Point2;
+
+
+
+class Popup : public Fl_Window {
 public:
 	Popup();
 
@@ -22,10 +33,14 @@ protected:
 //	int handle(int event) override;
 
 private:
+	int width;
+
 //XXX maybe move into outerGrid.hpp...	
 	int selected;
 	std::vector<Note>* notes;
 	MyGrid* grid;
+
+	Point2 popupPosition(Size size, Point2 pos);
 };
 
 #endif
