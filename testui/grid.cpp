@@ -59,10 +59,10 @@ void MyGrid::draw()
 
 	/* Rows: */
 	for (int i = 0; i < numRows+1; i++) {
-		int x0 = 0;
-		int y0 = i * rowHeight;
-		int x1 = numCols * colWidth;
-		int y1 = y0; 
+		int x0 = x();
+		int y0 = y() + i * rowHeight;
+		int x1 = x() + numCols * colWidth;
+		int y1 = y0;
 
 		fl_line(x0, y0, x1, y1);
 	}
@@ -71,26 +71,25 @@ void MyGrid::draw()
 
 	/* Columns: */
 	for (int i = 0; i < numCols+1; i++) {
-		int x0 = i * colWidth;
-		int y0 = 0;
-		int x1 = x0; 
-		int y1 = numRows * rowHeight;
+		int x0 = x() + i * colWidth;
+		int y0 = y();
+		int x1 = x0;
+		int y1 = y() + numRows * rowHeight;
 
 		fl_line(x0, y0, x1, y1);
 	}
 
 	/* Notes: */
 //XXX at what point does copying these small structures become a bad idea?
-	for (const Note note : notes) { 
-		int x0 = note.col * colWidth;  //TODO round to nearest?
-		int y0 = note.row * rowHeight;
+	for (const Note note : notes) {
+		int x0 = x() + note.col * colWidth;  //TODO round to nearest?
+		int y0 = y() + note.row * rowHeight;
 
-//TODO prevent to note from being so short its invisible (Q: how to handle very short notes?)		
+//TODO prevent to note from being so short its invisible (Q: how to handle very short notes?)
 		int width = note.length * colWidth;
-//printf("Drawing note @ %d, %d\n",note.row,note.col);
 
-		/* 
-		   Fit slightly inside the grid lines, except at the note start where I'm 
+		/*
+		   Fit slightly inside the grid lines, except at the note start where I'm
 		   lining it up with the start of the column.
 		*/
 		fl_rectf(x0,y0+1,width,rowHeight-1,0x5555EE00);
@@ -116,8 +115,8 @@ int MyGrid::handle(int event)
 				popup.open(selectedNote,&notes,this);
 				popup.show();
 			} else if (hoverState == NONE) {
-				int row = Fl::event_y() / rowHeight;
-				float col = (float)(Fl::event_x() / colWidth);
+				int row = (Fl::event_y() - y()) / rowHeight;
+				float col = (float)((Fl::event_x() - x()) / colWidth);
 				bool wouldRemove = std::any_of(notes.begin(), notes.end(),
 					[=](const Note& n) { return n.row == row && n.col == col; });
 				if (!wouldRemove) {
@@ -179,8 +178,8 @@ void MyGrid::moving()
 {
 	Note* selected = &notes[selectedNote];
 
-	float x = Fl::event_x();
-	selected->col = (x - movingGrabXOffset) / (float)colWidth; 
+	float ex = Fl::event_x() - this->x();
+	selected->col = (ex - movingGrabXOffset) / (float)colWidth;
 
 	/* Ensure the note stays within X bounds */
 	if (selected->col < 0.0)
@@ -189,11 +188,11 @@ void MyGrid::moving()
 		selected->col = numCols - selected->length;
 
 	/* Apply snap */
-	if (snap > 0.0) 
+	if (snap > 0.0)
 		selected->col = std::round(selected->col / snap) * snap;
 
-	float y = Fl::event_y();
-	selected->row = (y - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
+	float ey = Fl::event_y() - this->y();
+	selected->row = (ey - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
 
 	/* Ensure the note stays within Y bounds */
 	if (selected->row < 0)
@@ -222,12 +221,12 @@ void MyGrid::resizing()
 
 	Note* selected = &notes[selectedNote];
 
-	float x = Fl::event_x();
+	float ex = Fl::event_x() - this->x();
 
-//TODO restrict length to a certain minimum				
+//TODO restrict length to a certain minimum
 	if (side==LEFT) {
 		float endCol = selected->col + selected->length;
-		selected->col = x / (float)colWidth; 
+		selected->col = ex / (float)colWidth;
 
 		/* Apply snap: */
 		if (snap)
@@ -248,7 +247,7 @@ void MyGrid::resizing()
 		redraw();
 	}
 	else if (side==RIGHT) {
-		selected->length = x / (float)colWidth - selected->col;
+		selected->length = ex / (float)colWidth - selected->col;
 
 		/* Apply snap: */
 		float endCol = selected->col + selected->length;
@@ -274,11 +273,11 @@ void MyGrid::findNoteForCursor()
 {
 	const int resizeZone = 5;
 
-	float x = Fl::event_x();
-	int y = Fl::event_y();
+	float ex = Fl::event_x() - this->x();
+	int ey = Fl::event_y() - this->y();
 
-	int row = y / rowHeight;
-	float col = x / colWidth;
+	int row = ey / rowHeight;
+	float col = ex / colWidth;
 
 	int selectedIfResize = 0;
 
@@ -291,22 +290,22 @@ void MyGrid::findNoteForCursor()
 		float leftEdge = n.col * colWidth; 
 		float rightEdge = (n.col + n.length) * colWidth;
 
-		if (leftEdge - x <= resizeZone && x - leftEdge <= resizeZone) {
+		if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
 			hoverState = RESIZING;
 			side = LEFT;
 			selectedIfResize = i;
 		}
-		else if (rightEdge - x <= resizeZone && x - rightEdge <= resizeZone) {
+		else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
 			hoverState = RESIZING;
 			side = RIGHT;
 			selectedIfResize = i;
 		}
-		else if (x >= leftEdge && x <= rightEdge) {
+		else if (ex >= leftEdge && ex <= rightEdge) {
 			//XXX only required on initial press down
 			hoverState = MOVING;
 			selectedNote = i;
-			movingGrabXOffset = x - n.col * colWidth;
-			movingGrabYOffset = y - n.row * rowHeight;
+			movingGrabXOffset = ex - n.col * colWidth;
+			movingGrabYOffset = ey - n.row * rowHeight;
 			originalPosition = {n.row,n.col};
 			lastValidPosition = {n.row,n.col};
 
@@ -334,8 +333,8 @@ void MyGrid::findNoteForCursor()
 void MyGrid::toggleNote()
 {
 //TODO adjust for the position of the grid in the window. MAYBE use a "subwindow" so position starts at (0,0)
-	int ex = Fl::event_x();
-	int ey = Fl::event_y();
+	int ex = Fl::event_x() - x();
+	int ey = Fl::event_y() - y();
 
 	int row = ey / rowHeight;
 	float col = (float)(ex / colWidth);
