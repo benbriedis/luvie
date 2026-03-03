@@ -10,6 +10,8 @@
 #include <cmath>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
+#include <FL/Fl_RGB_Image.H>
+#include "cursors.hpp"
 #include <FL/fl_ask.H> // For fl_alert
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Item.H>
@@ -125,7 +127,7 @@ int MyGrid::handle(int event)
 					creationForbidden = std::any_of(notes.begin(), notes.end(),
 						[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
 					if (creationForbidden)
-						window()->cursor(FL_CURSOR_WAIT);
+						window()->cursor(forbiddenCursorImage(), 11, 11);
 				}
 			}
 			return 1;
@@ -206,7 +208,10 @@ void MyGrid::moving()
 	amOverlapping = overlappingNote() >= 0;
 	if (!amOverlapping)
 		lastValidPosition = {selected->row, selected->col};
-	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND);
+	if (amOverlapping)
+		window()->cursor(forbiddenCursorImage(), 11, 11);
+	else
+		window()->cursor(FL_CURSOR_HAND);
 
 	redraw();	//XXX is a full redraw really required - consider all redraws()?
 }
