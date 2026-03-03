@@ -56,6 +56,7 @@ private:
 	float movingGrabXOffset;
 	float movingGrabYOffset;
 	bool amOverlapping;
+	bool creationForbidden;
 	Point originalPosition;
 
 	void init();

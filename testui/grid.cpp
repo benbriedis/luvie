@@ -38,7 +38,7 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 
 MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) : 
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
-	hoverState(NONE),
+	hoverState(NONE),creationForbidden(false),
 	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
 { 
 }
@@ -110,11 +110,22 @@ int MyGrid::handle(int event)
 		return 0;
 
 	switch (event) {
-		case FL_PUSH: 
+		case FL_PUSH:
 			if (Fl::event_button() == FL_RIGHT_MOUSE) {
 				//XXX is a callback desirable here?
 				popup.open(selectedNote,&notes,this);
 				popup.show();
+			} else if (hoverState == NONE) {
+				int row = Fl::event_y() / rowHeight;
+				float col = (float)(Fl::event_x() / colWidth);
+				bool wouldRemove = std::any_of(notes.begin(), notes.end(),
+					[=](const Note& n) { return n.row == row && n.col == col; });
+				if (!wouldRemove) {
+					creationForbidden = std::any_of(notes.begin(), notes.end(),
+						[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+					if (creationForbidden)
+						window()->cursor(FL_CURSOR_WAIT);
+				}
 			}
 			return 1;
 
@@ -135,8 +146,12 @@ int MyGrid::handle(int event)
 				redraw();
 			}
 
-			if (hoverState==NONE)
-				toggleNote();
+			if (hoverState==NONE) {
+				if (!creationForbidden)
+					toggleNote();
+				creationForbidden = false;
+				window()->cursor(FL_CURSOR_DEFAULT);
+			}
 			//        redraw();
 			//        do_callback();
 			// never do anything after a callback, as the callback
@@ -342,13 +357,8 @@ void MyGrid::toggleNote()
 
 	/* Add the note */
 	if (notes.size() == size) {
-		/* Disallow note creation in partly occupied cells (too unclear to allow this behaviour) */
-		bool clear = true;
-		for (const Note n : notes) { 
-			clear = n.row != row || (col < (int)n.col || col > (int)(n.col + n.length - 0.000000001));  //HACK
-			if (clear)
-				break;
-		}
+		bool clear = std::none_of(notes.begin(), notes.end(),
+			[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
 		if (clear)
 			notes.push_back({row,col,1.0});
 	}
