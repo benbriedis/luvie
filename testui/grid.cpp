@@ -94,9 +94,10 @@ void MyGrid::draw()
 		   lining it up with the start of the column.
 		*/
 		fl_rectf(x0,y0+1,width,rowHeight-1,0x5555EE00);
+		const int barWidth = 5;
 		fl_color(0x1111EE00);
-		fl_line_style(FL_SOLID,5);
-		fl_line(x0,y0+1,x0,y0+rowHeight-1);
+		fl_line_style(FL_SOLID, barWidth);
+		fl_line(x0 + barWidth/2, y0+1, x0 + barWidth/2, y0+rowHeight-1);
 		fl_line_style(0);
 	}
 }
