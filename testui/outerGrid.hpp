@@ -8,6 +8,8 @@
 #include "cell.hpp"
 #include "grid.hpp"
 
+const Fl_Color bgColor = FL_WHITE;
+
 /* The group is required so we can support multiple widgets. */
 class OuterGrid : public Fl_Group {
 	MyGrid grid;

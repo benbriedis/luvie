@@ -1,4 +1,5 @@
 #include "grid.hpp"
+#include "outerGrid.hpp"
 #include "cell.hpp"
 #include "FL/Enumerations.H"
 #include "popup.hpp"
@@ -49,7 +50,7 @@ void MyGrid::draw()
 	// Call the base class draw method to handle border, label, etc.
 	Fl_Box::draw();  //XXX really needed?
 
-	fl_color(FL_BACKGROUND_COLOR); //TODO fix up background colour 
+	fl_color(bgColor);
 	fl_rectf(x(), y(), w(), h()); 
 //XXX Q: are/can backgrounds be transparent?
 
