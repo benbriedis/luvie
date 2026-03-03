@@ -75,11 +75,16 @@ flex->box(FL_BORDER_BOX);
  flex->fixed(deleteItem, 40); 
 
 	//XXX cf a "value" slider instead
-	Fl_Slider *slider = new Fl_Slider(0, 0, 150, 30, "Vel");
+	Fl_Flex *sliderRow = new Fl_Flex(0, 0, 150, 30, Fl_Flex::HORIZONTAL);
+	sliderRow->begin();
+	Fl_Box *velLabel = new Fl_Box(0, 0, 30, 30, "Vel");
+	sliderRow->fixed(velLabel, 30);
+	Fl_Slider *slider = new Fl_Slider(0, 0, 120, 30);
     slider->type(FL_HOR_NICE_SLIDER);
     slider->box(FL_FLAT_BOX);
 	slider->bounds(0.0,1.0);
 	slider->value(0.5);
+	sliderRow->end();
 
 //XXX NOT WORKING
  flex->fixed(deleteItem, 30); 
@@ -120,13 +125,16 @@ void Popup::open(int mySelected,std::vector<Note>* myNotes,MyGrid* myGrid)
 
 Note cell = (*notes)[mySelected];
 
-Point desiredPosition = new Point(cell.col * grid->colWidth,cell.row * grid->rowHeight);
+	Point2 desiredPosition = {
+		(int)(grid->x() + cell.col * grid->colWidth),
+		(int)(grid->y() + cell.row * grid->rowHeight)
+	};
 
-//    fn layout(&mut self,tree: &mut widget::Tree,renderer: &Renderer,limits: &layout::Limits) -> layout::Node
-position = popupPosition(limits.max(), desiredPosition);
+	Fl_Window* win = grid->window();
+	Size available = {win->w(), win->h()};
 
-//TODO set to position...
-
+	Point2 pos = popupPosition(available, desiredPosition);
+	position(pos.x, pos.y);
 
 	show();
 }
@@ -175,10 +183,9 @@ Point2 Popup::popupPosition(Size size, Point2 pos)
 {
 	float verticalPadding = 4.0;
 	//TODO probably need to account from internal padding of popup    
-	float sidePadding = 30.0;
+	float sidePadding = 10.0;
 
-	// TODO calculate?
-	float height = 85.0;
+	float height = h();
 
 	/* Place above if place, otherwise below */
 	bool placeAbove = pos.y >= (height + verticalPadding);
@@ -186,7 +193,7 @@ Point2 Popup::popupPosition(Size size, Point2 pos)
 	float y = placeAbove ? pos.y - height - verticalPadding : pos.y + grid->rowHeight + verticalPadding;
 
 	/* Use cell LHS if there is space, otherwise get as close as possible */
-	float maxX = size.width - width - sidePadding;
+	float maxX = size.width - w() - sidePadding;
 
 	float x = pos.x > maxX ? maxX : pos.x;
 	x = x < sidePadding ? sidePadding : x;
