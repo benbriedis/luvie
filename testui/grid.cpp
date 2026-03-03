@@ -140,9 +140,8 @@ int MyGrid::handle(int event)
 
 		case FL_RELEASE:
 			if (hoverState==MOVING && amOverlapping) {
-				// TODO maybe drift back or fade out and in note
-				notes[selectedNote].row = originalPosition.row;
-				notes[selectedNote].col = originalPosition.col;
+				notes[selectedNote].row = lastValidPosition.row;
+				notes[selectedNote].col = lastValidPosition.col;
 				redraw();
 			}
 
@@ -204,7 +203,9 @@ void MyGrid::moving()
 
 //TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
 	amOverlapping = overlappingNote() >= 0;
-	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND); 
+	if (!amOverlapping)
+		lastValidPosition = {selected->row, selected->col};
+	window()->cursor(amOverlapping ? FL_CURSOR_WAIT : FL_CURSOR_HAND);
 
 	redraw();	//XXX is a full redraw really required - consider all redraws()?
 }
@@ -307,6 +308,7 @@ void MyGrid::findNoteForCursor()
 			movingGrabXOffset = x - n.col * colWidth;
 			movingGrabYOffset = y - n.row * rowHeight;
 			originalPosition = {n.row,n.col};
+			lastValidPosition = {n.row,n.col};
 
 			window()->cursor(FL_CURSOR_HAND); 
 //			window()->cursor(FL_CURSOR_CROSS); 

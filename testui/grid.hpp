@@ -58,6 +58,7 @@ private:
 	bool amOverlapping;
 	bool creationForbidden;
 	Point originalPosition;
+	Point lastValidPosition;
 
 	void init();
 	void draw() override;
