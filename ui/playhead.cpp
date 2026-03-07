@@ -67,6 +67,10 @@ void Playhead::drawLine(int gridX, int gridY, int gridH) {
 	fl_line_style(0);
 }
 
+int Playhead::xOffset() const {
+	return transport ? secondsToPixel(transport->position()) : 0;
+}
+
 void Playhead::seek(int mouseX, int rulerX) {
 	if (!transport) return;
 	double secs    = pixelToSeconds(mouseX - rulerX);

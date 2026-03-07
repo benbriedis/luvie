@@ -35,6 +35,9 @@ public:
 
 	// Seek to the position corresponding to mouseX within the ruler
 	void seek(int mouseX, int rulerX);
+
+	// Pixel offset from the ruler's left edge to the triangle centre
+	int xOffset() const;
 };
 
 #endif

@@ -2,6 +2,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
+#include <cstdlib>
 
 OuterGrid::OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int numCols,
                      int rowHeight, int colWidth, float snap, Popup& popup)
@@ -50,7 +51,9 @@ int OuterGrid::handle(int event) {
 		break;
 	case FL_MOVE:
 		if (inRuler) {
-			window()->cursor(FL_CURSOR_WE);
+			const int grabZone = 8;
+			int dist = std::abs(Fl::event_x() - (x() + playhead.xOffset()));
+			window()->cursor(dist <= grabZone ? FL_CURSOR_WE : FL_CURSOR_CROSS);
 			return 1;
 		}
 		break;
