@@ -83,17 +83,6 @@ void MyGrid::draw()
 		fl_line(x0, y0, x1, y1);
 	}
 
-	/* Position line: */
-	if (transport) {
-		double posInBars = transport->position() * bpm / 60.0 / beatsPerBar;
-		if (posInBars > numCols) posInBars = numCols;
-		int lineX = x() + (int)(posInBars * colWidth);
-		fl_color(0xEF444400);  // red
-		fl_line_style(FL_SOLID, 2);
-		fl_line(lineX, y(), lineX, y() + numRows * rowHeight);
-		fl_line_style(0);
-	}
-
 	/* Notes: */
 //XXX at what point does copying these small structures become a bad idea?
 	for (const Note note : notes) {
@@ -112,6 +101,18 @@ void MyGrid::draw()
 		fl_color(0x1111EE00);
 		fl_line_style(FL_SOLID, barWidth);
 		fl_line(x0 + barWidth/2, y0+1, x0 + barWidth/2, y0+rowHeight-1);
+		fl_line_style(0);
+	}
+
+	/* Position line: drawn last so it appears over notes */
+	if (transport) {
+		double posInBars = transport->position() * bpm / 60.0 / beatsPerBar;
+		int lineX = x() + (int)(posInBars * colWidth);
+		if (lineX > x() + numCols * colWidth - 2)
+			lineX = x() + numCols * colWidth - 2;
+		fl_color(0xEF444400);  // red
+		fl_line_style(FL_SOLID, 2);
+		fl_line(lineX, y(), lineX, y() + numRows * rowHeight);
 		fl_line_style(0);
 	}
 }
