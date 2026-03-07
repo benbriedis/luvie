@@ -7,12 +7,14 @@
 #include "popup.hpp"
 #include "outerGrid.hpp"
 #include "modernTabs.hpp"
+#include "transport.hpp"
 
 
 int main(int argc, char **argv) {
 	const int tabBarH = 35;
+	const int bottomH = 50;
 	const int winW = 920;
-	const int winH = tabBarH + 10 * 45 + 20;  // fits the larger grid with margin
+	const int winH = tabBarH + 10 * 45 + 20 + bottomH;
 
 	Fl_Window window(winW, winH);
 	window.color(bgColor);
@@ -29,10 +31,12 @@ int main(int argc, char **argv) {
 	Popup popup2{};
 	window.add(popup2);
 
-	ModernTabs tabs(0, 0, winW, winH);
+	const int tabsH = winH - bottomH;
+
+	ModernTabs tabs(0, 0, winW, tabsH);
 	window.add(tabs);
 
-	Fl_Group tab1(0, tabBarH, winW, winH - tabBarH, "Piano Roll");
+	Fl_Group tab1(0, tabBarH, winW, tabsH - tabBarH, "Piano Roll");
 	tab1.color(bgColor);
 	tabs.add(tab1);
 
@@ -40,13 +44,16 @@ int main(int argc, char **argv) {
 	grid1.position(0, tabBarH);
 	tab1.add(grid1);
 
-	Fl_Group tab2(0, tabBarH, winW, winH - tabBarH, "Song Editor");
+	Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
 	tab2.color(bgColor);
 	tabs.add(tab2);
 
 	MyGrid grid2(notes2, 10, 15, 45, 60, 0.25, popup2);
 	grid2.position(0, tabBarH);
 	tab2.add(grid2);
+
+	Transport bottomPane(0, tabsH, winW, bottomH);
+	window.add(bottomPane);
 
 	window.show(argc, argv);
 	return Fl::run();

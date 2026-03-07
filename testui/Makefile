@@ -13,8 +13,8 @@ TARGET = main
 
 all: $(TARGET)
 
-$(TARGET): main.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp
-	$(CC) $(CXXFLAGS) main.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp -o $(TARGET) $(LDFLAGS)
+$(TARGET): main.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp
+	$(CC) $(CXXFLAGS) main.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp -o $(TARGET) $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
