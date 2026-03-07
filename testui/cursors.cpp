@@ -7,20 +7,32 @@ const Fl_RGB_Image* forbiddenCursorImage() {
 	static Fl_RGB_Image* img = nullptr;
 	if (img) return img;
 
-	const float cx          = (SIZE - 1) / 2.0f;
-	const float cy          = (SIZE - 1) / 2.0f;
-	const float outer_r     = 9.5f;
-	const float inner_r     = 7.5f;   // 2px thick ring
-	const float slash_width = 1.5f;   // half-width of diagonal slash
+	const float cx      = (SIZE - 1) / 2.0f;
+	const float cy      = (SIZE - 1) / 2.0f;
+	const float outer_r = 8.5f;   // leave ~1px margin for white border
+	const float inner_r = 6.5f;   // 2px thick ring
+	const float slash_hw = 2.0f;  // half-width of slash (perpendicular distance)
+
+	const float inv_sqrt2 = 1.0f / std::sqrt(2.0f);
 
 	/* Pass 1: record which pixels are part of the cursor shape */
 	bool isCursor[SIZE * SIZE] = {};
 	for (int y = 0; y < SIZE; y++) {
 		for (int x = 0; x < SIZE; x++) {
-			float dist = std::sqrt((x - cx)*(x - cx) + (y - cy)*(y - cy));
-			bool onCircle = dist >= inner_r && dist <= outer_r;
-			bool onSlash  = std::fabs((float)(x - y)) <= slash_width && dist <= outer_r;
-			isCursor[y * SIZE + x] = onCircle || onSlash;
+			float dx   = x - cx;
+			float dy   = y - cy;
+			float dist = std::sqrt(dx*dx + dy*dy);
+
+			// Ring: between inner and outer radius
+			bool onRing  = dist >= inner_r && dist <= outer_r;
+
+			// Slash: true perpendicular distance from the 45° diagonal (top-left to bottom-right)
+			// The diagonal direction is (1,1)/√2; perpendicular is (-1,1)/√2
+			// perp distance = |(-dx + dy)| / √2
+			float perp   = std::fabs(-dx + dy) * inv_sqrt2;
+			bool onSlash = perp <= slash_hw && dist <= outer_r;
+
+			isCursor[y * SIZE + x] = onRing || onSlash;
 		}
 	}
 
