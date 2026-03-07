@@ -10,9 +10,10 @@ class SimpleTransport : public ITransport {
 	std::chrono::steady_clock::time_point playStart;
 
 public:
-	void   play()   override;
-	void   pause()  override;
-	void   rewind() override;
+	void   play()               override;
+	void   pause()              override;
+	void   rewind()             override;
+	void   seek(double seconds) override;
 
 	double position()  const override;
 	bool   isPlaying() const override { return playing; }

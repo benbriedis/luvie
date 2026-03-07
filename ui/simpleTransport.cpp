@@ -1,4 +1,5 @@
 #include "simpleTransport.hpp"
+#include <algorithm>
 
 //TODO research std::chrono::steady_clock::now() before committing to it long term for use in the internal transport
 void SimpleTransport::play() {
@@ -18,6 +19,12 @@ void SimpleTransport::pause() {
 void SimpleTransport::rewind() {
 	playing       = false;
 	savedPosition = 0.0;
+}
+
+void SimpleTransport::seek(double seconds) {
+	savedPosition = std::max(0.0, seconds);
+	if (playing)
+		playStart = std::chrono::steady_clock::now();
 }
 
 double SimpleTransport::position() const {
