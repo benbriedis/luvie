@@ -8,7 +8,7 @@
 
 class TransportButton : public Fl_Button {
 public:
-	enum Icon { REWIND, STOP, PLAY, PAUSE };
+	enum Icon { REWIND, PLAY, PAUSE };
 
 private:
 	Icon icon;
@@ -26,7 +26,6 @@ public:
 
 class Transport : public Fl_Group {
 	TransportButton* rewindBtn;
-	TransportButton* stopBtn;
 	TransportButton* playPauseBtn;
 	Fl_Box*     posLabel;
 

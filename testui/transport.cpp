@@ -33,12 +33,6 @@ void TransportButton::drawIcon(int cx, int cy, int s, Icon icon) {
 		break;
 	}
 
-	case STOP: {
-		int ss = s * 4 / 5;
-		fl_rectf(cx - ss, cy - ss, ss * 2, ss * 2);
-		break;
-	}
-
 	case REWIND: {
 		int barW  = std::max(2, s / 3);
 		int triHW = s - barW - 2;
@@ -103,7 +97,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 
 	const int btnSize = h - 10;
 	const int gap     = 12;
-	const int totalW  = 3 * btnSize + 2 * gap;
+	const int totalW  = 2 * btnSize + gap;
 	const int bx      = x + (w - totalW) / 2;
 	const int by      = y + (h - btnSize) / 2;
 
@@ -117,22 +111,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		}
 	}, this);
 
-	stopBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
-	                              TransportButton::STOP);
-	stopBtn->callback([](Fl_Widget*, void* data) {
-		Transport* t = (Transport*)data;
-		if (!t->transport) return;
-		bool wasPlaying = t->transport->isPlaying();
-		t->transport->stop();
-		if (wasPlaying) {
-			t->playPauseBtn->setAlt(false);
-			t->playPauseBtn->redraw();
-			Fl::remove_timeout(pollCb, t);
-		}
-		t->updatePosition();
-	}, this);
-
-	playPauseBtn = new TransportButton(bx + 2 * (btnSize + gap), by, btnSize, btnSize,
+	playPauseBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
 	                                   TransportButton::PLAY, TransportButton::PAUSE);
 	playPauseBtn->callback([](Fl_Widget* w, void* data) {
 		Transport* t   = (Transport*)data;

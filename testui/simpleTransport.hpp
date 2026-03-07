@@ -12,7 +12,6 @@ class SimpleTransport : public ITransport {
 public:
 	void   play()   override;
 	void   pause()  override;
-	void   stop()   override;
 	void   rewind() override;
 
 	double position()  const override;

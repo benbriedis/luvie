@@ -1,5 +1,6 @@
 #include "simpleTransport.hpp"
 
+//TODO research std::chrono::steady_clock::now() before committing to it long term for use in the internal transport
 void SimpleTransport::play() {
 	if (!playing) {
 		playStart = std::chrono::steady_clock::now();
@@ -12,10 +13,6 @@ void SimpleTransport::pause() {
 		savedPosition = position();
 		playing       = false;
 	}
-}
-
-void SimpleTransport::stop() {
-	pause();
 }
 
 void SimpleTransport::rewind() {

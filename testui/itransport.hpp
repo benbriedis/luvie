@@ -7,7 +7,6 @@ public:
 
 	virtual void play()    = 0;
 	virtual void pause()   = 0;
-	virtual void stop()    = 0;
 	virtual void rewind()  = 0;
 
 	virtual double position()  const = 0;  // seconds from start
