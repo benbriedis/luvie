@@ -3,10 +3,10 @@
 
 #include "popup.hpp"
 #include "cell.hpp"
-#include "itransport.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
-#include <functional>
+
+class Playhead;
 
 enum SelectionState {
 	NONE,
@@ -26,14 +26,13 @@ enum Side {
 
 typedef struct {
 	int row;
-	float col; 
+	float col;
 } Point;
 
 
 class MyGrid : public Fl_Box {
 public:
 	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup);
-
 
 	/* Grid parameters */
 //XXX should be raised...
@@ -52,7 +51,7 @@ private:
 
 	/* Cursor parameters: */
 	/* selectedNote points to 'notes'. This is a Vector and can be reallocated - so using a pointer is not safe. */
-	int selectedNote; 
+	int selectedNote;
 	SelectionState hoverState;
 	Side side;
 	float movingGrabXOffset;
@@ -62,9 +61,7 @@ private:
 	Point originalPosition;
 	Point lastValidPosition;
 
-	ITransport* transport = nullptr;
-	double bpm       = 120.0;
-	int beatsPerBar  = 4;
+	Playhead* playhead = nullptr;
 
 	void init();
 	void draw() override;
@@ -74,14 +71,9 @@ private:
 	int overlappingNote();
 	void moving();
 	void resizing();
-	void checkAndRedraw();
-	static void posTimerCb(void* data);
 
 public:
-	std::function<void()> onEndReached;
-
-	void setTransport(ITransport* t, double b, int bpb);
+	void setPlayhead(Playhead* p) { playhead = p; }
 };
 
 #endif
-

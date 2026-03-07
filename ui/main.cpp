@@ -9,7 +9,7 @@
 #include "modernTabs.hpp"
 #include "transport.hpp"
 #include "simpleTransport.hpp"
-#include "playheadRuler.hpp"
+#include "playhead.hpp"
 
 
 static constexpr double bpm        = 120.0;
@@ -46,33 +46,33 @@ int main(int argc, char **argv) {
 	tab1.color(bgColor);
 	tabs.add(tab1);
 
-	PlayheadRuler ruler1(0, tabBarH, 15 * 40, rulerH, 15, 40);
-	tab1.add(ruler1);
+	Playhead playhead1(0, tabBarH, 15 * 40, rulerH, 15, 40);
+	tab1.add(playhead1);
 
 	MyGrid grid1(notes1, 10, 15, 30, 40, 0.25, popup1);
 	grid1.position(0, tabBarH + rulerH);
+	grid1.setPlayhead(&playhead1);
 	tab1.add(grid1);
 
 	Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
 	tab2.color(bgColor);
 	tabs.add(tab2);
 
-	PlayheadRuler ruler2(0, tabBarH, 15 * 60, rulerH, 15, 60);
-	tab2.add(ruler2);
+	Playhead playhead2(0, tabBarH, 15 * 60, rulerH, 15, 60);
+	tab2.add(playhead2);
 
 	MyGrid grid2(notes2, 10, 15, 45, 60, 0.25, popup2);
 	grid2.position(0, tabBarH + rulerH);
+	grid2.setPlayhead(&playhead2);
 	tab2.add(grid2);
 
 	SimpleTransport simpleTransport;
 	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, bpm, beatsPerBar);
 	window.add(bottomPane);
 
-	grid2.setTransport(&simpleTransport, bpm, beatsPerBar);
-	grid2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
-
-	ruler2.setTransport(&simpleTransport, bpm, beatsPerBar);
-	ruler2.setOnSeek([&grid2]() { grid2.redraw(); });
+	playhead2.setTransport(&simpleTransport, bpm, beatsPerBar);
+	playhead2.setLinkedGrid(&grid2);
+	playhead2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
 
 	window.show(argc, argv);
 	return Fl::run();

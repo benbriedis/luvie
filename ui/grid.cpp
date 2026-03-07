@@ -1,4 +1,5 @@
 #include "grid.hpp"
+#include "playhead.hpp"
 #include "outerGrid.hpp"
 #include <FL/Fl.H>
 #include "cell.hpp"
@@ -16,7 +17,6 @@
 #include <FL/fl_ask.H> // For fl_alert
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Item.H>
-#include <FL/fl_ask.H> // For fl_alert
 
 //import std;
 
@@ -35,26 +35,26 @@ void menu_callback(Fl_Widget* w, void* user_data) {
 
 //Fl_Menu_Button mb(0,0,100000,100000);
 
-//FIXME clicking before or after cell creates an overlapping cell 
+//FIXME clicking before or after cell creates an overlapping cell
 
 //FIXME leading front line narrows when putting next to another cell
 
 
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) : 
+MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) :
 	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
 	hoverState(NONE),creationForbidden(false),
-	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr) 
-{ 
+	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr)
+{
 }
 
-void MyGrid::draw() 
+void MyGrid::draw()
 {
-//XXX drawing is additive. Dont really need for add 	
+//XXX drawing is additive. Dont really need for add
 	// Call the base class draw method to handle border, label, etc.
 	Fl_Box::draw();  //XXX really needed?
 
 	fl_color(bgColor);
-	fl_rectf(x(), y(), w(), h()); 
+	fl_rectf(x(), y(), w(), h());
 //XXX Q: are/can backgrounds be transparent?
 
 
@@ -104,20 +104,12 @@ void MyGrid::draw()
 		fl_line_style(0);
 	}
 
-	/* Position line: drawn last so it appears over notes */
-	if (transport) {
-		double posInBars = transport->position() * bpm / 60.0 / beatsPerBar;
-		int lineX = x() + (int)(posInBars * colWidth);
-		if (lineX > x() + numCols * colWidth - 2)
-			lineX = x() + numCols * colWidth - 2;
-		fl_color(0xEF444400);  // red
-		fl_line_style(FL_SOLID, 2);
-		fl_line(lineX, y(), lineX, y() + numRows * rowHeight);
-		fl_line_style(0);
-	}
+	/* Playhead line: drawn last so it appears over notes */
+	if (playhead)
+		playhead->drawLine(x(), y(), numRows * rowHeight);
 }
 
-int MyGrid::handle(int event) 
+int MyGrid::handle(int event)
 {
 
 //damage() call may be  useful. Also cf double buffering (and scrolling)
@@ -145,11 +137,11 @@ int MyGrid::handle(int event)
 			}
 			return 1;
 
-		case FL_DRAG: 
-			if (hoverState==MOVING) 
+		case FL_DRAG:
+			if (hoverState==MOVING)
 				moving();
 
-			if (hoverState==RESIZING) 
+			if (hoverState==RESIZING)
 				resizing();
 
 			return 1;
@@ -174,16 +166,16 @@ int MyGrid::handle(int event)
 			return 1;
 
 		/* We want mouse events to change the cursor */
-		case FL_ENTER: 
+		case FL_ENTER:
 			return 1;		// non-zero = we want mouse events
 
 		/*
-		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving 
+		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving
 		   by hovering the cursor over different parts of the note. MAY want keycombs and/or mode as well/instead.
 		*/
 		case FL_MOVE: {
 			findNoteForCursor();
-			return 0; 
+			return 0;
 		}
 		default:
 //			return Fl_Widget::handle(event);
@@ -304,10 +296,10 @@ void MyGrid::findNoteForCursor()
 	hoverState = NONE;
 
 	for (const auto [i,n]: std::views::enumerate(notes)) {
-		if (n.row != row) 
+		if (n.row != row)
 			continue;
 
-		float leftEdge = n.col * colWidth; 
+		float leftEdge = n.col * colWidth;
 		float rightEdge = (n.col + n.length) * colWidth;
 
 		if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
@@ -329,22 +321,22 @@ void MyGrid::findNoteForCursor()
 			originalPosition = {n.row,n.col};
 			lastValidPosition = {n.row,n.col};
 
-			window()->cursor(FL_CURSOR_HAND); 
-//			window()->cursor(FL_CURSOR_CROSS); 
+			window()->cursor(FL_CURSOR_HAND);
+//			window()->cursor(FL_CURSOR_CROSS);
 
 			redraw();
 			/* Move takes precedence over resizing any neighbouring notes */
-			
+
 			return;
 		}
 	}
 
 	if (hoverState == RESIZING) {
 		selectedNote = selectedIfResize;
-		window()->cursor(FL_CURSOR_WE); 
+		window()->cursor(FL_CURSOR_WE);
 	}
-	else 
-		window()->cursor(FL_CURSOR_DEFAULT); 
+	else
+		window()->cursor(FL_CURSOR_DEFAULT);
 
 	redraw();
 }
@@ -362,12 +354,12 @@ void MyGrid::toggleNote()
 	/* Remove the note if present */
 	int size = notes.size();
 
-//FIXME delete - need keycombo, right mouse key, or mode to distinguish from move. 
-//      Delete should probably be the exception I think rather than the rule as its probably a bit less common and 
+//FIXME delete - need keycombo, right mouse key, or mode to distinguish from move.
+//      Delete should probably be the exception I think rather than the rule as its probably a bit less common and
 //      move requires more control. Cf using a right mouse shortcut menu? Maybe put velocity in there too?
-//TODO can we use a range instead?	
-	notes.erase(std::remove_if(notes.begin(), notes.end(), 
-		[=](const Note& n) { return n.row == row && n.col == col; }), 
+//TODO can we use a range instead?
+	notes.erase(std::remove_if(notes.begin(), notes.end(),
+		[=](const Note& n) { return n.row == row && n.col == col; }),
 		notes.end());
 
 //TODO add option to split the columns and zoom in or out
@@ -387,36 +379,6 @@ void MyGrid::toggleNote()
 	redraw();
 }
 
-void MyGrid::setTransport(ITransport* t, double b, int bpb) {
-	Fl::remove_timeout(posTimerCb, this);
-	transport   = t;
-	bpm         = b;
-	beatsPerBar = bpb;
-	Fl::add_timeout(0.5, posTimerCb, this);
-}
-
-void MyGrid::posTimerCb(void* data) {
-	auto* self = static_cast<MyGrid*>(data);
-	self->checkAndRedraw();
-	double interval = 0.1;  // slow poll when not playing
-	if (self->transport && self->transport->isPlaying()) {
-		double pxPerSec = (double)self->colWidth * self->bpm / 60.0 / self->beatsPerBar;
-		interval = std::clamp(1.0 / pxPerSec, 0.016, 0.05);
-	}
-	Fl::repeat_timeout(interval, posTimerCb, data);
-}
-
-void MyGrid::checkAndRedraw() {
-	if (transport && transport->isPlaying()) {
-		double endSeconds = (double)numCols * beatsPerBar / bpm * 60.0;
-		if (transport->position() >= endSeconds) {
-			transport->pause();
-			if (onEndReached) onEndReached();
-		}
-	}
-	redraw();
-}
-
 /* Returns the note index, or -1 */
 int MyGrid::overlappingNote()
 {
@@ -425,7 +387,7 @@ int MyGrid::overlappingNote()
 	float aEnd = a.col + a.length;
 
 	for (const auto [i,b]: std::views::enumerate(notes)) {
-		if (i == selectedNote || b.row != a.row) 
+		if (i == selectedNote || b.row != a.row)
 			continue;
 
 		float bStart = b.col;
@@ -439,4 +401,3 @@ int MyGrid::overlappingNote()
 	}
 	return -1;
 }
-
