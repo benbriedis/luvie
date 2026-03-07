@@ -11,6 +11,9 @@
 #include "simpleTransport.hpp"
 
 
+static constexpr double bpm         = 120.0;
+static constexpr int    beatsPerBar  = 4;
+
 int main(int argc, char **argv) {
 	const int tabBarH = 35;
 	const int bottomH = 50;
@@ -54,7 +57,9 @@ int main(int argc, char **argv) {
 	tab2.add(grid2);
 
 	SimpleTransport simpleTransport;
-	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport);
+	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, bpm, beatsPerBar);
+	grid2.setTransport(&simpleTransport, bpm, beatsPerBar);
+	grid2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
 	window.add(bottomPane);
 
 	window.show(argc, argv);

@@ -1,5 +1,6 @@
 #include "grid.hpp"
 #include "outerGrid.hpp"
+#include <FL/Fl.H>
 #include "cell.hpp"
 #include "FL/Enumerations.H"
 #include "popup.hpp"
@@ -80,6 +81,17 @@ void MyGrid::draw()
 		int y1 = y() + numRows * rowHeight;
 
 		fl_line(x0, y0, x1, y1);
+	}
+
+	/* Position line: */
+	if (transport) {
+		double posInBars = transport->position() * bpm / 60.0 / beatsPerBar;
+		if (posInBars > numCols) posInBars = numCols;
+		int lineX = x() + (int)(posInBars * colWidth);
+		fl_color(0xEF444400);  // red
+		fl_line_style(FL_SOLID, 2);
+		fl_line(lineX, y(), lineX, y() + numRows * rowHeight);
+		fl_line_style(0);
 	}
 
 	/* Notes: */
@@ -371,6 +383,31 @@ void MyGrid::toggleNote()
 			notes.push_back({row,col,1.0});
 	}
 
+	redraw();
+}
+
+void MyGrid::setTransport(ITransport* t, double b, int bpb) {
+	Fl::remove_timeout(posTimerCb, this);
+	transport   = t;
+	bpm         = b;
+	beatsPerBar = bpb;
+	Fl::add_timeout(0.5, posTimerCb, this);
+}
+
+void MyGrid::posTimerCb(void* data) {
+	auto* self = static_cast<MyGrid*>(data);
+	self->checkAndRedraw();
+	Fl::repeat_timeout(0.1, posTimerCb, data);
+}
+
+void MyGrid::checkAndRedraw() {
+	if (transport && transport->isPlaying()) {
+		double endSeconds = (double)numCols * beatsPerBar / bpm * 60.0;
+		if (transport->position() >= endSeconds) {
+			transport->pause();
+			if (onEndReached) onEndReached();
+		}
+	}
 	redraw();
 }
 

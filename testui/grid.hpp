@@ -3,8 +3,10 @@
 
 #include "popup.hpp"
 #include "cell.hpp"
+#include "itransport.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
+#include <functional>
 
 enum SelectionState {
 	NONE,
@@ -60,6 +62,10 @@ private:
 	Point originalPosition;
 	Point lastValidPosition;
 
+	ITransport* transport = nullptr;
+	double bpm       = 120.0;
+	int beatsPerBar  = 4;
+
 	void init();
 	void draw() override;
 	int handle(int event) override;
@@ -68,6 +74,13 @@ private:
 	int overlappingNote();
 	void moving();
 	void resizing();
+	void checkAndRedraw();
+	static void posTimerCb(void* data);
+
+public:
+	std::function<void()> onEndReached;
+
+	void setTransport(ITransport* t, double b, int bpb);
 };
 
 #endif

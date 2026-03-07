@@ -80,17 +80,27 @@ void Transport::pollCb(void* data) {
 		Fl::repeat_timeout(1.0, pollCb, data);
 }
 
+void Transport::notifyEndReached() {
+	Fl::remove_timeout(pollCb, this);
+	stoppedAtEnd = true;
+	playPauseBtn->setAlt(false);
+	playPauseBtn->redraw();
+	updatePosition();
+}
+
 void Transport::updatePosition() {
-	int secs = transport ? (int)transport->position() : 0;
-	std::snprintf(posText, sizeof(posText), "Position: %d secs", secs);
+	double totalBeats = transport ? transport->position() * bpm / 60.0 : 0.0;
+	int bar  = (int)(totalBeats / beatsPerBar) + 1;
+	int beat = (int)(totalBeats) % beatsPerBar + 1;
+	std::snprintf(posText, sizeof(posText), "Bar %d Beat %d", bar, beat);
 	posLabel->label(posText);
 	posLabel->redraw();
 }
 
 // ---------------------------------------------------------------------------
 
-Transport::Transport(int x, int y, int w, int h, ITransport* t)
-	: Fl_Group(x, y, w, h), transport(t)
+Transport::Transport(int x, int y, int w, int h, ITransport* t, double b, int bpb)
+	: Fl_Group(x, y, w, h), transport(t), bpm(b), beatsPerBar(bpb)
 {
 	box(FL_FLAT_BOX);
 	color(bgColor);
@@ -122,6 +132,10 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 			btn->setAlt(false);
 			Fl::remove_timeout(pollCb, t);
 		} else {
+			if (t->stoppedAtEnd) {
+				t->transport->rewind();
+				t->stoppedAtEnd = false;
+			}
 			t->transport->play();
 			btn->setAlt(true);
 			Fl::add_timeout(1.0, pollCb, t);

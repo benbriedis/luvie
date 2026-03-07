@@ -30,13 +30,17 @@ class Transport : public Fl_Group {
 	Fl_Box*     posLabel;
 
 	ITransport* transport;
+	double      bpm;
+	int         beatsPerBar;
+	bool        stoppedAtEnd = false;
 	char        posText[64];
 
 	static void pollCb(void* data);
 	void        updatePosition();
 
 public:
-	Transport(int x, int y, int w, int h, ITransport* t);
+	Transport(int x, int y, int w, int h, ITransport* t, double b, int bpb);
+	void notifyEndReached();
 };
 
 #endif
