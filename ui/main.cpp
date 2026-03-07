@@ -54,6 +54,7 @@ int main(int argc, char **argv) {
 
 	og2.setTransport(&simpleTransport, bpm, beatsPerBar);
 	og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
+	og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
 
 	window.show(argc, argv);
 	return Fl::run();

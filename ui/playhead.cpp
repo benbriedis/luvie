@@ -62,9 +62,7 @@ void Playhead::drawLine(int gridX, int gridY, int gridH) {
 	if (!transport) return;
 	int px = gridX + secondsToPixel(transport->position());
 	fl_color(headColor);
-	fl_line_style(FL_SOLID, 2);
 	fl_line(px, gridY, px, gridY + gridH);
-	fl_line_style(0);
 }
 
 int Playhead::xOffset() const {

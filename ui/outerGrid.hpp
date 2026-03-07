@@ -19,12 +19,14 @@ private:
 
 	Playhead playhead;  // declared before grid — initialised first
 	MyGrid   grid;
+	bool     rulerDragging = false;
 
 	void draw() override;
 	int  handle(int event) override;
 
 public:
 	std::function<void()> onEndReached;
+	std::function<void()> onSeek;
 
 	OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int numCols,
 	          int rowHeight, int colWidth, float snap, Popup& popup);

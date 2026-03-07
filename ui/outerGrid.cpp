@@ -39,15 +39,27 @@ int OuterGrid::handle(int event) {
 
 	switch (event) {
 	case FL_PUSH:
-	case FL_DRAG:
 		if (inRuler) {
+			rulerDragging = true;
 			playhead.seek(Fl::event_x(), x());
+			if (onSeek) onSeek();
+			redraw();
+			return 1;
+		}
+		break;
+	case FL_DRAG:
+		if (rulerDragging) {
+			playhead.seek(Fl::event_x(), x());
+			if (onSeek) onSeek();
 			redraw();
 			return 1;
 		}
 		break;
 	case FL_RELEASE:
-		if (inRuler) return 1;
+		if (rulerDragging) {
+			rulerDragging = false;
+			return 1;
+		}
 		break;
 	case FL_MOVE:
 		if (inRuler) {

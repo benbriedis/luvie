@@ -41,6 +41,7 @@ class Transport : public Fl_Group {
 public:
 	Transport(int x, int y, int w, int h, ITransport* t, double b, int bpb);
 	void notifyEndReached();
+	void notifySeek() { stoppedAtEnd = false; }
 };
 
 #endif
