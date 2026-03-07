@@ -398,7 +398,12 @@ void MyGrid::setTransport(ITransport* t, double b, int bpb) {
 void MyGrid::posTimerCb(void* data) {
 	auto* self = static_cast<MyGrid*>(data);
 	self->checkAndRedraw();
-	Fl::repeat_timeout(0.1, posTimerCb, data);
+	double interval = 0.1;  // slow poll when not playing
+	if (self->transport && self->transport->isPlaying()) {
+		double pxPerSec = (double)self->colWidth * self->bpm / 60.0 / self->beatsPerBar;
+		interval = std::clamp(1.0 / pxPerSec, 0.016, 0.05);
+	}
+	Fl::repeat_timeout(interval, posTimerCb, data);
 }
 
 void MyGrid::checkAndRedraw() {

@@ -1,5 +1,5 @@
 #include <FL/Fl.H>
-#include <FL/Fl_Window.H>
+#include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Item.H>
@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 	const int winW = 920;
 	const int winH = tabBarH + 10 * 45 + 20 + bottomH;
 
-	Fl_Window window(winW, winH);
+	Fl_Double_Window window(winW, winH);
 	window.color(bgColor);
 
 	/* Auto-adding child widgets fouls up. Silly feature anyway. */
