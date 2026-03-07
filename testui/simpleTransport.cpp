@@ -1,16 +1,16 @@
 #include "simpleTransport.hpp"
 
 void SimpleTransport::play() {
-	if (!playing_) {
-		playStart_ = std::chrono::steady_clock::now();
-		playing_   = true;
+	if (!playing) {
+		playStart = std::chrono::steady_clock::now();
+		playing   = true;
 	}
 }
 
 void SimpleTransport::pause() {
-	if (playing_) {
-		savedPosition_ = position();
-		playing_       = false;
+	if (playing) {
+		savedPosition = position();
+		playing       = false;
 	}
 }
 
@@ -19,12 +19,12 @@ void SimpleTransport::stop() {
 }
 
 void SimpleTransport::rewind() {
-	playing_       = false;
-	savedPosition_ = 0.0;
+	playing       = false;
+	savedPosition = 0.0;
 }
 
 double SimpleTransport::position() const {
-	if (!playing_) return savedPosition_;
+	if (!playing) return savedPosition;
 	auto now = std::chrono::steady_clock::now();
-	return savedPosition_ + std::chrono::duration<double>(now - playStart_).count();
+	return savedPosition + std::chrono::duration<double>(now - playStart).count();
 }

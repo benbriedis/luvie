@@ -5,9 +5,9 @@
 #include <chrono>
 
 class SimpleTransport : public ITransport {
-	double savedPosition_ = 0.0;
-	bool   playing_       = false;
-	std::chrono::steady_clock::time_point playStart_;
+	double savedPosition = 0.0;
+	bool   playing       = false;
+	std::chrono::steady_clock::time_point playStart;
 
 public:
 	void   play()   override;
@@ -16,7 +16,7 @@ public:
 	void   rewind() override;
 
 	double position()  const override;
-	bool   isPlaying() const override { return playing_; }
+	bool   isPlaying() const override { return playing; }
 };
 
 #endif

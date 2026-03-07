@@ -12,7 +12,7 @@ static constexpr Fl_Color iconColor = 0x37415100;    // dark slate
 // ---------------------------------------------------------------------------
 
 TransportButton::TransportButton(int x, int y, int w, int h, Icon icon, Icon altIcon)
-	: Fl_Button(x, y, w, h), icon_(icon), altIcon_(altIcon)
+	: Fl_Button(x, y, w, h), icon(icon), altIcon(altIcon)
 {
 	box(FL_NO_BOX);
 }
@@ -74,7 +74,7 @@ void TransportButton::draw() {
 	}
 
 	fl_color(pressed ? FL_WHITE : iconColor);
-	drawIcon(cx, cy, r / 2, useAlt_ ? altIcon_ : icon_);
+	drawIcon(cx, cy, r / 2, useAlt ? altIcon : icon);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,21 +82,21 @@ void TransportButton::draw() {
 void Transport::pollCb(void* data) {
 	auto* self = static_cast<Transport*>(data);
 	self->updatePosition();
-	if (self->transport_ && self->transport_->isPlaying())
+	if (self->transport && self->transport->isPlaying())
 		Fl::repeat_timeout(1.0, pollCb, data);
 }
 
 void Transport::updatePosition() {
-	int secs = transport_ ? (int)transport_->position() : 0;
-	std::snprintf(posText_, sizeof(posText_), "Position: %d secs", secs);
-	posLabel_->label(posText_);
-	posLabel_->redraw();
+	int secs = transport ? (int)transport->position() : 0;
+	std::snprintf(posText, sizeof(posText), "Position: %d secs", secs);
+	posLabel->label(posText);
+	posLabel->redraw();
 }
 
 // ---------------------------------------------------------------------------
 
-Transport::Transport(int x, int y, int w, int h, ITransport* transport)
-	: Fl_Group(x, y, w, h), transport_(transport)
+Transport::Transport(int x, int y, int w, int h, ITransport* t)
+	: Fl_Group(x, y, w, h), transport(t)
 {
 	box(FL_FLAT_BOX);
 	color(bgColor);
@@ -111,8 +111,8 @@ Transport::Transport(int x, int y, int w, int h, ITransport* transport)
 	                                TransportButton::REWIND);
 	rewindBtn->callback([](Fl_Widget*, void* data) {
 		Transport* t = (Transport*)data;
-		if (t->transport_) {
-			t->transport_->rewind();
+		if (t->transport) {
+			t->transport->rewind();
 			t->updatePosition();
 		}
 	}, this);
@@ -121,9 +121,9 @@ Transport::Transport(int x, int y, int w, int h, ITransport* transport)
 	                              TransportButton::STOP);
 	stopBtn->callback([](Fl_Widget*, void* data) {
 		Transport* t = (Transport*)data;
-		if (!t->transport_) return;
-		bool wasPlaying = t->transport_->isPlaying();
-		t->transport_->stop();
+		if (!t->transport) return;
+		bool wasPlaying = t->transport->isPlaying();
+		t->transport->stop();
 		if (wasPlaying) {
 			t->playPauseBtn->setAlt(false);
 			t->playPauseBtn->redraw();
@@ -137,13 +137,13 @@ Transport::Transport(int x, int y, int w, int h, ITransport* transport)
 	playPauseBtn->callback([](Fl_Widget* w, void* data) {
 		Transport* t   = (Transport*)data;
 		auto*      btn = (TransportButton*)w;
-		if (!t->transport_) return;
-		if (t->transport_->isPlaying()) {
-			t->transport_->pause();
+		if (!t->transport) return;
+		if (t->transport->isPlaying()) {
+			t->transport->pause();
 			btn->setAlt(false);
 			Fl::remove_timeout(pollCb, t);
 		} else {
-			t->transport_->play();
+			t->transport->play();
 			btn->setAlt(true);
 			Fl::add_timeout(1.0, pollCb, t);
 		}
@@ -154,9 +154,9 @@ Transport::Transport(int x, int y, int w, int h, ITransport* transport)
 	// Position label — sits to the right of the buttons
 	const int labelX = bx + totalW + 20;
 	const int labelW = x + w - labelX - 10;
-	posLabel_ = new Fl_Box(labelX, by, labelW, btnSize);
-	posLabel_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-	posLabel_->labelcolor(iconColor);
+	posLabel = new Fl_Box(labelX, by, labelW, btnSize);
+	posLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+	posLabel->labelcolor(iconColor);
 
 	updatePosition();
 	end();
