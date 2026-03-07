@@ -1,6 +1,0 @@
-name "dui"
-description "DLangUi grid test"
-authors "Ben Briedis"
-copyright "Copyright © 2026, Ben Briedis"
-license "proprietary"
-dependency "dlangui" version="~>0.10.8" path="../../temp/dlangui"
