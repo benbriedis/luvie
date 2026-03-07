@@ -3,6 +3,8 @@
 
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Box.H>
+#include "itransport.hpp"
 
 class TransportButton : public Fl_Button {
 public:
@@ -26,10 +28,16 @@ class Transport : public Fl_Group {
 	TransportButton* rewindBtn;
 	TransportButton* stopBtn;
 	TransportButton* playPauseBtn;
-	bool playing = false;
+	Fl_Box*          posLabel_;
+
+	ITransport* transport_;
+	char        posText_[64];
+
+	static void pollCb(void* data);
+	void        updatePosition();
 
 public:
-	Transport(int x, int y, int w, int h);
+	Transport(int x, int y, int w, int h, ITransport* transport);
 };
 
 #endif

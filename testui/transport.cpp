@@ -1,8 +1,9 @@
 #include "transport.hpp"
 #include "outerGrid.hpp"
+#include <FL/Fl.H>
 #include <FL/fl_draw.H>
-#include <iostream>
 #include <algorithm>
+#include <cstdio>
 
 static constexpr Fl_Color borderColor = 0xCBD5E100;  // slate blue-grey
 static constexpr Fl_Color pressedColor = 0x3B82F600; // blue accent
@@ -26,14 +27,14 @@ void TransportButton::drawIcon(int cx, int cy, int s, Icon icon) {
 
 	case PAUSE: {
 		int bw   = std::max(2, s / 2);
-		int span = s * 8 / 10;  // bars pulled in 20% from outer edge
+		int span = s * 8 / 10;
 		fl_rectf(cx - span,        cy - s, bw, s * 2);
 		fl_rectf(cx + span - bw,   cy - s, bw, s * 2);
 		break;
 	}
 
 	case STOP: {
-		int ss = s * 4 / 5;  // 20% smaller on each side
+		int ss = s * 4 / 5;
 		fl_rectf(cx - ss, cy - ss, ss * 2, ss * 2);
 		break;
 	}
@@ -57,11 +58,9 @@ void TransportButton::draw() {
 	int  cx = x() + w() / 2;
 	int  cy = y() + h() / 2;
 
-	// Clear own area to background colour
 	fl_color(bgColor);
 	fl_rectf(x(), y(), w(), h());
 
-	// Circle: filled when pressed, outlined when not
 	if (pressed) {
 		fl_color(pressedColor);
 		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
@@ -74,14 +73,31 @@ void TransportButton::draw() {
 		fl_line_style(0);
 	}
 
-	// Icon
 	fl_color(pressed ? FL_WHITE : iconColor);
 	drawIcon(cx, cy, r / 2, useAlt_ ? altIcon_ : icon_);
 }
 
 // ---------------------------------------------------------------------------
 
-Transport::Transport(int x, int y, int w, int h) : Fl_Group(x, y, w, h) {
+void Transport::pollCb(void* data) {
+	auto* self = static_cast<Transport*>(data);
+	self->updatePosition();
+	if (self->transport_ && self->transport_->isPlaying())
+		Fl::repeat_timeout(1.0, pollCb, data);
+}
+
+void Transport::updatePosition() {
+	int secs = transport_ ? (int)transport_->position() : 0;
+	std::snprintf(posText_, sizeof(posText_), "Position: %d secs", secs);
+	posLabel_->label(posText_);
+	posLabel_->redraw();
+}
+
+// ---------------------------------------------------------------------------
+
+Transport::Transport(int x, int y, int w, int h, ITransport* transport)
+	: Fl_Group(x, y, w, h), transport_(transport)
+{
 	box(FL_FLAT_BOX);
 	color(bgColor);
 
@@ -93,26 +109,55 @@ Transport::Transport(int x, int y, int w, int h) : Fl_Group(x, y, w, h) {
 
 	rewindBtn = new TransportButton(bx, by, btnSize, btnSize,
 	                                TransportButton::REWIND);
-	rewindBtn->callback([](Fl_Widget*, void*) {
-		std::cout << "Rewind to start pressed\n";
-	});
+	rewindBtn->callback([](Fl_Widget*, void* data) {
+		Transport* t = (Transport*)data;
+		if (t->transport_) {
+			t->transport_->rewind();
+			t->updatePosition();
+		}
+	}, this);
 
 	stopBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
 	                              TransportButton::STOP);
-	stopBtn->callback([](Fl_Widget*, void*) {
-		std::cout << "Stop pressed\n";
-	});
+	stopBtn->callback([](Fl_Widget*, void* data) {
+		Transport* t = (Transport*)data;
+		if (!t->transport_) return;
+		bool wasPlaying = t->transport_->isPlaying();
+		t->transport_->stop();
+		if (wasPlaying) {
+			t->playPauseBtn->setAlt(false);
+			t->playPauseBtn->redraw();
+			Fl::remove_timeout(pollCb, t);
+		}
+		t->updatePosition();
+	}, this);
 
 	playPauseBtn = new TransportButton(bx + 2 * (btnSize + gap), by, btnSize, btnSize,
 	                                   TransportButton::PLAY, TransportButton::PAUSE);
 	playPauseBtn->callback([](Fl_Widget* w, void* data) {
 		Transport* t   = (Transport*)data;
-		t->playing     = !t->playing;
-		auto* btn      = (TransportButton*)w;
-		btn->setAlt(t->playing);
+		auto*      btn = (TransportButton*)w;
+		if (!t->transport_) return;
+		if (t->transport_->isPlaying()) {
+			t->transport_->pause();
+			btn->setAlt(false);
+			Fl::remove_timeout(pollCb, t);
+		} else {
+			t->transport_->play();
+			btn->setAlt(true);
+			Fl::add_timeout(1.0, pollCb, t);
+		}
+		t->updatePosition();
 		btn->redraw();
-		std::cout << (t->playing ? "Play pressed\n" : "Pause pressed\n");
 	}, this);
 
+	// Position label — sits to the right of the buttons
+	const int labelX = bx + totalW + 20;
+	const int labelW = x + w - labelX - 10;
+	posLabel_ = new Fl_Box(labelX, by, labelW, btnSize);
+	posLabel_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+	posLabel_->labelcolor(iconColor);
+
+	updatePosition();
 	end();
 }

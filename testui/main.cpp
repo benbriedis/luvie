@@ -8,6 +8,7 @@
 #include "outerGrid.hpp"
 #include "modernTabs.hpp"
 #include "transport.hpp"
+#include "simpleTransport.hpp"
 
 
 int main(int argc, char **argv) {
@@ -52,7 +53,8 @@ int main(int argc, char **argv) {
 	grid2.position(0, tabBarH);
 	tab2.add(grid2);
 
-	Transport bottomPane(0, tabsH, winW, bottomH);
+	SimpleTransport simpleTransport;
+	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport);
 	window.add(bottomPane);
 
 	window.show(argc, argv);
