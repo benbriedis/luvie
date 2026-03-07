@@ -1,43 +1,64 @@
 #include "outerGrid.hpp"
-#include "cell.hpp"
-#include <FL/Fl_Menu_Button.H>
-#include <vector>
-#include <cstdio>
-#include <iostream> 
+#include <FL/Fl.H>
+#include <FL/fl_draw.H>
+#include <FL/Fl_Window.H>
 
-
-// Callback function for menu items
-void menuCallback(Fl_Widget* w, void* user_data) {
-    const Fl_Menu_Item* item = ((Fl_Menu_Button*)w)->mvalue(); // Get the selected item
-    std::cout << "Selected: " << item->label() << std::endl;
-    std::cout << "Selected item: " << item << std::endl;
-
-return;
-
-    Fl_Menu_Button* menu_button = static_cast<Fl_Menu_Button*>(w);
-    const Fl_Menu_Item* chosen_item = menu_button->mvalue(); // Get the chosen item
-    if (chosen_item) {
-//        fl_alert("Selected: %s", chosen_item->label());
-    }
-}
-
-
-Fl_Menu_Item menutable[] = {
-	{"foo",0,0,0,FL_MENU_INACTIVE},
-//	{"delete",0,0,0,FL_MENU_VALUE},
-	{"delete",0,menuCallback},
-	{"button",FL_F+4, 0, 0, FL_MENU_TOGGLE},
-	{0}
-};
-
-
-OuterGrid::OuterGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap) :
-	Fl_Group(0,0,numCols * colWidth,numRows * rowHeight),
-	grid(notes,numRows,numCols,rowHeight,colWidth,snap),
-	/* Put the capture area offscreen - otherwise it interferes with the grid events */
-	popup(-1,-1,0,0)
+OuterGrid::OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int numCols,
+                     int rowHeight, int colWidth, float snap, Popup& popup)
+	: Fl_Group(x, y, numCols * colWidth, rulerH + numRows * rowHeight),
+	  playhead(numCols, colWidth),
+	  grid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {
-	popup.menu(menutable);
-	popup.type(Fl_Menu_Button::POPUP3); 
+	grid.position(x, y + rulerH);
+	grid.setPlayhead(&playhead);
+	add(grid);
+	playhead.setOwner(this);
+	end();
 }
 
+void OuterGrid::setTransport(ITransport* t, double b, int bpb) {
+	playhead.setTransport(t, b, bpb);
+	playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
+}
+
+void OuterGrid::draw() {
+	fl_color(rulerBg);
+	fl_rectf(x(), y(), w(), rulerH);
+
+	fl_color(rulerBorder);
+	fl_line(x(), y() + rulerH - 1, x() + w() - 1, y() + rulerH - 1);
+
+	playhead.drawTriangle(x(), y(), rulerH);
+
+	draw_children();
+}
+
+int OuterGrid::handle(int event) {
+	bool inRuler = Fl::event_y() >= y() && Fl::event_y() < y() + rulerH;
+
+	switch (event) {
+	case FL_PUSH:
+	case FL_DRAG:
+		if (inRuler) {
+			playhead.seek(Fl::event_x(), x());
+			redraw();
+			return 1;
+		}
+		break;
+	case FL_RELEASE:
+		if (inRuler) return 1;
+		break;
+	case FL_MOVE:
+		if (inRuler) {
+			window()->cursor(FL_CURSOR_WE);
+			return 1;
+		}
+		break;
+	case FL_ENTER:
+		return 1;  // needed to receive FL_MOVE
+	case FL_LEAVE:
+		window()->cursor(FL_CURSOR_DEFAULT);
+		return 0;
+	}
+	return Fl_Group::handle(event);
+}

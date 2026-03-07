@@ -1,25 +1,35 @@
 #ifndef OUTER_GRID_HPP
 #define OUTER_GRID_HPP
 
-#include "FL/Fl_Group.H"
-#include <FL/Fl_Box.H>
-#include <FL/Fl_Menu_Button.H>
-#include <vector>
-#include "cell.hpp"
 #include "grid.hpp"
+#include "playhead.hpp"
+#include "popup.hpp"
+#include <FL/Fl_Group.H>
+#include <functional>
+#include <vector>
 
 const Fl_Color bgColor = FL_WHITE;
 
-/* The group is required so we can support multiple widgets. */
 class OuterGrid : public Fl_Group {
-	MyGrid grid;
-//	int handle(int event) override;
+public:
+	static constexpr int       rulerH     = 20;
+private:
+	static constexpr Fl_Color  rulerBg    = 0xFEFCE800;  // pale yellow
+	static constexpr Fl_Color  rulerBorder = 0xD1D5DB00; // gray-300
+
+	Playhead playhead;  // declared before grid — initialised first
+	MyGrid   grid;
+
+	void draw() override;
+	int  handle(int event) override;
 
 public:
-	OuterGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap);
+	std::function<void()> onEndReached;
 
-	Fl_Menu_Button popup;
+	OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int numCols,
+	          int rowHeight, int colWidth, float snap, Popup& popup);
+
+	void setTransport(ITransport* t, double b, int bpb);
 };
 
 #endif
-

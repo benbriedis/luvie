@@ -13,8 +13,8 @@ TARGET = main
 
 all: $(TARGET)
 
-$(TARGET): main.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp
-	$(CC) $(CXXFLAGS) main.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp -o $(TARGET) $(LDFLAGS)
+$(TARGET): main.cpp outerGrid.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp
+	$(CC) $(CXXFLAGS) main.cpp outerGrid.cpp grid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp -o $(TARGET) $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)

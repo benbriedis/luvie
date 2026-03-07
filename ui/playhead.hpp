@@ -5,34 +5,36 @@
 #include <FL/Fl_Widget.H>
 #include <functional>
 
-class Playhead : public Fl_Widget {
+class Playhead {
 	ITransport* transport = nullptr;
 	double bpm      = 120.0;
 	int beatsPerBar = 4;
 	int numCols;
 	int colWidth;
-
-	Fl_Widget* linkedGrid = nullptr;
+	Fl_Widget* owner = nullptr;
 
 	static void timerCb(void* data);
 	void tick();
 
-	double pixelToSeconds(int px) const;
 	int    secondsToPixel(double secs) const;
-
-	void draw() override;
-	int  handle(int event) override;
+	double pixelToSeconds(int px) const;
 
 public:
 	std::function<void()> onEndReached;
 
-	Playhead(int x, int y, int w, int h, int numCols, int colWidth);
+	Playhead(int numCols, int colWidth);
 
 	void setTransport(ITransport* t, double b, int bpb);
-	void setLinkedGrid(Fl_Widget* grid) { linkedGrid = grid; }
+	void setOwner(Fl_Widget* w) { owner = w; }
 
-	// Called from the grid's draw() to paint the vertical line
+	// Draw the downward-pointing triangle in the ruler area
+	void drawTriangle(int rulerX, int rulerY, int rulerH);
+
+	// Draw the vertical line — called from MyGrid::draw()
 	void drawLine(int gridX, int gridY, int gridH);
+
+	// Seek to the position corresponding to mouseX within the ruler
+	void seek(int mouseX, int rulerX);
 };
 
 #endif
