@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
 
     og1.setPatternPlayhead(&simpleTransport, &songTimeline, 0);
+    og2.setPatternBeats(og1.numPatternBeats());
 
     window.add(popup1);       window.registerPopup(&popup1);
     window.add(popup2);       window.registerPopup(&popup2);

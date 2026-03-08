@@ -18,14 +18,34 @@ void SongGrid::draw()
     const int tickH = 4;
     for (const auto& note : notes) {
         if (note.row < 0 || note.row >= numRows) continue;
-        int y0 = y() + note.row * rowHeight;
-        int top = 4, bottom = 4;
+        int   y0     = y() + note.row * rowHeight;
+        int   top    = 4, bottom = 4;
         if (timeline) timeline->timeSigAt((int)note.col, top, bottom);
-        float tickBarPos = note.col + note.startOffset / top;
-        int   tickX      = x() + (int)(tickBarPos * colWidth);
+
+        float firstTick   = note.col + note.startOffset / top;
+        float instanceEnd = note.col + note.length;
+
+        float intervalBars = 0.0f;
+        if (timeline) {
+            const Pattern* pat = timeline->patternForInstance(note.id);
+            if (pat && pat->lengthBeats > 0.0f)
+                intervalBars = pat->lengthBeats / top;
+        }
+
+        // Advance firstTick to the first occurrence inside the instance.
+        if (intervalBars > 0.0f && firstTick < note.col) {
+            float steps = std::ceil((note.col - firstTick) / intervalBars);
+            firstTick += steps * intervalBars;
+        }
+
         fl_color(FL_WHITE);
-        fl_rectf(tickX, y0 + 1,                      2, tickH);
-        fl_rectf(tickX, y0 + rowHeight - 1 - tickH,  2, tickH);
+        for (float tickBar = firstTick; tickBar < instanceEnd; ) {
+            int tickX = x() + (int)(tickBar * colWidth);
+            fl_rectf(tickX, y0 + 1,                      2, tickH);
+            fl_rectf(tickX, y0 + rowHeight - 1 - tickH,  2, tickH);
+            if (intervalBars <= 0.0f) break;
+            tickBar += intervalBars;
+        }
     }
 }
 
@@ -102,7 +122,7 @@ void SongGrid::resizing()
     if (side == LEFT) {
         // Keep the beat-0 tick fixed in song position.
         float newOffset = (tickBarPos - notes[selectedNote].col) * dragBeatsPerBar;
-        notes[selectedNote].startOffset = std::max(0.0f, newOffset);
+        notes[selectedNote].startOffset = newOffset;
     }
 }
 
@@ -146,5 +166,5 @@ void SongGrid::toggleNote()
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
     if (clear)
-        timeline->addPattern(row, col, 1.0f);
+        timeline->addPattern(row, col, 1.0f, patternBeats);
 }

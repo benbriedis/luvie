@@ -205,39 +205,79 @@ void ObservableTimeline::removeTrack(int trackId)
 }
 
 // ---------------------------------------------------------------------------
-// Pattern management
+// Pattern definition management
 
-void ObservableTimeline::addPattern(int trackIndex, float startBar, float length)
+int ObservableTimeline::createPattern(float lengthBeats)
+{
+	int id = nextId++;
+	data.patterns.push_back({id, lengthBeats});
+	notify();
+	return id;
+}
+
+const Pattern* ObservableTimeline::patternForInstance(int instanceId) const
+{
+	for (const auto& track : data.tracks)
+		for (const auto& inst : track.patterns)
+			if (inst.id == instanceId) {
+				for (const auto& pat : data.patterns)
+					if (pat.id == inst.patternId)
+						return &pat;
+				return nullptr;
+			}
+	return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Pattern instance management
+
+void ObservableTimeline::addPattern(int trackIndex, float startBar, float length, float patternBeats)
 {
 	if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;
-	data.tracks[trackIndex].patterns.push_back({nextId++, startBar, length});
+	int patId = 0;
+	if (patternBeats > 0.0f) {
+		patId = nextId++;
+		data.patterns.push_back({patId, patternBeats});
+	}
+	data.tracks[trackIndex].patterns.push_back({nextId++, patId, startBar, length});
 	notify();
 }
 
-void ObservableTimeline::removePattern(int patternId)
+void ObservableTimeline::removePattern(int instanceId)
 {
 	for (auto& track : data.tracks) {
 		auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
-			[patternId](const PatternInstance& p) { return p.id == patternId; });
+			[instanceId](const PatternInstance& p) { return p.id == instanceId; });
 		if (it != track.patterns.end()) {
+			int patId = it->patternId;
 			track.patterns.erase(it);
+			// Remove pattern definition if nothing else references it
+			if (patId > 0) {
+				bool stillUsed = false;
+				for (const auto& t : data.tracks)
+					for (const auto& p : t.patterns)
+						if (p.patternId == patId) { stillUsed = true; break; }
+				if (!stillUsed)
+					data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
+						[patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
+			}
 			notify();
 			return;
 		}
 	}
 }
 
-void ObservableTimeline::movePattern(int patternId, int newTrackIndex, float newStartBar)
+void ObservableTimeline::movePattern(int instanceId, int newTrackIndex, float newStartBar)
 {
 	if (newTrackIndex < 0 || newTrackIndex >= (int)data.tracks.size()) return;
 	for (auto& track : data.tracks) {
 		auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
-			[patternId](const PatternInstance& p) { return p.id == patternId; });
+			[instanceId](const PatternInstance& p) { return p.id == instanceId; });
 		if (it != track.patterns.end()) {
-			float len    = it->length;
-			float offset = it->startOffset;
+			PatternInstance inst = *it;
 			track.patterns.erase(it);
-			data.tracks[newTrackIndex].patterns.push_back({patternId, newStartBar, len, offset});
+			inst.startBar = newStartBar;
+			data.tracks[newTrackIndex].patterns.push_back(std::move(inst));
 			notify();
 			return;
 		}
@@ -281,7 +321,7 @@ std::vector<Note> ObservableTimeline::buildNotes() const
 {
 	std::vector<Note> notes;
 	for (int row = 0; row < (int)data.tracks.size(); row++)
-		for (auto& p : data.tracks[row].patterns)
+		for (const auto& p : data.tracks[row].patterns)
 			notes.push_back({p.id, row, p.startBar, p.length, p.startOffset});
 	return notes;
 }

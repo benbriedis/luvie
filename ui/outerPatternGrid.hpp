@@ -16,6 +16,7 @@ public:
                      int rowHeight, int colWidth, float snap, Popup& popup);
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
+    int  numPatternBeats() const { return patternGrid.numCols; }
 };
 
 #endif

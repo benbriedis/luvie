@@ -42,13 +42,17 @@ public:
 	int  addTrack(std::string label = "");
 	void removeTrack(int trackId);
 
-	// Pattern management (patterns identified by stable id)
-	void addPattern(int trackIndex, float startBar, float length);
-	void removePattern(int patternId);
-	void movePattern(int patternId, int newTrackIndex, float newStartBar);
-	void resizePattern(int patternId, float newLength);
-	void resizePatternLeft(int patternId, float newStartBar, float newLength, float newStartOffset);
-	void setPatternStartOffset(int patternId, float startOffset);
+	// Pattern definition management
+	int createPattern(float lengthBeats);
+	const Pattern* patternForInstance(int instanceId) const;
+
+	// Pattern instance management (instances identified by stable id)
+	void addPattern(int trackIndex, float startBar, float length, float patternBeats = 0.0f);
+	void removePattern(int instanceId);
+	void movePattern(int instanceId, int newTrackIndex, float newStartBar);
+	void resizePattern(int instanceId, float newLength);
+	void resizePatternLeft(int instanceId, float newStartBar, float newLength, float newStartOffset);
+	void setPatternStartOffset(int instanceId, float startOffset);
 
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;
