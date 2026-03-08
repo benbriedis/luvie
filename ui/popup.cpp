@@ -179,7 +179,20 @@ void Popup::draw()
 
 
 
-Point2 Popup::popupPosition(Size size, Point2 pos) 
+Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW, int popupH)
+{
+	const int vpad = 4, hpad = 10;
+	int x = anchor.x;
+	if (x + popupW > available.width - hpad) x = available.width - popupW - hpad;
+	if (x < hpad) x = hpad;
+	int y = anchor.y + anchorHeight + vpad;
+	if (y + popupH > available.height - vpad)
+		y = anchor.y - popupH - vpad;
+	if (y < vpad) y = vpad;
+	return Point2(x, y);
+}
+
+Point2 Popup::popupPosition(Size size, Point2 pos)
 {
 	float verticalPadding = 4.0;
 	//TODO probably need to account from internal padding of popup    

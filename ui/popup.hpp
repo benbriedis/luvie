@@ -21,6 +21,8 @@ typedef struct {
 
 
 
+Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW, int popupH);
+
 class Popup : public Fl_Window {
 public:
 	Popup();
