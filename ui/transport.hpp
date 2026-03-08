@@ -32,8 +32,6 @@ class Transport : public Fl_Group, public ITimelineObserver {
 
 	ITransport*         transport;
 	ObservableTimeline* timeline;
-	double              bpm         = 120.0;
-	int                 beatsPerBar = 4;
 	bool                stoppedAtEnd = false;
 	char                posText[64];
 

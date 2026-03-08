@@ -89,9 +89,9 @@ void Transport::notifyEndReached() {
 }
 
 void Transport::updatePosition() {
-	double totalBeats = transport ? transport->position() * bpm / 60.0 : 0.0;
-	int bar  = (int)(totalBeats / beatsPerBar) + 1;
-	int beat = (int)(totalBeats) % beatsPerBar + 1;
+	int bar = 1, beat = 1;
+	if (transport && timeline)
+		timeline->secondsToBarBeat(transport->position(), bar, beat);
 	std::snprintf(posText, sizeof(posText), "Bar %d Beat %d", bar, beat);
 	posLabel->label(posText);
 	posLabel->redraw();
@@ -107,11 +107,6 @@ Transport::~Transport()
 
 void Transport::onTimelineChanged()
 {
-	if (!timeline) return;
-	bpm = timeline->bpmAt(0);
-	int top, bottom;
-	timeline->timeSigAt(0, top, bottom);
-	beatsPerBar = top;
 	updatePosition();
 }
 

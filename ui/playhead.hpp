@@ -7,13 +7,11 @@
 #include <functional>
 
 class Playhead : public ITimelineObserver {
-	ITransport*         transport   = nullptr;
-	ObservableTimeline* obsTl       = nullptr;
-	double              bpm         = 120.0;
-	int                 beatsPerBar = 4;
+	ITransport*         transport = nullptr;
+	ObservableTimeline* obsTl     = nullptr;
 	int                 numCols;
 	int                 colWidth;
-	Fl_Widget*          owner       = nullptr;
+	Fl_Widget*          owner     = nullptr;
 
 	static void timerCb(void* data);
 	void tick();
@@ -30,7 +28,7 @@ public:
 	void setTransport(ITransport* t, ObservableTimeline* tl);
 	void setOwner(Fl_Widget* w) { owner = w; }
 
-	void onTimelineChanged() override;
+	void onTimelineChanged() override { if (owner) owner->redraw(); }
 
 	void drawTriangle(int rulerX, int rulerY, int rulerH);
 	void drawLine(int gridX, int gridY, int gridH);

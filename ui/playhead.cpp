@@ -23,31 +23,23 @@ void Playhead::setTransport(ITransport* t, ObservableTimeline* tl)
 	transport = t;
 	obsTl     = tl;
 
-	if (obsTl) {
-		obsTl->addObserver(this);
-		onTimelineChanged();  // populate bpm / beatsPerBar from timeline
-	}
+	if (obsTl) obsTl->addObserver(this);
 
 	Fl::add_timeout(0.1, timerCb, this);
-}
-
-void Playhead::onTimelineChanged()
-{
-	if (!obsTl) return;
-	bpm = obsTl->bpmAt(0);
-	int top, bottom;
-	obsTl->timeSigAt(0, top, bottom);
-	beatsPerBar = top;
-	if (owner) owner->redraw();
 }
 
 void Playhead::timerCb(void* data)
 {
 	auto* self = static_cast<Playhead*>(data);
 	self->tick();
+
 	double interval = 0.1;
-	if (self->transport && self->transport->isPlaying()) {
-		double pxPerSec = (double)self->colWidth * self->bpm / 60.0 / self->beatsPerBar;
+	if (self->transport && self->transport->isPlaying() && self->obsTl) {
+		float  curBar     = self->obsTl->secondsToBar(self->transport->position());
+		float  bpm        = self->obsTl->bpmAt((int)curBar);
+		int    top, bottom;
+		self->obsTl->timeSigAt((int)curBar, top, bottom);
+		double pxPerSec   = (double)self->colWidth * bpm / 60.0 / top;
 		interval = std::clamp(1.0 / pxPerSec, 0.016, 0.05);
 	}
 	Fl::repeat_timeout(interval, timerCb, data);
@@ -55,8 +47,8 @@ void Playhead::timerCb(void* data)
 
 void Playhead::tick()
 {
-	if (transport && transport->isPlaying()) {
-		double endSecs = (double)numCols * beatsPerBar / bpm * 60.0;
+	if (transport && transport->isPlaying() && obsTl) {
+		double endSecs = obsTl->barToSeconds((float)numCols);
 		if (transport->position() >= endSecs) {
 			transport->pause();
 			if (onEndReached) onEndReached();
@@ -67,13 +59,15 @@ void Playhead::tick()
 
 int Playhead::secondsToPixel(double secs) const
 {
-	int px = (int)(secs * bpm / 60.0 / beatsPerBar * colWidth);
+	if (!obsTl) return 0;
+	int px = (int)(obsTl->secondsToBar(secs) * colWidth);
 	return std::clamp(px, 0, numCols * colWidth - 2);
 }
 
 double Playhead::pixelToSeconds(int px) const
 {
-	return (double)px / colWidth * beatsPerBar / bpm * 60.0;
+	if (!obsTl) return 0.0;
+	return obsTl->barToSeconds((float)px / colWidth);
 }
 
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
@@ -102,8 +96,8 @@ int Playhead::xOffset() const
 
 void Playhead::seek(int mouseX, int rulerX)
 {
-	if (!transport) return;
+	if (!transport || !obsTl) return;
 	double secs    = pixelToSeconds(mouseX - rulerX);
-	double endSecs = (double)numCols * beatsPerBar / bpm * 60.0;
+	double endSecs = obsTl->barToSeconds((float)numCols);
 	transport->seek(std::clamp(secs, 0.0, endSecs));
 }

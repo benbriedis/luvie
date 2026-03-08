@@ -31,7 +31,18 @@ public:
 	void moveTimeSigMarker(int fromBar, int toBar);
 	void timeSigAt(int bar, int& top, int& bottom) const;
 
+	// Time conversion — integrates over BPM/time-sig segments
+	double barToSeconds(float bar) const;
+	float  secondsToBar(double secs) const;
+	void   secondsToBarBeat(double secs, int& bar, int& beat) const;
+
 private:
+	struct TimeSegment {
+		int   bar;
+		float bpm;
+		int   beatsPerBar;
+	};
+	std::vector<TimeSegment> buildSegments() const;
 	Timeline data;
 	std::vector<ITimelineObserver*> observers;
 

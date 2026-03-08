@@ -1,5 +1,7 @@
 #include "observableTimeline.hpp"
 #include <algorithm>
+#include <set>
+#include <cmath>
 
 ObservableTimeline::ObservableTimeline(float initBpm, int initTop, int initBottom)
 {
@@ -117,4 +119,67 @@ void ObservableTimeline::timeSigAt(int bar, int& top, int& bottom) const
 		if (m.bar <= bar) { top = m.top; bottom = m.bottom; }
 		else break;
 	}
+}
+
+// ---------------------------------------------------------------------------
+
+std::vector<ObservableTimeline::TimeSegment> ObservableTimeline::buildSegments() const
+{
+	std::set<int> breakpoints;
+	for (auto& m : data.bpms)    breakpoints.insert(m.bar);
+	for (auto& m : data.timeSigs) breakpoints.insert(m.bar);
+
+	std::vector<TimeSegment> segs;
+	for (int bar : breakpoints) {
+		int top, bottom;
+		timeSigAt(bar, top, bottom);
+		segs.push_back({bar, bpmAt(bar), top});
+	}
+	return segs;
+}
+
+double ObservableTimeline::barToSeconds(float targetBar) const
+{
+	auto segs = buildSegments();
+	double secs = 0.0;
+	for (int i = 0; i < (int)segs.size(); i++) {
+		float segStart = (float)segs[i].bar;
+		float segEnd   = (i + 1 < (int)segs.size()) ? (float)segs[i+1].bar : targetBar;
+		if (segStart >= targetBar) break;
+		float barsInSeg = std::min(segEnd, targetBar) - segStart;
+		double secsPerBar = segs[i].beatsPerBar * 60.0 / segs[i].bpm;
+		secs += barsInSeg * secsPerBar;
+	}
+	return secs;
+}
+
+float ObservableTimeline::secondsToBar(double secs) const
+{
+	auto segs = buildSegments();
+	double remaining = secs;
+	for (int i = 0; i < (int)segs.size(); i++) {
+		float  segStart   = (float)segs[i].bar;
+		float  segEnd     = (i + 1 < (int)segs.size()) ? (float)segs[i+1].bar : 1e9f;
+		double secsPerBar = segs[i].beatsPerBar * 60.0 / segs[i].bpm;
+		double segSecs    = (segEnd - segStart) * secsPerBar;
+		if (remaining < segSecs + 1e-9)
+			return segStart + (float)(remaining / secsPerBar);
+		remaining -= segSecs;
+	}
+	if (!segs.empty()) {
+		auto& last = segs.back();
+		double secsPerBar = last.beatsPerBar * 60.0 / last.bpm;
+		return (float)(last.bar + remaining / secsPerBar);
+	}
+	return 0.0f;
+}
+
+void ObservableTimeline::secondsToBarBeat(double secs, int& bar, int& beat) const
+{
+	float barF   = secondsToBar(secs);
+	int   barInt = (int)barF;
+	int   top, bottom;
+	timeSigAt(barInt, top, bottom);
+	bar  = barInt + 1;
+	beat = (int)((barF - (float)barInt) * top) + 1;
 }
