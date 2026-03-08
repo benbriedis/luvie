@@ -122,6 +122,7 @@ int MarkerRuler::handle(int event)
 		return 1;
 	}
 	case FL_PUSH: {
+		if (Fl::event_button() != FL_LEFT_MOUSE) return 1;
 		int bar = findBarAt(Fl::event_x());
 		clickedBar  = bar;
 		draggingBar = (bar >= 0 && !isFixed(bar)) ? bar : -1;
@@ -154,6 +155,7 @@ int MarkerRuler::handle(int event)
 		return 1;
 	}
 	case FL_RELEASE: {
+		if (Fl::event_button() != FL_LEFT_MOUSE) return 1;
 		if (!didDrag) {
 			if (clickedBar >= 0) {
 				openPopupFor(clickedBar);

@@ -120,9 +120,9 @@ int MyGrid::handle(int event)
 	switch (event) {
 		case FL_PUSH:
 			if (Fl::event_button() == FL_RIGHT_MOUSE) {
-				//XXX is a callback desirable here?
-				popup.open(selectedNote,&notes,this);
-				popup.show();
+				if (hoverState != NONE) {
+					popup.open(selectedNote,&notes,this);
+				}
 			} else if (hoverState == NONE) {
 				int row = (Fl::event_y() - y()) / rowHeight;
 				float col = (float)((Fl::event_x() - x()) / colWidth);
@@ -153,7 +153,7 @@ int MyGrid::handle(int event)
 				redraw();
 			}
 
-			if (hoverState==NONE) {
+			if (hoverState==NONE && Fl::event_button() == FL_LEFT_MOUSE) {
 				if (!creationForbidden)
 					toggleNote();
 				creationForbidden = false;

@@ -39,7 +39,7 @@ int OuterGrid::handle(int event) {
 
 	switch (event) {
 	case FL_PUSH:
-		if (inRuler) {
+		if (inRuler && Fl::event_button() == FL_LEFT_MOUSE) {
 			rulerDragging = true;
 			playhead.seek(Fl::event_x(), x());
 			if (onSeek) onSeek();
