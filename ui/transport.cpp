@@ -115,10 +115,13 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, double b, int bp
 	                                TransportButton::REWIND);
 	rewindBtn->callback([](Fl_Widget*, void* data) {
 		Transport* t = (Transport*)data;
-		if (t->transport) {
-			t->transport->rewind();
-			t->updatePosition();
-		}
+		if (!t->transport) return;
+		t->transport->rewind();
+		Fl::remove_timeout(pollCb, t);
+		t->stoppedAtEnd = false;
+		t->playPauseBtn->setAlt(false);
+		t->playPauseBtn->redraw();
+		t->updatePosition();
 	}, this);
 
 	playPauseBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
