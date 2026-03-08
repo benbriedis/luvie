@@ -173,6 +173,7 @@ int MarkerRuler::handle(int event)
 						timeline->timeSigAt(bar, top, bottom);
 						timeline->setTimeSig(bar, top, bottom);
 					}
+					openPopupFor(bar);
 				}
 			}
 		}
