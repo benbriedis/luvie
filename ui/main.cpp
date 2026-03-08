@@ -8,10 +8,7 @@
 #include "simpleTransport.hpp"
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
-
-
-static constexpr double bpm        = 120.0;
-static constexpr int    beatsPerBar = 4;
+#include "observableTimeline.hpp"
 
 int main(int argc, char **argv) {
 	const int tabBarH      = 35;
@@ -50,12 +47,14 @@ int main(int argc, char **argv) {
 	tab2.color(bgColor);
 	tabs.add(tab2);
 
+	ObservableTimeline songTimeline(120.0f, 4, 4);
+
 	MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
-	                          15, 60, MarkerRuler::TIME_SIG, 120.0, 4, 4, &timeSigPopup);
+	                          15, 60, MarkerRuler::TIME_SIG, &songTimeline, &timeSigPopup);
 	tab2.add(timeSigRuler);
 
 	MarkerRuler tempoRuler(0, tabBarH + markerRulerH, winW, markerRulerH,
-	                        15, 60, MarkerRuler::TEMPO, 120.0, 4, 4, &tempoPopup);
+	                        15, 60, MarkerRuler::TEMPO, &songTimeline, &tempoPopup);
 	tab2.add(tempoRuler);
 
 	std::vector<Note> patterns(0);
@@ -63,10 +62,10 @@ int main(int argc, char **argv) {
 	tab2.add(og2);
 
 	SimpleTransport simpleTransport;
-	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, bpm, beatsPerBar);
+	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, &songTimeline);
 	window.add(bottomPane);
 
-	og2.setTransport(&simpleTransport, bpm, beatsPerBar);
+	og2.setTransport(&simpleTransport, &songTimeline);
 	og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
 	og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
 

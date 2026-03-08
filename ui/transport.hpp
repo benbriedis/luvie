@@ -5,6 +5,7 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Box.H>
 #include "itransport.hpp"
+#include "observableTimeline.hpp"
 
 class TransportButton : public Fl_Button {
 public:
@@ -24,24 +25,27 @@ public:
 };
 
 
-class Transport : public Fl_Group {
-	TransportButton* rewindBtn;
-	TransportButton* playPauseBtn;
-	Fl_Box*     posLabel;
+class Transport : public Fl_Group, public ITimelineObserver {
+	TransportButton*    rewindBtn;
+	TransportButton*    playPauseBtn;
+	Fl_Box*             posLabel;
 
-	ITransport* transport;
-	double      bpm;
-	int         beatsPerBar;
-	bool        stoppedAtEnd = false;
-	char        posText[64];
+	ITransport*         transport;
+	ObservableTimeline* timeline;
+	double              bpm         = 120.0;
+	int                 beatsPerBar = 4;
+	bool                stoppedAtEnd = false;
+	char                posText[64];
 
 	static void pollCb(void* data);
 	void        updatePosition();
 
 public:
-	Transport(int x, int y, int w, int h, ITransport* t, double b, int bpb);
+	Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeline* tl);
+	~Transport();
 	void notifyEndReached();
 	void notifySeek() { stoppedAtEnd = false; }
+	void onTimelineChanged() override;
 };
 
 #endif

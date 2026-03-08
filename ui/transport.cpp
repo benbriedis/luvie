@@ -99,8 +99,24 @@ void Transport::updatePosition() {
 
 // ---------------------------------------------------------------------------
 
-Transport::Transport(int x, int y, int w, int h, ITransport* t, double b, int bpb)
-	: Fl_Group(x, y, w, h), transport(t), bpm(b), beatsPerBar(bpb)
+Transport::~Transport()
+{
+	Fl::remove_timeout(pollCb, this);
+	if (timeline) timeline->removeObserver(this);
+}
+
+void Transport::onTimelineChanged()
+{
+	if (!timeline) return;
+	bpm = timeline->bpmAt(0);
+	int top, bottom;
+	timeline->timeSigAt(0, top, bottom);
+	beatsPerBar = top;
+	updatePosition();
+}
+
+Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeline* tl)
+	: Fl_Group(x, y, w, h), transport(t), timeline(tl)
 {
 	box(FL_FLAT_BOX);
 	color(bgColor);
@@ -154,6 +170,11 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, double b, int bp
 	posLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 	posLabel->labelcolor(iconColor);
 
-	updatePosition();
+	if (timeline) {
+		timeline->addObserver(this);
+		onTimelineChanged();  // posLabel is now initialised
+	} else {
+		updatePosition();
+	}
 	end();
 }

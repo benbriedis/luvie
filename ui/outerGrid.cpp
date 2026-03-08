@@ -17,8 +17,8 @@ OuterGrid::OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int num
 	end();
 }
 
-void OuterGrid::setTransport(ITransport* t, double b, int bpb) {
-	playhead.setTransport(t, b, bpb);
+void OuterGrid::setTransport(ITransport* t, ObservableTimeline* tl) {
+	playhead.setTransport(t, tl);
 	playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
 }
 

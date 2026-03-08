@@ -31,7 +31,7 @@ public:
 	OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int numCols,
 	          int rowHeight, int colWidth, float snap, Popup& popup);
 
-	void setTransport(ITransport* t, double b, int bpb);
+	void setTransport(ITransport* t, ObservableTimeline* tl);
 };
 
 #endif
