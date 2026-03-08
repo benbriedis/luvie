@@ -7,6 +7,7 @@
 
 class AppWindow : public Fl_Double_Window {
 	std::vector<Fl_Window*> popups;
+	bool closingClick = false;
 
 public:
 	AppWindow(int w, int h) : Fl_Double_Window(w, h) {}
