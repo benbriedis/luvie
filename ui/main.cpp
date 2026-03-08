@@ -1,5 +1,6 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Group.H>
+#include <string>
 #include "appWindow.hpp"
 #include "outerGrid.hpp"
 #include "popup.hpp"
@@ -45,6 +46,8 @@ int main(int argc, char **argv) {
 	tabs.add(tab2);
 
 	ObservableTimeline songTimeline(120.0f, 4, 4);
+	for (int i = 0; i < 10; i++)
+		songTimeline.addTrack("Track " + std::to_string(i + 1));
 
 	MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
 	                          15, 60, MarkerRuler::TIME_SIG, &songTimeline, &timeSigPopup);

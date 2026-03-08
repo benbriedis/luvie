@@ -104,11 +104,11 @@ flex->margin(10,10,10,10);
 
 	deleteItem->callback([](Fl_Widget *w, void *me) {
 		Popup* me2 = (Popup*)me;
-
-		me2->notes->erase(me2->notes->begin() + me2->selected);
+		if (me2->onDeleteFn)
+			me2->onDeleteFn();
+		else
+			me2->notes->erase(me2->notes->begin() + me2->selected);
 		me2->hide();
-//XXX if not required can remove link to grid		
-//		me2->grid->redraw();
 	}, this);
 
 
@@ -118,11 +118,13 @@ flex->margin(10,10,10,10);
 
 
 
-void Popup::open(int mySelected,std::vector<Note>* myNotes,MyGrid* myGrid) 
-{ 
-	selected = mySelected;
-	notes = myNotes;
-	grid = myGrid;
+void Popup::open(int mySelected, std::vector<Note>* myNotes, MyGrid* myGrid,
+                 std::function<void()> onDelete)
+{
+	selected  = mySelected;
+	notes     = myNotes;
+	grid      = myGrid;
+	onDeleteFn = std::move(onDelete);
 
 Note cell = (*notes)[mySelected];
 

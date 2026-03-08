@@ -2,6 +2,8 @@
 #define OBSERVABLE_TIMELINE_HPP
 
 #include "timeline.hpp"
+#include "cell.hpp"
+#include <string>
 #include <vector>
 
 class ITimelineObserver {
@@ -36,6 +38,19 @@ public:
 	float  secondsToBar(double secs) const;
 	void   secondsToBarBeat(double secs, int& bar, int& beat) const;
 
+	// Track management
+	int  addTrack(std::string label = "");
+	void removeTrack(int trackId);
+
+	// Pattern management (patterns identified by stable id)
+	void addPattern(int trackIndex, float startBar, float length);
+	void removePattern(int patternId);
+	void movePattern(int patternId, int newTrackIndex, float newStartBar);
+	void resizePattern(int patternId, float newLength);
+
+	// Build a flat Note list for grid consumption (row = track index)
+	std::vector<Note> buildNotes() const;
+
 private:
 	struct TimeSegment {
 		int   bar;
@@ -45,6 +60,7 @@ private:
 	std::vector<TimeSegment> buildSegments() const;
 	Timeline data;
 	std::vector<ITimelineObserver*> observers;
+	int nextId = 1;
 
 	void notify();
 	void sortBpms();

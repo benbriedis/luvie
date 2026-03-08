@@ -20,6 +20,7 @@ OuterGrid::OuterGrid(int x, int y, std::vector<Note> notes, int numRows, int num
 void OuterGrid::setTransport(ITransport* t, ObservableTimeline* tl) {
 	playhead.setTransport(t, tl);
 	playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
+	grid.setTimeline(tl);
 }
 
 void OuterGrid::draw() {

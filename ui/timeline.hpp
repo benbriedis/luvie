@@ -1,6 +1,7 @@
 #ifndef TIMELINE_HPP
 #define TIMELINE_HPP
 
+#include <string>
 #include <vector>
 
 struct BpmMarker {
@@ -14,9 +15,22 @@ struct TimeSigMarker {
 	int bottom;
 };
 
+struct PatternInstance {
+	int   id;
+	float startBar;
+	float length;    // in bars
+};
+
+struct Track {
+	int         id;
+	std::string label;
+	std::vector<PatternInstance> patterns;
+};
+
 struct Timeline {
-	std::vector<BpmMarker>    bpms;
+	std::vector<BpmMarker>     bpms;
 	std::vector<TimeSigMarker> timeSigs;
+	std::vector<Track>         tracks;
 };
 
 #endif

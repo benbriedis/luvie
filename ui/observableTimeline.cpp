@@ -183,3 +183,84 @@ void ObservableTimeline::secondsToBarBeat(double secs, int& bar, int& beat) cons
 	bar  = barInt + 1;
 	beat = (int)((barF - (float)barInt) * top) + 1;
 }
+
+// ---------------------------------------------------------------------------
+// Track management
+
+int ObservableTimeline::addTrack(std::string label)
+{
+	int id = nextId++;
+	data.tracks.push_back({id, std::move(label), {}});
+	notify();
+	return id;
+}
+
+void ObservableTimeline::removeTrack(int trackId)
+{
+	data.tracks.erase(
+		std::remove_if(data.tracks.begin(), data.tracks.end(),
+			[trackId](const Track& t) { return t.id == trackId; }),
+		data.tracks.end());
+	notify();
+}
+
+// ---------------------------------------------------------------------------
+// Pattern management
+
+void ObservableTimeline::addPattern(int trackIndex, float startBar, float length)
+{
+	if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;
+	data.tracks[trackIndex].patterns.push_back({nextId++, startBar, length});
+	notify();
+}
+
+void ObservableTimeline::removePattern(int patternId)
+{
+	for (auto& track : data.tracks) {
+		auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
+			[patternId](const PatternInstance& p) { return p.id == patternId; });
+		if (it != track.patterns.end()) {
+			track.patterns.erase(it);
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::movePattern(int patternId, int newTrackIndex, float newStartBar)
+{
+	if (newTrackIndex < 0 || newTrackIndex >= (int)data.tracks.size()) return;
+	for (auto& track : data.tracks) {
+		auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
+			[patternId](const PatternInstance& p) { return p.id == patternId; });
+		if (it != track.patterns.end()) {
+			float len = it->length;
+			track.patterns.erase(it);
+			data.tracks[newTrackIndex].patterns.push_back({patternId, newStartBar, len});
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::resizePattern(int patternId, float newLength)
+{
+	for (auto& track : data.tracks) {
+		for (auto& p : track.patterns) {
+			if (p.id == patternId) {
+				p.length = newLength;
+				notify();
+				return;
+			}
+		}
+	}
+}
+
+std::vector<Note> ObservableTimeline::buildNotes() const
+{
+	std::vector<Note> notes;
+	for (int row = 0; row < (int)data.tracks.size(); row++)
+		for (auto& p : data.tracks[row].patterns)
+			notes.push_back({p.id, row, p.startBar, p.length});
+	return notes;
+}

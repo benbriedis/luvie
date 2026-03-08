@@ -3,6 +3,7 @@
 
 #include "popup.hpp"
 #include "cell.hpp"
+#include "observableTimeline.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 
@@ -30,9 +31,10 @@ typedef struct {
 } Point;
 
 
-class MyGrid : public Fl_Box {
+class MyGrid : public Fl_Box, public ITimelineObserver {
 public:
 	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup);
+	~MyGrid();
 
 	/* Grid parameters */
 //XXX should be raised...
@@ -61,19 +63,26 @@ private:
 	Point originalPosition;
 	Point lastValidPosition;
 
-	Playhead* playhead = nullptr;
+	Playhead*           playhead          = nullptr;
+	ObservableTimeline* timeline          = nullptr;
+	int                 draggingPatternId = -1;
+	float               originalLength    = 1.0f;
+	bool                isDragging        = false;
 
 	void init();
 	void draw() override;
-	int handle(int event) override;
+	int  handle(int event) override;
 	void findNoteForCursor();
 	void toggleNote();
-	int overlappingNote();
+	int  overlappingNote();
 	void moving();
 	void resizing();
+	void rebuildNotes();
 
 public:
 	void setPlayhead(Playhead* p) { playhead = p; }
+	void setTimeline(ObservableTimeline* tl);
+	void onTimelineChanged() override;
 };
 
 #endif

@@ -47,6 +47,36 @@ MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colW
 {
 }
 
+MyGrid::~MyGrid()
+{
+	if (timeline) timeline->removeObserver(this);
+}
+
+void MyGrid::setTimeline(ObservableTimeline* tl)
+{
+	if (timeline) timeline->removeObserver(this);
+	timeline = tl;
+	if (timeline) {
+		timeline->addObserver(this);
+		rebuildNotes();
+		redraw();
+	}
+}
+
+void MyGrid::rebuildNotes()
+{
+	if (timeline)
+		notes = timeline->buildNotes();
+}
+
+void MyGrid::onTimelineChanged()
+{
+	// Don't disrupt an active drag; the drag will explicitly rebuild on release.
+	if (!isDragging)
+		rebuildNotes();
+	redraw();
+}
+
 void MyGrid::draw()
 {
 //XXX drawing is additive. Dont really need for add
@@ -121,7 +151,12 @@ int MyGrid::handle(int event)
 		case FL_PUSH:
 			if (Fl::event_button() == FL_RIGHT_MOUSE) {
 				if (hoverState != NONE) {
-					popup.open(selectedNote,&notes,this);
+					std::function<void()> onDelete;
+					if (timeline) {
+						int id = notes[selectedNote].id;
+						onDelete = [this, id]() { timeline->removePattern(id); };
+					}
+					popup.open(selectedNote, &notes, this, std::move(onDelete));
 				}
 			} else if (hoverState == NONE) {
 				int row = (Fl::event_y() - y()) / rowHeight;
@@ -134,6 +169,11 @@ int MyGrid::handle(int event)
 					if (creationForbidden)
 						window()->cursor(forbiddenCursorImage(), 11, 11);
 				}
+			} else {
+				// MOVING or RESIZING — capture identity for timeline sync on release
+				draggingPatternId = notes[selectedNote].id;
+				originalLength    = notes[selectedNote].length;
+				isDragging        = true;
 			}
 			return 1;
 
@@ -151,6 +191,17 @@ int MyGrid::handle(int event)
 				notes[selectedNote].row = lastValidPosition.row;
 				notes[selectedNote].col = lastValidPosition.col;
 				redraw();
+			}
+
+			if (timeline && draggingPatternId >= 0) {
+				isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
+				if (hoverState == MOVING)
+					timeline->movePattern(draggingPatternId,
+					                      notes[selectedNote].row,
+					                      notes[selectedNote].col);
+				else if (hoverState == RESIZING)
+					timeline->resizePattern(draggingPatternId, notes[selectedNote].length);
+				draggingPatternId = -1;
 			}
 
 			if (hoverState==NONE && Fl::event_button() == FL_LEFT_MOUSE) {
@@ -341,42 +392,40 @@ void MyGrid::findNoteForCursor()
 	redraw();
 }
 
-//TODO change to addNote() and deleteNote() I guess. Connect deleteNote() up to the menu
 void MyGrid::toggleNote()
 {
-//TODO adjust for the position of the grid in the window. MAYBE use a "subwindow" so position starts at (0,0)
 	int ex = Fl::event_x() - x();
 	int ey = Fl::event_y() - y();
-
-	int row = ey / rowHeight;
+	int   row = ey / rowHeight;
 	float col = (float)(ex / colWidth);
 
-	/* Remove the note if present */
-	int size = notes.size();
-
-//FIXME delete - need keycombo, right mouse key, or mode to distinguish from move.
-//      Delete should probably be the exception I think rather than the rule as its probably a bit less common and
-//      move requires more control. Cf using a right mouse shortcut menu? Maybe put velocity in there too?
-//TODO can we use a range instead?
-	notes.erase(std::remove_if(notes.begin(), notes.end(),
-		[=](const Note& n) { return n.row == row && n.col == col; }),
-		notes.end());
-
-//TODO add option to split the columns and zoom in or out
-//     Probably best to keep using (pitch,column,length) and to create a column() function and then use that to perform
-//     calcs rather than col.  (Probably dont want for the SongEditor gui though)
-
-//TODO allow multiple additions using a single click and drag (sequencer only)
-
-	/* Add the note */
-	if (notes.size() == size) {
+	if (timeline) {
+		// Remove if clicking an existing pattern
+		for (auto& n : notes) {
+			if (n.row == row && n.col == col) {
+				timeline->removePattern(n.id);  // triggers rebuild via observer
+				return;
+			}
+		}
+		// Add if space is clear
 		bool clear = std::none_of(notes.begin(), notes.end(),
 			[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
 		if (clear)
-			notes.push_back({row,col,1.0});
+			timeline->addPattern(row, col, 1.0f);  // triggers rebuild via observer
+	} else {
+		// Fallback for grids without a timeline (e.g. pattern editor)
+		int size = notes.size();
+		notes.erase(std::remove_if(notes.begin(), notes.end(),
+			[=](const Note& n) { return n.row == row && n.col == col; }),
+			notes.end());
+		if (notes.size() == size) {
+			bool clear = std::none_of(notes.begin(), notes.end(),
+				[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+			if (clear)
+				notes.push_back({0, row, col, 1.0});
+		}
+		redraw();
 	}
-
-	redraw();
 }
 
 /* Returns the note index, or -1 */
