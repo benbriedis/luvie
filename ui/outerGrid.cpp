@@ -26,6 +26,7 @@ void OuterGrid::setTransport(ITransport* t, ObservableTimeline* tl) {
 void OuterGrid::setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex) {
 	playhead.setTransport(t, tl);
 	playhead.setPatternTrack(trackIndex);
+	grid.setDisplayTimeline(tl);
 }
 
 void OuterGrid::setTrackView(int trackIndex, bool beatResolution) {

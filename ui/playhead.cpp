@@ -129,6 +129,12 @@ int Playhead::xOffset() const
 	return transport ? secondsToPixel(transport->position()) : 0;
 }
 
+float Playhead::currentBar() const
+{
+	if (!transport || !obsTl) return 0.0f;
+	return obsTl->secondsToBar(transport->position());
+}
+
 void Playhead::seek(int mouseX, int rulerX)
 {
 	if (!transport || !obsTl) return;

@@ -33,10 +33,11 @@ public:
 
 	void onTimelineChanged() override { if (owner) owner->redraw(); }
 
-	void drawTriangle(int rulerX, int rulerY, int rulerH);
-	void drawLine(int gridX, int gridY, int gridH);
-	void seek(int mouseX, int rulerX);
-	int  xOffset() const;
+	void  drawTriangle(int rulerX, int rulerY, int rulerH);
+	void  drawLine(int gridX, int gridY, int gridH);
+	void  seek(int mouseX, int rulerX);
+	int   xOffset() const;
+	float currentBar() const;
 };
 
 #endif

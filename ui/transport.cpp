@@ -90,9 +90,12 @@ void Transport::notifyEndReached() {
 
 void Transport::updatePosition() {
 	int bar = 1, beat = 1;
-	if (transport && timeline)
+	int top = 4, bottom = 4;
+	if (transport && timeline) {
 		timeline->secondsToBarBeat(transport->position(), bar, beat);
-	std::snprintf(posText, sizeof(posText), "Bar %d Beat %d", bar, beat);
+		timeline->timeSigAt(bar - 1, top, bottom);
+	}
+	std::snprintf(posText, sizeof(posText), "Bar %d  Beat %d      %d/%d", bar, beat, top, bottom);
 	posLabel->label(posText);
 	posLabel->redraw();
 }

@@ -36,6 +36,7 @@ public:
 	void setTrackView(int trackIndex, bool beatResolution);
 	void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
 	void setSeekingEnabled(bool e) { seekingEnabled = e; }
+	void setDisplayTimeline(const ObservableTimeline* tl) { grid.setDisplayTimeline(tl); }
 };
 
 #endif

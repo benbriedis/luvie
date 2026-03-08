@@ -63,8 +63,9 @@ private:
 	Point originalPosition;
 	Point lastValidPosition;
 
-	Playhead*           playhead          = nullptr;
-	ObservableTimeline* timeline          = nullptr;
+	Playhead*                 playhead    = nullptr;
+	ObservableTimeline*       timeline    = nullptr;
+	const ObservableTimeline* displayTl   = nullptr;
 	int                 draggingPatternId = -1;
 	float               originalLength    = 1.0f;
 	bool                isDragging        = false;
@@ -83,6 +84,7 @@ private:
 
 public:
 	void setPlayhead(Playhead* p) { playhead = p; }
+	void setDisplayTimeline(const ObservableTimeline* tl) { displayTl = tl; }
 	void setTimeline(ObservableTimeline* tl);
 	void setTrackView(int trackFilter, bool beatResolution);
 	void onTimelineChanged() override;

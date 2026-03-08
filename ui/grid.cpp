@@ -122,15 +122,22 @@ void MyGrid::draw()
 		fl_line(x0, y0, x1, y1);
 	}
 
-	fl_color(0x00EE0000); //green
-
 	/* Columns: */
+	int beatsPerBar = 0;
+	if (displayTl) {
+		int queryBar = playhead ? (int)playhead->currentBar() : 0;
+		int top, bottom;
+		displayTl->timeSigAt(queryBar, top, bottom);
+		beatsPerBar = top;
+	}
 	for (int i = 0; i < numCols+1; i++) {
 		int x0 = x() + i * colWidth;
 		int y0 = y();
 		int x1 = x0;
 		int y1 = y() + numRows * rowHeight;
 
+		bool isBarStart = beatsPerBar > 0 && i % beatsPerBar == 0;
+		fl_color(isBarStart ? 0x00660000 : 0x00EE0000);
 		fl_line(x0, y0, x1, y1);
 	}
 
