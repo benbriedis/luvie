@@ -234,9 +234,10 @@ void ObservableTimeline::movePattern(int patternId, int newTrackIndex, float new
 		auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
 			[patternId](const PatternInstance& p) { return p.id == patternId; });
 		if (it != track.patterns.end()) {
-			float len = it->length;
+			float len    = it->length;
+			float offset = it->startOffset;
 			track.patterns.erase(it);
-			data.tracks[newTrackIndex].patterns.push_back({patternId, newStartBar, len});
+			data.tracks[newTrackIndex].patterns.push_back({patternId, newStartBar, len, offset});
 			notify();
 			return;
 		}
@@ -256,11 +257,31 @@ void ObservableTimeline::resizePattern(int patternId, float newLength)
 	}
 }
 
+void ObservableTimeline::resizePatternLeft(int patternId, float newStartBar, float newLength, float newStartOffset)
+{
+	for (auto& track : data.tracks)
+		for (auto& p : track.patterns)
+			if (p.id == patternId) {
+				p.startBar    = newStartBar;
+				p.length      = newLength;
+				p.startOffset = newStartOffset;
+				notify();
+				return;
+			}
+}
+
+void ObservableTimeline::setPatternStartOffset(int patternId, float startOffset)
+{
+	for (auto& track : data.tracks)
+		for (auto& p : track.patterns)
+			if (p.id == patternId) { p.startOffset = startOffset; notify(); return; }
+}
+
 std::vector<Note> ObservableTimeline::buildNotes() const
 {
 	std::vector<Note> notes;
 	for (int row = 0; row < (int)data.tracks.size(); row++)
 		for (auto& p : data.tracks[row].patterns)
-			notes.push_back({p.id, row, p.startBar, p.length});
+			notes.push_back({p.id, row, p.startBar, p.length, p.startOffset});
 	return notes;
 }

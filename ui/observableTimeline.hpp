@@ -47,6 +47,8 @@ public:
 	void removePattern(int patternId);
 	void movePattern(int patternId, int newTrackIndex, float newStartBar);
 	void resizePattern(int patternId, float newLength);
+	void resizePatternLeft(int patternId, float newStartBar, float newLength, float newStartOffset);
+	void setPatternStartOffset(int patternId, float startOffset);
 
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;

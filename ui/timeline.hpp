@@ -18,7 +18,8 @@ struct TimeSigMarker {
 struct PatternInstance {
 	int   id;
 	float startBar;
-	float length;    // in bars
+	float length;       // in bars
+	float startOffset = 0.0f;  // beat offset into the pattern to start playing from
 };
 
 struct Track {

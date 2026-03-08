@@ -83,7 +83,7 @@ int Playhead::secondsToPixel(double secs) const
 			if (currentBar >= inst.startBar && currentBar < inst.startBar + inst.length) {
 				int top, bottom;
 				obsTl->timeSigAt((int)inst.startBar, top, bottom);
-				float beatOffset = std::fmod((currentBar - inst.startBar) * top, (float)numCols);
+				float beatOffset = std::fmod(inst.startOffset + (currentBar - inst.startBar) * top, (float)numCols);
 				int px = (int)(beatOffset * colWidth);
 				return std::clamp(px, 0, numCols * colWidth - 2);
 			}

@@ -1,12 +1,33 @@
 #include "songGrid.hpp"
 #include "playhead.hpp"
 #include <FL/Fl.H>
+#include <FL/fl_draw.H>
 #include <algorithm>
+#include <cmath>
 
 SongGrid::SongGrid(std::vector<Note> notes, int numRows, int numCols,
                    int rowHeight, int colWidth, float snap, Popup& popup)
     : Grid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
+
+void SongGrid::draw()
+{
+    Grid::draw();
+    if (!timeline) return;
+
+    const int tickH = 4;
+    for (const auto& note : notes) {
+        if (note.row < 0 || note.row >= numRows) continue;
+        int y0 = y() + note.row * rowHeight;
+        int top = 4, bottom = 4;
+        if (timeline) timeline->timeSigAt((int)note.col, top, bottom);
+        float tickBarPos = note.col + note.startOffset / top;
+        int   tickX      = x() + (int)(tickBarPos * colWidth);
+        fl_color(FL_WHITE);
+        fl_rectf(tickX, y0 + 1,                      2, tickH);
+        fl_rectf(tickX, y0 + rowHeight - 1 - tickH,  2, tickH);
+    }
+}
 
 SongGrid::~SongGrid()
 {
@@ -70,6 +91,19 @@ void SongGrid::onBeginDrag()
     draggingPatternId = notes[selectedNote].id;
     originalLength    = notes[selectedNote].length;
     isDragging        = true;
+    if (timeline) { int dummy; timeline->timeSigAt((int)notes[selectedNote].col, dragBeatsPerBar, dummy); }
+    // Capture absolute song-bar position of the pattern's beat-0 tick.
+    tickBarPos = notes[selectedNote].col + notes[selectedNote].startOffset / dragBeatsPerBar;
+}
+
+void SongGrid::resizing()
+{
+    Grid::resizing();
+    if (side == LEFT) {
+        // Keep the beat-0 tick fixed in song position.
+        float newOffset = (tickBarPos - notes[selectedNote].col) * dragBeatsPerBar;
+        notes[selectedNote].startOffset = std::max(0.0f, newOffset);
+    }
 }
 
 void SongGrid::onCommitDrag()
@@ -78,8 +112,15 @@ void SongGrid::onCommitDrag()
     isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
     if (hoverState == MOVING)
         timeline->movePattern(draggingPatternId, notes[selectedNote].row, notes[selectedNote].col);
-    else if (hoverState == RESIZING)
-        timeline->resizePattern(draggingPatternId, notes[selectedNote].length);
+    else if (hoverState == RESIZING) {
+        if (side == LEFT)
+            timeline->resizePatternLeft(draggingPatternId,
+                                        notes[selectedNote].col,
+                                        notes[selectedNote].length,
+                                        notes[selectedNote].startOffset);
+        else
+            timeline->resizePattern(draggingPatternId, notes[selectedNote].length);
+    }
     draggingPatternId = -1;
 }
 

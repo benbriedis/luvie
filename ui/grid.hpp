@@ -38,7 +38,7 @@ protected:
     void findNoteForCursor();
     int  overlappingNote();
     void moving();
-    void resizing();
+    virtual void resizing();
 
     // Virtual extension hooks
     virtual Fl_Color columnColor(int col) const { (void)col; return 0x00EE0000; }
