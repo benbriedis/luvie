@@ -109,6 +109,7 @@ flex->margin(10,10,10,10);
 		else
 			me2->notes->erase(me2->notes->begin() + me2->selected);
 		me2->hide();
+		if (auto* win = me2->window()) win->redraw();
 	}, this);
 
 

@@ -47,7 +47,8 @@ void Playhead::timerCb(void* data)
 
 void Playhead::tick()
 {
-	if (transport && transport->isPlaying() && obsTl) {
+	// Only gate the transport in normal mode; pattern-view playheads are display-only.
+	if (patternTrack < 0 && transport && transport->isPlaying() && obsTl) {
 		double endSecs = obsTl->barToSeconds((float)numCols);
 		if (transport->position() >= endSecs) {
 			transport->pause();
@@ -57,10 +58,39 @@ void Playhead::tick()
 	if (owner) owner->redraw();
 }
 
+bool Playhead::isInPattern(float currentBar) const
+{
+	if (patternTrack < 0 || !obsTl) return true;
+	const auto& tracks = obsTl->get().tracks;
+	if (patternTrack >= (int)tracks.size()) return false;
+	for (auto& inst : tracks[patternTrack].patterns)
+		if (currentBar >= inst.startBar && currentBar < inst.startBar + inst.length)
+			return true;
+	return false;
+}
+
 int Playhead::secondsToPixel(double secs) const
 {
 	if (!obsTl) return 0;
-	int px = (int)(obsTl->secondsToBar(secs) * colWidth);
+	float currentBar = obsTl->secondsToBar(secs);
+
+	if (patternTrack >= 0) {
+		// Beat-relative position within the active pattern instance on patternTrack.
+		const auto& tracks = obsTl->get().tracks;
+		if (patternTrack >= (int)tracks.size()) return 0;
+		for (auto& inst : tracks[patternTrack].patterns) {
+			if (currentBar >= inst.startBar && currentBar < inst.startBar + inst.length) {
+				int top, bottom;
+				obsTl->timeSigAt((int)inst.startBar, top, bottom);
+				float beatOffset = (currentBar - inst.startBar) * top;
+				int px = (int)(beatOffset * colWidth);
+				return std::clamp(px, 0, numCols * colWidth - 2);
+			}
+		}
+		return 0;
+	}
+
+	int px = (int)(currentBar * colWidth);
 	return std::clamp(px, 0, numCols * colWidth - 2);
 }
 
@@ -72,7 +102,9 @@ double Playhead::pixelToSeconds(int px) const
 
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
-	if (!transport) return;
+	if (!transport || !obsTl) return;
+	float currentBar = obsTl->secondsToBar(transport->position());
+	if (!isInPattern(currentBar)) return;
 	int px  = rulerX + secondsToPixel(transport->position());
 	int tw  = 11;
 	int top = rulerY + 2;
@@ -83,7 +115,9 @@ void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 
 void Playhead::drawLine(int gridX, int gridY, int gridH)
 {
-	if (!transport) return;
+	if (!transport || !obsTl) return;
+	float currentBar = obsTl->secondsToBar(transport->position());
+	if (!isInPattern(currentBar)) return;
 	int px = gridX + secondsToPixel(transport->position());
 	fl_color(headColor);
 	fl_line(px, gridY, px, gridY + gridH);

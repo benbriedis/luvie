@@ -7,14 +7,16 @@
 #include <functional>
 
 class Playhead : public ITimelineObserver {
-	ITransport*         transport = nullptr;
-	ObservableTimeline* obsTl     = nullptr;
+	ITransport*         transport    = nullptr;
+	ObservableTimeline* obsTl        = nullptr;
 	int                 numCols;
 	int                 colWidth;
-	Fl_Widget*          owner     = nullptr;
+	Fl_Widget*          owner        = nullptr;
+	int                 patternTrack = -1;  // >= 0: beat-relative view of that track
 
 	static void timerCb(void* data);
 	void tick();
+	bool isInPattern(float currentBar) const;
 
 	int    secondsToPixel(double secs) const;
 	double pixelToSeconds(int px) const;
@@ -27,6 +29,7 @@ public:
 
 	void setTransport(ITransport* t, ObservableTimeline* tl);
 	void setOwner(Fl_Widget* w) { owner = w; }
+	void setPatternTrack(int track) { patternTrack = track; }
 
 	void onTimelineChanged() override { if (owner) owner->redraw(); }
 

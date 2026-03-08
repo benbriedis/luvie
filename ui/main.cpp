@@ -65,9 +65,14 @@ int main(int argc, char **argv) {
 	Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, &songTimeline);
 	window.add(bottomPane);
 
+	// Song editor: full transport control, all tracks, bar resolution.
 	og2.setTransport(&simpleTransport, &songTimeline);
 	og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
 	og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
+
+	// Pattern grid: independent notes, playhead tracks song editor track 1; no seeking.
+	og1.setPatternPlayhead(&simpleTransport, &songTimeline, 0);
+	og1.setSeekingEnabled(false);
 
 	// Added last so they're checked first in FLTK's event dispatch (reverse order).
 	// Registered with AppWindow for mutual exclusivity and event blocking.

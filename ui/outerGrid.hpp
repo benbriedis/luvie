@@ -19,7 +19,8 @@ private:
 
 	Playhead playhead;  // declared before grid — initialised first
 	MyGrid   grid;
-	bool     rulerDragging = false;
+	bool     rulerDragging  = false;
+	bool     seekingEnabled = true;
 
 	void draw() override;
 	int  handle(int event) override;
@@ -32,6 +33,9 @@ public:
 	          int rowHeight, int colWidth, float snap, Popup& popup);
 
 	void setTransport(ITransport* t, ObservableTimeline* tl);
+	void setTrackView(int trackIndex, bool beatResolution);
+	void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
+	void setSeekingEnabled(bool e) { seekingEnabled = e; }
 };
 
 #endif

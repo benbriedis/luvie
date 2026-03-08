@@ -23,6 +23,16 @@ void OuterGrid::setTransport(ITransport* t, ObservableTimeline* tl) {
 	grid.setTimeline(tl);
 }
 
+void OuterGrid::setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex) {
+	playhead.setTransport(t, tl);
+	playhead.setPatternTrack(trackIndex);
+}
+
+void OuterGrid::setTrackView(int trackIndex, bool beatResolution) {
+	grid.setTrackView(trackIndex, beatResolution);
+	playhead.setPatternTrack(trackIndex);
+}
+
 void OuterGrid::draw() {
 	fl_color(rulerBg);
 	fl_rectf(x(), y(), w(), rulerH);
@@ -40,7 +50,7 @@ int OuterGrid::handle(int event) {
 
 	switch (event) {
 	case FL_PUSH:
-		if (inRuler && Fl::event_button() == FL_LEFT_MOUSE) {
+		if (inRuler && Fl::event_button() == FL_LEFT_MOUSE && seekingEnabled) {
 			rulerDragging = true;
 			playhead.seek(Fl::event_x(), x());
 			if (onSeek) onSeek();
@@ -49,7 +59,7 @@ int OuterGrid::handle(int event) {
 		}
 		break;
 	case FL_DRAG:
-		if (rulerDragging) {
+		if (rulerDragging && seekingEnabled) {
 			playhead.seek(Fl::event_x(), x());
 			if (onSeek) onSeek();
 			redraw();
@@ -64,9 +74,11 @@ int OuterGrid::handle(int event) {
 		break;
 	case FL_MOVE:
 		if (inRuler) {
-			const int grabZone = 8;
-			int dist = std::abs(Fl::event_x() - (x() + playhead.xOffset()));
-			window()->cursor(dist <= grabZone ? FL_CURSOR_WE : FL_CURSOR_CROSS);
+			if (seekingEnabled) {
+				const int grabZone = 8;
+				int dist = std::abs(Fl::event_x() - (x() + playhead.xOffset()));
+				window()->cursor(dist <= grabZone ? FL_CURSOR_WE : FL_CURSOR_CROSS);
+			}
 			return 1;
 		}
 		break;

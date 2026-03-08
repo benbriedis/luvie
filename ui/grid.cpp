@@ -65,8 +65,29 @@ void MyGrid::setTimeline(ObservableTimeline* tl)
 
 void MyGrid::rebuildNotes()
 {
-	if (timeline)
+	if (!timeline) return;
+	if (trackFilter < 0) {
 		notes = timeline->buildNotes();
+		return;
+	}
+	const auto& tracks = timeline->get().tracks;
+	if (trackFilter >= (int)tracks.size()) { notes.clear(); return; }
+	float scale = 1.0f;
+	if (beatResolution) {
+		int top, bottom;
+		timeline->timeSigAt(0, top, bottom);
+		scale = (float)top;
+	}
+	notes.clear();
+	for (auto& p : tracks[trackFilter].patterns)
+		notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
+}
+
+void MyGrid::setTrackView(int tf, bool br)
+{
+	trackFilter    = tf;
+	beatResolution = br;
+	if (timeline) { rebuildNotes(); redraw(); }
 }
 
 void MyGrid::onTimelineChanged()
@@ -161,6 +182,7 @@ int MyGrid::handle(int event)
 			} else if (hoverState == NONE) {
 				int row = (Fl::event_y() - y()) / rowHeight;
 				float col = (float)((Fl::event_x() - x()) / colWidth);
+				creationForbidden = false;  // always reset — FL_RELEASE may have been swallowed
 				bool wouldRemove = std::any_of(notes.begin(), notes.end(),
 					[=](const Note& n) { return n.row == row && n.col == col; });
 				if (!wouldRemove) {
@@ -394,6 +416,7 @@ void MyGrid::findNoteForCursor()
 
 void MyGrid::toggleNote()
 {
+	if (trackFilter >= 0) return;  // read-only when displaying a single track view
 	int ex = Fl::event_x() - x();
 	int ey = Fl::event_y() - y();
 	int   row = ey / rowHeight;

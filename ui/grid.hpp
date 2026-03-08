@@ -68,6 +68,8 @@ private:
 	int                 draggingPatternId = -1;
 	float               originalLength    = 1.0f;
 	bool                isDragging        = false;
+	int                 trackFilter       = -1;   // -1 = all tracks
+	bool                beatResolution    = false; // if true, cols are beats not bars
 
 	void init();
 	void draw() override;
@@ -82,6 +84,7 @@ private:
 public:
 	void setPlayhead(Playhead* p) { playhead = p; }
 	void setTimeline(ObservableTimeline* tl);
+	void setTrackView(int trackFilter, bool beatResolution);
 	void onTimelineChanged() override;
 };
 

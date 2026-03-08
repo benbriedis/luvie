@@ -42,6 +42,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		auto* self = static_cast<MarkerPopup*>(d);
 		if (self->onDeleteCb) self->onDeleteCb();
 		self->hide();
+		if (auto* win = self->window()) win->redraw();
 	}, this);
 
 	okBtn->callback([](Fl_Widget*, void* d) {
@@ -57,6 +58,7 @@ void MarkerPopup::doOk()
 		if (onOkTimeSig) onOkTimeSig((int)input1->value(), (int)input2->value());
 	}
 	hide();
+	if (auto* win = window()) win->redraw();
 }
 
 int MarkerPopup::handle(int event)
