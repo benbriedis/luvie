@@ -1,6 +1,6 @@
 #include <FL/Fl.H>
-#include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Group.H>
+#include "appWindow.hpp"
 #include "outerGrid.hpp"
 #include "popup.hpp"
 #include "modernTabs.hpp"
@@ -17,15 +17,12 @@ int main(int argc, char **argv) {
 	const int winW         = 920;
 	const int winH         = tabBarH + 2 * markerRulerH + OuterGrid::rulerH + 10 * 45 + 20 + bottomH;
 
-	Fl_Double_Window window(winW, winH);
+	AppWindow window(winW, winH);
 	window.color(bgColor);
 	window.end();
 
 	Popup popup1{};
-	window.add(popup1);
-
 	Popup popup2{};
-	window.add(popup2);
 
 	MarkerPopup tempoPopup(MarkerPopup::TEMPO);
 	MarkerPopup timeSigPopup(MarkerPopup::TIME_SIG);
@@ -69,9 +66,12 @@ int main(int argc, char **argv) {
 	og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
 	og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
 
-	// Added last so they're checked first in FLTK's event dispatch (reverse order)
-	window.add(tempoPopup);
-	window.add(timeSigPopup);
+	// Added last so they're checked first in FLTK's event dispatch (reverse order).
+	// Registered with AppWindow for mutual exclusivity and event blocking.
+	window.add(popup1);       window.registerPopup(&popup1);
+	window.add(popup2);       window.registerPopup(&popup2);
+	window.add(tempoPopup);   window.registerPopup(&tempoPopup);
+	window.add(timeSigPopup); window.registerPopup(&timeSigPopup);
 
 	window.show(argc, argv);
 	return Fl::run();

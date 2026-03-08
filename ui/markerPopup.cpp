@@ -1,4 +1,5 @@
 #include "markerPopup.hpp"
+#include "appWindow.hpp"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 
@@ -64,22 +65,12 @@ int MarkerPopup::handle(int event)
 		if (kind == TIME_SIG && !onSecondField) {
 			input2->take_focus();
 			onSecondField = true;
-		}
-		else
+		} else {
 			doOk();
+		}
 		return 1;
 	}
-
-	int ret = Fl_Window::handle(event);
-	switch (event) {
-	case FL_PUSH:
-	case FL_DRAG:
-	case FL_RELEASE:
-	case FL_MOVE:
-	case FL_MOUSEWHEEL:
-		return 1;
-	}
-	return ret;
+	return Fl_Window::handle(event);
 }
 
 void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,
@@ -91,7 +82,10 @@ void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,
 	onOkTempo  = std::move(onOk);
 	onDeleteCb = std::move(onDelete);
 	position(wx, wy);
-	show();
+	if (auto* aw = dynamic_cast<AppWindow*>(window()))
+		aw->openPopup(this);
+	else
+		show();
 	input1->take_focus();
 }
 
@@ -106,6 +100,9 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
 	onOkTimeSig = std::move(onOk);
 	onDeleteCb  = std::move(onDelete);
 	position(wx, wy);
-	show();
+	if (auto* aw = dynamic_cast<AppWindow*>(window()))
+		aw->openPopup(this);
+	else
+		show();
 	input1->take_focus();
 }

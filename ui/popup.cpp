@@ -1,4 +1,5 @@
 #include "popup.hpp"
+#include "appWindow.hpp"
 #include "FL/Enumerations.H"
 #include "FL/Fl.H"
 #include "FL/Fl_Box.H"
@@ -136,7 +137,10 @@ Note cell = (*notes)[mySelected];
 	Point2 pos = popupPosition(available, desiredPosition);
 	position(pos.x, pos.y);
 
-	show();
+	if (auto* aw = dynamic_cast<AppWindow*>(window()))
+		aw->openPopup(this);
+	else
+		show();
 }
 
 
