@@ -95,7 +95,8 @@ void Transport::updatePosition() {
 		timeline->secondsToBarBeat(transport->position(), bar, beat);
 		timeline->timeSigAt(bar - 1, top, bottom);
 	}
-	std::snprintf(posText, sizeof(posText), "Bar %d  Beat %d      %d/%d", bar, beat, top, bottom);
+	float bpm = timeline ? timeline->bpmAt(bar - 1) : 120.0f;
+	std::snprintf(posText, sizeof(posText), "Bar %d  Beat %d      %d/%d      %.4g BPM", bar, beat, top, bottom, (double)bpm);
 	posLabel->label(posText);
 	posLabel->redraw();
 }

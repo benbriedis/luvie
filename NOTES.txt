@@ -147,4 +147,18 @@ Unit tests
 
 Use Patches? and Parameters?
 
+---------------------------------
+8/3/26
+------
+Re time signatures and live looping mode
+-----------------------------------------
+In time I'll probably add a "live mode" like Seq24.
+I think to get this to work well it will need to have its own time signature 
+(note that song mode can change time signatures and the patterns are just being dumped on top regardless).
+If a pattern doesn't divide up nicely probably pad out the loop by default 
+(the alternative is likely a pain to deal with in a live situation).
+
+cf Disallowing or discouraging weird denominators 
+   - MAYBE LEAVE IN FOR THE MOMENT. Nice if I can support experimental stuff.
+    cf "Irrational meters": https://en.wikipedia.org/wiki/Time_signature
 
