@@ -2,6 +2,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
+#include <cmath>
 
 static constexpr Fl_Color headColor = 0xEF444400;  // red
 
@@ -82,7 +83,7 @@ int Playhead::secondsToPixel(double secs) const
 			if (currentBar >= inst.startBar && currentBar < inst.startBar + inst.length) {
 				int top, bottom;
 				obsTl->timeSigAt((int)inst.startBar, top, bottom);
-				float beatOffset = (currentBar - inst.startBar) * top;
+				float beatOffset = std::fmod((currentBar - inst.startBar) * top, (float)numCols);
 				int px = (int)(beatOffset * colWidth);
 				return std::clamp(px, 0, numCols * colWidth - 2);
 			}
