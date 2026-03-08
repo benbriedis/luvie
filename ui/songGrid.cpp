@@ -5,7 +5,7 @@
 
 SongGrid::SongGrid(std::vector<Note> notes, int numRows, int numCols,
                    int rowHeight, int colWidth, float snap, Popup& popup)
-    : MyGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
+    : Grid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 
 SongGrid::~SongGrid()
@@ -92,7 +92,7 @@ void SongGrid::toggleNote()
     float col = (float)(ex / colWidth);
 
     if (!timeline) {
-        MyGrid::toggleNote();
+        Grid::toggleNote();
         return;
     }
 

@@ -119,7 +119,7 @@ flex->margin(10,10,10,10);
 
 
 
-void Popup::open(int mySelected, std::vector<Note>* myNotes, MyGrid* myGrid,
+void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
                  std::function<void()> onDelete)
 {
 	selected  = mySelected;

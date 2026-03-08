@@ -4,7 +4,7 @@
 #include "grid.hpp"
 #include "observableTimeline.hpp"
 
-class PatternGrid : public MyGrid {
+class PatternGrid : public Grid {
     const ObservableTimeline* displayTl = nullptr;
 
 protected:

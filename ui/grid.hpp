@@ -14,7 +14,7 @@ enum Side { LEFT, RIGHT };
 
 typedef struct { int row; float col; } Point;
 
-class MyGrid : public Fl_Box {
+class Grid : public Fl_Box {
 public:
     int numRows, numCols;
     int rowHeight, colWidth;
@@ -48,7 +48,7 @@ protected:
     virtual void toggleNote();
 
 public:
-    MyGrid(std::vector<Note> notes, int numRows, int numCols,
+    Grid(std::vector<Note> notes, int numRows, int numCols,
            int rowHeight, int colWidth, float snap, Popup& popup);
 
     void setPlayhead(Playhead* p) { playhead = p; }

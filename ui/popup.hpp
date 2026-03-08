@@ -8,7 +8,7 @@
 #include <FL/Fl_Flex.H>
 #include <functional>
 
-class MyGrid;
+class Grid;
 
 typedef struct {
     int width;
@@ -28,7 +28,7 @@ class Popup : public Fl_Window {
 public:
 	Popup();
 
-	void open(int selected, std::vector<Note>* notes, MyGrid* grid,
+	void open(int selected, std::vector<Note>* notes, Grid* grid,
 	          std::function<void()> onDelete = nullptr);
 
 protected:	
@@ -42,7 +42,7 @@ private:
 //XXX maybe move into outerGrid.hpp...	
 	int selected;
 	std::vector<Note>* notes;
-	MyGrid* grid;
+	Grid* grid;
 	std::function<void()> onDeleteFn;
 
 	Point2 popupPosition(Size size, Point2 pos);

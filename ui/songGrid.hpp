@@ -4,7 +4,7 @@
 #include "grid.hpp"
 #include "observableTimeline.hpp"
 
-class SongGrid : public MyGrid, public ITimelineObserver {
+class SongGrid : public Grid, public ITimelineObserver {
     ObservableTimeline* timeline          = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;

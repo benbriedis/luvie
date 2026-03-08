@@ -3,7 +3,7 @@
 
 PatternGrid::PatternGrid(std::vector<Note> notes, int numRows, int numCols,
                          int rowHeight, int colWidth, float snap, Popup& popup)
-    : MyGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
+    : Grid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 
 Fl_Color PatternGrid::columnColor(int col) const

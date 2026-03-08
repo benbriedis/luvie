@@ -17,12 +17,12 @@
 
 using std::vector;
 
-MyGrid::MyGrid(vector<Note> notes, int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup) :
+Grid::Grid(vector<Note> notes, int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup) :
     notes(notes), numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
     Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight, nullptr)
 {}
 
-void MyGrid::draw()
+void Grid::draw()
 {
     Fl_Box::draw();
 
@@ -59,7 +59,7 @@ void MyGrid::draw()
         playhead->drawLine(x(), y(), numRows * rowHeight);
 }
 
-int MyGrid::handle(int event)
+int Grid::handle(int event)
 {
     if (popup.visible())
         return 0;
@@ -120,7 +120,7 @@ int MyGrid::handle(int event)
     }
 }
 
-void MyGrid::moving()
+void Grid::moving()
 {
     Note* selected = &notes[selectedNote];
     float ex       = Fl::event_x() - this->x();
@@ -139,7 +139,7 @@ void MyGrid::moving()
     redraw();
 }
 
-void MyGrid::resizing()
+void Grid::resizing()
 {
     float minLength = 10.0 / colWidth;
     Note* selected  = &notes[selectedNote];
@@ -166,7 +166,7 @@ void MyGrid::resizing()
     }
 }
 
-void MyGrid::findNoteForCursor()
+void Grid::findNoteForCursor()
 {
     const int resizeZone = 5;
     float ex = Fl::event_x() - this->x();
@@ -199,7 +199,7 @@ void MyGrid::findNoteForCursor()
     redraw();
 }
 
-void MyGrid::toggleNote()
+void Grid::toggleNote()
 {
     int   ex  = Fl::event_x() - x();
     int   ey  = Fl::event_y() - y();
@@ -218,7 +218,7 @@ void MyGrid::toggleNote()
     redraw();
 }
 
-int MyGrid::overlappingNote()
+int Grid::overlappingNote()
 {
     Note  a      = notes[selectedNote];
     float aStart = a.col, aEnd = a.col + a.length;
