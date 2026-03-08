@@ -3,91 +3,55 @@
 
 #include "popup.hpp"
 #include "cell.hpp"
-#include "observableTimeline.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
+#include <functional>
 
 class Playhead;
 
-enum SelectionState {
-	NONE,
-	MOVING,
-	RESIZING
-};
+enum SelectionState { NONE, MOVING, RESIZING };
+enum Side { LEFT, RIGHT };
 
-enum Side {
-	LEFT,
-	RIGHT,
-};
+typedef struct { int row; float col; } Point;
 
-/* XXX
-   It would probably be best to have a single source of truth and store notes as beat and maybe pitch.
-   Consider using a facade to map these to row, col and length - used here.
-*/
-
-typedef struct {
-	int row;
-	float col;
-} Point;
-
-
-class MyGrid : public Fl_Box, public ITimelineObserver {
+class MyGrid : public Fl_Box {
 public:
-	MyGrid(std::vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup);
-	~MyGrid();
+    int numRows, numCols;
+    int rowHeight, colWidth;
 
-	/* Grid parameters */
-//XXX should be raised...
-	int numRows;
-	int numCols;
+protected:
+    float snap;
+    Popup& popup;
+    std::vector<Note> notes;
 
-	int rowHeight;
-	int colWidth;
+    int selectedNote = 0;
+    SelectionState hoverState = NONE;
+    Side side = LEFT;
+    float movingGrabXOffset = 0, movingGrabYOffset = 0;
+    bool amOverlapping = false, creationForbidden = false;
+    Point originalPosition = {0, 0.0f}, lastValidPosition = {0, 0.0f};
 
-private:
-	float snap;
-	Popup& popup;
+    Playhead* playhead = nullptr;
 
-	/* Note parameters: */
-	std::vector<Note> notes;
+    void draw() override;
+    int  handle(int event) override;
+    void findNoteForCursor();
+    int  overlappingNote();
+    void moving();
+    void resizing();
 
-	/* Cursor parameters: */
-	/* selectedNote points to 'notes'. This is a Vector and can be reallocated - so using a pointer is not safe. */
-	int selectedNote;
-	SelectionState hoverState;
-	Side side;
-	float movingGrabXOffset;
-	float movingGrabYOffset;
-	bool amOverlapping;
-	bool creationForbidden;
-	Point originalPosition;
-	Point lastValidPosition;
-
-	Playhead*                 playhead    = nullptr;
-	ObservableTimeline*       timeline    = nullptr;
-	const ObservableTimeline* displayTl   = nullptr;
-	int                 draggingPatternId = -1;
-	float               originalLength    = 1.0f;
-	bool                isDragging        = false;
-	int                 trackFilter       = -1;   // -1 = all tracks
-	bool                beatResolution    = false; // if true, cols are beats not bars
-
-	void init();
-	void draw() override;
-	int  handle(int event) override;
-	void findNoteForCursor();
-	void toggleNote();
-	int  overlappingNote();
-	void moving();
-	void resizing();
-	void rebuildNotes();
+    // Virtual extension hooks
+    virtual Fl_Color columnColor(int col) const { (void)col; return 0x00EE0000; }
+    virtual std::function<void()> makeDeleteCallback() { return nullptr; }
+    virtual void onBeginDrag() {}
+    virtual void onCommitDrag() {}
+    virtual void toggleNote();
 
 public:
-	void setPlayhead(Playhead* p) { playhead = p; }
-	void setDisplayTimeline(const ObservableTimeline* tl) { displayTl = tl; }
-	void setTimeline(ObservableTimeline* tl);
-	void setTrackView(int trackFilter, bool beatResolution);
-	void onTimelineChanged() override;
+    MyGrid(std::vector<Note> notes, int numRows, int numCols,
+           int rowHeight, int colWidth, float snap, Popup& popup);
+
+    void setPlayhead(Playhead* p) { playhead = p; }
 };
 
 #endif

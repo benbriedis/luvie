@@ -5,8 +5,6 @@
 #include "cell.hpp"
 #include "FL/Enumerations.H"
 #include "popup.hpp"
-#include <cstdio>
-#include <iostream>
 #include <ranges>
 #include <algorithm>
 #include <cmath>
@@ -14,469 +12,222 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_RGB_Image.H>
 #include "cursors.hpp"
-#include <FL/fl_ask.H> // For fl_alert
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Item.H>
 
-//import std;
-
 using std::vector;
 
-// Callback function for menu items
-/*
-void menu_callback(Fl_Widget* w, void* user_data) {
-    Fl_Menu_Button* menu_button = static_cast<Fl_Menu_Button*>(w);
-    const Fl_Menu_Item* chosen_item = menu_button->mvalue(); // Get the chosen item
-    if (chosen_item) {
-        fl_alert("Selected: %s", chosen_item->label());
-    }
-}
-*/
-
-//Fl_Menu_Button mb(0,0,100000,100000);
-
-//FIXME clicking before or after cell creates an overlapping cell
-
-//FIXME leading front line narrows when putting next to another cell
-
-
-MyGrid::MyGrid(vector<Note> notes,int numRows,int numCols,int rowHeight,int colWidth,float snap,Popup& popup) :
-	notes(notes),numRows(numRows),numCols(numCols),rowHeight(rowHeight),colWidth(colWidth),snap(snap),popup(popup),
-	hoverState(NONE),creationForbidden(false),
-	Fl_Box(0,0,numCols * colWidth,numRows * rowHeight,nullptr)
-{
-}
-
-MyGrid::~MyGrid()
-{
-	if (timeline) timeline->removeObserver(this);
-}
-
-void MyGrid::setTimeline(ObservableTimeline* tl)
-{
-	if (timeline) timeline->removeObserver(this);
-	timeline = tl;
-	if (timeline) {
-		timeline->addObserver(this);
-		rebuildNotes();
-		redraw();
-	}
-}
-
-void MyGrid::rebuildNotes()
-{
-	if (!timeline) return;
-	if (trackFilter < 0) {
-		notes = timeline->buildNotes();
-		return;
-	}
-	const auto& tracks = timeline->get().tracks;
-	if (trackFilter >= (int)tracks.size()) { notes.clear(); return; }
-	float scale = 1.0f;
-	if (beatResolution) {
-		int top, bottom;
-		timeline->timeSigAt(0, top, bottom);
-		scale = (float)top;
-	}
-	notes.clear();
-	for (auto& p : tracks[trackFilter].patterns)
-		notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
-}
-
-void MyGrid::setTrackView(int tf, bool br)
-{
-	trackFilter    = tf;
-	beatResolution = br;
-	if (timeline) { rebuildNotes(); redraw(); }
-}
-
-void MyGrid::onTimelineChanged()
-{
-	// Don't disrupt an active drag; the drag will explicitly rebuild on release.
-	if (!isDragging)
-		rebuildNotes();
-	redraw();
-}
+MyGrid::MyGrid(vector<Note> notes, int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup) :
+    notes(notes), numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
+    Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight, nullptr)
+{}
 
 void MyGrid::draw()
 {
-//XXX drawing is additive. Dont really need for add
-	// Call the base class draw method to handle border, label, etc.
-	Fl_Box::draw();  //XXX really needed?
+    Fl_Box::draw();
 
-	fl_color(bgColor);
-	fl_rectf(x(), y(), w(), h());
-//XXX Q: are/can backgrounds be transparent?
+    fl_color(bgColor);
+    fl_rectf(x(), y(), w(), h());
 
+    fl_color(0xEE888800);  // orange
+    for (int i = 0; i < numRows + 1; i++) {
+        fl_line(x(), y() + i * rowHeight, x() + numCols * colWidth, y() + i * rowHeight);
+    }
 
+    for (int i = 0; i < numCols + 1; i++) {
+        int x0 = x() + i * colWidth;
+        int y0 = y();
+        int x1 = x0;
+        int y1 = y() + numRows * rowHeight;
+        fl_color(columnColor(i));
+        fl_line(x0, y0, x1, y1);
+    }
 
-	fl_color(0xEE888800);  //orange
+    for (const Note note : notes) {
+        int x0    = x() + note.col * colWidth;
+        int y0    = y() + note.row * rowHeight;
+        int width = note.length * colWidth;
+        fl_rectf(x0, y0 + 1, width, rowHeight - 1, 0x5555EE00);
+        const int barWidth = 5;
+        fl_color(0x1111EE00);
+        fl_line_style(FL_SOLID, barWidth);
+        fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rowHeight - 1);
+        fl_line_style(0);
+    }
 
-	/* Rows: */
-	for (int i = 0; i < numRows+1; i++) {
-		int x0 = x();
-		int y0 = y() + i * rowHeight;
-		int x1 = x() + numCols * colWidth;
-		int y1 = y0;
-
-		fl_line(x0, y0, x1, y1);
-	}
-
-	/* Columns: */
-	int beatsPerBar = 0;
-	if (displayTl) {
-		int queryBar = playhead ? (int)playhead->currentBar() : 0;
-		int top, bottom;
-		displayTl->timeSigAt(queryBar, top, bottom);
-		beatsPerBar = top;
-	}
-	for (int i = 0; i < numCols+1; i++) {
-		int x0 = x() + i * colWidth;
-		int y0 = y();
-		int x1 = x0;
-		int y1 = y() + numRows * rowHeight;
-
-		bool isBarStart = beatsPerBar > 0 && i % beatsPerBar == 0;
-		fl_color(isBarStart ? 0x00660000 : 0x00EE0000);
-		fl_line(x0, y0, x1, y1);
-	}
-
-	/* Notes: */
-//XXX at what point does copying these small structures become a bad idea?
-	for (const Note note : notes) {
-		int x0 = x() + note.col * colWidth;  //TODO round to nearest?
-		int y0 = y() + note.row * rowHeight;
-
-//TODO prevent to note from being so short its invisible (Q: how to handle very short notes?)
-		int width = note.length * colWidth;
-
-		/*
-		   Fit slightly inside the grid lines, except at the note start where I'm
-		   lining it up with the start of the column.
-		*/
-		fl_rectf(x0,y0+1,width,rowHeight-1,0x5555EE00);
-		const int barWidth = 5;
-		fl_color(0x1111EE00);
-		fl_line_style(FL_SOLID, barWidth);
-		fl_line(x0 + barWidth/2, y0+1, x0 + barWidth/2, y0+rowHeight-1);
-		fl_line_style(0);
-	}
-
-	/* Playhead line: drawn last so it appears over notes */
-	if (playhead)
-		playhead->drawLine(x(), y(), numRows * rowHeight);
+    if (playhead)
+        playhead->drawLine(x(), y(), numRows * rowHeight);
 }
 
 int MyGrid::handle(int event)
 {
+    if (popup.visible())
+        return 0;
 
-//damage() call may be  useful. Also cf double buffering (and scrolling)
+    switch (event) {
+        case FL_PUSH:
+            if (Fl::event_button() == FL_RIGHT_MOUSE) {
+                if (hoverState != NONE) {
+                    auto onDelete = makeDeleteCallback();
+                    popup.open(selectedNote, &notes, this, std::move(onDelete));
+                }
+            } else if (hoverState == NONE) {
+                int row   = (Fl::event_y() - y()) / rowHeight;
+                float col = (float)((Fl::event_x() - x()) / colWidth);
+                creationForbidden = false;
+                bool wouldRemove = std::any_of(notes.begin(), notes.end(),
+                    [=](const Note& n) { return n.row == row && n.col == col; });
+                if (!wouldRemove) {
+                    creationForbidden = std::any_of(notes.begin(), notes.end(),
+                        [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+                    if (creationForbidden)
+                        window()->cursor(forbiddenCursorImage(), 11, 11);
+                }
+            } else {
+                onBeginDrag();
+            }
+            return 1;
 
-	if (popup.visible())
-		return 0;
+        case FL_DRAG:
+            if (hoverState == MOVING)   moving();
+            if (hoverState == RESIZING) resizing();
+            return 1;
 
-	switch (event) {
-		case FL_PUSH:
-			if (Fl::event_button() == FL_RIGHT_MOUSE) {
-				if (hoverState != NONE) {
-					std::function<void()> onDelete;
-					if (timeline) {
-						int id = notes[selectedNote].id;
-						onDelete = [this, id]() { timeline->removePattern(id); };
-					}
-					popup.open(selectedNote, &notes, this, std::move(onDelete));
-				}
-			} else if (hoverState == NONE) {
-				int row = (Fl::event_y() - y()) / rowHeight;
-				float col = (float)((Fl::event_x() - x()) / colWidth);
-				creationForbidden = false;  // always reset — FL_RELEASE may have been swallowed
-				bool wouldRemove = std::any_of(notes.begin(), notes.end(),
-					[=](const Note& n) { return n.row == row && n.col == col; });
-				if (!wouldRemove) {
-					creationForbidden = std::any_of(notes.begin(), notes.end(),
-						[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
-					if (creationForbidden)
-						window()->cursor(forbiddenCursorImage(), 11, 11);
-				}
-			} else {
-				// MOVING or RESIZING — capture identity for timeline sync on release
-				draggingPatternId = notes[selectedNote].id;
-				originalLength    = notes[selectedNote].length;
-				isDragging        = true;
-			}
-			return 1;
+        case FL_RELEASE:
+            if (hoverState == MOVING && amOverlapping) {
+                notes[selectedNote].row = lastValidPosition.row;
+                notes[selectedNote].col = lastValidPosition.col;
+                redraw();
+            }
+            onCommitDrag();
+            if (hoverState == NONE && Fl::event_button() == FL_LEFT_MOUSE) {
+                if (!creationForbidden)
+                    toggleNote();
+                creationForbidden = false;
+                window()->cursor(FL_CURSOR_DEFAULT);
+            }
+            return 1;
 
-		case FL_DRAG:
-			if (hoverState==MOVING)
-				moving();
+        case FL_ENTER:
+            return 1;
 
-			if (hoverState==RESIZING)
-				resizing();
+        case FL_MOVE:
+            findNoteForCursor();
+            return 0;
 
-			return 1;
-
-		case FL_RELEASE:
-			if (hoverState==MOVING && amOverlapping) {
-				notes[selectedNote].row = lastValidPosition.row;
-				notes[selectedNote].col = lastValidPosition.col;
-				redraw();
-			}
-
-			if (timeline && draggingPatternId >= 0) {
-				isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
-				if (hoverState == MOVING)
-					timeline->movePattern(draggingPatternId,
-					                      notes[selectedNote].row,
-					                      notes[selectedNote].col);
-				else if (hoverState == RESIZING)
-					timeline->resizePattern(draggingPatternId, notes[selectedNote].length);
-				draggingPatternId = -1;
-			}
-
-			if (hoverState==NONE && Fl::event_button() == FL_LEFT_MOUSE) {
-				if (!creationForbidden)
-					toggleNote();
-				creationForbidden = false;
-				window()->cursor(FL_CURSOR_DEFAULT);
-			}
-			//        redraw();
-			//        do_callback();
-			// never do anything after a callback, as the callback
-			// may delete the widget!
-			return 1;
-
-		/* We want mouse events to change the cursor */
-		case FL_ENTER:
-			return 1;		// non-zero = we want mouse events
-
-		/*
-		   ISSUE not sure at this stage whether notes will (always) be wide enough to easily support resizing AND moving
-		   by hovering the cursor over different parts of the note. MAY want keycombs and/or mode as well/instead.
-		*/
-		case FL_MOVE: {
-			findNoteForCursor();
-			return 0;
-		}
-		default:
-//			return Fl_Widget::handle(event);
-			return 0;
-	}
+        default:
+            return 0;
+    }
 }
 
 void MyGrid::moving()
 {
-	Note* selected = &notes[selectedNote];
-
-	float ex = Fl::event_x() - this->x();
-	selected->col = (ex - movingGrabXOffset) / (float)colWidth;
-
-	/* Ensure the note stays within X bounds */
-	if (selected->col < 0.0)
-		selected->col = 0.0;
-	if (selected->col + selected->length > numCols)
-		selected->col = numCols - selected->length;
-
-	/* Apply snap */
-	if (snap > 0.0)
-		selected->col = std::round(selected->col / snap) * snap;
-
-	float ey = Fl::event_y() - this->y();
-	selected->row = (ey - movingGrabYOffset + rowHeight/2.0) / (float)rowHeight;
-
-	/* Ensure the note stays within Y bounds */
-	if (selected->row < 0)
-		selected->row = 0;
-	if (selected->row >= numRows)
-		selected->row = numRows - 1;
-
-//TODO find or implement a no-drop / not-allow / forbidden icon (circle with cross through it, or just X)
-	amOverlapping = overlappingNote() >= 0;
-	if (!amOverlapping)
-		lastValidPosition = {selected->row, selected->col};
-	if (amOverlapping)
-		window()->cursor(forbiddenCursorImage(), 11, 11);
-	else
-		window()->cursor(FL_CURSOR_HAND);
-
-	redraw();	//XXX is a full redraw really required - consider all redraws()?
+    Note* selected = &notes[selectedNote];
+    float ex       = Fl::event_x() - this->x();
+    selected->col  = (ex - movingGrabXOffset) / (float)colWidth;
+    if (selected->col < 0.0) selected->col = 0.0;
+    if (selected->col + selected->length > numCols) selected->col = numCols - selected->length;
+    if (snap > 0.0) selected->col = std::round(selected->col / snap) * snap;
+    float ey      = Fl::event_y() - this->y();
+    selected->row = (ey - movingGrabYOffset + rowHeight / 2.0) / (float)rowHeight;
+    if (selected->row < 0)        selected->row = 0;
+    if (selected->row >= numRows) selected->row = numRows - 1;
+    amOverlapping = overlappingNote() >= 0;
+    if (!amOverlapping) lastValidPosition = {selected->row, selected->col};
+    if (amOverlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
+    else               window()->cursor(FL_CURSOR_HAND);
+    redraw();
 }
 
-/*
-   NOTE the song editor will/may want 2 modes for this: probably the main one to preserve its bar alignment.
-   The second one (optional) might allow it to move relative to the bar.
-*/
 void MyGrid::resizing()
 {
-//TODO add snap / magnetism
-//XXX if changing grid size want the num of pixels to remain constant.
-	float minLength = 10.0 / colWidth;
-
-	Note* selected = &notes[selectedNote];
-
-	float ex = Fl::event_x() - this->x();
-
-//TODO restrict length to a certain minimum
-	if (side==LEFT) {
-		float endCol = selected->col + selected->length;
-		selected->col = ex / (float)colWidth;
-
-		/* Apply snap: */
-		if (snap)
-			selected->col = std::round(selected->col / snap) * snap;
-
-		int neighbour = overlappingNote();
-		float min = neighbour < 0 ? 0.0 : notes[neighbour].col + notes[neighbour].length;
-		if (selected->col < min)
-			selected->col = min;
-
-		selected->length = endCol - selected->col;
-
-		if (selected->length < minLength) {
-			selected->length = minLength;
-			selected->col = endCol - minLength;
-		}
-
-		redraw();
-	}
-	else if (side==RIGHT) {
-		selected->length = ex / (float)colWidth - selected->col;
-
-		/* Apply snap: */
-		float endCol = selected->col + selected->length;
-		if (snap) {
-			endCol = std::round(endCol / snap) * snap;
-			selected->length = endCol - selected->col;
-		}
-
-		int neighbour = overlappingNote();
-		float max = neighbour < 0 ? numCols : notes[neighbour].col;
-		if (selected->col + selected->length > max)
-			selected->length = max - selected->col;
-
-		if (selected->length < minLength)
-			selected->length = minLength;
-
-		redraw();
-	}
-	//Right side to change duration...
+    float minLength = 10.0 / colWidth;
+    Note* selected  = &notes[selectedNote];
+    float ex        = Fl::event_x() - this->x();
+    if (side == LEFT) {
+        float endCol   = selected->col + selected->length;
+        selected->col  = ex / (float)colWidth;
+        if (snap) selected->col = std::round(selected->col / snap) * snap;
+        int   neighbour = overlappingNote();
+        float min       = neighbour < 0 ? 0.0 : notes[neighbour].col + notes[neighbour].length;
+        if (selected->col < min) selected->col = min;
+        selected->length = endCol - selected->col;
+        if (selected->length < minLength) { selected->length = minLength; selected->col = endCol - minLength; }
+        redraw();
+    } else if (side == RIGHT) {
+        selected->length = ex / (float)colWidth - selected->col;
+        float endCol     = selected->col + selected->length;
+        if (snap) { endCol = std::round(endCol / snap) * snap; selected->length = endCol - selected->col; }
+        int   neighbour = overlappingNote();
+        float max       = neighbour < 0 ? numCols : notes[neighbour].col;
+        if (selected->col + selected->length > max) selected->length = max - selected->col;
+        if (selected->length < minLength) selected->length = minLength;
+        redraw();
+    }
 }
 
 void MyGrid::findNoteForCursor()
 {
-	const int resizeZone = 5;
-
-	float ex = Fl::event_x() - this->x();
-	int ey = Fl::event_y() - this->y();
-
-	int row = ey / rowHeight;
-	float col = ex / colWidth;
-
-	int selectedIfResize = 0;
-
-	hoverState = NONE;
-
-	for (const auto [i,n]: std::views::enumerate(notes)) {
-		if (n.row != row)
-			continue;
-
-		float leftEdge = n.col * colWidth;
-		float rightEdge = (n.col + n.length) * colWidth;
-
-		if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
-			hoverState = RESIZING;
-			side = LEFT;
-			selectedIfResize = i;
-		}
-		else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
-			hoverState = RESIZING;
-			side = RIGHT;
-			selectedIfResize = i;
-		}
-		else if (ex >= leftEdge && ex <= rightEdge) {
-			//XXX only required on initial press down
-			hoverState = MOVING;
-			selectedNote = i;
-			movingGrabXOffset = ex - n.col * colWidth;
-			movingGrabYOffset = ey - n.row * rowHeight;
-			originalPosition = {n.row,n.col};
-			lastValidPosition = {n.row,n.col};
-
-			window()->cursor(FL_CURSOR_HAND);
-//			window()->cursor(FL_CURSOR_CROSS);
-
-			redraw();
-			/* Move takes precedence over resizing any neighbouring notes */
-
-			return;
-		}
-	}
-
-	if (hoverState == RESIZING) {
-		selectedNote = selectedIfResize;
-		window()->cursor(FL_CURSOR_WE);
-	}
-	else
-		window()->cursor(FL_CURSOR_DEFAULT);
-
-	redraw();
+    const int resizeZone = 5;
+    float ex = Fl::event_x() - this->x();
+    int   ey = Fl::event_y() - this->y();
+    int   row = ey / rowHeight;
+    int selectedIfResize = 0;
+    hoverState = NONE;
+    for (const auto [i, n] : std::views::enumerate(notes)) {
+        if (n.row != row) continue;
+        float leftEdge  = n.col * colWidth;
+        float rightEdge = (n.col + n.length) * colWidth;
+        if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
+            hoverState = RESIZING; side = LEFT; selectedIfResize = i;
+        } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
+            hoverState = RESIZING; side = RIGHT; selectedIfResize = i;
+        } else if (ex >= leftEdge && ex <= rightEdge) {
+            hoverState         = MOVING;
+            selectedNote       = i;
+            movingGrabXOffset  = ex - n.col * colWidth;
+            movingGrabYOffset  = ey - n.row * rowHeight;
+            originalPosition   = {n.row, n.col};
+            lastValidPosition  = {n.row, n.col};
+            window()->cursor(FL_CURSOR_HAND);
+            redraw();
+            return;
+        }
+    }
+    if (hoverState == RESIZING) { selectedNote = selectedIfResize; window()->cursor(FL_CURSOR_WE); }
+    else window()->cursor(FL_CURSOR_DEFAULT);
+    redraw();
 }
 
 void MyGrid::toggleNote()
 {
-	if (trackFilter >= 0) return;  // read-only when displaying a single track view
-	int ex = Fl::event_x() - x();
-	int ey = Fl::event_y() - y();
-	int   row = ey / rowHeight;
-	float col = (float)(ex / colWidth);
+    int   ex  = Fl::event_x() - x();
+    int   ey  = Fl::event_y() - y();
+    int   row = ey / rowHeight;
+    float col = (float)(ex / colWidth);
 
-	if (timeline) {
-		// Remove if clicking an existing pattern
-		for (auto& n : notes) {
-			if (n.row == row && n.col == col) {
-				timeline->removePattern(n.id);  // triggers rebuild via observer
-				return;
-			}
-		}
-		// Add if space is clear
-		bool clear = std::none_of(notes.begin(), notes.end(),
-			[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
-		if (clear)
-			timeline->addPattern(row, col, 1.0f);  // triggers rebuild via observer
-	} else {
-		// Fallback for grids without a timeline (e.g. pattern editor)
-		int size = notes.size();
-		notes.erase(std::remove_if(notes.begin(), notes.end(),
-			[=](const Note& n) { return n.row == row && n.col == col; }),
-			notes.end());
-		if (notes.size() == size) {
-			bool clear = std::none_of(notes.begin(), notes.end(),
-				[=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
-			if (clear)
-				notes.push_back({0, row, col, 1.0});
-		}
-		redraw();
-	}
+    int size = notes.size();
+    notes.erase(std::remove_if(notes.begin(), notes.end(),
+        [=](const Note& n) { return n.row == row && n.col == col; }), notes.end());
+    if ((int)notes.size() == size) {
+        bool clear = std::none_of(notes.begin(), notes.end(),
+            [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+        if (clear)
+            notes.push_back({0, row, col, 1.0});
+    }
+    redraw();
 }
 
-/* Returns the note index, or -1 */
 int MyGrid::overlappingNote()
 {
-	Note a = notes[selectedNote];
-	float aStart = a.col;
-	float aEnd = a.col + a.length;
-
-	for (const auto [i,b]: std::views::enumerate(notes)) {
-		if (i == selectedNote || b.row != a.row)
-			continue;
-
-		float bStart = b.col;
-		float bEnd = b.col + b.length;
-
-		float firstEnd = aStart <= bStart ? aEnd : bEnd;
-		float secondStart = aStart <= bStart ? bStart : aStart;
-
-		if (firstEnd > secondStart)
-			return i;
-	}
-	return -1;
+    Note  a      = notes[selectedNote];
+    float aStart = a.col, aEnd = a.col + a.length;
+    for (const auto [i, b] : std::views::enumerate(notes)) {
+        if (i == selectedNote || b.row != a.row) continue;
+        float bStart      = b.col, bEnd = b.col + b.length;
+        float firstEnd    = aStart <= bStart ? aEnd : bEnd;
+        float secondStart = aStart <= bStart ? bStart : aStart;
+        if (firstEnd > secondStart) return i;
+    }
+    return -1;
 }
