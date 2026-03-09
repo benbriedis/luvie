@@ -2,8 +2,8 @@
 #include <FL/Fl_Group.H>
 #include <string>
 #include "appWindow.hpp"
-#include "outerSongGrid.hpp"
-#include "outerPatternGrid.hpp"
+#include "songEditor.hpp"
+#include "patternEditor.hpp"
 #include "popup.hpp"
 #include "modernTabs.hpp"
 #include "transport.hpp"
@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     const int bottomH      = 50;
     const int markerRulerH = 18;
     const int winW         = 920;
-    const int winH         = tabBarH + 2 * markerRulerH + OuterGrid::rulerH + 10 * 45 + 20 + bottomH;
+    const int winH         = tabBarH + 2 * markerRulerH + Editor::rulerH + 10 * 45 + 20 + bottomH;
 
     AppWindow window(winW, winH);
     window.color(bgColor);
@@ -34,12 +34,12 @@ int main(int argc, char **argv) {
     ModernTabs tabs(0, 0, winW, tabsH);
     window.add(tabs);
 
-    Fl_Group tab1(0, tabBarH, winW, tabsH - tabBarH, "Pattern");
+    Fl_Group tab1(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab1.color(bgColor);
     tabs.add(tab1);
 
     std::vector<Note> notes(0);
-    OuterPatternGrid og1(0, tabBarH, notes, 10, 8, 30, 40, 0.25, popup1);
+    PatternEditor og1(0, tabBarH, notes, 10, 8, 30, 40, 0.25, popup1);
     tab1.add(og1);
 
     Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
     tab2.add(tempoRuler);
 
     std::vector<Note> patterns(0);
-    OuterSongGrid og2(0, tabBarH + 2 * markerRulerH, patterns, 10, 15, 45, 60, 0.25, popup2);
+    SongEditor og2(0, tabBarH + 2 * markerRulerH, patterns, 10, 15, 45, 60, 0.25, popup2);
     tab2.add(og2);
 
     SimpleTransport simpleTransport;

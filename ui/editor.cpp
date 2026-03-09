@@ -1,15 +1,15 @@
-#include "outerGrid.hpp"
+#include "editor.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 #include <cstdlib>
 
-OuterGrid::OuterGrid(int x, int y, int w, int h, int numCols, int colWidth)
+Editor::Editor(int x, int y, int w, int h, int numCols, int colWidth)
     : Fl_Group(x, y, w, h),
       playhead(numCols, colWidth)
 {}
 
-void OuterGrid::draw()
+void Editor::draw()
 {
     fl_color(rulerBg);
     fl_rectf(x(), y(), w(), rulerH);
@@ -19,7 +19,7 @@ void OuterGrid::draw()
     draw_children();
 }
 
-int OuterGrid::handle(int event)
+int Editor::handle(int event)
 {
     bool inRuler = Fl::event_y() >= y() && Fl::event_y() < y() + rulerH;
     switch (event) {

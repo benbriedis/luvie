@@ -1,5 +1,5 @@
 #include "modernTabs.hpp"
-#include "outerGrid.hpp"
+#include "editor.hpp"
 #include <FL/fl_draw.H>
 
 ModernTabs::ModernTabs(int x, int y, int w, int h) : Fl_Tabs(x, y, w, h) {}

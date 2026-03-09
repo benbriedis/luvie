@@ -1,6 +1,6 @@
 #include "grid.hpp"
 #include "playhead.hpp"
-#include "outerGrid.hpp"
+#include "editor.hpp"
 #include <FL/Fl.H>
 #include "cell.hpp"
 #include "FL/Enumerations.H"

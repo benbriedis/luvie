@@ -1,5 +1,5 @@
-#ifndef OUTER_GRID_HPP
-#define OUTER_GRID_HPP
+#ifndef EDITOR_HPP
+#define EDITOR_HPP
 
 #include "playhead.hpp"
 #include <FL/Fl_Group.H>
@@ -7,7 +7,7 @@
 
 const Fl_Color bgColor = FL_WHITE;
 
-class OuterGrid : public Fl_Group {
+class Editor : public Fl_Group {
 public:
     static constexpr int rulerH = 20;
 
@@ -22,7 +22,7 @@ protected:
     void draw() override;
     int  handle(int event) override;
 
-    OuterGrid(int x, int y, int w, int h, int numCols, int colWidth);
+    Editor(int x, int y, int w, int h, int numCols, int colWidth);
 
 public:
     std::function<void()> onEndReached;

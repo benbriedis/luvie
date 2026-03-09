@@ -13,7 +13,7 @@ TARGET = main
 
 all: $(TARGET)
 
-SRCS = main.cpp appWindow.cpp outerGrid.cpp outerSongGrid.cpp outerPatternGrid.cpp grid.cpp songGrid.cpp patternGrid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp
 
 $(TARGET): $(SRCS)
 	$(CC) $(CXXFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
