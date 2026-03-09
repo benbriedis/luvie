@@ -187,12 +187,24 @@ void ObservableTimeline::secondsToBarBeat(double secs, int& bar, int& beat) cons
 // ---------------------------------------------------------------------------
 // Track management
 
-int ObservableTimeline::addTrack(std::string label)
+int ObservableTimeline::addTrack(std::string label, int patternId)
 {
 	int id = nextId++;
-	data.tracks.push_back({id, std::move(label), {}});
+	data.tracks.push_back({id, std::move(label), patternId, {}});
 	notify();
 	return id;
+}
+
+void ObservableTimeline::renameTrack(int trackId, std::string newLabel)
+{
+	for (auto& t : data.tracks)
+		if (t.id == trackId) { t.label = std::move(newLabel); notify(); return; }
+}
+
+void ObservableTimeline::selectTrack(int index)
+{
+	data.selectedTrackIndex = index;
+	notify();
 }
 
 void ObservableTimeline::removeTrack(int trackId)

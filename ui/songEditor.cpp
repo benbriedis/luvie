@@ -2,11 +2,15 @@
 
 SongEditor::SongEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
                        int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
+    : Editor(x, y, labelW + numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
+      trackLabels(x, y + rulerH, labelW, rowHeight),
       songGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {
-    songGrid.position(x, y + rulerH);
+    rulerOffsetX = labelW;
+    trackLabels.position(x, y + rulerH);
+    songGrid.position(x + labelW, y + rulerH);
     songGrid.setPlayhead(&playhead);
+    add(trackLabels);
     add(songGrid);
     playhead.setOwner(this);
     end();
@@ -17,6 +21,7 @@ void SongEditor::setTransport(ITransport* t, ObservableTimeline* tl)
     playhead.setTransport(t, tl);
     playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
     songGrid.setTimeline(tl);
+    trackLabels.setTimeline(tl);
 }
 
 void SongEditor::setTrackView(int trackIndex, bool beatResolution)

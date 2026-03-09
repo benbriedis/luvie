@@ -14,8 +14,6 @@ class SongGrid : public Grid, public ITimelineObserver {
     float               tickBarPos        = 0.0f;
     float               dragStartOffset   = 0.0f;
     int                 dragBeatsPerBar   = 4;
-    float               patternBeats      = 0.0f;  // default pattern beat-length for new instances
-    int                 defaultPatternId  = -1;
 
     void rebuildNotes();
 
@@ -34,8 +32,6 @@ public:
 
     void setTimeline(ObservableTimeline* tl);
     void setTrackView(int trackFilter, bool beatResolution);
-    void setPatternBeats(float b) { patternBeats = b; }
-    void setDefaultPatternId(int id) { defaultPatternId = id; }
     void onTimelineChanged() override;
 };
 

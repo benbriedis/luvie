@@ -171,10 +171,9 @@ void SongGrid::toggleNote()
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
-    if (clear) {
-        if (defaultPatternId >= 0)
-            timeline->placePattern(row, defaultPatternId, col, 1.0f);
-        else
-            timeline->addPattern(row, col, 1.0f, patternBeats);
+    if (clear && row >= 0 && row < (int)timeline->get().tracks.size()) {
+        int patId = timeline->get().tracks[row].patternId;
+        if (patId > 0)
+            timeline->placePattern(row, patId, col, 1.0f);
     }
 }

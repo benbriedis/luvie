@@ -18,6 +18,7 @@ protected:
     Playhead playhead;
     bool     rulerDragging  = false;
     bool     seekingEnabled = true;
+    int      rulerOffsetX   = 0;   // x offset of grid area within editor (e.g. label panel width)
 
     void draw() override;
     int  handle(int event) override;

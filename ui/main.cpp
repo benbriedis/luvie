@@ -47,8 +47,10 @@ int main(int argc, char **argv) {
     tabs.add(tab2);
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
-    for (int i = 0; i < 10; i++)
-        songTimeline.addTrack("Track " + std::to_string(i + 1));
+    for (int i = 0; i < 10; i++) {
+        int patId = songTimeline.createPattern(og1.numPatternBeats());
+        songTimeline.addTrack("Track " + std::to_string(i + 1), patId);
+    }
 
     MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
                               15, 60, MarkerRuler::TIME_SIG, &songTimeline, &timeSigPopup);
@@ -71,11 +73,7 @@ int main(int argc, char **argv) {
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
 
     og1.setPatternPlayhead(&simpleTransport, &songTimeline, 0);
-    og2.setPatternBeats(og1.numPatternBeats());
-
-    int defaultPatId = songTimeline.createPattern(og1.numPatternBeats());
-    og1.setTimeline(&songTimeline, defaultPatId);
-    og2.setDefaultPatternId(defaultPatId);
+    songTimeline.selectTrack(0);  // triggers PatternEditor to load track 0's pattern
 
     window.add(popup1);       window.registerPopup(&popup1);
     window.add(popup2);       window.registerPopup(&popup2);

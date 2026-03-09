@@ -38,8 +38,10 @@ public:
 	void   secondsToBarBeat(double secs, int& bar, int& beat) const;
 
 	// Track management
-	int  addTrack(std::string label = "");
+	int  addTrack(std::string label = "", int patternId = 0);
 	void removeTrack(int trackId);
+	void renameTrack(int trackId, std::string newLabel);
+	void selectTrack(int index);
 
 	// Pattern definition management
 	int createPattern(float lengthBeats);

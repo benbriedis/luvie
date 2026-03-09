@@ -40,6 +40,7 @@ struct PatternInstance {
 struct Track {
 	int         id;
 	std::string label;
+	int         patternId = 0;   // the pattern displayed in the pattern editor for this track
 	std::vector<PatternInstance> patterns;
 };
 
@@ -48,6 +49,7 @@ struct Timeline {
 	std::vector<TimeSigMarker> timeSigs;
 	std::vector<Pattern>       patterns;  // pattern definitions
 	std::vector<Track>         tracks;
+	int                        selectedTrackIndex = -1;
 };
 
 #endif
