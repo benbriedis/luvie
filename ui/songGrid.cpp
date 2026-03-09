@@ -23,7 +23,9 @@ void SongGrid::draw()
         if (timeline) timeline->timeSigAt((int)note.col, top, bottom);
 
         float startOffset = 0.0f;
-        if (const PatternInstance* inst = timeline->instanceById(note.id))
+        if (isDragging && hoverState == RESIZING && side == LEFT && note.id == draggingPatternId)
+            startOffset = dragStartOffset;
+        else if (const PatternInstance* inst = timeline->instanceById(note.id))
             startOffset = inst->startOffset;
         float firstTick   = note.col + startOffset / top;
         float instanceEnd = note.col + note.length;
