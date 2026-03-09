@@ -1,6 +1,7 @@
 #include "trackLabels.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
+#include <FL/Fl_Window.H>
 
 static constexpr Fl_Color colNormal   = 0x1F293700;  // dark slate
 static constexpr Fl_Color colSelected = 0x3B82F600;  // blue
@@ -48,6 +49,10 @@ void TrackLabels::draw()
 
 int TrackLabels::handle(int event)
 {
+    if (event == FL_ENTER) {
+        window()->cursor(FL_CURSOR_DEFAULT);
+        return 1;
+    }
     if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE) {
         if (!timeline) return 1;
         int row = (Fl::event_y() - y()) / rowHeight;
