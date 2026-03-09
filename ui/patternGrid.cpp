@@ -78,8 +78,12 @@ void PatternGrid::onCommitDrag()
     isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
     if (hoverState == MOVING)
         timeline->moveNote(draggingNoteId, notes[selectedNote].col, (float)notes[selectedNote].row);
-    else if (hoverState == RESIZING)
-        timeline->resizeNote(draggingNoteId, notes[selectedNote].length);
+    else if (hoverState == RESIZING) {
+        if (side == LEFT)
+            timeline->resizeNoteLeft(draggingNoteId, notes[selectedNote].col, notes[selectedNote].length);
+        else
+            timeline->resizeNoteRight(draggingNoteId, notes[selectedNote].length);
+    }
     draggingNoteId = -1;
 }
 

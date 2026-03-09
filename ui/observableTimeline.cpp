@@ -368,11 +368,25 @@ void ObservableTimeline::moveNote(int noteId, float newStart, float newPitch)
 	}
 }
 
-void ObservableTimeline::resizeNote(int noteId, float newLength)
+void ObservableTimeline::resizeNoteRight(int noteId, float newLength)
 {
 	for (auto& pat : data.patterns) {
 		for (auto& n : pat.notes) {
 			if (n.id == noteId) {
+				n.length = newLength;
+				notify();
+				return;
+			}
+		}
+	}
+}
+
+void ObservableTimeline::resizeNoteLeft(int noteId, float newStart, float newLength)
+{
+	for (auto& pat : data.patterns) {
+		for (auto& n : pat.notes) {
+			if (n.id == noteId) {
+				n.start  = newStart;
 				n.length = newLength;
 				notify();
 				return;

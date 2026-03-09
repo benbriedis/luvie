@@ -58,7 +58,8 @@ public:
 	void addNote(int patternId, float start, float pitch, float length, float velocity = 0.8f);
 	void removeNote(int noteId);
 	void moveNote(int noteId, float newStart, float newPitch);
-	void resizeNote(int noteId, float newLength);
+	void resizeNoteRight(int noteId, float newLength);
+	void resizeNoteLeft(int noteId, float newStart, float newLength);
 	std::vector<Note> buildPatternNotes(int patternId) const;
 
 	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)
