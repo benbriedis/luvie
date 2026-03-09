@@ -2,7 +2,6 @@
 #define OBSERVABLE_TIMELINE_HPP
 
 #include "timeline.hpp"
-#include "cell.hpp"
 #include <string>
 #include <vector>
 

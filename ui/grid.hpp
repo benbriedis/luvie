@@ -2,7 +2,7 @@
 #define GRID_HPP
 
 #include "popup.hpp"
-#include "cell.hpp"
+#include "timeline.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 #include <functional>

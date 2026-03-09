@@ -1,7 +1,7 @@
 #ifndef POPUP_HPP
 #define POPUP_HPP
 
-#include "cell.hpp"
+#include "timeline.hpp"
 #include "FL/Fl_Window.H"
 //#include "grid.hpp"
 #include <FL/Fl_Menu_Button.H>

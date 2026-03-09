@@ -2,7 +2,6 @@
 #include "playhead.hpp"
 #include "editor.hpp"
 #include <FL/Fl.H>
-#include "cell.hpp"
 #include "FL/Enumerations.H"
 #include "popup.hpp"
 #include <ranges>

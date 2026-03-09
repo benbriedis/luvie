@@ -319,22 +319,17 @@ void ObservableTimeline::setPatternStartOffset(int patternId, float startOffset)
 
 std::vector<Note> ObservableTimeline::buildPatternNotes(int patternId) const
 {
-	std::vector<Note> result;
-	for (const auto& pat : data.patterns) {
-		if (pat.id == patternId) {
-			for (const auto& pn : pat.notes)
-				result.push_back({pn.id, (int)pn.pitch, pn.start, pn.length, 0.0f});
-			break;
-		}
-	}
-	return result;
+	for (const auto& pat : data.patterns)
+		if (pat.id == patternId)
+			return pat.notes;
+	return {};
 }
 
 void ObservableTimeline::addNote(int patternId, float start, float pitch, float length, float velocity)
 {
 	for (auto& pat : data.patterns) {
 		if (pat.id == patternId) {
-			pat.notes.push_back({nextId++, start, pitch, length, velocity});
+			pat.notes.push_back({nextId++, (int)pitch, start, length, velocity});
 			notify();
 			return;
 		}
@@ -345,7 +340,7 @@ void ObservableTimeline::removeNote(int noteId)
 {
 	for (auto& pat : data.patterns) {
 		auto it = std::find_if(pat.notes.begin(), pat.notes.end(),
-			[noteId](const PatternNote& n) { return n.id == noteId; });
+			[noteId](const Note& n) { return n.id == noteId; });
 		if (it != pat.notes.end()) {
 			pat.notes.erase(it);
 			notify();
@@ -359,8 +354,8 @@ void ObservableTimeline::moveNote(int noteId, float newStart, float newPitch)
 	for (auto& pat : data.patterns) {
 		for (auto& n : pat.notes) {
 			if (n.id == noteId) {
-				n.start = newStart;
-				n.pitch = newPitch;
+				n.col = newStart;
+				n.row = (int)newPitch;
 				notify();
 				return;
 			}
@@ -386,7 +381,7 @@ void ObservableTimeline::resizeNoteLeft(int noteId, float newStart, float newLen
 	for (auto& pat : data.patterns) {
 		for (auto& n : pat.notes) {
 			if (n.id == noteId) {
-				n.start  = newStart;
+				n.col    = newStart;
 				n.length = newLength;
 				notify();
 				return;
@@ -407,6 +402,6 @@ std::vector<Note> ObservableTimeline::buildNotes() const
 	std::vector<Note> notes;
 	for (int row = 0; row < (int)data.tracks.size(); row++)
 		for (const auto& p : data.tracks[row].patterns)
-			notes.push_back({p.id, row, p.startBar, p.length, p.startOffset});
+			notes.push_back({p.id, row, p.startBar, p.length, 0.0f, p.startOffset});
 	return notes;
 }
