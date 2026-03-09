@@ -317,6 +317,77 @@ void ObservableTimeline::setPatternStartOffset(int patternId, float startOffset)
 			if (p.id == patternId) { p.startOffset = startOffset; notify(); return; }
 }
 
+std::vector<Note> ObservableTimeline::buildPatternNotes(int patternId) const
+{
+	std::vector<Note> result;
+	for (const auto& pat : data.patterns) {
+		if (pat.id == patternId) {
+			for (const auto& pn : pat.notes)
+				result.push_back({pn.id, (int)pn.pitch, pn.start, pn.length, 0.0f});
+			break;
+		}
+	}
+	return result;
+}
+
+void ObservableTimeline::addNote(int patternId, float start, float pitch, float length, float velocity)
+{
+	for (auto& pat : data.patterns) {
+		if (pat.id == patternId) {
+			pat.notes.push_back({nextId++, start, pitch, length, velocity});
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::removeNote(int noteId)
+{
+	for (auto& pat : data.patterns) {
+		auto it = std::find_if(pat.notes.begin(), pat.notes.end(),
+			[noteId](const PatternNote& n) { return n.id == noteId; });
+		if (it != pat.notes.end()) {
+			pat.notes.erase(it);
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::moveNote(int noteId, float newStart, float newPitch)
+{
+	for (auto& pat : data.patterns) {
+		for (auto& n : pat.notes) {
+			if (n.id == noteId) {
+				n.start = newStart;
+				n.pitch = newPitch;
+				notify();
+				return;
+			}
+		}
+	}
+}
+
+void ObservableTimeline::resizeNote(int noteId, float newLength)
+{
+	for (auto& pat : data.patterns) {
+		for (auto& n : pat.notes) {
+			if (n.id == noteId) {
+				n.length = newLength;
+				notify();
+				return;
+			}
+		}
+	}
+}
+
+void ObservableTimeline::placePattern(int trackIndex, int patternId, float startBar, float length)
+{
+	if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;
+	data.tracks[trackIndex].patterns.push_back({nextId++, patternId, startBar, length});
+	notify();
+}
+
 std::vector<Note> ObservableTimeline::buildNotes() const
 {
 	std::vector<Note> notes;

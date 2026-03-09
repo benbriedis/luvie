@@ -18,6 +18,7 @@ public:
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setTrackView(int trackIndex, bool beatResolution);
     void setPatternBeats(float b) { songGrid.setPatternBeats(b); }
+    void setDefaultPatternId(int id) { songGrid.setDefaultPatternId(id); }
 };
 
 #endif

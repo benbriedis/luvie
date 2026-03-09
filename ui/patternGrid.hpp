@@ -4,17 +4,30 @@
 #include "grid.hpp"
 #include "observableTimeline.hpp"
 
-class PatternGrid : public Grid {
-    const ObservableTimeline* displayTl = nullptr;
+class PatternGrid : public Grid, public ITimelineObserver {
+    const ObservableTimeline* displayTl  = nullptr;
+    ObservableTimeline*       timeline   = nullptr;
+    int                       patternId  = -1;
+    int                       draggingNoteId = -1;
+    bool                      isDragging = false;
+
+    void rebuildNotes();
 
 protected:
     Fl_Color columnColor(int col) const override;
+    std::function<void()> makeDeleteCallback() override;
+    void onBeginDrag() override;
+    void onCommitDrag() override;
+    void toggleNote() override;
 
 public:
     PatternGrid(std::vector<Note> notes, int numRows, int numCols,
                 int rowHeight, int colWidth, float snap, Popup& popup);
+    ~PatternGrid();
 
     void setDisplayTimeline(const ObservableTimeline* tl) { displayTl = tl; }
+    void setTimeline(ObservableTimeline* tl, int patId);
+    void onTimelineChanged() override;
 };
 
 #endif

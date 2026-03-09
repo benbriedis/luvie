@@ -4,6 +4,14 @@
 #include <string>
 #include <vector>
 
+struct PatternNote {
+	int   id;
+	float start;     // beat position within the pattern
+	float pitch;     // MIDI note number (0-127), used as row index in grid
+	float length;    // in beats
+	float velocity;  // 0.0-1.0
+};
+
 struct BpmMarker {
 	int   bar;
 	float bpm;
@@ -18,6 +26,7 @@ struct TimeSigMarker {
 struct Pattern {
 	int   id;
 	float lengthBeats;
+	std::vector<PatternNote> notes;
 };
 
 struct PatternInstance {

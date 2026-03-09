@@ -162,3 +162,14 @@ cf Disallowing or discouraging weird denominators
    - MAYBE LEAVE IN FOR THE MOMENT. Nice if I can support experimental stuff.
     cf "Irrational meters": https://en.wikipedia.org/wiki/Time_signature
 
+     ....
+
+Linear ramping of tempos...
+
+MINOR: all the rulers should end at the the end of the song (but maybe we dont limit the song in this fashion)
+
+Either both popups should have Close, or neither.
+   There is an inconsistency in the popups too... maybe require right click to popup marker popups?
+   Delete buttons maybe should be positioned consistently.
+
+TODO put notes into the new Pattern structure

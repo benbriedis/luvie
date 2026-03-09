@@ -54,6 +54,16 @@ public:
 	void resizePatternLeft(int instanceId, float newStartBar, float newLength, float newStartOffset);
 	void setPatternStartOffset(int instanceId, float startOffset);
 
+	// Pattern note CRUD
+	void addNote(int patternId, float start, float pitch, float length, float velocity = 0.8f);
+	void removeNote(int noteId);
+	void moveNote(int noteId, float newStart, float newPitch);
+	void resizeNote(int noteId, float newLength);
+	std::vector<Note> buildPatternNotes(int patternId) const;
+
+	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)
+	void placePattern(int trackIndex, int patternId, float startBar, float length);
+
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;
 
