@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     ObservableTimeline songTimeline(120.0f, 4, 4);
     for (int i = 0; i < 10; i++) {
         int patId = songTimeline.createPattern(og1.numPatternBeats());
-        songTimeline.addTrack("Track " + std::to_string(i + 1), patId);
+        songTimeline.addTrack("Pattern " + std::to_string(i + 1), patId);
     }
 
     MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
