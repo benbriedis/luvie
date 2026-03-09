@@ -215,6 +215,15 @@ int ObservableTimeline::createPattern(float lengthBeats)
 	return id;
 }
 
+const PatternInstance* ObservableTimeline::instanceById(int instanceId) const
+{
+	for (const auto& track : data.tracks)
+		for (const auto& inst : track.patterns)
+			if (inst.id == instanceId)
+				return &inst;
+	return nullptr;
+}
+
 const Pattern* ObservableTimeline::patternForInstance(int instanceId) const
 {
 	for (const auto& track : data.tracks)
@@ -402,6 +411,6 @@ std::vector<Note> ObservableTimeline::buildNotes() const
 	std::vector<Note> notes;
 	for (int row = 0; row < (int)data.tracks.size(); row++)
 		for (const auto& p : data.tracks[row].patterns)
-			notes.push_back({p.id, row, p.startBar, p.length, 0.0f, p.startOffset});
+			notes.push_back({p.id, row, p.startBar, p.length});
 	return notes;
 }

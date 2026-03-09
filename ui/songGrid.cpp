@@ -22,7 +22,10 @@ void SongGrid::draw()
         int   top    = 4, bottom = 4;
         if (timeline) timeline->timeSigAt((int)note.col, top, bottom);
 
-        float firstTick   = note.col + note.startOffset / top;
+        float startOffset = 0.0f;
+        if (const PatternInstance* inst = timeline->instanceById(note.id))
+            startOffset = inst->startOffset;
+        float firstTick   = note.col + startOffset / top;
         float instanceEnd = note.col + note.length;
 
         float intervalBars = 0.0f;
@@ -113,7 +116,10 @@ void SongGrid::onBeginDrag()
     isDragging        = true;
     if (timeline) { int dummy; timeline->timeSigAt((int)notes[selectedNote].col, dragBeatsPerBar, dummy); }
     // Capture absolute song-bar position of the pattern's beat-0 tick.
-    tickBarPos = notes[selectedNote].col + notes[selectedNote].startOffset / dragBeatsPerBar;
+    float startOffset = 0.0f;
+    if (const PatternInstance* inst = timeline->instanceById(notes[selectedNote].id))
+        startOffset = inst->startOffset;
+    tickBarPos = notes[selectedNote].col + startOffset / dragBeatsPerBar;
 }
 
 void SongGrid::resizing()
@@ -122,7 +128,7 @@ void SongGrid::resizing()
     if (side == LEFT) {
         // Keep the beat-0 tick fixed in song position.
         float newOffset = (tickBarPos - notes[selectedNote].col) * dragBeatsPerBar;
-        notes[selectedNote].startOffset = newOffset;
+        dragStartOffset = newOffset;
     }
 }
 
@@ -137,7 +143,7 @@ void SongGrid::onCommitDrag()
             timeline->resizePatternLeft(draggingPatternId,
                                         notes[selectedNote].col,
                                         notes[selectedNote].length,
-                                        notes[selectedNote].startOffset);
+                                        dragStartOffset);
         else
             timeline->resizePattern(draggingPatternId, notes[selectedNote].length);
     }

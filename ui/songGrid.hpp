@@ -12,6 +12,7 @@ class SongGrid : public Grid, public ITimelineObserver {
     float               originalLength    = 1.0f;
     bool                isDragging        = false;
     float               tickBarPos        = 0.0f;
+    float               dragStartOffset   = 0.0f;
     int                 dragBeatsPerBar   = 4;
     float               patternBeats      = 0.0f;  // default pattern beat-length for new instances
     int                 defaultPatternId  = -1;
