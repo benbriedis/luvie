@@ -122,11 +122,13 @@ int MarkerRuler::handle(int event)
 		return 1;
 	}
 	case FL_PUSH: {
-		if (Fl::event_button() != FL_LEFT_MOUSE) return 1;
-		int bar = findBarAt(Fl::event_x());
-		clickedBar  = bar;
-		draggingBar = (bar >= 0 && !isFixed(bar)) ? bar : -1;
-		didDrag     = false;
+		if (Fl::event_button() == FL_LEFT_MOUSE) {
+			int bar = findBarAt(Fl::event_x());
+			draggingBar = (bar >= 0 && !isFixed(bar)) ? bar : -1;
+			didDrag     = false;
+		} else if (Fl::event_button() == FL_RIGHT_MOUSE) {
+			clickedBar = findBarAt(Fl::event_x());
+		}
 		return 1;
 	}
 	case FL_DRAG: {
@@ -155,11 +157,9 @@ int MarkerRuler::handle(int event)
 		return 1;
 	}
 	case FL_RELEASE: {
-		if (Fl::event_button() != FL_LEFT_MOUSE) return 1;
-		if (!didDrag) {
-			if (clickedBar >= 0) {
-				openPopupFor(clickedBar);
-			} else {
+		if (Fl::event_button() == FL_LEFT_MOUSE) {
+			if (!didDrag && draggingBar < 0) {
+				// Left click on empty space: create marker and open popup
 				int bar = std::max(1, pixelToBar(Fl::event_x() - x()));
 				bool occupied = false;
 				if (kind == TEMPO) {
@@ -170,9 +170,9 @@ int MarkerRuler::handle(int event)
 						if (m.bar == bar) { occupied = true; break; }
 				}
 				if (!occupied) {
-					if (kind == TEMPO) {
+					if (kind == TEMPO)
 						timeline->setBpm(bar, timeline->bpmAt(bar));
-					} else {
+					else {
 						int top, bottom;
 						timeline->timeSigAt(bar, top, bottom);
 						timeline->setTimeSig(bar, top, bottom);
@@ -180,10 +180,13 @@ int MarkerRuler::handle(int event)
 					openPopupFor(bar);
 				}
 			}
+			draggingBar = -1;
+			didDrag     = false;
+		} else if (Fl::event_button() == FL_RIGHT_MOUSE) {
+			if (clickedBar >= 0)
+				openPopupFor(clickedBar);
+			clickedBar = -1;
 		}
-		draggingBar = -1;
-		clickedBar  = -1;
-		didDrag     = false;
 		return 1;
 	}
 	}
