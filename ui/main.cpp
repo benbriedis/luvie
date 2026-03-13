@@ -34,17 +34,12 @@ int main(int argc, char **argv) {
     ModernTabs tabs(0, 0, winW, tabsH);
     window.add(tabs);
 
-    Fl_Group tab1(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
+    Fl_Group tab1(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
     tab1.color(bgColor);
     tabs.add(tab1);
 
     std::vector<Note> notes(0);
     PatternEditor og1(0, tabBarH, notes, 10, 8, 30, 40, 0.25, popup1);
-    tab1.add(og1);
-
-    Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
-    tab2.color(bgColor);
-    tabs.add(tab2);
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
     for (int i = 0; i < 10; i++) {
@@ -54,15 +49,20 @@ int main(int argc, char **argv) {
 
     MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
                               15, 60, MarkerRuler::TIME_SIG, &songTimeline, &timeSigPopup);
-    tab2.add(timeSigRuler);
+    tab1.add(timeSigRuler);
 
     MarkerRuler tempoRuler(0, tabBarH + markerRulerH, winW, markerRulerH,
                             15, 60, MarkerRuler::TEMPO, &songTimeline, &tempoPopup);
-    tab2.add(tempoRuler);
+    tab1.add(tempoRuler);
 
     std::vector<Note> patterns(0);
     SongEditor og2(0, tabBarH + 2 * markerRulerH, patterns, 10, 15, 45, 60, 0.25, popup2);
-    tab2.add(og2);
+    tab1.add(og2);
+
+    Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
+    tab2.color(bgColor);
+    tabs.add(tab2);
+    tab2.add(og1);
 
     SimpleTransport simpleTransport;
     Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, &songTimeline);
