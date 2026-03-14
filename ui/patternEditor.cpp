@@ -70,7 +70,7 @@ int PatternEditor::computeDefaultOffset(int patId) const
         for (int n = 0; n < total; n++) {
             if (midiForTone(n) <= A3) best = n;
         }
-        return std::clamp(best, 0, maxOffset);
+        return std::clamp(best - 1, 0, maxOffset);
     } else {
         int lowest = (int)allNotes[0].row;
         for (const auto& n : allNotes)

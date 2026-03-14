@@ -15,8 +15,6 @@ class NoteLabels : public Fl_Widget {
     int  rowOffset  = 0;
     int  totalTones = 30;
 
-    static constexpr int btnH = 14;
-
     int         computeTotalTones() const;
     std::string noteForRow(int n) const;
     void        draw() override;

@@ -1,5 +1,6 @@
 #include "noteLabels.hpp"
 #include <FL/fl_draw.H>
+#include <algorithm>
 
 static const char* sharpNames[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 static const char* flatNames[]  = {"C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"};
@@ -93,15 +94,15 @@ void NoteLabels::draw() {
         std::string label = noteForRow(n);
         int ry = y() + r * rowHeight;
         int ly = ry, lh = rowHeight;
-        if (r == 0 && canUp)             { ly += btnH; lh -= btnH; }
-        if (r == numRows - 1 && canDown) { lh -= btnH; }
+        if (r == 0 && canUp)             { ly += rowHeight; lh -= rowHeight; }
+        if (r == numRows - 1 && canDown) { lh -= rowHeight; }
         if (lh > 0)
             fl_draw(label.c_str(), x(), ly, w() - 3, lh,
                     FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
     }
 
-    if (canUp)   drawBtn(x(), y(),              w(), btnH, true);
-    if (canDown) drawBtn(x(), y() + h() - btnH, w(), btnH, false);
+    if (canUp)   drawBtn(x(), y(),                   w(), rowHeight, true);
+    if (canDown) drawBtn(x(), y() + h() - rowHeight, w(), rowHeight, false);
 }
 
 int NoteLabels::handle(int event) {
@@ -111,12 +112,12 @@ int NoteLabels::handle(int event) {
     case FL_PUSH:
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             int ey = Fl::event_y();
-            if (rowOffset + numRows < totalTones && ey < y() + btnH) {
-                if (onPageChange) onPageChange(numRows);
+            if (rowOffset + numRows < totalTones && ey < y() + rowHeight) {
+                if (onPageChange) onPageChange(std::max(1, numRows / 2));
                 return 1;
             }
-            if (rowOffset > 0 && ey > y() + h() - btnH) {
-                if (onPageChange) onPageChange(-numRows);
+            if (rowOffset > 0 && ey > y() + h() - rowHeight) {
+                if (onPageChange) onPageChange(-std::max(1, numRows / 2));
                 return 1;
             }
         }
