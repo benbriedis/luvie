@@ -54,7 +54,16 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         self->useSharp = !self->useSharp;
         self->sharpFlatBtn.label(self->useSharp ? "#" : "b");
         self->updateRootChoiceLabels(idx);
+        if (self->onParamsChanged) self->onParamsChanged();
     }, this);
+
+    auto paramsCb = [](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (self->onParamsChanged) self->onParamsChanged();
+    };
+    octaveChoice.callback(paramsCb, this);
+    rootChoice.callback(paramsCb, this);
+    chordChoice.callback(paramsCb, this);
 
     rootLabel.box(FL_NO_BOX);
     rootLabel.labelcolor(text);

@@ -2,15 +2,24 @@
 
 PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
+    : Editor(x, y, labelsW + numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
+      noteLabels(x, y + rulerH, labelsW, numRows, rowHeight),
       patternGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {
-    patternGrid.position(x, y + rulerH);
+    rulerOffsetX = labelsW;
+    noteLabels.position(x, y + rulerH);
+    patternGrid.position(x + labelsW, y + rulerH);
     patternGrid.setPlayhead(&playhead);
+    add(noteLabels);
     add(patternGrid);
     playhead.setOwner(this);
     seekingEnabled = false;
     end();
+}
+
+void PatternEditor::setNoteParams(int octave, int rootPitch, int chordType, bool useSharp)
+{
+    noteLabels.setParams(octave, rootPitch, chordType, useSharp);
 }
 
 PatternEditor::~PatternEditor()

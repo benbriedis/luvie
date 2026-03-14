@@ -87,6 +87,13 @@ int main(int argc, char **argv) {
     og1.setPatternPlayhead(&simpleTransport, &songTimeline, 0);
     songTimeline.selectTrack(0);  // triggers PatternEditor to load track 0's pattern
 
+    auto syncNoteLabels = [&]() {
+        og1.setNoteParams(patternPanel.octave(), patternPanel.rootPitch(),
+                          patternPanel.chordType(), patternPanel.isSharp());
+    };
+    patternPanel.onParamsChanged = syncNoteLabels;
+    syncNoteLabels();
+
     window.add(popup1);       window.registerPopup(&popup1);
     window.add(popup2);       window.registerPopup(&popup2);
     window.add(tempoPopup);   window.registerPopup(&tempoPopup);

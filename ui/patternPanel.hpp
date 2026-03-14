@@ -41,7 +41,14 @@ public:
     PatternPanel(int x, int y, int w, int h);
     ~PatternPanel();
 
+    std::function<void()> onParamsChanged;
+
     void commitEdit();
+
+    int  octave()    const { return octaveChoice.value(); }
+    int  rootPitch() const { return rootChoice.value(); }
+    int  chordType() const { return chordChoice.value(); }
+    bool isSharp()   const { return useSharp; }
 
     void setTimeline(ObservableTimeline* tl);
     void onTimelineChanged() override;
