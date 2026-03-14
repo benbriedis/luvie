@@ -4,36 +4,36 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 
-static constexpr int pad           = 3;
-static constexpr int groupGap      = 10;  // between Octave choice and #/b button
-static constexpr int ctrlH         = 24;
-static constexpr int labelW        = 55;
-static constexpr int nameW         = 150;
-static constexpr int octaveChoiceW = 50;
-static constexpr int toggleBtnW    = 26;
-static constexpr int choiceW       = 130;
+static constexpr int pad          = 3;
+static constexpr int sg           = 3;    // small gap within base group
+static constexpr int groupGap     = 12;   // between base group and chord
+static constexpr int ctrlH        = 24;
+static constexpr int labelW       = 55;
+static constexpr int nameW        = 150;
+static constexpr int toggleBtnW   = 26;
+static constexpr int rootChoiceW  = 110;
+static constexpr int octaveChoiceW = 40;
+static constexpr int choiceW      = 130;
 
-static int nameX(int x)         { return x + pad; }
-static int octaveLabelX(int x)  { return nameX(x) + nameW + pad; }
-static int octaveChoiceX(int x) { return octaveLabelX(x) + labelW; }
-static int sharpFlatBtnX(int x) { return octaveChoiceX(x) + octaveChoiceW + groupGap; }
-static int rootLabelX(int x)    { return sharpFlatBtnX(x) + toggleBtnW + 1; }
-static int rootChoiceX(int x)   { return rootLabelX(x) + labelW; }
-static int chordLabelX(int x)   { return rootChoiceX(x) + choiceW + pad; }
-static int chordChoiceX(int x)  { return chordLabelX(x) + labelW; }
-static int ctrlY(int y, int h)  { return y + (h - ctrlH) / 2; }
+static int nameX(int x)          { return x + pad; }
+static int baseLabelX(int x)     { return nameX(x) + nameW + pad; }
+static int sharpFlatBtnX(int x)  { return baseLabelX(x) + labelW + sg; }
+static int rootChoiceX(int x)    { return sharpFlatBtnX(x) + toggleBtnW + sg; }
+static int octaveChoiceX(int x)  { return rootChoiceX(x) + rootChoiceW + sg; }
+static int chordLabelX(int x)    { return octaveChoiceX(x) + octaveChoiceW + groupGap; }
+static int chordChoiceX(int x)   { return chordLabelX(x) + labelW; }
+static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
-      patternName (nameX(x),          ctrlY(y,h), nameW,        ctrlH),
-      octaveLabel (octaveLabelX(x),  ctrlY(y,h), labelW,       ctrlH, "Octave"),
-      octaveChoice(octaveChoiceX(x), ctrlY(y,h), octaveChoiceW,ctrlH),
+      patternName (nameX(x),         ctrlY(y,h), nameW,         ctrlH),
+      baseLabel   (baseLabelX(x),    ctrlY(y,h), labelW,        ctrlH, "Base"),
       sharpFlatBtn(sharpFlatBtnX(x), ctrlY(y,h), toggleBtnW,   ctrlH, "#"),
-      rootLabel   (rootLabelX(x),    ctrlY(y,h), labelW,       ctrlH, "Root"),
-      rootChoice  (rootChoiceX(x),   ctrlY(y,h), choiceW,      ctrlH),
-      chordLabel  (chordLabelX(x),   ctrlY(y,h), labelW,       ctrlH, "Chord"),
-      chordChoice (chordChoiceX(x),  ctrlY(y,h), choiceW,      ctrlH),
-      input       (nameX(x),           ctrlY(y,h), nameW,        ctrlH)
+      rootChoice  (rootChoiceX(x),   ctrlY(y,h), rootChoiceW,  ctrlH),
+      octaveChoice(octaveChoiceX(x), ctrlY(y,h), octaveChoiceW,ctrlH),
+      chordLabel  (chordLabelX(x),   ctrlY(y,h), labelW,        ctrlH, "Chord"),
+      chordChoice (chordChoiceX(x),  ctrlY(y,h), choiceW,       ctrlH),
+      input       (nameX(x),         ctrlY(y,h), nameW,         ctrlH)
 {
     box(FL_NO_BOX);
 
@@ -41,12 +41,9 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     patternName.labelcolor(text);
     patternName.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
 
-    octaveLabel.box(FL_NO_BOX);
-    octaveLabel.labelcolor(text);
-    octaveLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-    for (int i = 0; i <= 9; i++) octaveChoice.add(std::to_string(i).c_str());
-    octaveChoice.value(4);
+    baseLabel.box(FL_NO_BOX);
+    baseLabel.labelcolor(text);
+    baseLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
     sharpFlatBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
@@ -57,19 +54,17 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         if (self->onParamsChanged) self->onParamsChanged();
     }, this);
 
+    updateRootChoiceLabels(0);
+
     auto paramsCb = [](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         if (self->onParamsChanged) self->onParamsChanged();
     };
-    octaveChoice.callback(paramsCb, this);
     rootChoice.callback(paramsCb, this);
-    chordChoice.callback(paramsCb, this);
 
-    rootLabel.box(FL_NO_BOX);
-    rootLabel.labelcolor(text);
-    rootLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-    updateRootChoiceLabels(0);
+    for (int i = 0; i <= 9; i++) octaveChoice.add(std::to_string(i).c_str());
+    octaveChoice.value(4);
+    octaveChoice.callback(paramsCb, this);
 
     chordLabel.box(FL_NO_BOX);
     chordLabel.labelcolor(text);
@@ -78,6 +73,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     for (const char* chord : {"Major", "Minor", "Major 7", "Minor 7"})
         chordChoice.add(chord);
     chordChoice.value(0);
+    chordChoice.callback(paramsCb, this);
 
     input.hide();
     input.box(FL_FLAT_BOX);

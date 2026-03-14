@@ -20,11 +20,10 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     bool                useSharp      = true;
 
     Fl_Box      patternName;
-    Fl_Box      octaveLabel;
-    Fl_Choice   octaveChoice;
+    Fl_Box      baseLabel;
     Fl_Button   sharpFlatBtn;
-    Fl_Box      rootLabel;
     Fl_Choice   rootChoice;
+    Fl_Choice   octaveChoice;
     Fl_Box      chordLabel;
     Fl_Choice   chordChoice;
     InlineInput input;
