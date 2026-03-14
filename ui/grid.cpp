@@ -28,8 +28,8 @@ void Grid::draw()
     fl_color(bgColor);
     fl_rectf(x(), y(), w(), h());
 
-    fl_color(0xEE888800);  // orange
     for (int i = 0; i < numRows + 1; i++) {
+        fl_color(rowLineColor(i));
         fl_line(x(), y() + i * rowHeight, x() + numCols * colWidth, y() + i * rowHeight);
     }
 

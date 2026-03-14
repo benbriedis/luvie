@@ -42,7 +42,8 @@ protected:
     void clampSelection() { if (selectedNote >= (int)notes.size()) { selectedNote = 0; hoverState = NONE; } }
 
     // Virtual extension hooks
-    virtual Fl_Color columnColor(int col) const { (void)col; return 0x00EE0000; }
+    virtual Fl_Color columnColor(int col)      const { (void)col; return 0x00EE0000; }
+    virtual Fl_Color rowLineColor(int lineIdx) const { (void)lineIdx; return 0xEE888800; }
     virtual std::function<void()> makeDeleteCallback() { return nullptr; }
     virtual void onBeginDrag() {}
     virtual void onCommitDrag() {}

@@ -86,6 +86,13 @@ void PatternGrid::onCommitDrag()
     draggingNoteId = -1;
 }
 
+Fl_Color PatternGrid::rowLineColor(int i) const
+{
+    if (i > 0 && i < numRows && chordSize > 0 && (numRows - i) % chordSize == 0)
+        return 0x33110000;  // dark octave boundary
+    return 0xEE888800;
+}
+
 Fl_Color PatternGrid::columnColor(int col) const
 {
     if (!timeline) return 0x00EE0000;

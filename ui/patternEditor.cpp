@@ -19,7 +19,9 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
 
 void PatternEditor::setNoteParams(int octave, int rootPitch, int chordType, bool useSharp)
 {
+    static const int chordSizes[] = {3, 3, 4, 4};
     noteLabels.setParams(octave, rootPitch, chordType, useSharp);
+    patternGrid.setChordSize(chordSizes[chordType]);
 }
 
 PatternEditor::~PatternEditor()
