@@ -1,4 +1,13 @@
 #include "patternEditor.hpp"
+#include <algorithm>
+
+static const int intervals[][4] = {
+    {0, 4, 7,  0},
+    {0, 3, 7,  0},
+    {0, 4, 7, 11},
+    {0, 3, 7, 10},
+};
+static const int chordSizes[] = {3, 3, 4, 4};
 
 PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
@@ -14,14 +23,68 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
     add(patternGrid);
     playhead.setOwner(this);
     seekingEnabled = false;
+
+    noteLabels.onPageChange = [this](int delta) {
+        setRowOffset(noteLabels.getRowOffset() + delta);
+    };
+
     end();
 }
 
-void PatternEditor::setNoteParams(int octave, int rootPitch, int chordType, bool useSharp)
+void PatternEditor::setNoteParams(int root, int chord, bool sharp)
 {
-    static const int chordSizes[] = {3, 3, 4, 4};
-    noteLabels.setParams(octave, rootPitch, chordType, useSharp);
-    patternGrid.setChordSize(chordSizes[chordType]);
+    rootPitch = root;
+    chordType = chord;
+    noteLabels.setParams(root, chord, sharp);
+    patternGrid.setChordSize(chordSizes[chord]);
+
+    int patId = -1;
+    if (timeline && lastSelectedTrack >= 0) {
+        const auto& tracks = timeline->get().tracks;
+        if (lastSelectedTrack < (int)tracks.size())
+            patId = tracks[lastSelectedTrack].patternId;
+    }
+    setRowOffset(computeDefaultOffset(patId));
+}
+
+int PatternEditor::computeDefaultOffset(int patId) const
+{
+    int rootSemitone = (rootPitch + 9) % 12;
+    int rootMidi0    = 12 + rootSemitone;
+    int size         = chordSizes[chordType];
+    int total        = noteLabels.getTotalTones();
+
+    auto midiForTone = [&](int n) {
+        return rootMidi0 + intervals[chordType][n % size] + (n / size) * 12;
+    };
+
+    std::vector<Note> allNotes;
+    if (timeline && patId >= 0)
+        allNotes = timeline->buildPatternNotes(patId);
+
+    int maxOffset = std::max(0, total - patternGrid.numRows);
+
+    if (allNotes.empty()) {
+        const int A3 = 57;
+        int best = 0;
+        for (int n = 0; n < total; n++) {
+            if (midiForTone(n) <= A3) best = n;
+        }
+        return std::clamp(best, 0, maxOffset);
+    } else {
+        int lowest = (int)allNotes[0].row;
+        for (const auto& n : allNotes)
+            lowest = std::min(lowest, (int)n.row);
+        return std::clamp(lowest - 1, 0, maxOffset);
+    }
+}
+
+void PatternEditor::setRowOffset(int offset)
+{
+    int total = noteLabels.getTotalTones();
+    offset = std::clamp(offset, 0, std::max(0, total - patternGrid.numRows));
+    noteLabels.setRowOffset(offset);
+    patternGrid.setRowOffset(offset);
 }
 
 PatternEditor::~PatternEditor()
@@ -46,7 +109,9 @@ void PatternEditor::onTimelineChanged()
     if (sel >= 0 && sel < (int)tracks.size()) {
         playhead.setPatternTrack(sel);
         int patId = tracks[sel].patternId;
-        if (patId > 0)
+        if (patId > 0) {
             patternGrid.setTimeline(timeline, patId);
+            setRowOffset(computeDefaultOffset(patId));
+        }
     }
 }

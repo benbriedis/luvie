@@ -90,8 +90,7 @@ int main(int argc, char **argv) {
     songTimeline.selectTrack(0);  // triggers PatternEditor to load track 0's pattern
 
     auto syncNoteLabels = [&]() {
-        og1.setNoteParams(patternPanel.octave(), patternPanel.rootPitch(),
-                          patternPanel.chordType(), patternPanel.isSharp());
+        og1.setNoteParams(patternPanel.rootPitch(), patternPanel.chordType(), patternPanel.isSharp());
     };
     patternPanel.onParamsChanged = syncNoteLabels;
     syncNoteLabels();

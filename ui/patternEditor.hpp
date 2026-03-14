@@ -16,6 +16,11 @@ class PatternEditor : public Editor, public ITimelineObserver {
     PatternGrid         patternGrid;
     ObservableTimeline* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
+    int                 rootPitch         = 0;
+    int                 chordType         = 0;
+
+    int  computeDefaultOffset(int patId) const;
+    void setRowOffset(int offset);
 
 public:
     PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
@@ -23,7 +28,7 @@ public:
     ~PatternEditor();
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
-    void setNoteParams(int octave, int rootPitch, int chordType, bool useSharp);
+    void setNoteParams(int rootPitch, int chordType, bool useSharp);
     int  numPatternBeats() const { return patternGrid.numCols; }
     void onTimelineChanged() override;
 };

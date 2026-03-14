@@ -23,7 +23,6 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     Fl_Box      baseLabel;
     Fl_Button   sharpFlatBtn;
     ModernChoice rootChoice;
-    ModernChoice octaveChoice;
     Fl_Box      chordLabel;
     ModernChoice chordChoice;
     InlineInput input;
@@ -44,7 +43,6 @@ public:
 
     void commitEdit();
 
-    int  octave()    const { return octaveChoice.value(); }
     int  rootPitch() const { return rootChoice.value(); }
     int  chordType() const { return chordChoice.value(); }
     bool isSharp()   const { return useSharp; }

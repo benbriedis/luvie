@@ -22,8 +22,15 @@ void PatternGrid::setTimeline(ObservableTimeline* tl, int patId)
 
 void PatternGrid::rebuildNotes()
 {
-    if (timeline && patternId >= 0)
-        notes = timeline->buildPatternNotes(patternId);
+    notes.clear();
+    if (!timeline || patternId < 0) { clampSelection(); return; }
+    for (auto n : timeline->buildPatternNotes(patternId)) {
+        int visual = (rowOffset + numRows - 1) - (int)n.row;
+        if (visual >= 0 && visual < numRows) {
+            n.row = visual;
+            notes.push_back(n);
+        }
+    }
     clampSelection();
 }
 
@@ -36,10 +43,11 @@ void PatternGrid::onTimelineChanged()
 
 void PatternGrid::toggleNote()
 {
-    int   ex  = Fl::event_x() - x();
-    int   ey  = Fl::event_y() - y();
-    int   row = ey / rowHeight;
-    float col = (float)(ex / colWidth);
+    int   ey         = Fl::event_y() - y();
+    int   ex         = Fl::event_x() - x();
+    int   visual_row = ey / rowHeight;
+    int   abs_row    = (rowOffset + numRows - 1) - visual_row;
+    float col        = (float)(ex / colWidth);
 
     if (!timeline || patternId < 0) {
         Grid::toggleNote();
@@ -47,15 +55,15 @@ void PatternGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.row == row && n.col == col) {
+        if (n.row == visual_row && n.col == col) {
             timeline->removeNote(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+        [=](const Note& n) { return n.row == visual_row && col < n.col + n.length && col + 1.0f > n.col; });
     if (clear)
-        timeline->addNote(patternId, col, (float)row, 1.0f);
+        timeline->addNote(patternId, col, (float)abs_row, 1.0f);
 }
 
 std::function<void()> PatternGrid::makeDeleteCallback()
@@ -74,16 +82,24 @@ void PatternGrid::onBeginDrag()
 void PatternGrid::onCommitDrag()
 {
     if (!timeline || draggingNoteId < 0) return;
-    isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
-    if (hoverState == MOVING)
-        timeline->moveNote(draggingNoteId, notes[selectedNote].col, (float)notes[selectedNote].row);
-    else if (hoverState == RESIZING) {
+    isDragging = false;
+    if (hoverState == MOVING) {
+        float abs_row = (float)((rowOffset + numRows - 1) - notes[selectedNote].row);
+        timeline->moveNote(draggingNoteId, notes[selectedNote].col, abs_row);
+    } else if (hoverState == RESIZING) {
         if (side == LEFT)
             timeline->resizeNoteLeft(draggingNoteId, notes[selectedNote].col, notes[selectedNote].length);
         else
             timeline->resizeNoteRight(draggingNoteId, notes[selectedNote].length);
     }
     draggingNoteId = -1;
+}
+
+void PatternGrid::setRowOffset(int offset)
+{
+    rowOffset = offset;
+    rebuildNotes();
+    redraw();
 }
 
 Fl_Color PatternGrid::rowLineColor(int i) const

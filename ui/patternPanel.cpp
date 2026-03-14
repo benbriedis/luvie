@@ -12,15 +12,13 @@ static constexpr int labelW       = 55;
 static constexpr int nameW        = 150;
 static constexpr int toggleBtnW   = 26;
 static constexpr int rootChoiceW  = 110;
-static constexpr int octaveChoiceW = 40;
 static constexpr int choiceW      = 130;
 
 static int nameX(int x)          { return x + pad; }
 static int baseLabelX(int x)     { return nameX(x) + nameW + pad; }
 static int sharpFlatBtnX(int x)  { return baseLabelX(x) + labelW + sg; }
 static int rootChoiceX(int x)    { return sharpFlatBtnX(x) + toggleBtnW + sg; }
-static int octaveChoiceX(int x)  { return rootChoiceX(x) + rootChoiceW + sg; }
-static int chordLabelX(int x)    { return octaveChoiceX(x) + octaveChoiceW + groupGap; }
+static int chordLabelX(int x)    { return rootChoiceX(x) + rootChoiceW + groupGap; }
 static int chordChoiceX(int x)   { return chordLabelX(x) + labelW; }
 static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
 
@@ -30,7 +28,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       baseLabel   (baseLabelX(x),    ctrlY(y,h), labelW,        ctrlH, "Base"),
       sharpFlatBtn(sharpFlatBtnX(x), ctrlY(y,h), toggleBtnW,   ctrlH, "#"),
       rootChoice  (rootChoiceX(x),   ctrlY(y,h), rootChoiceW,  ctrlH),
-      octaveChoice(octaveChoiceX(x), ctrlY(y,h), octaveChoiceW,ctrlH),
       chordLabel  (chordLabelX(x),   ctrlY(y,h), labelW,        ctrlH, "Chord"),
       chordChoice (chordChoiceX(x),  ctrlY(y,h), choiceW,       ctrlH),
       input       (nameX(x),         ctrlY(y,h), nameW,         ctrlH)
@@ -61,10 +58,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         if (self->onParamsChanged) self->onParamsChanged();
     };
     rootChoice.callback(paramsCb, this);
-
-    for (int i = 0; i <= 9; i++) octaveChoice.add(std::to_string(i).c_str());
-    octaveChoice.value(4);
-    octaveChoice.callback(paramsCb, this);
 
     chordLabel.box(FL_NO_BOX);
     chordLabel.labelcolor(text);

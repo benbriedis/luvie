@@ -10,6 +10,7 @@ class PatternGrid : public Grid, public ITimelineObserver {
     int                 draggingNoteId = -1;
     bool                isDragging     = false;
     int                 chordSize      = 3;
+    int                 rowOffset      = 0;
 
     void rebuildNotes();
 
@@ -28,6 +29,7 @@ public:
 
     void setTimeline(ObservableTimeline* tl, int patId);
     void setChordSize(int size) { chordSize = size; redraw(); }
+    void setRowOffset(int offset);
     void onTimelineChanged() override;
 };
 
