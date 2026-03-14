@@ -4,33 +4,45 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 
-static constexpr int pad     = 10;
-static constexpr int ctrlH   = 24;
-static constexpr int labelW  = 55;
-static constexpr int nameW   = 150;
-static constexpr int choiceW = 130;
+static constexpr int pad          = 3;
+static constexpr int ctrlH        = 24;
+static constexpr int labelW       = 55;
+static constexpr int nameW        = 150;
+static constexpr int octaveChoiceW = 50;
+static constexpr int choiceW      = 130;
 
-static int nameX(int x) { return x + pad; }
-static int rootLabelX(int x) { return nameX(x) + nameW + pad * 2; }
-static int rootChoiceX(int x) { return rootLabelX(x) + labelW; }
-static int chordLabelX(int x) { return rootChoiceX(x) + choiceW + pad; }
+static int nameX(int x)        { return x + pad; }
+static int octaveLabelX(int x) { return nameX(x) + nameW + pad; }
+static int octaveChoiceX(int x){ return octaveLabelX(x) + labelW; }
+static int rootLabelX(int x)   { return octaveChoiceX(x) + octaveChoiceW + pad; }
+static int rootChoiceX(int x)  { return rootLabelX(x) + labelW; }
+static int chordLabelX(int x)  { return rootChoiceX(x) + choiceW + pad; }
 static int chordChoiceX(int x) { return chordLabelX(x) + labelW; }
 static int ctrlY(int y, int h) { return y + (h - ctrlH) / 2; }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
-      patternName(nameX(x),       ctrlY(y,h), nameW,   ctrlH),
-      rootLabel  (rootLabelX(x),  ctrlY(y,h), labelW,  ctrlH, "Root note"),
-      rootChoice (rootChoiceX(x), ctrlY(y,h), choiceW, ctrlH),
-      chordLabel (chordLabelX(x), ctrlY(y,h), labelW,  ctrlH, "Chord"),
-      chordChoice(chordChoiceX(x),ctrlY(y,h), choiceW, ctrlH),
-      input      (nameX(x),       ctrlY(y,h), nameW,   ctrlH)
+      patternName (nameX(x),        ctrlY(y,h), nameW,        ctrlH),
+      octaveLabel (octaveLabelX(x), ctrlY(y,h), labelW,       ctrlH, "Octave"),
+      octaveChoice(octaveChoiceX(x),ctrlY(y,h), octaveChoiceW,ctrlH),
+      rootLabel   (rootLabelX(x),   ctrlY(y,h), labelW,       ctrlH, "Root"),
+      rootChoice  (rootChoiceX(x),  ctrlY(y,h), choiceW,      ctrlH),
+      chordLabel  (chordLabelX(x),  ctrlY(y,h), labelW,       ctrlH, "Chord"),
+      chordChoice (chordChoiceX(x), ctrlY(y,h), choiceW,      ctrlH),
+      input       (nameX(x),        ctrlY(y,h), nameW,        ctrlH)
 {
     box(FL_NO_BOX);
 
     patternName.box(FL_NO_BOX);
     patternName.labelcolor(text);
     patternName.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
+
+    octaveLabel.box(FL_NO_BOX);
+    octaveLabel.labelcolor(text);
+    octaveLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    for (int i = 0; i <= 9; i++) octaveChoice.add(std::to_string(i).c_str());
+    octaveChoice.value(4);
 
     rootLabel.box(FL_NO_BOX);
     rootLabel.labelcolor(text);

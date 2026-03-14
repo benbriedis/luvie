@@ -18,6 +18,8 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     std::string         originalLabel;
 
     Fl_Box      patternName;
+    Fl_Box      octaveLabel;
+    Fl_Choice   octaveChoice;
     Fl_Box      rootLabel;
     Fl_Choice   rootChoice;
     Fl_Box      chordLabel;
