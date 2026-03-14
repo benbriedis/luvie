@@ -6,7 +6,7 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Button.H>
-#include <FL/Fl_Choice.H>
+#include "modernChoice.hpp"
 #include <string>
 
 class PatternPanel : public Fl_Group, public ITimelineObserver {
@@ -22,10 +22,10 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     Fl_Box      patternName;
     Fl_Box      baseLabel;
     Fl_Button   sharpFlatBtn;
-    Fl_Choice   rootChoice;
-    Fl_Choice   octaveChoice;
+    ModernChoice rootChoice;
+    ModernChoice octaveChoice;
     Fl_Box      chordLabel;
-    Fl_Choice   chordChoice;
+    ModernChoice chordChoice;
     InlineInput input;
 
     void startEdit();
