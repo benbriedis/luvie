@@ -11,7 +11,7 @@ static constexpr int nameW   = 150;
 static constexpr int choiceW = 130;
 
 static int nameX(int x) { return x + pad; }
-static int rootLabelX(int x) { return nameX(x) + nameW + pad; }
+static int rootLabelX(int x) { return nameX(x) + nameW + pad * 2; }
 static int rootChoiceX(int x) { return rootLabelX(x) + labelW; }
 static int chordLabelX(int x) { return rootChoiceX(x) + choiceW + pad; }
 static int chordChoiceX(int x) { return chordLabelX(x) + labelW; }
@@ -28,8 +28,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
 {
     box(FL_NO_BOX);
 
-    patternName.box(FL_FLAT_BOX);
-    patternName.color(0x37415100);
+    patternName.box(FL_NO_BOX);
     patternName.labelcolor(text);
     patternName.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
 
