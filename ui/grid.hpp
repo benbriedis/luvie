@@ -39,6 +39,7 @@ protected:
     int  overlappingNote();
     void moving();
     virtual void resizing();
+    void clampSelection() { if (selectedNote >= (int)notes.size()) { selectedNote = 0; hoverState = NONE; } }
 
     // Virtual extension hooks
     virtual Fl_Color columnColor(int col) const { (void)col; return 0x00EE0000; }

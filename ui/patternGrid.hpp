@@ -5,8 +5,7 @@
 #include "observableTimeline.hpp"
 
 class PatternGrid : public Grid, public ITimelineObserver {
-    const ObservableTimeline* displayTl  = nullptr;
-    ObservableTimeline*       timeline   = nullptr;
+    ObservableTimeline* timeline   = nullptr;
     int                       patternId  = -1;
     int                       draggingNoteId = -1;
     bool                      isDragging = false;
@@ -25,7 +24,6 @@ public:
                 int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternGrid();
 
-    void setDisplayTimeline(const ObservableTimeline* tl) { displayTl = tl; }
     void setTimeline(ObservableTimeline* tl, int patId);
     void onTimelineChanged() override;
 };

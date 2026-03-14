@@ -61,17 +61,15 @@ TrackLabels::TrackLabels(int x, int y, int w, int rowHeight)
 
 TrackLabels::~TrackLabels()
 {
-    if (timeline) timeline->removeObserver(this);
+    swapObserver(timeline, nullptr, this);
 }
 
 void TrackLabels::setTimeline(ObservableTimeline* tl)
 {
-    if (timeline) timeline->removeObserver(this);
-    timeline = tl;
+    swapObserver(timeline, tl, this);
     if (timeline) {
         int rows = (int)timeline->get().tracks.size();
         size(w(), rows * rowHeight);
-        timeline->addObserver(this);
     }
     redraw();
 }

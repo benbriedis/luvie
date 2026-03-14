@@ -56,18 +56,14 @@ void SongGrid::draw()
 
 SongGrid::~SongGrid()
 {
-    if (timeline) timeline->removeObserver(this);
+    swapObserver(timeline, nullptr, this);
 }
 
 void SongGrid::setTimeline(ObservableTimeline* tl)
 {
-    if (timeline) timeline->removeObserver(this);
-    timeline = tl;
-    if (timeline) {
-        timeline->addObserver(this);
-        rebuildNotes();
-        redraw();
-    }
+    swapObserver(timeline, tl, this);
+    rebuildNotes();
+    redraw();
 }
 
 void SongGrid::rebuildNotes()
@@ -75,6 +71,7 @@ void SongGrid::rebuildNotes()
     if (!timeline) return;
     if (trackFilter < 0) {
         notes = timeline->buildNotes();
+        clampSelection();
         return;
     }
     const auto& tracks = timeline->get().tracks;
@@ -88,6 +85,7 @@ void SongGrid::rebuildNotes()
     notes.clear();
     for (auto& p : tracks[trackFilter].patterns)
         notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
+    clampSelection();
 }
 
 void SongGrid::setTrackView(int tf, bool br)

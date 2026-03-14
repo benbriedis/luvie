@@ -9,15 +9,13 @@ PatternGrid::PatternGrid(std::vector<Note> notes, int numRows, int numCols,
 
 PatternGrid::~PatternGrid()
 {
-    if (timeline) timeline->removeObserver(this);
+    swapObserver(timeline, nullptr, this);
 }
 
 void PatternGrid::setTimeline(ObservableTimeline* tl, int patId)
 {
-    if (timeline) timeline->removeObserver(this);
-    timeline  = tl;
+    swapObserver(timeline, tl, this);
     patternId = patId;
-    if (timeline) timeline->addObserver(this);
     rebuildNotes();
     redraw();
 }
@@ -26,6 +24,7 @@ void PatternGrid::rebuildNotes()
 {
     if (timeline && patternId >= 0)
         notes = timeline->buildPatternNotes(patternId);
+    clampSelection();
 }
 
 void PatternGrid::onTimelineChanged()
@@ -89,10 +88,10 @@ void PatternGrid::onCommitDrag()
 
 Fl_Color PatternGrid::columnColor(int col) const
 {
-    if (!displayTl) return 0x00EE0000;
+    if (!timeline) return 0x00EE0000;
     int queryBar = playhead ? (int)playhead->currentBar() : 0;
     int top, bottom;
-    displayTl->timeSigAt(queryBar, top, bottom);
+    timeline->timeSigAt(queryBar, top, bottom);
     int beatsPerBar = top;
     bool isBarStart = beatsPerBar > 0 && col % beatsPerBar == 0;
     return isBarStart ? 0x00660000 : 0x00EE0000;

@@ -11,6 +11,7 @@ public:
 	virtual void onTimelineChanged() = 0;
 };
 
+
 class ObservableTimeline {
 public:
 	ObservableTimeline(float initBpm, int initTop, int initBottom);
@@ -85,5 +86,12 @@ private:
 	void sortBpms();
 	void sortTimeSigs();
 };
+
+inline void swapObserver(ObservableTimeline*& stored, ObservableTimeline* next, ITimelineObserver* self)
+{
+    if (stored) stored->removeObserver(self);
+    stored = next;
+    if (stored) stored->addObserver(self);
+}
 
 #endif

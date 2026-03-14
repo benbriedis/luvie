@@ -15,17 +15,14 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
 
 PatternEditor::~PatternEditor()
 {
-    if (timeline) timeline->removeObserver(this);
+    swapObserver(timeline, nullptr, this);
 }
 
 void PatternEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex)
 {
-    if (timeline) timeline->removeObserver(this);
-    timeline = tl;
-    if (timeline) timeline->addObserver(this);
+    swapObserver(timeline, tl, this);
     playhead.setTransport(t, tl);
     playhead.setPatternTrack(trackIndex);
-    patternGrid.setDisplayTimeline(tl);
 }
 
 void PatternEditor::onTimelineChanged()
