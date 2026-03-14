@@ -39,12 +39,11 @@ int main(int argc, char **argv) {
     tab1.color(bgColor);
     tabs.add(tab1);
 
-    std::vector<Note> notes(0);
-    PatternEditor og1(0, tabBarH, notes, 10, 8, 30, 40, 0.25, popup1);
+    const int numPatternBeats = 8;
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
     for (int i = 0; i < 10; i++) {
-        int patId = songTimeline.createPattern(og1.numPatternBeats());
+        int patId = songTimeline.createPattern(numPatternBeats);
         songTimeline.addTrack("Pattern " + std::to_string(i + 1), patId);
     }
 
@@ -65,6 +64,9 @@ int main(int argc, char **argv) {
     Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2.color(bgColor);
     tabs.add(tab2);
+
+    std::vector<Note> notes(0);
+    PatternEditor og1(0, tabBarH, notes, 10, numPatternBeats, 30, 40, 0.25, popup1);
     tab2.add(og1);
 
     PatternPanel patternPanel(0, tabsH - panelH, winW, panelH);
