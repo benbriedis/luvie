@@ -20,10 +20,13 @@ public:
 	                 std::function<void(int, int)> onOk,
 	                 std::function<void()>          onDelete);
 
-	int handle(int event) override;
+	int  handle(int event) override;
+	void hide() override;
 
 private:
 	void doOk();
+	void doDelete();
+	bool committed = false;
 	Kind            kind;
 	Fl_Value_Input* input1    = nullptr;
 	Fl_Value_Input* input2    = nullptr;

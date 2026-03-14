@@ -39,10 +39,7 @@ MarkerPopup::MarkerPopup(Kind k)
 	end();
 
 	deleteBtn->callback([](Fl_Widget*, void* d) {
-		auto* self = static_cast<MarkerPopup*>(d);
-		if (self->onDeleteCb) self->onDeleteCb();
-		self->hide();
-		if (auto* win = self->window()) win->redraw();
+		static_cast<MarkerPopup*>(d)->doDelete();
 	}, this);
 
 	okBtn->callback([](Fl_Widget*, void* d) {
@@ -50,8 +47,17 @@ MarkerPopup::MarkerPopup(Kind k)
 	}, this);
 }
 
+void MarkerPopup::doDelete()
+{
+	committed = true;
+	if (onDeleteCb) onDeleteCb();
+	hide();
+	if (auto* win = window()) win->redraw();
+}
+
 void MarkerPopup::doOk()
 {
+	committed = true;
 	if (kind == TEMPO) {
 		if (onOkTempo) onOkTempo(input1->value());
 	} else {
@@ -61,15 +67,30 @@ void MarkerPopup::doOk()
 	if (auto* win = window()) win->redraw();
 }
 
+void MarkerPopup::hide()
+{
+	if (!committed && visible()) {
+		doOk();
+		return;
+	}
+	Fl_Window::hide();
+}
+
 int MarkerPopup::handle(int event)
 {
 	if (event == FL_KEYDOWN && Fl::event_key() == FL_Enter) {
-		if (kind == TIME_SIG && !onSecondField) {
-			input2->take_focus();
-			onSecondField = true;
-		} else {
-			doOk();
+		Fl_Widget* f = Fl::focus();
+		if (f == input1 || f == input2) {
+			if (kind == TIME_SIG && f == input1) {
+				input2->take_focus();
+				onSecondField = true;
+			} else {
+				doOk();
+			}
+			return 1;
 		}
+		if (f == deleteBtn) { doDelete(); return 1; }
+		doOk();
 		return 1;
 	}
 	return Fl_Window::handle(event);
@@ -79,6 +100,7 @@ void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,
                              std::function<void(double)> onOk,
                              std::function<void()> onDelete)
 {
+	committed  = false;
 	input1->value(bpm);
 	fixed ? deleteBtn->deactivate() : deleteBtn->activate();
 	onOkTempo  = std::move(onOk);
@@ -95,6 +117,7 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
                                std::function<void(int, int)> onOk,
                                std::function<void()> onDelete)
 {
+	committed     = false;
 	input1->value(num);
 	input2->value(den);
 	onSecondField = false;
