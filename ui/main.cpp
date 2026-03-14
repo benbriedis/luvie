@@ -11,6 +11,7 @@
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
 #include "observableTimeline.hpp"
+#include "patternPanel.hpp"
 
 int main(int argc, char **argv) {
     const int tabBarH      = 35;
@@ -59,10 +60,15 @@ int main(int argc, char **argv) {
     SongEditor og2(0, tabBarH + 2 * markerRulerH, patterns, 10, 15, 45, 60, 0.25, popup2);
     tab1.add(og2);
 
+    const int panelH = 50;
+
     Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2.color(bgColor);
     tabs.add(tab2);
     tab2.add(og1);
+
+    PatternPanel patternPanel(0, tabsH - panelH, winW, panelH);
+    tab2.add(patternPanel);
 
     SimpleTransport simpleTransport;
     Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, &songTimeline);
