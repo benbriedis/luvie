@@ -1,40 +1,8 @@
 #include "trackLabels.hpp"
+#include "inlineEditDispatch.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
-
-// While a track label is being edited, intercept FL_PUSH events before they
-// reach any widget.  Fl::event_dispatch() is called ahead of all widget dispatch.
-static TrackLabels*      activeEditor     = nullptr;
-static Fl_Event_Dispatch originalDispatch = nullptr;
-static bool              commitPending    = false;  // true between consuming push and release
-
-static int editDispatch(int event, Fl_Window* window)
-{
-    // Phase 2: we already consumed a push outside the labels — also consume
-    // drag and release so they never reach the grid or rulers.
-    if (commitPending) {
-        if (event == FL_DRAG) return 1;
-        if (event == FL_RELEASE) {
-            commitPending = false;
-            if (activeEditor) activeEditor->commitEdit();
-            return 1;
-        }
-    }
-
-    // Phase 1: watch for a click outside the labels panel.
-    if (activeEditor && event == FL_PUSH) {
-        int ex = Fl::event_x(), ey = Fl::event_y();
-        bool inLabels = ex >= activeEditor->x() && ex < activeEditor->x() + activeEditor->w()
-                     && ey >= activeEditor->y() && ey < activeEditor->y() + activeEditor->h();
-        if (!inLabels) {
-            commitPending = true;
-            return 1;  // consume push; wait for release before committing
-        }
-    }
-
-    return Fl::handle_(event, window);
-}
 
 static constexpr Fl_Color colNormal   = 0x1F293700;
 static constexpr Fl_Color colSelected = 0x3B82F600;
@@ -88,9 +56,7 @@ void TrackLabels::startEdit(int trackIndex)
     input.show();
     input.take_focus();
     input.onChange([this]() { checkDuplicate(); });
-    activeEditor     = this;
-    originalDispatch = Fl::event_dispatch();
-    Fl::event_dispatch(editDispatch);
+    InlineEditDispatch::install(this, [this]() { commitEdit(); });
     redraw();
 }
 
@@ -112,10 +78,7 @@ void TrackLabels::commitEdit()
     if (editingTrackIndex < 0) return;
     int idx = editingTrackIndex;
     editingTrackIndex = -1;  // clear first to guard against re-entry via FL_UNFOCUS on hide
-    Fl::event_dispatch(originalDispatch);
-    activeEditor     = nullptr;
-    originalDispatch = nullptr;
-    commitPending    = false;
+    InlineEditDispatch::uninstall();
     std::string newLabel = input.value();
     input.hide();
     if (timeline) {
@@ -135,10 +98,7 @@ void TrackLabels::cancelEdit()
 {
     if (editingTrackIndex < 0) return;
     editingTrackIndex = -1;
-    Fl::event_dispatch(originalDispatch);
-    activeEditor     = nullptr;
-    originalDispatch = nullptr;
-    commitPending    = false;
+    InlineEditDispatch::uninstall();
     input.hide();
     redraw();
 }

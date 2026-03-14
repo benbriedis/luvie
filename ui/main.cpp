@@ -68,6 +68,7 @@ int main(int argc, char **argv) {
     tab2.add(og1);
 
     PatternPanel patternPanel(0, tabsH - panelH, winW, panelH);
+    patternPanel.setTimeline(&songTimeline);
     tab2.add(patternPanel);
 
     SimpleTransport simpleTransport;
