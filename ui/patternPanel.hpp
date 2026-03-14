@@ -5,6 +5,7 @@
 #include "inlineInput.hpp"
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Button.H>
 #include <FL/Fl_Choice.H>
 #include <string>
 
@@ -16,10 +17,12 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     ObservableTimeline* timeline      = nullptr;
     int                 editingTrackId = -1;
     std::string         originalLabel;
+    bool                useSharp      = true;
 
     Fl_Box      patternName;
     Fl_Box      octaveLabel;
     Fl_Choice   octaveChoice;
+    Fl_Button   sharpFlatBtn;
     Fl_Box      rootLabel;
     Fl_Choice   rootChoice;
     Fl_Box      chordLabel;
@@ -29,6 +32,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void startEdit();
     void cancelEdit();
     void checkDuplicate();
+    void updateRootChoiceLabels(int preserveIndex);
 
     void draw() override;
     int  handle(int event) override;
