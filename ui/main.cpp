@@ -71,6 +71,11 @@ int main(int argc, char **argv) {
     og2.setTransport(&simpleTransport, &songTimeline);
     og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
+    og2.onPatternDoubleClick = [&](int trackIndex) {
+        songTimeline.selectTrack(trackIndex);
+        tabs.value(&tab2);
+        tabs.redraw();
+    };
 
     og1.setPatternPlayhead(&simpleTransport, &songTimeline, 0);
     songTimeline.selectTrack(0);  // triggers PatternEditor to load track 0's pattern

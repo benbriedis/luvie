@@ -19,6 +19,8 @@ public:
     SongEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
                int rowHeight, int colWidth, float snap, Popup& popup);
 
+    std::function<void(int trackIndex)> onPatternDoubleClick;
+
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setTrackView(int trackIndex, bool beatResolution);
 };

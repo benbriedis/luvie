@@ -20,6 +20,7 @@ void SongEditor::setTransport(ITransport* t, ObservableTimeline* tl)
 {
     playhead.setTransport(t, tl);
     playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
+    songGrid.onPatternDoubleClick = [this](int i) { if (onPatternDoubleClick) onPatternDoubleClick(i); };
     songGrid.setTimeline(tl);
     trackLabels.setTimeline(tl);
 }

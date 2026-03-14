@@ -46,6 +46,7 @@ protected:
     virtual std::function<void()> makeDeleteCallback() { return nullptr; }
     virtual void onBeginDrag() {}
     virtual void onCommitDrag() {}
+    virtual void onNoteDoubleClick() {}
     virtual void toggleNote();
 
 public:

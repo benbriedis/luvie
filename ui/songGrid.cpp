@@ -150,6 +150,12 @@ void SongGrid::onCommitDrag()
     draggingPatternId = -1;
 }
 
+void SongGrid::onNoteDoubleClick()
+{
+    if (selectedNote < (int)notes.size() && onPatternDoubleClick)
+        onPatternDoubleClick(notes[selectedNote].row);
+}
+
 void SongGrid::toggleNote()
 {
     if (trackFilter >= 0) return;  // read-only when displaying a single track view

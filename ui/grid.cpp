@@ -82,6 +82,8 @@ int Grid::handle(int event)
                     if (creationForbidden)
                         window()->cursor(forbiddenCursorImage(), 11, 11);
                 }
+            } else if (Fl::event_clicks() == 1) {
+                onNoteDoubleClick();
             } else {
                 onBeginDrag();
             }

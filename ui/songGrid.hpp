@@ -23,12 +23,15 @@ protected:
     std::function<void()> makeDeleteCallback() override;
     void onBeginDrag() override;
     void onCommitDrag() override;
+    void onNoteDoubleClick() override;
     void toggleNote() override;
 
 public:
     SongGrid(std::vector<Note> notes, int numRows, int numCols,
              int rowHeight, int colWidth, float snap, Popup& popup);
     ~SongGrid();
+
+    std::function<void(int trackIndex)> onPatternDoubleClick;
 
     void setTimeline(ObservableTimeline* tl);
     void setTrackView(int trackFilter, bool beatResolution);
