@@ -1,133 +1,60 @@
 #include "popup.hpp"
 #include "appWindow.hpp"
-#include "FL/Enumerations.H"
 #include "FL/Fl.H"
 #include "FL/Fl_Box.H"
 #include "FL/Fl_Window.H"
 #include "FL/Fl_Flex.H"
 #include "FL/Fl_Button.H"
 #include "FL/Fl_Slider.H"
-#include "FL/fl_ask.H"
-#include <iostream>
-#include <iterator>
 #include "grid.hpp"
 
-/*
-   TODO 
-   1. look for pretty slider
-   2. when overlapping keep the last legal position
-   3. Remove grey colour
-   4. Look for or create 'orbidden' cursor icon
-   5. Prettier buttons
-
-   6. Copy popup postioning code over from the Iced version.
-
-   7. Prevent creation of items underneith the popup
-*/
-
-
-
-// Callback function for menu items
-void menuCallback(Fl_Widget* w, void* user_data) {
-    const Fl_Menu_Item* item = ((Fl_Menu_Button*)w)->mvalue(); // Get the selected item
-    std::cout << "Selected: " << item->label() << std::endl;
-    std::cout << "Selected item: " << item << std::endl;
-
-return;
-
-/*
-    Fl_Menu_Button* menu_button = static_cast<Fl_Menu_Button*>(w);
-    const Fl_Menu_Item* chosen_item = menu_button->mvalue(); // Get the chosen item
-    if (chosen_item) {
-//        fl_alert("Selected: %s", chosen_item->label());
-    }
-*/	
-}
-
-Fl_Menu_Item menutable[] = {
-	{"foo",0,0,0,FL_MENU_INACTIVE},
-	{"delete",0,menuCallback},
-	{"button",FL_F+4, 0, 0, FL_MENU_TOGGLE},
-	{0}
-};
-
-
-//XXX are we sure window is the one to use?
-
 Popup::Popup() : Fl_Window(0,0,0,0)
-{   
-	width = 200;
-
-//Fl_Box *frame = new Fl_Box(0, 0, 0, 0);
-//frame->box(FL_ENGRAVED_BOX);
-
-	//XXX haven't been able to size the flex up from its contents. Its meant to be possible...
-	//    The children heights are being calculated from the flex box, not the other way around.
+{
 	Fl_Flex *flex = new Fl_Flex(0,0,150,100);
-
-flex->box(FL_BORDER_BOX);
-
-    flex->begin();
+	flex->box(FL_BORDER_BOX);
+	flex->begin();
 	flex->gap(10);
-	Fl_Button *deleteItem = new Fl_Button(0, 0, 40, 30, "Delete");  //XXX remove new?
+	Fl_Button *deleteItem = new Fl_Button(0, 0, 40, 30, "Delete");
+	flex->fixed(deleteItem, 40);
 
-
-//XXX NOT WORKING
- flex->fixed(deleteItem, 40); 
-
-	//XXX cf a "value" slider instead
 	Fl_Flex *sliderRow = new Fl_Flex(0, 0, 150, 30, Fl_Flex::HORIZONTAL);
 	sliderRow->begin();
 	Fl_Box *velLabel = new Fl_Box(0, 0, 30, 30, "Vel");
 	sliderRow->fixed(velLabel, 30);
 	Fl_Slider *slider = new Fl_Slider(0, 0, 120, 30);
-    slider->type(FL_HOR_NICE_SLIDER);
-    slider->box(FL_FLAT_BOX);
+	slider->type(FL_HOR_NICE_SLIDER);
+	slider->box(FL_FLAT_BOX);
 	slider->bounds(0.0,1.0);
 	slider->value(0.5);
 	sliderRow->end();
 
-//XXX NOT WORKING
- flex->fixed(deleteItem, 30); 
+	flex->fixed(deleteItem, 30);
+	flex->margin(10,10,10,10);
+	flex->end();
 
-flex->margin(10,10,10,10);
-
-	//flex->resizable(NULL);
-    flex->end();
-
-
-	resize(0,0,flex->w(),flex->h());  //XXX couldnt get resizable to work
-	//resizable(flex);
-
-
+	resize(0,0,flex->w(),flex->h());
 	end();
 
-	deleteItem->callback([](Fl_Widget *w, void *me) {
-		Popup* me2 = (Popup*)me;
-		if (me2->onDeleteFn)
-			me2->onDeleteFn();
+	deleteItem->callback([](Fl_Widget*, void* me) {
+		Popup* self = (Popup*)me;
+		if (self->onDeleteFn)
+			self->onDeleteFn();
 		else
-			me2->notes->erase(me2->notes->begin() + me2->selected);
-		me2->hide();
-		if (auto* win = me2->window()) win->redraw();
+			self->notes->erase(self->notes->begin() + self->selected);
+		self->hide();
+		if (auto* win = self->window()) win->redraw();
 	}, this);
-
-
-//	Fl::grab(this);
-//TODO use Fl::grab(0) to disable	
 }
-
-
 
 void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
                  std::function<void()> onDelete)
 {
-	selected  = mySelected;
-	notes     = myNotes;
-	grid      = myGrid;
+	selected   = mySelected;
+	notes      = myNotes;
+	grid       = myGrid;
 	onDeleteFn = std::move(onDelete);
 
-Note cell = (*notes)[mySelected];
+	Note cell = (*notes)[mySelected];
 
 	Point2 desiredPosition = {
 		(int)(grid->x() + cell.col * grid->colWidth),
@@ -146,46 +73,6 @@ Note cell = (*notes)[mySelected];
 		show();
 }
 
-
-/*
-void Popup::draw() 
-{
-	Fl_Window::draw();
-	fl_color(FL_RED);
-	fl_line_style(FL_SOLID, 3);
-	// We draw it slightly inside to ensure it's visible
-	fl_rect(1, 1, w() - 2, h() - 2);
-	fl_line_style(0);  
-
-	/ *
-        Fl_Window::draw();
-
-        auto borderColor = FL_RED;
-        auto bgColor = FL_WHITE;
-        auto outPad = 5;  // Outer padding
-        auto bThick = 4;  // Border thickness
-        auto inPad = 5;   // Inner padding
-
-        // 1. Draw outer background (padding)
-        fl_color(bgColor);
-        fl_rectf(0, 0, w(), h());
-
-        // 2. Draw border
-        fl_color(borderColor);
-        fl_rectf(outPad, outPad, w() - 2*outPad, h() - 2*outPad);
-
-        // 3. Draw inner background
-        fl_color(FL_WHITE); // Or your inner content color
-        fl_rectf(outPad + bThick, outPad + bThick, 
-                 w() - 2*(outPad + bThick), h() - 2*(outPad + bThick));
-
-        Fl_Window::draw();
-* /		
-}
-*/
-
-
-
 Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW, int popupH)
 {
 	const int vpad = 4, hpad = 10;
@@ -201,23 +88,17 @@ Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW,
 
 Point2 Popup::popupPosition(Size size, Point2 pos)
 {
-	float verticalPadding = 4.0;
-	//TODO probably need to account from internal padding of popup    
-	float sidePadding = 10.0;
-
+	const float verticalPadding = 4.0;
+	const float sidePadding     = 10.0;
 	float height = h();
 
-	/* Place above if place, otherwise below */
 	bool placeAbove = pos.y >= (height + verticalPadding);
+	float y = placeAbove ? pos.y - height - verticalPadding
+	                     : pos.y + grid->rowHeight + verticalPadding;
 
-	float y = placeAbove ? pos.y - height - verticalPadding : pos.y + grid->rowHeight + verticalPadding;
-
-	/* Use cell LHS if there is space, otherwise get as close as possible */
 	float maxX = size.width - w() - sidePadding;
-
 	float x = pos.x > maxX ? maxX : pos.x;
 	x = x < sidePadding ? sidePadding : x;
 
-	return Point2(x,y);
+	return Point2(x, y);
 }
-
