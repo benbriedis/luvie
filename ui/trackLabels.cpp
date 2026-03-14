@@ -80,15 +80,31 @@ void TrackLabels::startEdit(int trackIndex)
     const auto& tracks = timeline->get().tracks;
     if (trackIndex < 0 || trackIndex >= (int)tracks.size()) return;
     editingTrackIndex = trackIndex;
+    originalLabel     = tracks[trackIndex].label;
     int ry = y() + trackIndex * rowHeight;
     input.resize(x(), ry, w(), rowHeight);
-    input.value(tracks[trackIndex].label.c_str());
+    input.value(originalLabel.c_str());
+    input.textcolor(colText);
     input.show();
     input.take_focus();
+    input.onChange([this]() { checkDuplicate(); });
     activeEditor     = this;
     originalDispatch = Fl::event_dispatch();
     Fl::event_dispatch(editDispatch);
     redraw();
+}
+
+void TrackLabels::checkDuplicate()
+{
+    if (!timeline) return;
+    const auto& tracks = timeline->get().tracks;
+    std::string current = input.value();
+    bool dup = false;
+    for (int i = 0; i < (int)tracks.size(); i++) {
+        if (i != editingTrackIndex && tracks[i].label == current) { dup = true; break; }
+    }
+    input.textcolor(dup ? FL_RED : colText);
+    input.redraw();
 }
 
 void TrackLabels::commitEdit()
@@ -104,8 +120,13 @@ void TrackLabels::commitEdit()
     input.hide();
     if (timeline) {
         const auto& tracks = timeline->get().tracks;
-        if (idx < (int)tracks.size())
-            timeline->renameTrack(tracks[idx].id, newLabel);
+        if (idx < (int)tracks.size()) {
+            bool dup = false;
+            for (int i = 0; i < (int)tracks.size(); i++) {
+                if (i != idx && tracks[i].label == newLabel) { dup = true; break; }
+            }
+            timeline->renameTrack(tracks[idx].id, dup ? originalLabel : newLabel);
+        }
     }
     redraw();
 }
