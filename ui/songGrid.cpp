@@ -20,15 +20,15 @@ void SongGrid::draw()
         if (note.pitch < 0 || note.pitch >= numRows) continue;
         int   y0     = y() + note.pitch * rowHeight;
         int   top    = 4, bottom = 4;
-        if (timeline) timeline->timeSigAt((int)note.col, top, bottom);
+        if (timeline) timeline->timeSigAt((int)note.beat, top, bottom);
 
         float startOffset = 0.0f;
         if (isDragging && hoverState == RESIZING && side == LEFT && note.id == draggingPatternId)
             startOffset = dragStartOffset;
         else if (const PatternInstance* inst = timeline->instanceById(note.id))
             startOffset = inst->startOffset;
-        float firstTick   = note.col + startOffset / top;
-        float instanceEnd = note.col + note.length;
+        float firstTick   = note.beat + startOffset / top;
+        float instanceEnd = note.beat + note.length;
 
         float intervalBars = 0.0f;
         if (timeline) {
@@ -38,8 +38,8 @@ void SongGrid::draw()
         }
 
         // Advance firstTick to the first occurrence inside the instance.
-        if (intervalBars > 0.0f && firstTick < note.col) {
-            float steps = std::ceil((note.col - firstTick) / intervalBars);
+        if (intervalBars > 0.0f && firstTick < note.beat) {
+            float steps = std::ceil((note.beat - firstTick) / intervalBars);
             firstTick += steps * intervalBars;
         }
 
@@ -114,12 +114,12 @@ void SongGrid::onBeginDrag()
     draggingPatternId = notes[selectedNote].id;
     originalLength    = notes[selectedNote].length;
     isDragging        = true;
-    if (timeline) { int dummy; timeline->timeSigAt((int)notes[selectedNote].col, dragBeatsPerBar, dummy); }
+    if (timeline) { int dummy; timeline->timeSigAt((int)notes[selectedNote].beat, dragBeatsPerBar, dummy); }
     // Capture absolute song-bar position of the pattern's beat-0 tick.
     float startOffset = 0.0f;
     if (const PatternInstance* inst = timeline->instanceById(notes[selectedNote].id))
         startOffset = inst->startOffset;
-    tickBarPos = notes[selectedNote].col + startOffset / dragBeatsPerBar;
+    tickBarPos = notes[selectedNote].beat + startOffset / dragBeatsPerBar;
 }
 
 void SongGrid::resizing()
@@ -127,7 +127,7 @@ void SongGrid::resizing()
     Grid::resizing();
     if (side == LEFT) {
         // Keep the beat-0 tick fixed in song position.
-        float newOffset = (tickBarPos - notes[selectedNote].col) * dragBeatsPerBar;
+        float newOffset = (tickBarPos - notes[selectedNote].beat) * dragBeatsPerBar;
         dragStartOffset = newOffset;
     }
 }
@@ -137,11 +137,11 @@ void SongGrid::onCommitDrag()
     if (!timeline || draggingPatternId < 0) return;
     isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
     if (hoverState == MOVING)
-        timeline->movePattern(draggingPatternId, notes[selectedNote].pitch, notes[selectedNote].col);
+        timeline->movePattern(draggingPatternId, notes[selectedNote].pitch, notes[selectedNote].beat);
     else if (hoverState == RESIZING) {
         if (side == LEFT)
             timeline->resizePatternLeft(draggingPatternId,
-                                        notes[selectedNote].col,
+                                        notes[selectedNote].beat,
                                         notes[selectedNote].length,
                                         dragStartOffset);
         else
@@ -170,13 +170,13 @@ void SongGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.pitch == row && n.col == col) {
+        if (n.pitch == row && n.beat == col) {
             timeline->removePattern(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.pitch == row && col < n.col + n.length && col + 1.0f > n.col; });
+        [=](const Note& n) { return n.pitch == row && col < n.beat + n.length && col + 1.0f > n.beat; });
     if (clear && row >= 0 && row < (int)timeline->get().tracks.size()) {
         int patId = timeline->get().tracks[row].patternId;
         if (patId > 0)

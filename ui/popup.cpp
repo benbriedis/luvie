@@ -57,7 +57,7 @@ void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
 	Note cell = (*notes)[mySelected];
 
 	Point2 desiredPosition = {
-		(int)(grid->x() + cell.col * grid->colWidth),
+		(int)(grid->x() + cell.beat * grid->colWidth),
 		(int)(grid->y() + cell.pitch * grid->rowHeight)
 	};
 

@@ -55,13 +55,13 @@ void PatternGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.pitch == visual_row && n.col == col) {
+        if (n.pitch == visual_row && n.beat == col) {
             timeline->removeNote(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.pitch == visual_row && col < n.col + n.length && col + 1.0f > n.col; });
+        [=](const Note& n) { return n.pitch == visual_row && col < n.beat + n.length && col + 1.0f > n.beat; });
     if (clear)
         timeline->addNote(patternId, col, (float)abs_row, 1.0f);
 }
@@ -85,10 +85,10 @@ void PatternGrid::onCommitDrag()
     isDragging = false;
     if (hoverState == MOVING) {
         float abs_row = (float)((rowOffset + numRows - 1) - notes[selectedNote].pitch);
-        timeline->moveNote(draggingNoteId, notes[selectedNote].col, abs_row);
+        timeline->moveNote(draggingNoteId, notes[selectedNote].beat, abs_row);
     } else if (hoverState == RESIZING) {
         if (side == LEFT)
-            timeline->resizeNoteLeft(draggingNoteId, notes[selectedNote].col, notes[selectedNote].length);
+            timeline->resizeNoteLeft(draggingNoteId, notes[selectedNote].beat, notes[selectedNote].length);
         else
             timeline->resizeNoteRight(draggingNoteId, notes[selectedNote].length);
     }

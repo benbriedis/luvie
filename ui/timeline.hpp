@@ -7,7 +7,7 @@
 struct Note {
 	int   id;
 	int   pitch;
-	float col;
+	float beat;
 	float length;
 	float velocity = 0.0f;
 };

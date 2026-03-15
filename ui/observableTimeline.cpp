@@ -375,7 +375,7 @@ void ObservableTimeline::moveNote(int noteId, float newStart, float newPitch)
 	for (auto& pat : data.patterns) {
 		for (auto& n : pat.notes) {
 			if (n.id == noteId) {
-				n.col = newStart;
+				n.beat = newStart;
 				n.pitch = (int)newPitch;
 				notify();
 				return;
@@ -402,7 +402,7 @@ void ObservableTimeline::resizeNoteLeft(int noteId, float newStart, float newLen
 	for (auto& pat : data.patterns) {
 		for (auto& n : pat.notes) {
 			if (n.id == noteId) {
-				n.col    = newStart;
+				n.beat    = newStart;
 				n.length = newLength;
 				notify();
 				return;
