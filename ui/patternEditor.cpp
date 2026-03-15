@@ -72,9 +72,9 @@ int PatternEditor::computeDefaultOffset(int patId) const
         }
         return std::clamp(best - 1, 0, maxOffset);
     } else {
-        int lowest = (int)allNotes[0].row;
+        int lowest = (int)allNotes[0].pitch;
         for (const auto& n : allNotes)
-            lowest = std::min(lowest, (int)n.row);
+            lowest = std::min(lowest, (int)n.pitch);
         return std::clamp(lowest - 1, 0, maxOffset);
     }
 }

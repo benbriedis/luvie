@@ -25,9 +25,9 @@ void PatternGrid::rebuildNotes()
     notes.clear();
     if (!timeline || patternId < 0) { clampSelection(); return; }
     for (auto n : timeline->buildPatternNotes(patternId)) {
-        int visual = (rowOffset + numRows - 1) - (int)n.row;
+        int visual = (rowOffset + numRows - 1) - (int)n.pitch;
         if (visual >= 0 && visual < numRows) {
-            n.row = visual;
+            n.pitch = visual;
             notes.push_back(n);
         }
     }
@@ -55,13 +55,13 @@ void PatternGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.row == visual_row && n.col == col) {
+        if (n.pitch == visual_row && n.col == col) {
             timeline->removeNote(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.row == visual_row && col < n.col + n.length && col + 1.0f > n.col; });
+        [=](const Note& n) { return n.pitch == visual_row && col < n.col + n.length && col + 1.0f > n.col; });
     if (clear)
         timeline->addNote(patternId, col, (float)abs_row, 1.0f);
 }
@@ -84,7 +84,7 @@ void PatternGrid::onCommitDrag()
     if (!timeline || draggingNoteId < 0) return;
     isDragging = false;
     if (hoverState == MOVING) {
-        float abs_row = (float)((rowOffset + numRows - 1) - notes[selectedNote].row);
+        float abs_row = (float)((rowOffset + numRows - 1) - notes[selectedNote].pitch);
         timeline->moveNote(draggingNoteId, notes[selectedNote].col, abs_row);
     } else if (hoverState == RESIZING) {
         if (side == LEFT)

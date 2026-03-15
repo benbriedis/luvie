@@ -376,7 +376,7 @@ void ObservableTimeline::moveNote(int noteId, float newStart, float newPitch)
 		for (auto& n : pat.notes) {
 			if (n.id == noteId) {
 				n.col = newStart;
-				n.row = (int)newPitch;
+				n.pitch = (int)newPitch;
 				notify();
 				return;
 			}

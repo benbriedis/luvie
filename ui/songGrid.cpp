@@ -17,8 +17,8 @@ void SongGrid::draw()
 
     const int tickH = 4;
     for (const auto& note : notes) {
-        if (note.row < 0 || note.row >= numRows) continue;
-        int   y0     = y() + note.row * rowHeight;
+        if (note.pitch < 0 || note.pitch >= numRows) continue;
+        int   y0     = y() + note.pitch * rowHeight;
         int   top    = 4, bottom = 4;
         if (timeline) timeline->timeSigAt((int)note.col, top, bottom);
 
@@ -137,7 +137,7 @@ void SongGrid::onCommitDrag()
     if (!timeline || draggingPatternId < 0) return;
     isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
     if (hoverState == MOVING)
-        timeline->movePattern(draggingPatternId, notes[selectedNote].row, notes[selectedNote].col);
+        timeline->movePattern(draggingPatternId, notes[selectedNote].pitch, notes[selectedNote].col);
     else if (hoverState == RESIZING) {
         if (side == LEFT)
             timeline->resizePatternLeft(draggingPatternId,
@@ -153,7 +153,7 @@ void SongGrid::onCommitDrag()
 void SongGrid::onNoteDoubleClick()
 {
     if (selectedNote < (int)notes.size() && onPatternDoubleClick)
-        onPatternDoubleClick(notes[selectedNote].row);
+        onPatternDoubleClick(notes[selectedNote].pitch);
 }
 
 void SongGrid::toggleNote()
@@ -170,13 +170,13 @@ void SongGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.row == row && n.col == col) {
+        if (n.pitch == row && n.col == col) {
             timeline->removePattern(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+        [=](const Note& n) { return n.pitch == row && col < n.col + n.length && col + 1.0f > n.col; });
     if (clear && row >= 0 && row < (int)timeline->get().tracks.size()) {
         int patId = timeline->get().tracks[row].patternId;
         if (patId > 0)

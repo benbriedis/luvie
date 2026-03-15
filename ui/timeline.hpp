@@ -6,7 +6,7 @@
 
 struct Note {
 	int   id;
-	int   row;
+	int   pitch;
 	float col;
 	float length;
 	float velocity = 0.0f;

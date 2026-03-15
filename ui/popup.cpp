@@ -58,7 +58,7 @@ void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
 
 	Point2 desiredPosition = {
 		(int)(grid->x() + cell.col * grid->colWidth),
-		(int)(grid->y() + cell.row * grid->rowHeight)
+		(int)(grid->y() + cell.pitch * grid->rowHeight)
 	};
 
 	Fl_Window* win = grid->window();

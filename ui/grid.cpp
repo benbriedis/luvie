@@ -44,7 +44,7 @@ void Grid::draw()
 
     for (const Note note : notes) {
         int x0    = x() + note.col * colWidth;
-        int y0    = y() + note.row * rowHeight;
+        int y0    = y() + note.pitch * rowHeight;
         int width = note.length * colWidth;
         fl_rectf(x0, y0 + 1, width, rowHeight - 1, 0x5555EE00);
         const int barWidth = 5;
@@ -75,10 +75,10 @@ int Grid::handle(int event)
                 float col = (float)((Fl::event_x() - x()) / colWidth);
                 creationForbidden = false;
                 bool wouldRemove = std::any_of(notes.begin(), notes.end(),
-                    [=](const Note& n) { return n.row == row && n.col == col; });
+                    [=](const Note& n) { return n.pitch == row && n.col == col; });
                 if (!wouldRemove) {
                     creationForbidden = std::any_of(notes.begin(), notes.end(),
-                        [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+                        [=](const Note& n) { return n.pitch == row && col < n.col + n.length && col + 1.0f > n.col; });
                     if (creationForbidden)
                         window()->cursor(forbiddenCursorImage(), 11, 11);
                 }
@@ -96,7 +96,7 @@ int Grid::handle(int event)
 
         case FL_RELEASE:
             if (hoverState == MOVING && amOverlapping) {
-                notes[selectedNote].row = lastValidPosition.row;
+                notes[selectedNote].pitch = lastValidPosition.row;
                 notes[selectedNote].col = lastValidPosition.col;
                 redraw();
             }
@@ -130,11 +130,11 @@ void Grid::moving()
     if (selected->col + selected->length > numCols) selected->col = numCols - selected->length;
     if (snap > 0.0) selected->col = std::round(selected->col / snap) * snap;
     float ey      = Fl::event_y() - this->y();
-    selected->row = (ey - movingGrabYOffset + rowHeight / 2.0) / (float)rowHeight;
-    if (selected->row < 0)        selected->row = 0;
-    if (selected->row >= numRows) selected->row = numRows - 1;
+    selected->pitch = (ey - movingGrabYOffset + rowHeight / 2.0) / (float)rowHeight;
+    if (selected->pitch < 0)        selected->pitch = 0;
+    if (selected->pitch >= numRows) selected->pitch = numRows - 1;
     amOverlapping = overlappingNote() >= 0;
-    if (!amOverlapping) lastValidPosition = {selected->row, selected->col};
+    if (!amOverlapping) lastValidPosition = {selected->pitch, selected->col};
     if (amOverlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
     else               window()->cursor(FL_CURSOR_HAND);
     redraw();
@@ -176,7 +176,7 @@ void Grid::findNoteForCursor()
     int selectedIfResize = 0;
     hoverState = NONE;
     for (const auto [i, n] : std::views::enumerate(notes)) {
-        if (n.row != row) continue;
+        if (n.pitch != row) continue;
         float leftEdge  = n.col * colWidth;
         float rightEdge = (n.col + n.length) * colWidth;
         if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
@@ -187,9 +187,9 @@ void Grid::findNoteForCursor()
             hoverState         = MOVING;
             selectedNote       = i;
             movingGrabXOffset  = ex - n.col * colWidth;
-            movingGrabYOffset  = ey - n.row * rowHeight;
-            originalPosition   = {n.row, n.col};
-            lastValidPosition  = {n.row, n.col};
+            movingGrabYOffset  = ey - n.pitch * rowHeight;
+            originalPosition   = {n.pitch, n.col};
+            lastValidPosition  = {n.pitch, n.col};
             window()->cursor(FL_CURSOR_HAND);
             redraw();
             return;
@@ -209,10 +209,10 @@ void Grid::toggleNote()
 
     int size = notes.size();
     notes.erase(std::remove_if(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.row == row && n.col == col; }), notes.end());
+        [=](const Note& n) { return n.pitch == row && n.col == col; }), notes.end());
     if ((int)notes.size() == size) {
         bool clear = std::none_of(notes.begin(), notes.end(),
-            [=](const Note& n) { return n.row == row && col < n.col + n.length && col + 1.0f > n.col; });
+            [=](const Note& n) { return n.pitch == row && col < n.col + n.length && col + 1.0f > n.col; });
         if (clear)
             notes.push_back({0, row, col, 1.0});
     }
@@ -224,7 +224,7 @@ int Grid::overlappingNote()
     Note  a      = notes[selectedNote];
     float aStart = a.col, aEnd = a.col + a.length;
     for (const auto [i, b] : std::views::enumerate(notes)) {
-        if (i == selectedNote || b.row != a.row) continue;
+        if (i == selectedNote || b.pitch != a.pitch) continue;
         float bStart      = b.col, bEnd = b.col + b.length;
         float firstEnd    = aStart <= bStart ? aEnd : bEnd;
         float secondStart = aStart <= bStart ? bStart : aStart;
