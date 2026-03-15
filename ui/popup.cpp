@@ -1,29 +1,42 @@
 #include "popup.hpp"
 #include "appWindow.hpp"
+#include "modernButton.hpp"
 #include "FL/Fl.H"
 #include "FL/Fl_Box.H"
 #include "FL/Fl_Window.H"
 #include "FL/Fl_Flex.H"
-#include "FL/Fl_Button.H"
 #include "FL/Fl_Slider.H"
 #include "grid.hpp"
 
+static constexpr Fl_Color popupBg  = 0x1E293B00;
+static constexpr Fl_Color inputBg  = 0x0F172A00;
+
 Popup::Popup() : Fl_Window(0,0,0,0)
 {
+	color(popupBg);
+	box(FL_FLAT_BOX);
+
 	Fl_Flex *flex = new Fl_Flex(0,0,150,100);
-	flex->box(FL_BORDER_BOX);
+	flex->box(FL_FLAT_BOX);
+	flex->color(popupBg);
 	flex->begin();
 	flex->gap(10);
-	Fl_Button *deleteItem = new Fl_Button(0, 0, 40, 30, "Delete");
+	ModernButton *deleteItem = new ModernButton(0, 0, 40, 30, "Delete");
 	flex->fixed(deleteItem, 40);
 
 	Fl_Flex *sliderRow = new Fl_Flex(0, 0, 150, 30, Fl_Flex::HORIZONTAL);
+	sliderRow->box(FL_FLAT_BOX);
+	sliderRow->color(popupBg);
 	sliderRow->begin();
 	Fl_Box *velLabel = new Fl_Box(0, 0, 30, 30, "Vel");
+	velLabel->labelcolor(FL_WHITE);
+	velLabel->box(FL_NO_BOX);
 	sliderRow->fixed(velLabel, 30);
 	Fl_Slider *slider = new Fl_Slider(0, 0, 120, 30);
 	slider->type(FL_HOR_NICE_SLIDER);
 	slider->box(FL_FLAT_BOX);
+	slider->color(inputBg);
+	slider->selection_color(0x38BDF800);
 	slider->bounds(0.0,1.0);
 	slider->value(0.5);
 	sliderRow->end();

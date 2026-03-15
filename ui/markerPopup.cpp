@@ -2,6 +2,11 @@
 #include "appWindow.hpp"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <FL/fl_draw.H>
+
+static constexpr Fl_Color popupBg     = 0x1E293B00;
+static constexpr Fl_Color popupBorder = 0x47556900;
+static constexpr Fl_Color inputBg     = 0x0F172A00;
 
 // Layout constants (shared by both kinds)
 static constexpr int popupW  = 160;
@@ -16,23 +21,48 @@ static constexpr int row2H   = 24;
 MarkerPopup::MarkerPopup(Kind k)
 	: Fl_Window(0, 0, popupW, popupH), kind(k)
 {
+	color(popupBg);
+	box(FL_FLAT_BOX);
+
+	// border overlay — drawn first so it sits behind all other children
+	auto* border = new Fl_Box(0, 0, popupW, popupH);
+	border->box(FL_BORDER_BOX);
+	border->color(popupBg);
+
+	auto styleInput = [](Fl_Value_Input* inp) {
+		inp->box(FL_FLAT_BOX);
+		inp->color(inputBg);
+		inp->textcolor(FL_WHITE);
+		inp->cursor_color(FL_WHITE);
+		inp->labelcolor(FL_WHITE);
+	};
+
 	if (kind == TEMPO) {
-		new Fl_Box(pad, row1Y, 30, row1H, "BPM");
+		auto* lbl = new Fl_Box(pad, row1Y, 30, row1H, "BPM");
+		lbl->labelcolor(FL_WHITE);
+		lbl->box(FL_NO_BOX);
 		input1 = new Fl_Value_Input(pad + 34, row1Y, popupW - pad - 34 - pad, row1H);
 		input1->range(20, 300);
 		input1->step(1);
+		styleInput(input1);
 	} else {
-		new Fl_Box(pad, row1Y, 25, row1H, "Sig");
+		auto* lbl = new Fl_Box(pad, row1Y, 25, row1H, "Sig");
+		lbl->labelcolor(FL_WHITE);
+		lbl->box(FL_NO_BOX);
 		input1 = new Fl_Value_Input(pad + 29, row1Y, 44, row1H);
 		input1->range(1, 32);
 		input1->step(1);
-		new Fl_Box(pad + 29 + 44 + 2, row1Y, 10, row1H, "/");
+		styleInput(input1);
+		auto* slash = new Fl_Box(pad + 29 + 44 + 2, row1Y, 10, row1H, "/");
+		slash->labelcolor(FL_WHITE);
+		slash->box(FL_NO_BOX);
 		input2 = new Fl_Value_Input(pad + 29 + 44 + 16, row1Y, 44, row1H);
 		input2->range(1, 32);
 		input2->step(1);
+		styleInput(input2);
 	}
 
-	deleteBtn = new Fl_Button(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
+	deleteBtn = new ModernButton(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
 
 	end();
 
@@ -104,6 +134,7 @@ void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,
 		aw->openPopup(this);
 	else
 		show();
+	redraw();
 	input1->take_focus();
 }
 
@@ -123,5 +154,6 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
 		aw->openPopup(this);
 	else
 		show();
+	redraw();
 	input1->take_focus();
 }

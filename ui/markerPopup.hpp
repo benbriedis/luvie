@@ -3,7 +3,7 @@
 
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Value_Input.H>
-#include <FL/Fl_Button.H>
+#include "modernButton.hpp"
 #include <functional>
 
 class MarkerPopup : public Fl_Window {
@@ -30,7 +30,7 @@ private:
 	Kind            kind;
 	Fl_Value_Input* input1    = nullptr;
 	Fl_Value_Input* input2    = nullptr;
-	Fl_Button*      deleteBtn = nullptr;
+	ModernButton*   deleteBtn = nullptr;
 
 	std::function<void(double)>   onOkTempo;
 	std::function<void(int, int)> onOkTimeSig;
