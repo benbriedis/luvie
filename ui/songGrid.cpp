@@ -27,7 +27,7 @@ void SongGrid::draw()
             startOffset = dragStartOffset;
         else if (const PatternInstance* inst = timeline->instanceById(note.id))
             startOffset = inst->startOffset;
-        float firstTick   = note.beat + startOffset / top;
+        float beatZeroPos = note.beat - startOffset / top;
         float instanceEnd = note.beat + note.length;
 
         float intervalBars = 0.0f;
@@ -37,10 +37,12 @@ void SongGrid::draw()
                 intervalBars = pat->lengthBeats / top;
         }
 
-        // Advance firstTick to the first occurrence inside the instance.
-        if (intervalBars > 0.0f && firstTick < note.beat) {
-            float steps = std::ceil((note.beat - firstTick) / intervalBars);
-            firstTick += steps * intervalBars;
+        // Find the first tick >= note.beat in the series beatZeroPos + k*intervalBars.
+        // ceil() handles both cases: beatZeroPos before or inside the instance.
+        float firstTick = beatZeroPos;
+        if (intervalBars > 0.0f) {
+            float k = std::ceil((note.beat - beatZeroPos) / intervalBars);
+            firstTick = beatZeroPos + k * intervalBars;
         }
 
         fl_color(FL_WHITE);
@@ -119,7 +121,7 @@ void SongGrid::onBeginDrag()
     float startOffset = 0.0f;
     if (const PatternInstance* inst = timeline->instanceById(notes[selectedNote].id))
         startOffset = inst->startOffset;
-    tickBarPos = notes[selectedNote].beat + startOffset / dragBeatsPerBar;
+    tickBarPos = notes[selectedNote].beat - startOffset / dragBeatsPerBar;
 }
 
 void SongGrid::resizing()
@@ -127,7 +129,7 @@ void SongGrid::resizing()
     Grid::resizing();
     if (side == LEFT) {
         // Keep the beat-0 tick fixed in song position.
-        float newOffset = (tickBarPos - notes[selectedNote].beat) * dragBeatsPerBar;
+        float newOffset = (notes[selectedNote].beat - tickBarPos) * dragBeatsPerBar;
         dragStartOffset = newOffset;
     }
 }
