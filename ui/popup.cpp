@@ -9,7 +9,7 @@
 #include "FL/Fl_Slider.H"
 #include "grid.hpp"
 
-Popup::Popup() : Fl_Window(0,0,0,0)
+Popup::Popup() : BasePopup(0,0,0,0)
 {
 	color(popupBg);
 	box(FL_BORDER_BOX);

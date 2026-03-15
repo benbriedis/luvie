@@ -16,7 +16,7 @@ static constexpr int row2H   = 24;
 // total h = row2Y + row2H + pad = 38+24+8 = 70 ✓
 
 MarkerPopup::MarkerPopup(Kind k)
-	: Fl_Window(0, 0, popupW, popupH), kind(k)
+	: BasePopup(0, 0, popupW, popupH), kind(k)
 {
 	color(popupBg);
 	box(FL_BORDER_BOX);
@@ -111,7 +111,7 @@ int MarkerPopup::handle(int event)
 		doOk();
 		return 1;
 	}
-	return Fl_Window::handle(event);
+	return BasePopup::handle(event);
 }
 
 void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,

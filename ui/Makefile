@@ -19,16 +19,21 @@ DEPS = $(SRCS:%.cpp=$(BUILDDIR)/%.d)
 
 all: $(BUILDDIR) $(TARGET)
 
+rebuild: clean all
+
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	@echo "Build complete: $(TARGET)"
 
 $(BUILDDIR)/%.o: %.cpp
 	$(CC) $(CXXFLAGS) -c $< -o $@
 
 -include $(DEPS)
+
+.PHONY: all rebuild clean
 
 clean:
 	rm -rf $(BUILDDIR)

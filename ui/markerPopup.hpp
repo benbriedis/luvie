@@ -1,12 +1,12 @@
 #ifndef MARKER_POPUP_HPP
 #define MARKER_POPUP_HPP
 
-#include <FL/Fl_Window.H>
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
+#include "basePopup.hpp"
 #include <functional>
 
-class MarkerPopup : public Fl_Window {
+class MarkerPopup : public BasePopup {
 public:
 	enum Kind { TEMPO, TIME_SIG };
 

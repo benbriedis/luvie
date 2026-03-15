@@ -2,7 +2,7 @@
 #define POPUP_HPP
 
 #include "timeline.hpp"
-#include <FL/Fl_Window.H>
+#include "basePopup.hpp"
 #include <FL/Fl_Flex.H>
 #include <functional>
 
@@ -13,7 +13,7 @@ typedef struct { int x;     int y;      } Point2;
 
 Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW, int popupH);
 
-class Popup : public Fl_Window {
+class Popup : public BasePopup {
 public:
 	Popup();
 
