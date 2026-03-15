@@ -7,13 +7,17 @@
 class ModernButton : public Fl_Button {
     bool hovered = false;
 
+    static constexpr Fl_Color borderCol = 0xCBD5E100;  // matches transport buttons
+
     void draw() override {
         Fl_Color bg = color();
         fl_color(hovered ? fl_color_average(bg, FL_WHITE, 0.8f) : bg);
         fl_rectf(x(), y(), w(), h());
 
-        fl_color(fl_darker(bg));
+        fl_color(borderCol);
+        fl_line_style(FL_SOLID, 2);
         fl_rect(x(), y(), w(), h());
+        fl_line_style(0);
 
         if (label()) {
             fl_font(labelfont(), labelsize());

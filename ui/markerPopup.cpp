@@ -55,7 +55,7 @@ MarkerPopup::MarkerPopup(Kind k)
 	}
 
 	deleteBtn = new ModernButton(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
-	deleteBtn->color(popupInputBg);
+	deleteBtn->color(FL_WHITE);
 	deleteBtn->labelcolor(popupText);
 
 	end();

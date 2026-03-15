@@ -20,7 +20,7 @@ Popup::Popup() : Fl_Window(0,0,0,0)
 	flex->begin();
 	flex->gap(10);
 	ModernButton *deleteItem = new ModernButton(0, 0, 40, 30, "Delete");
-	deleteItem->color(popupInputBg);
+	deleteItem->color(FL_WHITE);
 	deleteItem->labelcolor(popupText);
 	flex->fixed(deleteItem, 40);
 
