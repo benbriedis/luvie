@@ -22,6 +22,7 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
 
     scrollbar = new Fl_Scrollbar(x, y + rulerH, scrollbarW, gridH);
     scrollbar->type(FL_VERTICAL);
+    scrollbar->linesize(1);
     scrollbar->callback([](Fl_Widget* w, void* d) {
         auto* self = static_cast<PatternEditor*>(d);
         auto* sb   = static_cast<Fl_Scrollbar*>(w);
@@ -103,6 +104,15 @@ void PatternEditor::setRowOffset(int offset)
     patternGrid.setRowOffset(offset);
     if (scrollbar)
         scrollbar->value(maxOff - offset, patternGrid.numRows, 0, total);
+}
+
+int PatternEditor::handle(int event)
+{
+    if (event == FL_MOUSEWHEEL) {
+        setRowOffset(noteLabels.getRowOffset() - Fl::event_dy());
+        return 1;
+    }
+    return Editor::handle(event);
 }
 
 void PatternEditor::focusPattern()

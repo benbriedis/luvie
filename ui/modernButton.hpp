@@ -5,9 +5,9 @@
 #include <FL/fl_draw.H>
 
 class ModernButton : public Fl_Button {
-    bool hovered = false;
-
-    static constexpr Fl_Color borderCol = 0xCBD5E100;  // matches transport buttons
+    bool      hovered     = false;
+    int       borderWidth = 2;
+    Fl_Color  borderCol   = 0xCBD5E100;  // matches transport buttons by default
 
     void draw() override {
         Fl_Color bg = color();
@@ -15,7 +15,7 @@ class ModernButton : public Fl_Button {
         fl_rectf(x(), y(), w(), h());
 
         fl_color(borderCol);
-        fl_line_style(FL_SOLID, 2);
+        fl_line_style(FL_SOLID, borderWidth);
         fl_rect(x(), y(), w(), h());
         fl_line_style(0);
 
@@ -35,6 +35,9 @@ class ModernButton : public Fl_Button {
 public:
     ModernButton(int x, int y, int w, int h, const char* label = nullptr)
         : Fl_Button(x, y, w, h, label) { box(FL_NO_BOX); }
+
+    void setBorderWidth(int w)     { borderWidth = w; }
+    void setBorderColor(Fl_Color c) { borderCol   = c; }
 };
 
 #endif

@@ -7,12 +7,10 @@
 #include <FL/Fl_Box.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
+#include "panelStyle.hpp"
 #include <string>
 
 class PatternPanel : public Fl_Group, public ITimelineObserver {
-    static constexpr Fl_Color bg     = 0x1E293B00;
-    static constexpr Fl_Color border = 0x37415100;
-    static constexpr Fl_Color text   = FL_WHITE;
 
     ObservableTimeline* timeline      = nullptr;
     int                 editingTrackId = -1;

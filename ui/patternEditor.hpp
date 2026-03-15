@@ -25,6 +25,7 @@ class PatternEditor : public Editor, public ITimelineObserver {
     int  computeDefaultOffset(int patId) const;
     void setRowOffset(int offset);
     void focusPattern();
+    int  handle(int event) override;
 
 public:
     PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,

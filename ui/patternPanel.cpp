@@ -1,4 +1,5 @@
 #include "patternPanel.hpp"
+#include "panelStyle.hpp"
 #include "inlineEditDispatch.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -35,15 +36,17 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     box(FL_NO_BOX);
 
     patternName.box(FL_NO_BOX);
-    patternName.labelcolor(text);
+    patternName.labelcolor(panelText);
     patternName.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
 
     baseLabel.box(FL_NO_BOX);
-    baseLabel.labelcolor(text);
+    baseLabel.labelcolor(panelText);
     baseLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    sharpFlatBtn.color(0x1E293B00);
-    sharpFlatBtn.labelcolor(FL_WHITE);
+    sharpFlatBtn.color(panelBg);
+    sharpFlatBtn.labelcolor(panelText);
+    sharpFlatBtn.setBorderWidth(1);
+    sharpFlatBtn.setBorderColor(panelCtrlBorder);
 
     sharpFlatBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
@@ -63,7 +66,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     rootChoice.callback(paramsCb, this);
 
     chordLabel.box(FL_NO_BOX);
-    chordLabel.labelcolor(text);
+    chordLabel.labelcolor(panelText);
     chordLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
     for (const char* chord : {"Major", "Minor", "Major 7", "Minor 7"})
@@ -74,8 +77,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     input.hide();
     input.box(FL_FLAT_BOX);
     input.color(0x37415100);
-    input.textcolor(text);
-    input.cursor_color(text);
+    input.textcolor(panelText);
+    input.cursor_color(panelText);
     input.when(FL_WHEN_ENTER_KEY);
     input.callback([](Fl_Widget*, void* d) {
         static_cast<PatternPanel*>(d)->commitEdit();
@@ -131,7 +134,7 @@ void PatternPanel::startEdit()
     editingTrackId = tl.tracks[sel].id;
     originalLabel  = tl.tracks[sel].label;
     input.value(originalLabel.c_str());
-    input.textcolor(text);
+    input.textcolor(panelText);
     input.show();
     input.take_focus();
     input.onChange([this]() { checkDuplicate(); });
@@ -147,7 +150,7 @@ void PatternPanel::checkDuplicate()
     bool dup = false;
     for (const auto& t : tracks)
         if (t.id != editingTrackId && t.label == current) { dup = true; break; }
-    input.textcolor(dup ? FL_RED : text);
+    input.textcolor(dup ? FL_RED : panelText);
     input.redraw();
 }
 
@@ -180,9 +183,9 @@ void PatternPanel::cancelEdit()
 
 void PatternPanel::draw()
 {
-    fl_color(border);
+    fl_color(panelBorder);
     fl_rectf(x(), y(), w(), 1);
-    fl_color(bg);
+    fl_color(panelBg);
     fl_rectf(x(), y() + 1, w(), h() - 1);
     draw_children();
 }

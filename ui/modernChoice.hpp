@@ -3,20 +3,16 @@
 
 #include <FL/Fl_Choice.H>
 #include <FL/fl_draw.H>
+#include "panelStyle.hpp"
 
 class ModernChoice : public Fl_Choice {
     bool hovered = false;
 
-    static constexpr Fl_Color bgNormal  = 0x1E293B00;
-    static constexpr Fl_Color bgHover   = 0x2D374800;
-    static constexpr Fl_Color borderCol = 0x47556900;
-    static constexpr Fl_Color arrowCol  = 0x94A3B800;
-
     void draw() override {
-        fl_color(hovered ? bgHover : bgNormal);
+        fl_color(hovered ? panelBgHover : panelBg);
         fl_rectf(x(), y(), w(), h());
 
-        fl_color(borderCol);
+        fl_color(panelCtrlBorder);
         fl_rect(x(), y(), w(), h());
 
         const char* lbl = value() >= 0 ? text(value()) : nullptr;
@@ -29,7 +25,7 @@ class ModernChoice : public Fl_Choice {
         // chevron
         int cx = x() + w() - 13;
         int cy = y() + h() / 2 + 1;
-        fl_color(arrowCol);
+        fl_color(panelArrow);
         fl_line_style(FL_SOLID, 2);
         fl_line(cx - 4, cy - 2, cx,     cy + 2);
         fl_line(cx,     cy + 2, cx + 4, cy - 2);
