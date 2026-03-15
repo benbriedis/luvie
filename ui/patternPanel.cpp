@@ -42,6 +42,9 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     baseLabel.labelcolor(text);
     baseLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
+    sharpFlatBtn.color(0x1E293B00);
+    sharpFlatBtn.labelcolor(FL_WHITE);
+
     sharpFlatBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         int idx = self->rootChoice.value();

@@ -7,20 +7,17 @@
 class ModernButton : public Fl_Button {
     bool hovered = false;
 
-    static constexpr Fl_Color bgNormal  = 0x1E293B00;
-    static constexpr Fl_Color bgHover   = 0x2D374800;
-    static constexpr Fl_Color borderCol = 0x47556900;
-
     void draw() override {
-        fl_color(hovered ? bgHover : bgNormal);
+        Fl_Color bg = color();
+        fl_color(hovered ? fl_color_average(bg, FL_WHITE, 0.8f) : bg);
         fl_rectf(x(), y(), w(), h());
 
-        fl_color(borderCol);
+        fl_color(fl_darker(bg));
         fl_rect(x(), y(), w(), h());
 
         if (label()) {
             fl_font(labelfont(), labelsize());
-            fl_color(FL_WHITE);
+            fl_color(labelcolor());
             fl_draw(label(), x(), y(), w(), h(), FL_ALIGN_CENTER);
         }
     }
