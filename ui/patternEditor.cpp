@@ -1,4 +1,5 @@
 #include "patternEditor.hpp"
+#include <FL/fl_draw.H>
 #include <algorithm>
 
 static const int intervals[][4] = {
@@ -11,22 +12,36 @@ static const int chordSizes[] = {3, 3, 4, 4};
 
 PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, labelsW + numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
-      noteLabels(x, y + rulerH, labelsW, numRows, rowHeight),
+    : Editor(x, y, scrollbarW + labelsW + numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
+      noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       patternGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {
-    rulerOffsetX = labelsW;
-    noteLabels.position(x, y + rulerH);
-    patternGrid.position(x + labelsW, y + rulerH);
+    rulerOffsetX = scrollbarW + labelsW;
+
+    const int gridH = numRows * rowHeight;
+
+    scrollbar = new Fl_Scrollbar(x, y + rulerH, scrollbarW, gridH);
+    scrollbar->type(FL_VERTICAL);
+    scrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<PatternEditor*>(d);
+        auto* sb   = static_cast<Fl_Scrollbar*>(w);
+        int total  = self->noteLabels.getTotalTones();
+        int maxOff = std::max(0, total - self->patternGrid.numRows);
+        self->setRowOffset(maxOff - (int)sb->value());
+    }, this);
+
+    noteLabels.position(x + scrollbarW, y + rulerH);
+    patternGrid.position(x + scrollbarW + labelsW, y + rulerH);
     patternGrid.setPlayhead(&playhead);
+
+    add(*scrollbar);
     add(noteLabels);
     add(patternGrid);
+
     playhead.setOwner(this);
     seekingEnabled = false;
 
-    noteLabels.onPageChange = [this](int delta) {
-        setRowOffset(noteLabels.getRowOffset() + delta);
-    };
+    noteLabels.onFocus = [this]() { focusPattern(); };
 
     end();
 }
@@ -81,10 +96,24 @@ int PatternEditor::computeDefaultOffset(int patId) const
 
 void PatternEditor::setRowOffset(int offset)
 {
-    int total = noteLabels.getTotalTones();
-    offset = std::clamp(offset, 0, std::max(0, total - patternGrid.numRows));
+    int total  = noteLabels.getTotalTones();
+    int maxOff = std::max(0, total - patternGrid.numRows);
+    offset = std::clamp(offset, 0, maxOff);
     noteLabels.setRowOffset(offset);
     patternGrid.setRowOffset(offset);
+    if (scrollbar)
+        scrollbar->value(maxOff - offset, patternGrid.numRows, 0, total);
+}
+
+void PatternEditor::focusPattern()
+{
+    int patId = -1;
+    if (timeline && lastSelectedTrack >= 0) {
+        const auto& tracks = timeline->get().tracks;
+        if (lastSelectedTrack < (int)tracks.size())
+            patId = tracks[lastSelectedTrack].patternId;
+    }
+    setRowOffset(computeDefaultOffset(patId));
 }
 
 PatternEditor::~PatternEditor()

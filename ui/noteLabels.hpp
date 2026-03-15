@@ -21,7 +21,7 @@ class NoteLabels : public Fl_Widget {
     int         handle(int event) override;
 
 public:
-    std::function<void(int delta)> onPageChange;
+    std::function<void()> onFocus;
 
     NoteLabels(int x, int y, int w, int numRows, int rowHeight);
 

@@ -54,22 +54,22 @@ std::string NoteLabels::noteForRow(int n) const {
     return std::string(name) + std::to_string(noteOct);
 }
 
-static void drawBtn(int x, int y, int w, int h, bool up) {
+static void drawFocusBtn(int x, int y, int w, int h) {
     static constexpr Fl_Color btnBg = 0x2D374800;
     static constexpr Fl_Color btnFg = 0x94A3B800;
     fl_color(btnBg);
     fl_rectf(x, y, w, h);
     int cx = x + w / 2;
-    int cy = y + h / 2 + (up ? 1 : -1);
+    int cy = y + h / 2;
+    int r  = std::min(w, h) / 4;
+    int tk = 3;  // tick length
     fl_color(btnFg);
-    fl_line_style(FL_SOLID, 2);
-    if (up) {
-        fl_line(cx - 4, cy + 2, cx,     cy - 2);
-        fl_line(cx,     cy - 2, cx + 4, cy + 2);
-    } else {
-        fl_line(cx - 4, cy - 2, cx,     cy + 2);
-        fl_line(cx,     cy + 2, cx + 4, cy - 2);
-    }
+    fl_line_style(FL_SOLID, 1);
+    fl_arc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
+    fl_line(cx,       cy - r - 1,   cx,       cy - r - 1 - tk);
+    fl_line(cx,       cy + r + 1,   cx,       cy + r + 1 + tk);
+    fl_line(cx - r - 1, cy,         cx - r - 1 - tk, cy);
+    fl_line(cx + r + 1, cy,         cx + r + 1 + tk, cy);
     fl_line_style(0);
 }
 
@@ -82,27 +82,21 @@ void NoteLabels::draw() {
     fl_color(borderCol);
     fl_rectf(x() + w() - 1, y(), 1, h());
 
-    bool canUp   = rowOffset + numRows < totalTones;
-    bool canDown = rowOffset > 0;
-
     fl_font(FL_HELVETICA, 10);
     fl_color(FL_WHITE);
 
     for (int r = 0; r < numRows; r++) {
         int n = rowOffset + (numRows - 1 - r);
         if (n < 0 || n >= totalTones) continue;
+        // suppress label on the bottom row — occupied by focus button
+        if (r == numRows - 1) continue;
         std::string label = noteForRow(n);
         int ry = y() + r * rowHeight;
-        int ly = ry, lh = rowHeight;
-        if (r == 0 && canUp)             { ly += rowHeight; lh -= rowHeight; }
-        if (r == numRows - 1 && canDown) { lh -= rowHeight; }
-        if (lh > 0)
-            fl_draw(label.c_str(), x(), ly, w() - 3, lh,
-                    FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+        fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
+                FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
     }
 
-    if (canUp)   drawBtn(x(), y(),                   w(), rowHeight, true);
-    if (canDown) drawBtn(x(), y() + h() - rowHeight, w(), rowHeight, false);
+    drawFocusBtn(x(), y() + h() - rowHeight, w(), rowHeight);
 }
 
 int NoteLabels::handle(int event) {
@@ -111,13 +105,8 @@ int NoteLabels::handle(int event) {
         return 1;
     case FL_PUSH:
         if (Fl::event_button() == FL_LEFT_MOUSE) {
-            int ey = Fl::event_y();
-            if (rowOffset + numRows < totalTones && ey < y() + rowHeight) {
-                if (onPageChange) onPageChange(std::max(1, numRows / 2));
-                return 1;
-            }
-            if (rowOffset > 0 && ey > y() + h() - rowHeight) {
-                if (onPageChange) onPageChange(-std::max(1, numRows / 2));
+            if (Fl::event_y() >= y() + h() - rowHeight) {
+                if (onFocus) onFocus();
                 return 1;
             }
         }

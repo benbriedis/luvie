@@ -7,11 +7,14 @@
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
+#include <FL/Fl_Scrollbar.H>
 #include <vector>
 
 class PatternEditor : public Editor, public ITimelineObserver {
-    static constexpr int labelsW = 36;
+    static constexpr int labelsW    = 36;
+    static constexpr int scrollbarW = 14;
 
+    Fl_Scrollbar*       scrollbar         = nullptr;
     NoteLabels          noteLabels;
     PatternGrid         patternGrid;
     ObservableTimeline* timeline          = nullptr;
@@ -21,6 +24,7 @@ class PatternEditor : public Editor, public ITimelineObserver {
 
     int  computeDefaultOffset(int patId) const;
     void setRowOffset(int offset);
+    void focusPattern();
 
 public:
     PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
