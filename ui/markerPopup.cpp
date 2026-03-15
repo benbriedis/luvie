@@ -32,18 +32,12 @@ MarkerPopup::MarkerPopup(Kind k)
 		input2->step(1);
 	}
 
-	const int btnW = (popupW - 2 * pad - pad) / 2;  // two buttons + gap
-	deleteBtn      = new Fl_Button(pad, row2Y, btnW, row2H, "Delete");
-	auto* okBtn    = new Fl_Button(pad + btnW + pad, row2Y, btnW, row2H, "OK");
+	deleteBtn = new Fl_Button(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
 
 	end();
 
 	deleteBtn->callback([](Fl_Widget*, void* d) {
 		static_cast<MarkerPopup*>(d)->doDelete();
-	}, this);
-
-	okBtn->callback([](Fl_Widget*, void* d) {
-		static_cast<MarkerPopup*>(d)->doOk();
 	}, this);
 }
 
