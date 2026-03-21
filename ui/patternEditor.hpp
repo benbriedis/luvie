@@ -7,14 +7,14 @@
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
-#include <FL/Fl_Scrollbar.H>
+#include "gridScrollPane.hpp"
 #include <vector>
 
 class PatternEditor : public Editor, public ITimelineObserver {
     static constexpr int labelsW    = 36;
     static constexpr int scrollbarW = 14;
 
-    Fl_Scrollbar*       scrollbar         = nullptr;
+    GridScrollPane*     scrollbar         = nullptr;
     NoteLabels          noteLabels;
     PatternGrid         patternGrid;
     ObservableTimeline* timeline          = nullptr;

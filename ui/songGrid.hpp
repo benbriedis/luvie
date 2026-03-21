@@ -15,6 +15,8 @@ class SongGrid : public Grid, public ITimelineObserver {
     float               dragStartOffset   = 0.0f;
     int                 dragBeatsPerBar   = 4;
 
+    int rowOffset = 0;
+
     void rebuildNotes();
 
 protected:
@@ -35,6 +37,7 @@ public:
 
     void setTimeline(ObservableTimeline* tl);
     void setTrackView(int trackFilter, bool beatResolution);
+    void setRowOffset(int offset);
     void onTimelineChanged() override;
 };
 

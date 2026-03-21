@@ -216,6 +216,44 @@ void ObservableTimeline::removeTrack(int trackId)
 	notify();
 }
 
+int ObservableTimeline::copyPattern(int srcPatId)
+{
+	const Pattern* src = nullptr;
+	for (const auto& p : data.patterns)
+		if (p.id == srcPatId) { src = &p; break; }
+	if (!src) return -1;
+
+	Pattern copy;
+	copy.id = nextId++;
+	copy.lengthBeats = src->lengthBeats;
+	for (auto n : src->notes) {
+		n.id = nextId++;
+		copy.notes.push_back(n);
+	}
+	data.patterns.push_back(copy);
+	return copy.id;
+}
+
+void ObservableTimeline::removeTrackAndPattern(int trackId)
+{
+	auto it = std::find_if(data.tracks.begin(), data.tracks.end(),
+		[trackId](const Track& t) { return t.id == trackId; });
+	if (it == data.tracks.end()) return;
+
+	int patId = it->patternId;
+	data.tracks.erase(it);
+
+	bool stillUsed = std::any_of(data.tracks.begin(), data.tracks.end(),
+		[patId](const Track& t) { return t.patternId == patId; });
+	if (!stillUsed && patId > 0)
+		data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
+			[patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
+
+	if (data.selectedTrackIndex >= (int)data.tracks.size())
+		data.selectedTrackIndex = std::max(0, (int)data.tracks.size() - 1);
+	notify();
+}
+
 // ---------------------------------------------------------------------------
 // Pattern definition management
 

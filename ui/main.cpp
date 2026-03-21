@@ -12,6 +12,7 @@
 #include "markerRuler.hpp"
 #include "observableTimeline.hpp"
 #include "patternPanel.hpp"
+#include "trackContextPopup.hpp"
 
 int main(int argc, char **argv) {
     const int tabBarH      = 35;
@@ -42,9 +43,9 @@ int main(int argc, char **argv) {
     const int numPatternBeats = 8;
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
-    for (int i = 0; i < 10; i++) {
+    {
         int patId = songTimeline.createPattern(numPatternBeats);
-        songTimeline.addTrack("Pattern " + std::to_string(i + 1), patId);
+        songTimeline.addTrack("Pattern 1", patId);
     }
 
     MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
@@ -55,8 +56,10 @@ int main(int argc, char **argv) {
                             15, 60, MarkerRuler::TEMPO, &songTimeline, &tempoPopup);
     tab1.add(tempoRuler);
 
+    TrackContextPopup trackContextPopup;
+
     std::vector<Note> patterns(0);
-    SongEditor og2(0, tabBarH + 2 * markerRulerH, patterns, 10, 15, 45, 60, 0.25, popup2);
+    SongEditor og2(0, tabBarH + 2 * markerRulerH, winW, patterns, 10, 15, 45, 60, 0.25, popup2);
     tab1.add(og2);
 
     const int panelH = 50;
@@ -81,6 +84,7 @@ int main(int argc, char **argv) {
     window.add(bottomPane);
 
     og2.setTransport(&simpleTransport, &songTimeline);
+    og2.setContextPopup(&trackContextPopup);
     og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
     og2.onPatternDoubleClick = [&](int trackIndex) {
@@ -98,10 +102,11 @@ int main(int argc, char **argv) {
     patternPanel.onParamsChanged = syncNoteLabels;
     syncNoteLabels();
 
-    window.add(popup1);       window.registerPopup(&popup1);
-    window.add(popup2);       window.registerPopup(&popup2);
-    window.add(tempoPopup);   window.registerPopup(&tempoPopup);
-    window.add(timeSigPopup); window.registerPopup(&timeSigPopup);
+    window.add(popup1);              window.registerPopup(&popup1);
+    window.add(popup2);              window.registerPopup(&popup2);
+    window.add(tempoPopup);          window.registerPopup(&tempoPopup);
+    window.add(timeSigPopup);        window.registerPopup(&timeSigPopup);
+    window.add(trackContextPopup);   window.registerPopup(&trackContextPopup);
 
     window.show(argc, argv);
     return Fl::run();

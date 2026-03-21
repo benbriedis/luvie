@@ -71,6 +71,13 @@ public:
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;
 
+	// Copy a pattern definition (notes + length); returns new pattern id.
+	// Does NOT notify — caller must add a track (which notifies) or call notify manually.
+	int copyPattern(int srcPatId);
+
+	// Remove a track and its pattern definition (if the pattern is not shared).
+	void removeTrackAndPattern(int trackId);
+
 private:
 	struct TimeSegment {
 		int   bar;

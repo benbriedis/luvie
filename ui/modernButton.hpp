@@ -8,21 +8,25 @@ class ModernButton : public Fl_Button {
     bool      hovered     = false;
     int       borderWidth = 2;
     Fl_Color  borderCol   = 0xCBD5E100;  // matches transport buttons by default
+    Fl_Color  hoverCol    = 0;           // 0 = auto-derive (lighter of bg)
 
     void draw() override {
         Fl_Color bg = color();
-        fl_color(hovered ? fl_color_average(bg, FL_WHITE, 0.8f) : bg);
+        Fl_Color hov = hoverCol ? hoverCol : fl_color_average(bg, FL_WHITE, 0.8f);
+        fl_color(hovered ? hov : bg);
         fl_rectf(x(), y(), w(), h());
 
-        fl_color(borderCol);
-        fl_line_style(FL_SOLID, borderWidth);
-        fl_rect(x(), y(), w(), h());
-        fl_line_style(0);
+        if (borderWidth > 0) {
+            fl_color(borderCol);
+            fl_line_style(FL_SOLID, borderWidth);
+            fl_rect(x(), y(), w(), h());
+            fl_line_style(0);
+        }
 
         if (label()) {
             fl_font(labelfont(), labelsize());
             fl_color(labelcolor());
-            fl_draw(label(), x(), y(), w(), h(), FL_ALIGN_CENTER);
+            fl_draw(label(), x() + 4, y(), w() - 8, h(), align());
         }
     }
 
@@ -36,8 +40,9 @@ public:
     ModernButton(int x, int y, int w, int h, const char* label = nullptr)
         : Fl_Button(x, y, w, h, label) { box(FL_NO_BOX); }
 
-    void setBorderWidth(int w)     { borderWidth = w; }
+    void setBorderWidth(int w)      { borderWidth = w; }
     void setBorderColor(Fl_Color c) { borderCol   = c; }
+    void setHoverColor(Fl_Color c)  { hoverCol    = c; }
 };
 
 #endif

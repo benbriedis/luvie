@@ -71,23 +71,40 @@ void SongGrid::setTimeline(ObservableTimeline* tl)
 void SongGrid::rebuildNotes()
 {
     if (!timeline) return;
-    if (trackFilter < 0) {
-        notes = timeline->buildNotes();
+    if (trackFilter >= 0) {
+        // Single-track view: no row offset needed
+        const auto& tracks = timeline->get().tracks;
+        notes.clear();
+        if (trackFilter < (int)tracks.size()) {
+            float scale = 1.0f;
+            if (beatResolution) {
+                int top, bottom;
+                timeline->timeSigAt(0, top, bottom);
+                scale = (float)top;
+            }
+            for (auto& p : tracks[trackFilter].patterns)
+                notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
+        }
         clampSelection();
         return;
     }
-    const auto& tracks = timeline->get().tracks;
-    if (trackFilter >= (int)tracks.size()) { notes.clear(); return; }
-    float scale = 1.0f;
-    if (beatResolution) {
-        int top, bottom;
-        timeline->timeSigAt(0, top, bottom);
-        scale = (float)top;
-    }
+    // All-tracks view: map absolute track index to visual row
+    std::vector<Note> all = timeline->buildNotes();
     notes.clear();
-    for (auto& p : tracks[trackFilter].patterns)
-        notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
+    for (auto n : all) {
+        int visual = (int)n.pitch - rowOffset;
+        if (visual >= 0 && visual < numRows) {
+            n.pitch = (float)visual;
+            notes.push_back(n);
+        }
+    }
     clampSelection();
+}
+
+void SongGrid::setRowOffset(int offset)
+{
+    rowOffset = offset;
+    if (timeline) { rebuildNotes(); redraw(); }
 }
 
 void SongGrid::setTrackView(int tf, bool br)
@@ -139,7 +156,7 @@ void SongGrid::onCommitDrag()
     if (!timeline || draggingPatternId < 0) return;
     isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
     if (hoverState == MOVING)
-        timeline->movePattern(draggingPatternId, notes[selectedNote].pitch, notes[selectedNote].beat);
+        timeline->movePattern(draggingPatternId, (int)notes[selectedNote].pitch + rowOffset, notes[selectedNote].beat);
     else if (hoverState == RESIZING) {
         if (side == LEFT)
             timeline->resizePatternLeft(draggingPatternId,
@@ -155,16 +172,17 @@ void SongGrid::onCommitDrag()
 void SongGrid::onNoteDoubleClick()
 {
     if (selectedNote < (int)notes.size() && onPatternDoubleClick)
-        onPatternDoubleClick(notes[selectedNote].pitch);
+        onPatternDoubleClick((int)notes[selectedNote].pitch + rowOffset);
 }
 
 void SongGrid::toggleNote()
 {
     if (trackFilter >= 0) return;  // read-only when displaying a single track view
-    int   ex  = Fl::event_x() - x();
-    int   ey  = Fl::event_y() - y();
-    int   row = ey / rowHeight;
-    float col = (float)(ex / colWidth);
+    int   ex       = Fl::event_x() - x();
+    int   ey       = Fl::event_y() - y();
+    int   visualRow = ey / rowHeight;
+    int   absRow    = visualRow + rowOffset;
+    float col       = (float)(ex / colWidth);
 
     if (!timeline) {
         Grid::toggleNote();
@@ -172,16 +190,17 @@ void SongGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.pitch == row && n.beat == col) {
+        if ((int)n.pitch == visualRow && n.beat == col) {
             timeline->removePattern(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.pitch == row && col < n.beat + n.length && col + 1.0f > n.beat; });
-    if (clear && row >= 0 && row < (int)timeline->get().tracks.size()) {
-        int patId = timeline->get().tracks[row].patternId;
+        [=](const Note& n) { return (int)n.pitch == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
+    const auto& tracks = timeline->get().tracks;
+    if (clear && absRow >= 0 && absRow < (int)tracks.size()) {
+        int patId = tracks[absRow].patternId;
         if (patId > 0)
-            timeline->placePattern(row, patId, col, 1.0f);
+            timeline->placePattern(absRow, patId, col, 1.0f);
     }
 }

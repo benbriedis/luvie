@@ -20,12 +20,11 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
 
     const int gridH = numRows * rowHeight;
 
-    scrollbar = new Fl_Scrollbar(x, y + rulerH, scrollbarW, gridH);
-    scrollbar->type(FL_VERTICAL);
+    scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
     scrollbar->linesize(1);
     scrollbar->callback([](Fl_Widget* w, void* d) {
         auto* self = static_cast<PatternEditor*>(d);
-        auto* sb   = static_cast<Fl_Scrollbar*>(w);
+        auto* sb   = static_cast<GridScrollPane*>(w);
         int total  = self->noteLabels.getTotalTones();
         int maxOff = std::max(0, total - self->patternGrid.numRows);
         self->setRowOffset(maxOff - (int)sb->value());

@@ -5,12 +5,17 @@
 #include "inlineInput.hpp"
 #include <FL/Fl_Group.H>
 
+class TrackContextPopup;
+
 class TrackLabels : public Fl_Group, public ITimelineObserver {
-    ObservableTimeline* timeline          = nullptr;
-    int                 rowHeight;
-    InlineInput         input;
-    int                 editingTrackIndex = -1;
-    std::string         originalLabel;
+    ObservableTimeline*  timeline          = nullptr;
+    TrackContextPopup*   contextPopup      = nullptr;
+    int                  numVisibleRows;
+    int                  rowHeight;
+    int                  rowOffset         = 0;
+    InlineInput          input;
+    int                  editingTrackIndex = -1;
+    std::string          originalLabel;
 
     void startEdit(int trackIndex);
     void cancelEdit();
@@ -20,10 +25,13 @@ public:
     void commitEdit();
 
 public:
-    TrackLabels(int x, int y, int w, int rowHeight);
+    TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight);
     ~TrackLabels();
 
     void setTimeline(ObservableTimeline* tl);
+    void setContextPopup(TrackContextPopup* p) { contextPopup = p; }
+    void setRowOffset(int offset);
+    void setNumVisibleRows(int n) { numVisibleRows = n; }
     void onTimelineChanged() override { redraw(); }
 
 protected:
