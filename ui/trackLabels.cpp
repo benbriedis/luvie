@@ -60,6 +60,7 @@ void TrackLabels::startEdit(int trackIndex)
     input.textcolor(colText);
     input.show();
     input.take_focus();
+    input.position(input.size(), 0);  // select all
     input.onChange([this]() { checkDuplicate(); });
     InlineEditDispatch::install(this, [this]() { commitEdit(); });
     redraw();
