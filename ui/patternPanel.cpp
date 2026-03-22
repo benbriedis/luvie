@@ -182,6 +182,17 @@ void PatternPanel::cancelEdit()
     redraw();
 }
 
+void PatternPanel::resize(int x, int y, int w, int h)
+{
+	int dx = x - this->x(), dy = y - this->y();
+	Fl_Widget::resize(x, y, w, h);
+	if (dx || dy)
+		for (int i = 0; i < children(); i++) {
+			Fl_Widget* c = child(i);
+			c->position(c->x() + dx, c->y() + dy);
+		}
+}
+
 void PatternPanel::draw()
 {
     fl_color(panelBorder);

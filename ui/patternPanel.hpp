@@ -32,6 +32,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
 
     void draw() override;
     int  handle(int event) override;
+    void resize(int x, int y, int w, int h) override;
 
 public:
     PatternPanel(int x, int y, int w, int h);

@@ -44,6 +44,7 @@ public:
 	void notifyEndReached();
 	void notifySeek() { stoppedAtEnd = false; }
 	void onTimelineChanged() override;
+	void resize(int x, int y, int w, int h) override;
 };
 
 #endif

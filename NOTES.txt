@@ -207,6 +207,10 @@ Connect up to ALSA midi for easy testing.
 
 Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
 
+Shrinking pattern editor horizontally - could reorangise things a bit befor resorting to cropping in smaller windows.
+
+Maybe put horizontal scrollbar lower?
+   Lighter theme scrollbar?
 
 
 

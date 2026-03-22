@@ -106,6 +106,21 @@ void Transport::updatePosition() {
 
 // ---------------------------------------------------------------------------
 
+void Transport::resize(int x, int y, int w, int h)
+{
+	Fl_Widget::resize(x, y, w, h);
+	const int bw     = rewindBtn->w();
+	const int pw     = playPauseBtn->w();
+	const int gap    = 12;
+	const int totalW = bw + gap + pw;
+	int bx = x + (w - totalW) / 2;
+	bx = std::max(x + 10, bx);          // don't push buttons off the left edge
+	int by = y + (h - rewindBtn->h()) / 2;
+	rewindBtn->position(bx, by);
+	playPauseBtn->position(bx + bw + gap, by);
+	posLabel->position(bx + totalW + 20, by);
+}
+
 Transport::~Transport()
 {
 	Fl::remove_timeout(pollCb, this);
