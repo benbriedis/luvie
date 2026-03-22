@@ -1,7 +1,9 @@
 #include "songEditor.hpp"
 #include "trackContextPopup.hpp"
 #include <FL/Fl.H>
+#include <FL/fl_draw.H>
 #include <algorithm>
+#include <cstdio>
 
 SongEditor::SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
                        int numRows, int numCols, int rowHeight, int colWidth,
@@ -47,6 +49,31 @@ SongEditor::SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
 
     playhead.setOwner(this);
     end();
+}
+
+void SongEditor::drawRulerLabels()
+{
+    if (songGrid.colWidth <= 0) return;
+
+    fl_font(FL_HELVETICA, 9);
+    fl_color(0xA0906000);   // dim warm tone on yellow ruler bg
+
+    int gridLeft     = x() + rulerOffsetX;
+    int gridRight    = x() + w();
+    int pixelBase    = x() + rulerOffsetX - hScrollPixel;
+    int textBaseline = y() + rulerH / 2 + (fl_height() - fl_descent()) / 2;
+
+    int firstCol = songGrid.colWidth > 0 ? hScrollPixel / songGrid.colWidth : 0;
+    for (int col = firstCol; col < songGrid.numCols; ++col) {
+        int cx = pixelBase + col * songGrid.colWidth + songGrid.colWidth / 2;
+        if (cx < gridLeft)  continue;
+        if (cx >= gridRight) break;
+
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%d", col + 1);
+        int tw = (int)fl_width(buf);
+        fl_draw(buf, cx - tw / 2, textBaseline);
+    }
 }
 
 SongEditor::~SongEditor()

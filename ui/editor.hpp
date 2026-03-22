@@ -24,6 +24,7 @@ protected:
     int             rulerOffsetX   = 0;   // x offset of grid area within editor (e.g. label panel width)
     int             hScrollPixel   = 0;   // horizontal scroll offset in pixels
 
+    virtual void drawRulerLabels() {}
     void draw() override;
     int  handle(int event) override;
 

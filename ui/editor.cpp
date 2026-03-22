@@ -15,6 +15,7 @@ void Editor::draw()
     fl_rectf(x(), y(), w(), rulerH);
     fl_color(rulerBorder);
     fl_line(x(), y() + rulerH - 1, x() + w() - 1, y() + rulerH - 1);
+    drawRulerLabels();
     playhead.drawTriangle(x() + rulerOffsetX - hScrollPixel, y(), rulerH);
     draw_children();
 }

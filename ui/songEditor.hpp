@@ -28,6 +28,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     void updateScrollBounds();
     void setRowOffset(int offset);
     void setColOffset(int offset);
+    void drawRulerLabels() override;
 
 public:
     SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
