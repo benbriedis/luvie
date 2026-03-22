@@ -148,10 +148,12 @@ Unit tests
 Use Patches? and Parameters?
 
 ---------------------------------
+
+
 8/3/26
 ------
 Re time signatures and live looping mode
------------------------------------------
+~~~
 In time I'll probably add a "live mode" like Seq24.
 I think to get this to work well it will need to have its own time signature 
 (note that song mode can change time signatures and the patterns are just being dumped on top regardless).
@@ -162,21 +164,6 @@ cf Disallowing or discouraging weird denominators
    - MAYBE LEAVE IN FOR THE MOMENT. Nice if I can support experimental stuff.
     cf "Irrational meters": https://en.wikipedia.org/wiki/Time_signature
 
-     ....
-
-Linear ramping of tempos...
-
-MINOR: all the rulers should end at the the end of the song (but maybe we dont limit the song in this fashion)
-
-Either both popups should have Close, or neither.
-   There is an inconsistency in the popups too... maybe require right click to popup marker popups?
-   Delete buttons maybe should be positioned consistently.
-
-TODO put notes into the new Pattern structure
-
-
-CURRENT JOBS TO DO
-==================
 
 Allow the song to be longer. Add horizontal scrolls to both editors.
 Pattern editor to allow number of beats to be set 
@@ -184,48 +171,42 @@ Pattern editor to allow number of beats to be set
 
 Linear ramping of tempos...
 
-MINOR: all the rulers should end at the the end of the song (but maybe we dont limit the song in this fashion)
-
-Delete buttons maybe should be positioned consistently between popups.
-
 - The O(n²) searches in ObservableTimeline — with 10-20 tracks they're negligible, and the structure
 isn't complex enough to warrant indexing yet.
 - Floating-point bar comparisons — no evidence of actual bugs from this.
 - The Point/Point2 naming — they serve genuinely different purposes.
 
 
-Add pattern, note or marker on mouse down.
+Add pattern, note or marker on mouse down (probably want a 'mode'/'tool').
   cf being able to select a group of notes though.
   cf being able to click and drag to create a bunch of notes. (strafe mode?)
 
 Cf Transpose vs fixed modes aka 
-   Relative vs Absolute/Fixed modes
-   - Both can have 'disabled' notes. Fixed mode can play them, Transpose cannot.
+   Relative vs Absolute/Fixed modes (probably best on a pattern-by-pattern basis I think)
+   - Both can have 'disabled' notes. Fixed mode can play them, Transpose cannot (until we select a chord/scale with as many notes).
    - Be reticent about allowing notes to be added or deleted to these rows?
+   - THINK best to basically just to implement relative mode for the moment. If I put in an absolute mode in time, then
+     sort out a translation process backwards and forwards.
 
-
-
-Add copy pattern & delete & disable.
-   Song editor: click and drag patterns to reorder.
-                right click on pattern name cell to clone and delete
-   NB a song/loop or live mode...
-   
-Song editor - add pattern button. Start with a single pattern. Add vertical scrollbar.   
-
+Song editor - add pattern button.
 
 cf options for # of octaves or notes to display?
-   Will need scrollbar sometimes.
    Remove octave numbers, except on bottom one? 
        Or place octave number to left? Issue: base note octive clash a bit with midi octaves
            (space here will vary)
 
 Allow window to be resizable
 
-Newer looking scrollbars
-
 Application icon
 
 BUG? When changing chord the position of the notes change...
+
+Print out notes as they play for plain MIDI as a debug option.
+Connect up to ALSA midi for easy testing.
+
+Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
+
+Add steps as labels to pattern editor. 
 
 
 sivcas   'so i vibe-coded a sequencer'

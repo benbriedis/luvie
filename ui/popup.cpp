@@ -19,10 +19,6 @@ Popup::Popup() : BasePopup(0,0,0,0)
 	flex->color(popupBg);
 	flex->begin();
 	flex->gap(10);
-	ModernButton *deleteItem = new ModernButton(0, 0, 40, 30, "Delete");
-	deleteItem->color(FL_WHITE);
-	deleteItem->labelcolor(popupText);
-	flex->fixed(deleteItem, 40);
 
 	Fl_Flex *sliderRow = new Fl_Flex(0, 0, 150, 30, Fl_Flex::HORIZONTAL);
 	sliderRow->box(FL_FLAT_BOX);
@@ -41,6 +37,9 @@ Popup::Popup() : BasePopup(0,0,0,0)
 	slider->value(0.5);
 	sliderRow->end();
 
+	ModernButton *deleteItem = new ModernButton(0, 0, 40, 30, "Delete");
+	deleteItem->color(FL_WHITE);
+	deleteItem->labelcolor(popupText);
 	flex->fixed(deleteItem, 30);
 	flex->margin(10,10,10,10);
 	flex->end();

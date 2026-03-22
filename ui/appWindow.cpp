@@ -10,8 +10,8 @@ int AppWindow::handle(int event)
 	case FL_MOVE:
 	case FL_MOUSEWHEEL: {
 		// Swallow the FL_RELEASE that follows a click which closed a popup.
-		if (event == FL_RELEASE && closingClick) {
-			closingClick = false;
+		if ((event == FL_RELEASE || event == FL_DRAG) && closingClick) {
+			if (event == FL_RELEASE) closingClick = false;
 			return 1;
 		}
 

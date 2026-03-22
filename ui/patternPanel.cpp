@@ -137,6 +137,7 @@ void PatternPanel::startEdit()
     input.textcolor(panelText);
     input.show();
     input.take_focus();
+    input.position(input.size(), 0);  // select all
     input.onChange([this]() { checkDuplicate(); });
     InlineEditDispatch::install(this, [this]() { commitEdit(); });
     redraw();
