@@ -45,9 +45,12 @@ void PatternGrid::toggleNote()
 {
     int   ey         = Fl::event_y() - y();
     int   ex         = Fl::event_x() - x();
+    int   gridRight  = std::min(w(), (numCols - colOffset) * colWidth);
+    if (ex >= gridRight) return;
+
     int   visual_row = ey / rowHeight;
     int   abs_row    = (rowOffset + numRows - 1) - visual_row;
-    float col        = (float)(ex / colWidth);
+    float col        = (float)(ex / colWidth) + colOffset;
 
     if (!timeline || patternId < 0) {
         Grid::toggleNote();

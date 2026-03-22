@@ -10,15 +10,16 @@ static const int intervals[][4] = {
 };
 static const int chordSizes[] = {3, 3, 4, 4};
 
-PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
+PatternEditor::PatternEditor(int x, int y, int visibleW, std::vector<Note> notes, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, scrollbarW + labelsW + numCols * colWidth, rulerH + numRows * rowHeight, numCols, colWidth),
+    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       patternGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     rulerOffsetX = scrollbarW + labelsW;
 
-    const int gridH = numRows * rowHeight;
+    const int gridH      = numRows * rowHeight;
+    const int visibleGridW = visibleW - scrollbarW - labelsW;
 
     scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
     scrollbar->linesize(1);
@@ -30,11 +31,23 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
         self->setRowOffset(maxOff - (int)sb->value());
     }, this);
 
+    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, y + rulerH + gridH,
+                                    visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
+    hScrollbar->linesize(1);
+    hScrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<PatternEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->setColOffset((int)sb->value());
+    }, this);
+    hScrollbar->hide();
+
     noteLabels.position(x + scrollbarW, y + rulerH);
     patternGrid.position(x + scrollbarW + labelsW, y + rulerH);
+    patternGrid.size(visibleGridW, gridH);
     patternGrid.setPlayhead(&playhead);
 
     add(*scrollbar);
+    add(*hScrollbar);
     add(noteLabels);
     add(patternGrid);
 
@@ -42,6 +55,13 @@ PatternEditor::PatternEditor(int x, int y, std::vector<Note> notes, int numRows,
     seekingEnabled = false;
 
     noteLabels.onFocus = [this]() { focusPattern(); };
+
+    // initialise horizontal scroll state
+    int totalGridW = numCols * colWidth;
+    if (totalGridW > visibleGridW) {
+        hScrollbar->value(0, visibleGridW / colWidth, 0, numCols);
+        hScrollbar->show();
+    }
 
     end();
 }
@@ -105,10 +125,30 @@ void PatternEditor::setRowOffset(int offset)
         scrollbar->value(maxOff - offset, patternGrid.numRows, 0, total);
 }
 
+void PatternEditor::setColOffset(int offset)
+{
+    if (!hScrollbar) return;
+    int visibleCols = patternGrid.w() / patternGrid.colWidth;
+    colOffset = std::clamp(offset, 0, std::max(0, patternGrid.numCols - visibleCols));
+    hScrollPixel = colOffset * patternGrid.colWidth;
+    patternGrid.setColOffset(colOffset);
+    hScrollbar->value(colOffset, visibleCols, 0, patternGrid.numCols);
+
+    int totalGridW = patternGrid.numCols * patternGrid.colWidth;
+    if (totalGridW > patternGrid.w())
+        hScrollbar->show();
+    else
+        hScrollbar->hide();
+    redraw();
+}
+
 int PatternEditor::handle(int event)
 {
     if (event == FL_MOUSEWHEEL) {
-        setRowOffset(noteLabels.getRowOffset() - Fl::event_dy());
+        if (Fl::event_dx() != 0)
+            setColOffset(colOffset + Fl::event_dx());
+        else
+            setRowOffset(noteLabels.getRowOffset() - Fl::event_dy());
         return 1;
     }
     return Editor::handle(event);

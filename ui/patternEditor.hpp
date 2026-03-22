@@ -21,14 +21,16 @@ class PatternEditor : public Editor, public ITimelineObserver {
     int                 lastSelectedTrack = -1;
     int                 rootPitch         = 0;
     int                 chordType         = 0;
+    int                 colOffset         = 0;
 
     int  computeDefaultOffset(int patId) const;
     void setRowOffset(int offset);
+    void setColOffset(int offset);
     void focusPattern();
     int  handle(int event) override;
 
 public:
-    PatternEditor(int x, int y, std::vector<Note> notes, int numRows, int numCols,
+    PatternEditor(int x, int y, int visibleW, std::vector<Note> notes, int numRows, int numCols,
                   int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternEditor();
 

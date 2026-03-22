@@ -69,10 +69,10 @@ int main(int argc, char **argv) {
     tabs.add(tab2);
 
     const int rowHeight = 30;
-    const int numRows   = (tabsH - tabBarH - Editor::rulerH - panelH) / rowHeight;
+    const int numRows   = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
 
     std::vector<Note> notes(0);
-    PatternEditor og1(0, tabBarH, notes, numRows, numPatternBeats, rowHeight, 40, 0.25, popup1);
+    PatternEditor og1(0, tabBarH, winW, notes, numRows, numPatternBeats, rowHeight, 40, 0.25, popup1);
     tab2.add(og1);
 
     PatternPanel patternPanel(0, tabsH - panelH, winW, panelH);

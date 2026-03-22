@@ -25,14 +25,15 @@ void Grid::draw()
 {
     Fl_Box::draw();
 
-    fl_push_clip(x(), y(), w() + 1, h());
+    fl_push_clip(x(), y(), w() + 1, h() + 1);
 
     fl_color(bgColor);
     fl_rectf(x(), y(), w(), h());
 
+    int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
     for (int i = 0; i < numRows + 1; i++) {
         fl_color(rowLineColor(i));
-        fl_line(x(), y() + i * rowHeight, x() + w(), y() + i * rowHeight);
+        fl_line(x(), y() + i * rowHeight, x() + gridRight, y() + i * rowHeight);
     }
 
     int endCol = colOffset + w() / colWidth + 2;
@@ -74,16 +75,20 @@ int Grid::handle(int event)
                     popup.open(selectedNote, &notes, this, std::move(onDelete));
                 }
             } else if (hoverState == NONE) {
+                int ex    = Fl::event_x() - x();
                 int row   = (Fl::event_y() - y()) / rowHeight;
-                float col = (float)((Fl::event_x() - x()) / colWidth) + colOffset;
-                creationForbidden = false;
-                bool wouldRemove = std::any_of(notes.begin(), notes.end(),
-                    [=](const Note& n) { return n.pitch == row && n.beat == col; });
-                if (!wouldRemove) {
-                    creationForbidden = std::any_of(notes.begin(), notes.end(),
-                        [=](const Note& n) { return n.pitch == row && col < n.beat + n.length && col + 1.0f > n.beat; });
-                    if (creationForbidden)
-                        window()->cursor(forbiddenCursorImage(), 11, 11);
+                float col = (float)(ex / colWidth) + colOffset;
+                int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+                creationForbidden = ex >= gridRight;
+                if (!creationForbidden) {
+                    bool wouldRemove = std::any_of(notes.begin(), notes.end(),
+                        [=](const Note& n) { return n.pitch == row && n.beat == col; });
+                    if (!wouldRemove) {
+                        creationForbidden = std::any_of(notes.begin(), notes.end(),
+                            [=](const Note& n) { return n.pitch == row && col < n.beat + n.length && col + 1.0f > n.beat; });
+                        if (creationForbidden)
+                            window()->cursor(forbiddenCursorImage(), 11, 11);
+                    }
                 }
             } else if (Fl::event_clicks() == 1) {
                 onNoteDoubleClick();
