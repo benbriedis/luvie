@@ -13,6 +13,7 @@ class Playhead : public ITimelineObserver {
 	int                 colWidth;
 	Fl_Widget*          owner        = nullptr;
 	int                 patternTrack = -1;  // >= 0: beat-relative view of that track
+	float               positionBars = 0.0f; // bar position; re-anchors transport on timeline changes
 
 	static void timerCb(void* data);
 	void tick();
@@ -31,7 +32,7 @@ public:
 	void setOwner(Fl_Widget* w) { owner = w; }
 	void setPatternTrack(int track) { patternTrack = track; }
 
-	void onTimelineChanged() override { if (owner) owner->redraw(); }
+	void onTimelineChanged() override;
 
 	void  drawTriangle(int rulerX, int rulerY, int rulerH);
 	void  drawLine(int gridX, int gridY, int gridH);

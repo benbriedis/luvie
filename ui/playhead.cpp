@@ -29,6 +29,15 @@ void Playhead::setTransport(ITransport* t, ObservableTimeline* tl)
 	Fl::add_timeout(0.1, timerCb, this);
 }
 
+void Playhead::onTimelineChanged()
+{
+	if (transport && obsTl) {
+		double endSecs = obsTl->barToSeconds((float)numCols);
+		transport->seek(std::clamp(obsTl->barToSeconds(positionBars), 0.0, endSecs));
+	}
+	if (owner) owner->redraw();
+}
+
 void Playhead::timerCb(void* data)
 {
 	auto* self = static_cast<Playhead*>(data);
@@ -56,6 +65,8 @@ void Playhead::tick()
 			if (onEndReached) onEndReached();
 		}
 	}
+	if (transport && obsTl)
+		positionBars = obsTl->secondsToBar(transport->position());
 	if (owner) owner->redraw();
 }
 
@@ -141,5 +152,7 @@ void Playhead::seek(int mouseX, int rulerX)
 	if (!transport || !obsTl) return;
 	double secs    = pixelToSeconds(mouseX - rulerX);
 	double endSecs = obsTl->barToSeconds((float)numCols);
-	transport->seek(std::clamp(secs, 0.0, endSecs));
+	secs = std::clamp(secs, 0.0, endSecs);
+	transport->seek(secs);
+	positionBars = obsTl->secondsToBar(secs);
 }
