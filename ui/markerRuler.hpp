@@ -34,11 +34,15 @@ private:
 	void draw()           override;
 	int  handle(int event) override;
 
-	int  barToPixel(int bar) const { return x() + bar * colWidth; }
+	int  offsetX = 0;
+	int  barToPixel(int bar) const { return x() + offsetX + bar * colWidth; }
 	int  pixelToBar(int px)  const;
 	int  findBarAt(int px)   const;  // bar of marker under px, or -1
 	bool isFixed(int bar)    const   { return bar == 0; }
 	void openPopupFor(int bar);
+
+public:
+	void setOffsetX(int ox) { offsetX = ox; redraw(); }
 };
 
 #endif

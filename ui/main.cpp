@@ -84,6 +84,10 @@ int main(int argc, char **argv) {
     window.add(bottomPane);
 
     og2.setTransport(&simpleTransport, &songTimeline);
+    og2.onRulerOffsetChanged = [&](int off) {
+        timeSigRuler.setOffsetX(off);
+        tempoRuler.setOffsetX(off);
+    };
     og2.setContextPopup(&trackContextPopup);
     og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };

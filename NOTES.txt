@@ -150,6 +150,7 @@ Use Patches? and Parameters?
 ---------------------------------
 
 NOTE: currently restricting # patterns to a min of 1 so I can continue to add patterns.
+      Maybe add add pattern button in future.
 
 8/3/26
 ------
@@ -179,7 +180,9 @@ isn't complex enough to warrant indexing yet.
 
 
 Add pattern, note or marker on mouse down (probably want a 'mode'/'tool').
+  nb at the moment if you click, drag and release you create a note at the release point, which is weird.
   cf being able to select a group of notes though.
+     - cf picking the tool from the context menu...
   cf being able to click and drag to create a bunch of notes. (strafe mode?)
 
 Cf Transpose vs fixed modes aka 
@@ -188,8 +191,6 @@ Cf Transpose vs fixed modes aka
    - Be reticent about allowing notes to be added or deleted to these rows?
    - THINK best to basically just to implement relative mode for the moment. If I put in an absolute mode in time, then
      sort out a translation process backwards and forwards.
-
-Song editor - add pattern button.
 
 Allow window to be resizable
 
@@ -201,6 +202,7 @@ Print out notes as they play for plain MIDI as a debug option.
 Connect up to ALSA midi for easy testing.
 
 Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
+
 
 
 

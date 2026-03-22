@@ -33,6 +33,7 @@ class ModernButton : public Fl_Button {
     int handle(int event) override {
         if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
+        if (event == FL_HIDE)  { hovered = false; return 0; }
         return Fl_Button::handle(event);
     }
 

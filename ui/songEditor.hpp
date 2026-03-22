@@ -34,6 +34,7 @@ public:
     ~SongEditor();
 
     std::function<void(int trackIndex)> onPatternDoubleClick;
+    std::function<void(int offsetX)>    onRulerOffsetChanged;
 
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setContextPopup(TrackContextPopup* p);

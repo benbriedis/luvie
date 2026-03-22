@@ -97,6 +97,7 @@ void SongEditor::updateScrollBounds()
     trackLabels.position(baseX + sbW, trackLabels.y());
     songGrid.position(baseX + sbW + labelW, songGrid.y());
     rulerOffsetX = sbW + labelW;
+    if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX);
 
     // Resize children to match actual track count (up to numVisibleRows)
     songGrid.numRows = visRows;

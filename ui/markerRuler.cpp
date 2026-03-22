@@ -57,7 +57,7 @@ void MarkerRuler::draw()
 
 int MarkerRuler::pixelToBar(int px) const
 {
-	return std::clamp(px / colWidth, 0, numCols - 1);
+	return std::clamp((px - offsetX) / colWidth, 0, numCols - 1);
 }
 
 int MarkerRuler::findBarAt(int px) const
