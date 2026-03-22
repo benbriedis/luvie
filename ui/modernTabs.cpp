@@ -65,6 +65,13 @@ void ModernTabs::draw() {
 	}
 }
 
+void ModernTabs::resize(int x, int y, int w, int h) {
+	Fl_Widget::resize(x, y, w, h);
+	int tbH = tabBarH();
+	for (int i = 0; i < children(); i++)
+		child(i)->resize(x, y + tbH, w, h - tbH);
+}
+
 int ModernTabs::handle(int event) {
 	if (event == FL_PUSH) {
 		int tbH = tabBarH();

@@ -15,6 +15,7 @@ public:
 	ModernTabs(int x, int y, int w, int h);
 
 	void draw() override;
+	void resize(int x, int y, int w, int h) override;
 	int handle(int event) override;
 };
 

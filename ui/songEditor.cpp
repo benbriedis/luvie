@@ -170,6 +170,14 @@ void SongEditor::setColOffset(int offset)
     redraw();
 }
 
+void SongEditor::resize(int x, int /*y*/, int w, int h)
+{
+    Fl_Widget::resize(x, y(), w, h);
+    baseX          = x;
+    numVisibleRows = std::max(1, (h - rulerH - hScrollH) / songGrid.rowHeight);
+    updateScrollBounds();
+}
+
 int SongEditor::handle(int event)
 {
     if (event == FL_MOUSEWHEEL) {

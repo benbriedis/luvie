@@ -43,6 +43,7 @@ public:
     void setTrackView(int trackIndex, bool beatResolution);
 
     void onTimelineChanged() override;
+    void resize(int x, int y, int w, int h) override;
     int  handle(int event) override;
 };
 

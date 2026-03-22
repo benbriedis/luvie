@@ -29,6 +29,7 @@ public:
 
     void setTimeline(ObservableTimeline* tl, int patId);
     void setChordSize(int size) { chordSize = size; redraw(); }
+    void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);
     void onTimelineChanged() override;
 };

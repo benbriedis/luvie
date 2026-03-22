@@ -14,6 +14,7 @@ public:
 	~MarkerRuler();
 
 	void onTimelineChanged() override { redraw(); }
+	void resize(int x, int /*y*/, int w, int /*h*/) override { Fl_Widget::resize(x, y(), w, h()); }
 
 private:
 	Kind                kind;

@@ -27,6 +27,7 @@ public:
 
     void setParams(int rootPitch, int chordType, bool useSharp);
     void setRowOffset(int offset);
+    void setNumRows(int n) { numRows = n; }
     int  getTotalTones() const { return totalTones; }
     int  getRowOffset()  const { return rowOffset; }
 };

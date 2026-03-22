@@ -38,6 +38,7 @@ public:
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
     int  numPatternBeats() const { return patternGrid.numCols; }
     void onTimelineChanged() override;
+    void resize(int x, int y, int w, int h) override;
 };
 
 #endif

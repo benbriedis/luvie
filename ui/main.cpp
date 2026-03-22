@@ -114,6 +114,16 @@ int main(int argc, char **argv) {
     window.add(timeSigPopup);        window.registerPopup(&timeSigPopup);
     window.add(trackContextPopup);   window.registerPopup(&trackContextPopup);
 
+    // Resizable chain: window → tabs → each tab → editor
+    tab1.resizable(og1);
+    tab2.resizable(og2);
+    window.resizable(tabs);
+
+    // Minimum size: at least 5 pattern columns wide and 5 pattern rows tall
+    const int minW = 14 + 36 + 5 * 40;  // scrollbarW + labelsW + 5 cols
+    const int minH = tabBarH + Editor::rulerH + 5 * rowHeight + Editor::hScrollH + panelH + bottomH;
+    window.size_range(minW, minH);
+
     window.show(argc, argv);
     return Fl::run();
 }

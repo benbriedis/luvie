@@ -142,6 +142,47 @@ void PatternEditor::setColOffset(int offset)
     redraw();
 }
 
+void PatternEditor::resize(int x, int /*y*/, int w, int h)
+{
+    Fl_Widget::resize(x, y(), w, h);
+
+    int gy           = y();
+    int newNumRows   = std::max(1, (h - rulerH - hScrollH) / patternGrid.rowHeight);
+    int visibleGridW = std::max(1, w - scrollbarW - labelsW);
+    int gridH        = newNumRows * patternGrid.rowHeight;
+
+    scrollbar->resize(x, gy + rulerH, scrollbarW, gridH);
+
+    noteLabels.setNumRows(newNumRows);
+    noteLabels.resize(x + scrollbarW, gy + rulerH, labelsW, gridH);
+
+    patternGrid.setNumRows(newNumRows);
+    patternGrid.resize(x + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
+
+    hScrollbar->resize(x + scrollbarW + labelsW, gy + rulerH + gridH, visibleGridW, hScrollH);
+
+    // Recompute vertical scroll range with updated numRows
+    setRowOffset(noteLabels.getRowOffset());
+
+    // Recompute horizontal scroll
+    int totalGridW = patternGrid.numCols * patternGrid.colWidth;
+    if (totalGridW > visibleGridW) {
+        int visibleCols = visibleGridW / patternGrid.colWidth;
+        colOffset    = std::clamp(colOffset, 0, std::max(0, patternGrid.numCols - visibleCols));
+        hScrollPixel = colOffset * patternGrid.colWidth;
+        patternGrid.setColOffset(colOffset);
+        hScrollbar->value(colOffset, visibleCols, 0, patternGrid.numCols);
+        hScrollbar->show();
+    } else {
+        colOffset    = 0;
+        hScrollPixel = 0;
+        patternGrid.setColOffset(0);
+        hScrollbar->hide();
+    }
+
+    redraw();
+}
+
 int PatternEditor::handle(int event)
 {
     if (event == FL_MOUSEWHEEL) {
