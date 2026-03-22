@@ -2,21 +2,26 @@
 #define SIMPLETRANSPORT_HPP
 
 #include "itransport.hpp"
+#include "observableTimeline.hpp"
 #include <chrono>
 
 class SimpleTransport : public ITransport {
-	double savedPosition = 0.0;
-	bool   playing       = false;
+	ObservableTimeline* timeline         = nullptr;
+	float  savedPositionBars             = 0.0f;
+	double playStartSeconds              = 0.0;   // barToSeconds(savedPositionBars) at play/seek time
+	bool   playing                       = false;
 	std::chrono::steady_clock::time_point playStart;
 
 public:
-	void   play()               override;
-	void   pause()              override;
-	void   rewind()             override;
-	void   seek(double seconds) override;
+	void setTimeline(ObservableTimeline* tl) { timeline = tl; }
 
-	double position()  const override;
-	bool   isPlaying() const override { return playing; }
+	void  play()            override;
+	void  pause()           override;
+	void  rewind()          override;
+	void  seek(float bars)  override;
+
+	float position()  const override;
+	bool  isPlaying() const override { return playing; }
 };
 
 #endif

@@ -92,8 +92,11 @@ void Transport::updatePosition() {
 	int bar = 1, beat = 1;
 	int top = 4, bottom = 4;
 	if (transport && timeline) {
-		timeline->secondsToBarBeat(transport->position(), bar, beat);
-		timeline->timeSigAt(bar - 1, top, bottom);
+		float pos    = transport->position();  // bars, 0-indexed float
+		int   barInt = (int)pos;
+		timeline->timeSigAt(barInt, top, bottom);
+		bar  = barInt + 1;
+		beat = (int)((pos - (float)barInt) * top) + 1;
 	}
 	float bpm = timeline ? timeline->bpmAt(bar - 1) : 120.0f;
 	std::snprintf(posText, sizeof(posText), "Bar %d  Beat %d      %d/%d      %.4g BPM", bar, beat, top, bottom, (double)bpm);

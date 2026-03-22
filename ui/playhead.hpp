@@ -13,14 +13,13 @@ class Playhead : public ITimelineObserver {
 	int                 colWidth;
 	Fl_Widget*          owner        = nullptr;
 	int                 patternTrack = -1;  // >= 0: beat-relative view of that track
-	float               positionBars = 0.0f; // bar position; re-anchors transport on timeline changes
 
 	static void timerCb(void* data);
 	void tick();
-	bool isInPattern(float currentBar) const;
+	bool isInPattern(float bars) const;
 
-	int    secondsToPixel(double secs) const;
-	double pixelToSeconds(int px) const;
+	int   barsToPixel(float bars) const;
+	float pixelToBars(int px)     const;
 
 public:
 	std::function<void()> onEndReached;

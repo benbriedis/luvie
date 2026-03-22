@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
     tab2.add(patternPanel);
 
     SimpleTransport simpleTransport;
+    simpleTransport.setTimeline(&songTimeline);
     Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, &songTimeline);
     window.add(bottomPane);
 
