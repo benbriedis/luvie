@@ -46,6 +46,9 @@ void TrackContextPopup::open(int row, ObservableTimeline* tl, int wx, int wy)
     timeline  = tl;
     targetRow = row;
 
+    bool canDelete = tl && (int)tl->get().tracks.size() > 1;
+    canDelete ? deleteBtn->activate() : deleteBtn->deactivate();
+
     position(wx, wy);
     if (auto* aw = dynamic_cast<AppWindow*>(window()))
         aw->openPopup(this);

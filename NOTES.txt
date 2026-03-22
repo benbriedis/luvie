@@ -149,6 +149,7 @@ Use Patches? and Parameters?
 
 ---------------------------------
 
+NOTE: currently restricting # patterns to a min of 1 so I can continue to add patterns.
 
 8/3/26
 ------
@@ -190,11 +191,6 @@ Cf Transpose vs fixed modes aka
 
 Song editor - add pattern button.
 
-cf options for # of octaves or notes to display?
-   Remove octave numbers, except on bottom one? 
-       Or place octave number to left? Issue: base note octive clash a bit with midi octaves
-           (space here will vary)
-
 Allow window to be resizable
 
 Application icon
@@ -206,7 +202,6 @@ Connect up to ALSA midi for easy testing.
 
 Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
 
-Add steps as labels to pattern editor. 
 
 
 sivcas   'so i vibe-coded a sequencer'

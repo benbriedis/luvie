@@ -25,7 +25,7 @@ class ModernButton : public Fl_Button {
 
         if (label()) {
             fl_font(labelfont(), labelsize());
-            fl_color(labelcolor());
+            fl_color(active() ? labelcolor() : fl_color_average(labelcolor(), bg, 0.4f));
             fl_draw(label(), x() + 4, y(), w() - 8, h(), align());
         }
     }
