@@ -6,7 +6,7 @@
 SongEditor::SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
                        int numRows, int numCols, int rowHeight, int colWidth,
                        float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight, numCols, colWidth),
+    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
       songGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup),
       numVisibleRows(numRows)
@@ -25,11 +25,23 @@ SongEditor::SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
     }, this);
     scrollbar->hide();
 
+    hScrollbar = new GridScrollPane(x + labelW, y + rulerH + numRows * rowHeight,
+                                    visibleW - labelW, hScrollH,
+                                    GridScrollPane::HORIZONTAL);
+    hScrollbar->linesize(1);
+    hScrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<SongEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->setColOffset((int)sb->value());
+    }, this);
+    hScrollbar->hide();
+
     trackLabels.position(x, y + rulerH);
     songGrid.position(x + labelW, y + rulerH);
     songGrid.setPlayhead(&playhead);
 
     add(*scrollbar);
+    add(*hScrollbar);
     add(trackLabels);
     add(songGrid);
 
@@ -97,11 +109,32 @@ void SongEditor::updateScrollBounds()
     trackLabels.position(baseX + sbW, trackLabels.y());
     songGrid.position(baseX + sbW + labelW, songGrid.y());
     rulerOffsetX = sbW + labelW;
-    if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX);
+
+    // Horizontal scroll
+    int visibleGridW = w() - sbW - labelW;
+    int totalGridW   = songGrid.numCols * songGrid.colWidth;
+    bool needsHScroll = totalGridW > visibleGridW;
+    int visibleCols   = visibleGridW / songGrid.colWidth;
+
+    if (needsHScroll) {
+        colOffset = std::clamp(colOffset, 0, songGrid.numCols - visibleCols);
+        hScrollbar->value(colOffset, visibleCols, 0, songGrid.numCols);
+        hScrollbar->show();
+    } else {
+        colOffset = 0;
+        hScrollbar->hide();
+    }
+    hScrollbar->position(baseX + sbW + labelW, y() + rulerH + gridH);
+    hScrollbar->size(visibleGridW, hScrollH);
+
+    hScrollPixel = colOffset * songGrid.colWidth;
+    songGrid.setColOffset(colOffset);
+
+    if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
 
     // Resize children to match actual track count (up to numVisibleRows)
     songGrid.numRows = visRows;
-    songGrid.size(songGrid.w(), gridH);
+    songGrid.size(visibleGridW, gridH);
     trackLabels.setNumVisibleRows(visRows);
     trackLabels.size(trackLabels.w(), gridH);
 
@@ -124,10 +157,26 @@ void SongEditor::setRowOffset(int offset)
     trackLabels.setRowOffset(rowOffset);
 }
 
+void SongEditor::setColOffset(int offset)
+{
+    if (!hScrollbar) return;
+    int visibleGridW = w() - (scrollbar && scrollbar->visible() ? scrollbarW : 0) - labelW;
+    int visibleCols  = visibleGridW / songGrid.colWidth;
+    colOffset  = std::clamp(offset, 0, std::max(0, songGrid.numCols - visibleCols));
+    hScrollPixel = colOffset * songGrid.colWidth;
+    songGrid.setColOffset(colOffset);
+    hScrollbar->value(colOffset, visibleCols, 0, songGrid.numCols);
+    if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
+    redraw();
+}
+
 int SongEditor::handle(int event)
 {
     if (event == FL_MOUSEWHEEL) {
-        setRowOffset(rowOffset + Fl::event_dy());
+        if (Fl::event_dx() != 0)
+            setColOffset(colOffset + Fl::event_dx());
+        else
+            setRowOffset(rowOffset + Fl::event_dy());
         return 1;
     }
     return Editor::handle(event);

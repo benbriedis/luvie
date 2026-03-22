@@ -34,7 +34,8 @@ private:
 	void draw()           override;
 	int  handle(int event) override;
 
-	int  offsetX = 0;
+	int  offsetX  = 0;
+	int  clipLeft = 0;   // pixels from x() to clip the content region
 	int  barToPixel(int bar) const { return x() + offsetX + bar * colWidth; }
 	int  pixelToBar(int px)  const;
 	int  findBarAt(int px)   const;  // bar of marker under px, or -1
@@ -42,7 +43,8 @@ private:
 	void openPopupFor(int bar);
 
 public:
-	void setOffsetX(int ox) { offsetX = ox; redraw(); }
+	void setOffsetX(int ox)  { offsetX  = ox; redraw(); }
+	void setClipLeft(int cl) { clipLeft = cl; redraw(); }
 };
 
 #endif

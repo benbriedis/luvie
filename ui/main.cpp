@@ -43,23 +43,23 @@ int main(int argc, char **argv) {
     const int numPatternBeats = 8;
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
-    {
+    for (int i = 1; i <= 8; i++) {
         int patId = songTimeline.createPattern(numPatternBeats);
-        songTimeline.addTrack("Pattern 1", patId);
+        songTimeline.addTrack("Pattern " + std::to_string(i), patId);
     }
 
     MarkerRuler timeSigRuler(0, tabBarH, winW, markerRulerH,
-                              15, 60, MarkerRuler::TIME_SIG, &songTimeline, &timeSigPopup);
+                              80, 60, MarkerRuler::TIME_SIG, &songTimeline, &timeSigPopup);
     tab1.add(timeSigRuler);
 
     MarkerRuler tempoRuler(0, tabBarH + markerRulerH, winW, markerRulerH,
-                            15, 60, MarkerRuler::TEMPO, &songTimeline, &tempoPopup);
+                            80, 60, MarkerRuler::TEMPO, &songTimeline, &tempoPopup);
     tab1.add(tempoRuler);
 
     TrackContextPopup trackContextPopup;
 
     std::vector<Note> patterns(0);
-    SongEditor og2(0, tabBarH + 2 * markerRulerH, winW, patterns, 10, 15, 45, 60, 0.25, popup2);
+    SongEditor og2(0, tabBarH + 2 * markerRulerH, winW, patterns, 10, 80, 45, 60, 0.25, popup2);
     tab1.add(og2);
 
     const int panelH = 50;
@@ -84,9 +84,11 @@ int main(int argc, char **argv) {
     window.add(bottomPane);
 
     og2.setTransport(&simpleTransport, &songTimeline);
-    og2.onRulerOffsetChanged = [&](int off) {
+    og2.onRulerOffsetChanged = [&](int off, int clipLeft) {
         timeSigRuler.setOffsetX(off);
+        timeSigRuler.setClipLeft(clipLeft);
         tempoRuler.setOffsetX(off);
+        tempoRuler.setClipLeft(clipLeft);
     };
     og2.setContextPopup(&trackContextPopup);
     og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };

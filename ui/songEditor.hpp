@@ -19,13 +19,16 @@ class SongEditor : public Editor, public ITimelineObserver {
     TrackLabels        trackLabels;
     SongGrid           songGrid;
     GridScrollPane*    scrollbar      = nullptr;
+    GridScrollPane*    hScrollbar     = nullptr;
     ObservableTimeline* timeline      = nullptr;
     int                numVisibleRows;
     int                rowOffset      = 0;
+    int                colOffset      = 0;
     int                baseX          = 0;
 
     void updateScrollBounds();
     void setRowOffset(int offset);
+    void setColOffset(int offset);
 
 public:
     SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
@@ -33,8 +36,10 @@ public:
                float snap, Popup& popup);
     ~SongEditor();
 
-    std::function<void(int trackIndex)> onPatternDoubleClick;
-    std::function<void(int offsetX)>    onRulerOffsetChanged;
+    static constexpr int hScrollH = 14;
+
+    std::function<void(int trackIndex)>        onPatternDoubleClick;
+    std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
 
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setContextPopup(TrackContextPopup* p);

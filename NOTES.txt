@@ -167,7 +167,11 @@ cf Disallowing or discouraging weird denominators
     cf "Irrational meters": https://en.wikipedia.org/wiki/Time_signature
 
 
-Allow the song to be longer. Add horizontal scrolls to both editors.
+Allow the song to be longer. Maybe allow song length to be set in top menu?
+  Then again, it does belong to the song context...
+  Could have #bars in transport and allow it to be editted...
+  Or put it in a context popup when right clicking in the grid or playhead ruler.
+
 Pattern editor to allow number of beats to be set 
    (or maybe # of bars and time signature when we are in "loop mode")
 

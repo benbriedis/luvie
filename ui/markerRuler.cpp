@@ -27,6 +27,7 @@ void MarkerRuler::draw()
 	fl_color(0xD1D5DB00);
 	fl_line(x(), y() + h() - 1, x() + w() - 1, y() + h() - 1);
 
+	fl_push_clip(x() + clipLeft, y(), w() - clipLeft, h() - 1);
 	static constexpr int flagW = 44;
 	const int flagH = h() - 2;
 	Fl_Color mc = (kind == TEMPO) ? tempoColor : timeSigColor;
@@ -53,6 +54,7 @@ void MarkerRuler::draw()
 			drawMarker(m.bar, label);
 		}
 	}
+	fl_pop_clip();
 }
 
 int MarkerRuler::pixelToBar(int px) const

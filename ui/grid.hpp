@@ -31,7 +31,8 @@ protected:
     bool amOverlapping = false, creationForbidden = false;
     Point originalPosition = {0, 0.0f}, lastValidPosition = {0, 0.0f};
 
-    Playhead* playhead = nullptr;
+    Playhead* playhead  = nullptr;
+    int       colOffset = 0;
 
     void draw() override;
     int  handle(int event) override;
@@ -54,7 +55,8 @@ public:
     Grid(std::vector<Note> notes, int numRows, int numCols,
            int rowHeight, int colWidth, float snap, Popup& popup);
 
-    void setPlayhead(Playhead* p) { playhead = p; }
+    void setPlayhead(Playhead* p)  { playhead   = p; }
+    void setColOffset(int off)     { colOffset  = off; redraw(); }
 };
 
 #endif

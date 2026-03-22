@@ -25,27 +25,28 @@ void Grid::draw()
 {
     Fl_Box::draw();
 
+    fl_push_clip(x(), y(), w() + 1, h());
+
     fl_color(bgColor);
     fl_rectf(x(), y(), w(), h());
 
     for (int i = 0; i < numRows + 1; i++) {
         fl_color(rowLineColor(i));
-        fl_line(x(), y() + i * rowHeight, x() + numCols * colWidth, y() + i * rowHeight);
+        fl_line(x(), y() + i * rowHeight, x() + w(), y() + i * rowHeight);
     }
 
-    for (int i = 0; i < numCols + 1; i++) {
-        int x0 = x() + i * colWidth;
-        int y0 = y();
-        int x1 = x0;
-        int y1 = y() + numRows * rowHeight;
+    int endCol = colOffset + w() / colWidth + 2;
+    for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
+        int x0 = x() + (i - colOffset) * colWidth;
         fl_color(columnColor(i));
-        fl_line(x0, y0, x1, y1);
+        fl_line(x0, y(), x0, y() + numRows * rowHeight);
     }
 
     for (const Note note : notes) {
-        int x0    = x() + note.beat * colWidth;
-        int y0    = y() + note.pitch * rowHeight;
-        int width = note.length * colWidth;
+        int x0    = x() + (int)((note.beat - colOffset) * colWidth);
+        int y0    = y() + (int)(note.pitch * rowHeight);
+        int width = (int)(note.length * colWidth);
+        if (x0 + width < x() || x0 > x() + w()) continue;
         fl_rectf(x0, y0 + 1, width, rowHeight - 1, 0x5555EE00);
         const int barWidth = 5;
         fl_color(0x1111EE00);
@@ -55,7 +56,9 @@ void Grid::draw()
     }
 
     if (playhead)
-        playhead->drawLine(x(), y(), numRows * rowHeight);
+        playhead->drawLine(x() - colOffset * colWidth, y(), numRows * rowHeight);
+
+    fl_pop_clip();
 }
 
 int Grid::handle(int event)
@@ -72,7 +75,7 @@ int Grid::handle(int event)
                 }
             } else if (hoverState == NONE) {
                 int row   = (Fl::event_y() - y()) / rowHeight;
-                float col = (float)((Fl::event_x() - x()) / colWidth);
+                float col = (float)((Fl::event_x() - x()) / colWidth) + colOffset;
                 creationForbidden = false;
                 bool wouldRemove = std::any_of(notes.begin(), notes.end(),
                     [=](const Note& n) { return n.pitch == row && n.beat == col; });
@@ -125,7 +128,7 @@ void Grid::moving()
 {
     Note* selected = &notes[selectedNote];
     float ex       = Fl::event_x() - this->x();
-    selected->beat  = (ex - movingGrabXOffset) / (float)colWidth;
+    selected->beat  = (ex - movingGrabXOffset) / (float)colWidth + colOffset;
     if (selected->beat < 0.0) selected->beat = 0.0;
     if (selected->beat + selected->length > numCols) selected->beat = numCols - selected->length;
     if (snap > 0.0) selected->beat = std::round(selected->beat / snap) * snap;
@@ -147,7 +150,7 @@ void Grid::resizing()
     float ex        = Fl::event_x() - this->x();
     if (side == LEFT) {
         float endCol   = selected->beat + selected->length;
-        selected->beat  = ex / (float)colWidth;
+        selected->beat  = ex / (float)colWidth + colOffset;
         if (snap) selected->beat = std::round(selected->beat / snap) * snap;
         int   neighbour = overlappingNote();
         float min       = neighbour < 0 ? 0.0 : notes[neighbour].beat + notes[neighbour].length;
@@ -156,7 +159,7 @@ void Grid::resizing()
         if (selected->length < minLength) { selected->length = minLength; selected->beat = endCol - minLength; }
         redraw();
     } else if (side == RIGHT) {
-        selected->length = ex / (float)colWidth - selected->beat;
+        selected->length = ex / (float)colWidth + colOffset - selected->beat;
         float endCol     = selected->beat + selected->length;
         if (snap) { endCol = std::round(endCol / snap) * snap; selected->length = endCol - selected->beat; }
         int   neighbour = overlappingNote();
@@ -177,8 +180,8 @@ void Grid::findNoteForCursor()
     hoverState = NONE;
     for (const auto [i, n] : std::views::enumerate(notes)) {
         if (n.pitch != row) continue;
-        float leftEdge  = n.beat * colWidth;
-        float rightEdge = (n.beat + n.length) * colWidth;
+        float leftEdge  = (n.beat - colOffset) * colWidth;
+        float rightEdge = (n.beat + n.length - colOffset) * colWidth;
         if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
             hoverState = RESIZING; side = LEFT; selectedIfResize = i;
         } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
@@ -186,7 +189,7 @@ void Grid::findNoteForCursor()
         } else if (ex >= leftEdge && ex <= rightEdge) {
             hoverState         = MOVING;
             selectedNote       = i;
-            movingGrabXOffset  = ex - n.beat * colWidth;
+            movingGrabXOffset  = ex - leftEdge;
             movingGrabYOffset  = ey - n.pitch * rowHeight;
             originalPosition   = {n.pitch, n.beat};
             lastValidPosition  = {n.pitch, n.beat};
@@ -205,7 +208,7 @@ void Grid::toggleNote()
     int   ex  = Fl::event_x() - x();
     int   ey  = Fl::event_y() - y();
     int   row = ey / rowHeight;
-    float col = (float)(ex / colWidth);
+    float col = (float)(ex / colWidth) + colOffset;
 
     int size = notes.size();
     notes.erase(std::remove_if(notes.begin(), notes.end(),

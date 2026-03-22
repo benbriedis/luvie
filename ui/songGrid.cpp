@@ -15,6 +15,7 @@ void SongGrid::draw()
     Grid::draw();
     if (!timeline) return;
 
+    fl_push_clip(x(), y(), w(), h());
     const int tickH = 4;
     for (const auto& note : notes) {
         if (note.pitch < 0 || note.pitch >= numRows) continue;
@@ -47,13 +48,14 @@ void SongGrid::draw()
 
         fl_color(FL_WHITE);
         for (float tickBar = firstTick; tickBar < instanceEnd; ) {
-            int tickX = x() + (int)(tickBar * colWidth);
+            int tickX = x() + (int)((tickBar - colOffset) * colWidth);
             fl_rectf(tickX, y0 + 1,                      2, tickH);
             fl_rectf(tickX, y0 + rowHeight - 1 - tickH,  2, tickH);
             if (intervalBars <= 0.0f) break;
             tickBar += intervalBars;
         }
     }
+    fl_pop_clip();
 }
 
 SongGrid::~SongGrid()
@@ -182,7 +184,7 @@ void SongGrid::toggleNote()
     int   ey       = Fl::event_y() - y();
     int   visualRow = ey / rowHeight;
     int   absRow    = visualRow + rowOffset;
-    float col       = (float)(ex / colWidth);
+    float col       = (float)(ex / colWidth) + colOffset;
 
     if (!timeline) {
         Grid::toggleNote();
