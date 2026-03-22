@@ -111,13 +111,13 @@ void SongEditor::updateScrollBounds()
     rulerOffsetX = sbW + labelW;
 
     // Horizontal scroll
-    int visibleGridW = w() - sbW - labelW;
-    int totalGridW   = songGrid.numCols * songGrid.colWidth;
+    int visibleGridW  = std::max(0, w() - sbW - labelW);
+    int totalGridW    = songGrid.numCols * songGrid.colWidth;
     bool needsHScroll = totalGridW > visibleGridW;
-    int visibleCols   = visibleGridW / songGrid.colWidth;
+    int visibleCols   = songGrid.colWidth > 0 ? visibleGridW / songGrid.colWidth : 0;
 
     if (needsHScroll) {
-        colOffset = std::clamp(colOffset, 0, songGrid.numCols - visibleCols);
+        colOffset = std::clamp(colOffset, 0, std::max(0, songGrid.numCols - visibleCols));
         hScrollbar->value(colOffset, visibleCols, 0, songGrid.numCols);
         hScrollbar->show();
     } else {
@@ -160,8 +160,8 @@ void SongEditor::setRowOffset(int offset)
 void SongEditor::setColOffset(int offset)
 {
     if (!hScrollbar) return;
-    int visibleGridW = w() - (scrollbar && scrollbar->visible() ? scrollbarW : 0) - labelW;
-    int visibleCols  = visibleGridW / songGrid.colWidth;
+    int visibleGridW = std::max(0, w() - (scrollbar && scrollbar->visible() ? scrollbarW : 0) - labelW);
+    int visibleCols  = songGrid.colWidth > 0 ? visibleGridW / songGrid.colWidth : 0;
     colOffset  = std::clamp(offset, 0, std::max(0, songGrid.numCols - visibleCols));
     hScrollPixel = colOffset * songGrid.colWidth;
     songGrid.setColOffset(colOffset);

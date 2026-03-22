@@ -115,8 +115,8 @@ int main(int argc, char **argv) {
     window.add(trackContextPopup);   window.registerPopup(&trackContextPopup);
 
     // Resizable chain: window → tabs → each tab → editor
-    tab1.resizable(og1);
-    tab2.resizable(og2);
+    tab1.resizable(og2);
+    tab2.resizable(og1);
     window.resizable(tabs);
 
     // Minimum size: at least 5 pattern columns wide and 5 pattern rows tall
