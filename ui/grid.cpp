@@ -69,6 +69,8 @@ int Grid::handle(int event)
 
     switch (event) {
         case FL_PUSH:
+            if (std::holds_alternative<StateIdle>(state))
+                findNoteForCursor();
             if (Fl::event_button() == FL_RIGHT_MOUSE) {
                 int idx = -1;
                 if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;

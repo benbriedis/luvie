@@ -13,6 +13,18 @@ static const int intervals[][4] = {
 };
 static const int chordSizes[] = {3, 3, 4, 4};
 
+std::string noteName(int n, int rootPitch, int chordType, bool useSharp)
+{
+    int rootSemitone = (rootPitch + 9) % 12;
+    int rootMidi0    = 12 + rootSemitone;
+    int size         = chordSizes[chordType];
+    int midi         = rootMidi0 + intervals[chordType][n % size] + (n / size) * 12;
+    int noteOct      = midi / 12 - 1;
+    int semitone     = midi % 12;
+    const char* name = useSharp ? sharpNames[semitone] : flatNames[semitone];
+    return std::string(name) + std::to_string(noteOct);
+}
+
 NoteLabels::NoteLabels(int x, int y, int w, int numRows, int rowHeight)
     : Fl_Widget(x, y, w, numRows * rowHeight), numRows(numRows), rowHeight(rowHeight)
 {}
@@ -44,14 +56,7 @@ void NoteLabels::setRowOffset(int offset) {
 }
 
 std::string NoteLabels::noteForRow(int n) const {
-    int rootSemitone = (rootPitch + 9) % 12;
-    int rootMidi0    = 12 + rootSemitone;
-    int size         = chordSizes[chordType];
-    int midi         = rootMidi0 + intervals[chordType][n % size] + (n / size) * 12;
-    int noteOct      = midi / 12 - 1;
-    int semitone     = midi % 12;
-    const char* name = useSharp ? sharpNames[semitone] : flatNames[semitone];
-    return std::string(name) + std::to_string(noteOct);
+    return noteName(n, rootPitch, chordType, useSharp);
 }
 
 static void drawFocusBtn(int x, int y, int w, int h) {

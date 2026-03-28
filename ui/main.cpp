@@ -13,8 +13,19 @@
 #include "observableTimeline.hpp"
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
+#include "noteLabels.hpp"
 
 int main(int argc, char **argv) {
+    bool verbose = false;
+    int  fltk_argc = 1;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--verbose" || arg == "-v")
+            verbose = true;
+        else
+            argv[fltk_argc++] = argv[i];
+    }
+    argc = fltk_argc;
     const int tabBarH      = 35;
     const int bottomH      = 50;
     const int markerRulerH = 18;
@@ -85,6 +96,14 @@ int main(int argc, char **argv) {
     window.add(bottomPane);
 
     og2.setTransport(&simpleTransport, &songTimeline);
+    if (verbose) {
+        og2.setVerbose(true);
+        og2.setPitchName([&patternPanel](int pitch) {
+            return noteName(pitch, patternPanel.rootPitch(),
+                                   patternPanel.chordType(),
+                                   patternPanel.isSharp());
+        });
+    }
     og2.onRulerOffsetChanged = [&](int off, int clipLeft) {
         timeSigRuler.setOffsetX(off);
         timeSigRuler.setClipLeft(clipLeft);

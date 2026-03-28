@@ -34,7 +34,9 @@ public:
     std::function<void()> onEndReached;
     std::function<void()> onSeek;
 
-    void setSeekingEnabled(bool e) { seekingEnabled = e; }
+    void setSeekingEnabled(bool e)                           { seekingEnabled      = e; }
+    void setVerbose(bool v)                                  { playhead.setVerbose(v); }
+    void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName  = std::move(fn); }
 };
 
 #endif

@@ -6,6 +6,8 @@
 #include <functional>
 #include <string>
 
+std::string noteName(int n, int rootPitch, int chordType, bool useSharp);
+
 class NoteLabels : public Fl_Widget {
     int  numRows;
     int  rowHeight;

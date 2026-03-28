@@ -3,6 +3,7 @@
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 static constexpr Fl_Color headColor = 0xEF444400;  // red
 
@@ -36,7 +37,7 @@ void Playhead::onTimelineChanged()
 		float bars = transport->position();
 		transport->seek(std::clamp(bars, 0.0f, (float)numCols));
 	}
-	if (owner) owner->redraw();
+	if (owner && owner->visible_r()) owner->redraw();
 }
 
 void Playhead::timerCb(void* data)
@@ -60,12 +61,62 @@ void Playhead::tick()
 {
 	// Only gate the transport in normal mode; pattern-view playheads are display-only.
 	if (patternTrack < 0 && transport && transport->isPlaying()) {
-		if (transport->position() >= (float)numCols) {
+		float curPos = transport->position();
+		if (verbose && obsTl && curPos >= lastPosition)
+			checkVerboseNotes(lastPosition, curPos);
+		lastPosition = curPos;
+		if (curPos >= (float)numCols) {
 			transport->pause();
 			if (onEndReached) onEndReached();
 		}
+	} else if (transport) {
+		// Keep lastPosition in sync while paused so resuming doesn't re-fire past notes.
+		lastPosition = transport->position();
 	}
-	if (owner) owner->redraw();
+	if (owner && owner->visible_r()) owner->redraw();
+}
+
+void Playhead::checkVerboseNotes(float prevPos, float curPos)
+{
+	const Timeline& tl = obsTl->get();
+	for (const Track& track : tl.tracks) {
+		for (const PatternInstance& inst : track.patterns) {
+			if (inst.startBar + inst.length <= prevPos) continue;
+			if (inst.startBar >= curPos) continue;
+
+			const Pattern* pat = obsTl->patternForInstance(inst.id);
+			if (!pat || pat->notes.empty() || pat->lengthBeats <= 0.0f) continue;
+
+			int top, bottom;
+			obsTl->timeSigAt((int)inst.startBar, top, bottom);
+			float beatsPerBar = (float)top;
+
+			// Convert the song-bar window to a pattern-beat window for this instance.
+			float windowStart = std::max(prevPos, inst.startBar);
+			float windowEnd   = std::min(curPos,  inst.startBar + inst.length);
+			float beatStart   = inst.startOffset + (windowStart - inst.startBar) * beatsPerBar;
+			float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * beatsPerBar;
+
+			for (const Note& note : pat->notes) {
+				// Find the first firing of this note (accounting for pattern looping)
+				// at or after beatStart.
+				float len      = pat->lengthBeats;
+				float cycles   = std::floor((beatStart - note.beat) / len);
+				float firstFire = note.beat + cycles * len;
+				if (firstFire < beatStart) firstFire += len;
+
+				if (firstFire < beatEnd) {
+					float songBar  = inst.startBar + (firstFire - inst.startOffset) / beatsPerBar;
+					int   bar      = (int)songBar + 1;
+					int   beat     = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+					std::string name = pitchName ? pitchName(note.pitch)
+					                             : std::to_string(note.pitch);
+					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
+					       bar, beat, track.label.c_str(), name.c_str(), note.beat, note.length);
+				}
+			}
+		}
+	}
 }
 
 bool Playhead::isInPattern(float bars) const
