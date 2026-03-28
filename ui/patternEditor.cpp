@@ -2,6 +2,8 @@
 #include "chords.hpp"
 #include <FL/fl_draw.H>
 #include <algorithm>
+#include <climits>
+#include <set>
 
 PatternEditor::PatternEditor(int x, int y, int visibleW, std::vector<Note> notes, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
@@ -49,6 +51,13 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, std::vector<Note> notes
 
     noteLabels.onFocus = [this]() { focusPattern(); };
 
+    patternGrid.onDisabledDegreesChanged = [this](const std::vector<int>& dd, int gs, const std::set<int>& occ) {
+        int oldTotal = noteLabels.getTotalTones();
+        noteLabels.setDisabledDegrees(dd, gs, occ);
+        if (noteLabels.getTotalTones() != oldTotal)
+            setRowOffset(noteLabels.getRowOffset());
+    };
+
     // initialise horizontal scroll state
     int totalGridW = numCols * colWidth;
     if (totalGridW > visibleGridW) {
@@ -61,6 +70,7 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, std::vector<Note> notes
 
 void PatternEditor::setNoteParams(int root, int chord, bool sharp)
 {
+    int oldChordType = chordType;
     rootPitch = root;
     chordType = chord;
     noteLabels.setParams(root, chord, sharp);
@@ -72,6 +82,10 @@ void PatternEditor::setNoteParams(int root, int chord, bool sharp)
         if (lastSelectedTrack < (int)tracks.size())
             patId = tracks[lastSelectedTrack].patternId;
     }
+
+    if (timeline && patId > 0 && chordDefs[oldChordType].size != chordDefs[chord].size)
+        timeline->remapPatternNotes(patId, chordDefs[oldChordType].size, chordDefs[chord].size);
+
     setRowOffset(computeDefaultOffset(patId));
 }
 
@@ -92,18 +106,33 @@ int PatternEditor::computeDefaultOffset(int patId) const
 
     int maxOffset = std::max(0, total - patternGrid.numRows);
 
+    int gs = patternGrid.getGroupSize();
+    int cs = patternGrid.getChordSize();
+
+    // number of enabled chord tones (for searching by MIDI)
+    int numChordTones = (total / gs) * cs;
+
     if (allNotes.empty()) {
         const int A3 = 57;
-        int best = 0;
-        for (int n = 0; n < total; n++) {
-            if (midiForTone(n) <= A3) best = n;
+        int bestChordTone = 0;
+        for (int n = 0; n < numChordTones; n++) {
+            if (midiForTone(n) <= A3) bestChordTone = n;
         }
-        return std::clamp(best - 1, 0, maxOffset);
+        // Convert chord-tone index to virtual-row index
+        int octave     = bestChordTone / cs;
+        int degree     = bestChordTone % cs;
+        int virtualPos = octave * gs + degree;
+        return std::clamp(virtualPos - 1, 0, maxOffset);
     } else {
-        int lowest = (int)allNotes[0].pitch;
+        // Find lowest enabled note in chord-space, convert to virtual row
+        int lowest = INT_MAX;
         for (const auto& n : allNotes)
-            lowest = std::min(lowest, (int)n.pitch);
-        return std::clamp(lowest - 1, 0, maxOffset);
+            if (!n.disabled) lowest = std::min(lowest, (int)n.pitch);
+        if (lowest == INT_MAX) lowest = 0;
+        int octave     = lowest / cs;
+        int degree     = lowest % cs;
+        int virtualPos = octave * gs + degree;
+        return std::clamp(virtualPos - 1, 0, maxOffset);
     }
 }
 

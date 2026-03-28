@@ -6,10 +6,12 @@
 
 struct Note {
 	int   id;
-	int   pitch;
+	int   pitch;           // abs_row in current chord encoding; when disabled: stores octave only
 	float beat;
 	float length;
-	float velocity = 0.0f;
+	float velocity       = 0.0f;
+	bool  disabled       = false;
+	int   disabledDegree = -1;  // degree at time of disabling (>= chord size); -1 when enabled
 };
 
 struct BpmMarker {

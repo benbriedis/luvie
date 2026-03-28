@@ -384,6 +384,36 @@ std::vector<Note> ObservableTimeline::buildPatternNotes(int patternId) const
 	return {};
 }
 
+void ObservableTimeline::remapPatternNotes(int patId, int oldSize, int newSize)
+{
+	for (auto& pat : data.patterns) {
+		if (pat.id != patId) continue;
+		for (auto& note : pat.notes) {
+			if (note.disabled) {
+				// Re-enable if the degree is now valid in the larger chord
+				if (note.disabledDegree >= 0 && note.disabledDegree < newSize) {
+					note.pitch    = note.pitch * newSize + note.disabledDegree;
+					note.disabled = false;
+					note.disabledDegree = -1;
+				}
+				// else stays disabled; degree still >= newSize
+			} else {
+				int degree = note.pitch % oldSize;
+				int octave = note.pitch / oldSize;
+				if (degree < newSize) {
+					note.pitch = octave * newSize + degree;
+				} else {
+					note.disabled       = true;
+					note.disabledDegree = degree;
+					note.pitch          = octave;  // store bare octave for reconstruction
+				}
+			}
+		}
+		break;
+	}
+	notify();
+}
+
 void ObservableTimeline::addNote(int patternId, float start, float pitch, float length, float velocity)
 {
 	for (auto& pat : data.patterns) {

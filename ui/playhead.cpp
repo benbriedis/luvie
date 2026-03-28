@@ -98,6 +98,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 			float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * beatsPerBar;
 
 			for (const Note& note : pat->notes) {
+				if (note.disabled) continue;
 				// Find the first firing of this note (accounting for pattern looping)
 				// at or after beatStart.
 				float len      = pat->lengthBeats;

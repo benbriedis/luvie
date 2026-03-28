@@ -31,6 +31,15 @@ void Grid::draw()
     fl_rectf(x(), y(), w(), h());
 
     int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+
+    for (int r = 0; r < numRows; r++) {
+        Fl_Color rc = rowBgColor(r);
+        if (rc != bgColor) {
+            fl_color(rc);
+            fl_rectf(x(), y() + r * rowHeight, gridRight, rowHeight);
+        }
+    }
+
     for (int i = 0; i < numRows + 1; i++) {
         fl_color(rowLineColor(i));
         fl_line(x(), y() + i * rowHeight, x() + gridRight, y() + i * rowHeight);
@@ -43,14 +52,16 @@ void Grid::draw()
         fl_line(x0, y(), x0, y() + numRows * rowHeight);
     }
 
-    for (const Note note : notes) {
+    for (const Note& note : notes) {
         int x0    = x() + (int)((note.beat - colOffset) * colWidth);
         int y0    = y() + (int)(note.pitch * rowHeight);
         int width = (int)(note.length * colWidth);
         if (x0 + width < x() || x0 > x() + w()) continue;
-        fl_rectf(x0, y0 + 1, width, rowHeight - 1, 0x5555EE00);
+        Fl_Color fill = 0x5555EE00;
+        Fl_Color bar  = 0x1111EE00;
+        fl_rectf(x0, y0 + 1, width, rowHeight - 1, fill);
         const int barWidth = 5;
-        fl_color(0x1111EE00);
+        fl_color(bar);
         fl_line_style(FL_SOLID, barWidth);
         fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rowHeight - 1);
         fl_line_style(0);
