@@ -1,14 +1,7 @@
 #include "patternEditor.hpp"
+#include "chords.hpp"
 #include <FL/fl_draw.H>
 #include <algorithm>
-
-static const int intervals[][4] = {
-    {0, 4, 7,  0},
-    {0, 3, 7,  0},
-    {0, 4, 7, 11},
-    {0, 3, 7, 10},
-};
-static const int chordSizes[] = {3, 3, 4, 4};
 
 PatternEditor::PatternEditor(int x, int y, int visibleW, std::vector<Note> notes, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
@@ -71,7 +64,7 @@ void PatternEditor::setNoteParams(int root, int chord, bool sharp)
     rootPitch = root;
     chordType = chord;
     noteLabels.setParams(root, chord, sharp);
-    patternGrid.setChordSize(chordSizes[chord]);
+    patternGrid.setChordSize(chordDefs[chord].size);
 
     int patId = -1;
     if (timeline && lastSelectedTrack >= 0) {
@@ -86,11 +79,11 @@ int PatternEditor::computeDefaultOffset(int patId) const
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = 12 + rootSemitone;
-    int size         = chordSizes[chordType];
+    int size         = chordDefs[chordType].size;
     int total        = noteLabels.getTotalTones();
 
     auto midiForTone = [&](int n) {
-        return rootMidi0 + intervals[chordType][n % size] + (n / size) * 12;
+        return rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
     };
 
     std::vector<Note> allNotes;

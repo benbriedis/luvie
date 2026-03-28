@@ -1,4 +1,5 @@
 #include "patternPanel.hpp"
+#include "chords.hpp"
 #include "panelStyle.hpp"
 #include "inlineEditDispatch.hpp"
 #include <FL/Fl.H>
@@ -69,8 +70,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     chordLabel.labelcolor(panelText);
     chordLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    for (const char* chord : {"Major", "Minor", "Major 7", "Minor 7"})
-        chordChoice.add(chord);
+    for (const auto& def : chordDefs)
+        chordChoice.add(def.name);
     chordChoice.value(0);
     chordChoice.callback(paramsCb, this);
 

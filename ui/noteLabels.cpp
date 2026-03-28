@@ -1,24 +1,17 @@
 #include "noteLabels.hpp"
+#include "chords.hpp"
 #include <FL/fl_draw.H>
 #include <algorithm>
 
 static const char* sharpNames[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 static const char* flatNames[]  = {"C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"};
 
-static const int intervals[][4] = {
-    {0, 4, 7,  0},
-    {0, 3, 7,  0},
-    {0, 4, 7, 11},
-    {0, 3, 7, 10},
-};
-static const int chordSizes[] = {3, 3, 4, 4};
-
 std::string noteName(int n, int rootPitch, int chordType, bool useSharp)
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = 12 + rootSemitone;
-    int size         = chordSizes[chordType];
-    int midi         = rootMidi0 + intervals[chordType][n % size] + (n / size) * 12;
+    int size         = chordDefs[chordType].size;
+    int midi         = rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
     int noteOct      = midi / 12 - 1;
     int semitone     = midi % 12;
     const char* name = useSharp ? sharpNames[semitone] : flatNames[semitone];
@@ -32,10 +25,10 @@ NoteLabels::NoteLabels(int x, int y, int w, int numRows, int rowHeight)
 int NoteLabels::computeTotalTones() const {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = 12 + rootSemitone;
-    int size         = chordSizes[chordType];
+    int size         = chordDefs[chordType].size;
     int total        = 0;
     for (int n = 0; n < 10 * size; n++) {
-        int midi = rootMidi0 + intervals[chordType][n % size] + (n / size) * 12;
+        int midi = rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
         if (midi > 127) break;
         total++;
     }
