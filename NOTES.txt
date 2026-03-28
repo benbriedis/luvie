@@ -156,6 +156,8 @@ NOTE: currently restricting # patterns to a min of 1 so I can continue to add pa
 ------
 Re time signatures and live looping mode
 ~~~
+Re: resizing the main window... it may be Wayland that is to blame here... possible I've over-customised for it.
+
 In time I'll probably add a "live mode" like Seq24.
 I think to get this to work well it will need to have its own time signature 
 (note that song mode can change time signatures and the patterns are just being dumped on top regardless).

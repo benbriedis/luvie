@@ -7,8 +7,6 @@
 class PatternGrid : public Grid, public ITimelineObserver {
     ObservableTimeline* timeline       = nullptr;
     int                 patternId      = -1;
-    int                 draggingNoteId = -1;
-    bool                isDragging     = false;
     int                 chordSize      = 3;
     int                 rowOffset      = 0;
 
@@ -17,9 +15,9 @@ class PatternGrid : public Grid, public ITimelineObserver {
 protected:
     Fl_Color columnColor(int col) const override;
     Fl_Color rowLineColor(int i)  const override;
-    std::function<void()> makeDeleteCallback() override;
-    void onBeginDrag() override;
-    void onCommitDrag() override;
+    std::function<void()> makeDeleteCallback(int noteIdx) override;
+    void onCommitMove(const StateDragMove& s) override;
+    void onCommitResize(const StateDragResize& s) override;
     void toggleNote() override;
 
 public:

@@ -6,13 +6,36 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 #include <functional>
+#include <variant>
 
 class Playhead;
 
-enum SelectionState { NONE, MOVING, RESIZING };
 enum Side { LEFT, RIGHT };
-
 typedef struct { int row; float col; } Point;
+
+// ---------------------------------------------------------------------------
+// Interaction state — each variant carries only the fields relevant to it.
+// ---------------------------------------------------------------------------
+
+struct StateIdle {};
+
+struct StateHoverMove   { int noteIdx; float grabX, grabY; };
+struct StateHoverResize { int noteIdx; Side side; };
+
+struct StateDragMove {
+    int   noteIdx;
+    float grabX, grabY;
+    Point original;
+    Point lastValid;
+    bool  overlapping = false;
+};
+
+struct StateDragResize { int noteIdx; Side side; };
+
+using GridState = std::variant<
+    StateIdle, StateHoverMove, StateHoverResize, StateDragMove, StateDragResize>;
+
+// ---------------------------------------------------------------------------
 
 class Grid : public Fl_Box {
 public:
@@ -20,43 +43,45 @@ public:
     int rowHeight, colWidth;
 
 protected:
-    float snap;
-    Popup& popup;
+    float             snap;
+    Popup&            popup;
     std::vector<Note> notes;
 
-    int selectedNote = 0;
-    SelectionState hoverState = NONE;
-    Side side = LEFT;
-    float movingGrabXOffset = 0, movingGrabYOffset = 0;
-    bool amOverlapping = false, creationForbidden = false;
-    Point originalPosition = {0, 0.0f}, lastValidPosition = {0, 0.0f};
+    GridState state;
+    bool      creationForbidden = false;
 
     Playhead* playhead  = nullptr;
     int       colOffset = 0;
 
+    bool isActiveDrag() const {
+        return std::holds_alternative<StateDragMove>(state) ||
+               std::holds_alternative<StateDragResize>(state);
+    }
+
     void draw() override;
     int  handle(int event) override;
     void findNoteForCursor();
-    int  overlappingNote();
-    void moving();
-    virtual void resizing();
-    void clampSelection() { if (selectedNote >= (int)notes.size()) { selectedNote = 0; hoverState = NONE; } }
+    int  overlappingNote(int noteIdx) const;
+    void moving(StateDragMove& s);
+    virtual void resizing(StateDragResize& s);
+    void clampSelection();
 
     // Virtual extension hooks
-    virtual Fl_Color columnColor(int col)      const { (void)col; return 0x00EE0000; }
-    virtual Fl_Color rowLineColor(int lineIdx) const { (void)lineIdx; return 0xEE888800; }
-    virtual std::function<void()> makeDeleteCallback() { return nullptr; }
-    virtual void onBeginDrag() {}
-    virtual void onCommitDrag() {}
-    virtual void onNoteDoubleClick() {}
+    virtual Fl_Color columnColor(int col)      const { (void)col;      return 0x00EE0000; }
+    virtual Fl_Color rowLineColor(int lineIdx) const { (void)lineIdx;  return 0xEE888800; }
+    virtual std::function<void()> makeDeleteCallback(int noteIdx) { (void)noteIdx; return nullptr; }
+    virtual void onBeginDrag(int noteIdx)               { (void)noteIdx; }
+    virtual void onCommitMove(const StateDragMove& s)   { (void)s; }
+    virtual void onCommitResize(const StateDragResize& s) { (void)s; }
+    virtual void onNoteDoubleClick(int noteIdx)         { (void)noteIdx; }
     virtual void toggleNote();
 
 public:
     Grid(std::vector<Note> notes, int numRows, int numCols,
            int rowHeight, int colWidth, float snap, Popup& popup);
 
-    void setPlayhead(Playhead* p)  { playhead   = p; }
-    void setColOffset(int off)     { colOffset  = off; redraw(); }
+    void setPlayhead(Playhead* p) { playhead  = p; }
+    void setColOffset(int off)    { colOffset = off; redraw(); }
 };
 
 #endif

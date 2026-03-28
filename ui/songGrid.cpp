@@ -19,27 +19,27 @@ void SongGrid::draw()
     const int tickH = 4;
     for (const auto& note : notes) {
         if (note.pitch < 0 || note.pitch >= numRows) continue;
-        int   y0     = y() + note.pitch * rowHeight;
-        int   top    = 4, bottom = 4;
+        int y0  = y() + note.pitch * rowHeight;
+        int top = 4, bottom = 4;
         if (timeline) timeline->timeSigAt((int)note.beat, top, bottom);
 
         float startOffset = 0.0f;
-        if (isDragging && hoverState == RESIZING && side == LEFT && note.id == draggingPatternId)
-            startOffset = dragStartOffset;
-        else if (const PatternInstance* inst = timeline->instanceById(note.id))
-            startOffset = inst->startOffset;
+        // While left-resizing, show dragStartOffset so the tick stays fixed visually
+        if (auto* s = std::get_if<StateDragResize>(&state))
+            if (s->side == LEFT && note.id == notes[s->noteIdx].id)
+                startOffset = dragStartOffset;
+        if (startOffset == 0.0f)
+            if (const PatternInstance* inst = timeline->instanceById(note.id))
+                startOffset = inst->startOffset;
+
         float beatZeroPos = note.beat - startOffset / top;
         float instanceEnd = note.beat + note.length;
 
         float intervalBars = 0.0f;
-        if (timeline) {
-            const Pattern* pat = timeline->patternForInstance(note.id);
-            if (pat && pat->lengthBeats > 0.0f)
+        if (const Pattern* pat = timeline->patternForInstance(note.id))
+            if (pat->lengthBeats > 0.0f)
                 intervalBars = pat->lengthBeats / top;
-        }
 
-        // Find the first tick >= note.beat in the series beatZeroPos + k*intervalBars.
-        // ceil() handles both cases: beatZeroPos before or inside the instance.
         float firstTick = beatZeroPos;
         if (intervalBars > 0.0f) {
             float k = std::ceil((note.beat - beatZeroPos) / intervalBars);
@@ -49,8 +49,8 @@ void SongGrid::draw()
         fl_color(FL_WHITE);
         for (float tickBar = firstTick; tickBar < instanceEnd; ) {
             int tickX = x() + (int)((tickBar - colOffset) * colWidth);
-            fl_rectf(tickX, y0 + 1,                      2, tickH);
-            fl_rectf(tickX, y0 + rowHeight - 1 - tickH,  2, tickH);
+            fl_rectf(tickX, y0 + 1,                     2, tickH);
+            fl_rectf(tickX, y0 + rowHeight - 1 - tickH, 2, tickH);
             if (intervalBars <= 0.0f) break;
             tickBar += intervalBars;
         }
@@ -74,7 +74,6 @@ void SongGrid::rebuildNotes()
 {
     if (!timeline) return;
     if (trackFilter >= 0) {
-        // Single-track view: no row offset needed
         const auto& tracks = timeline->get().tracks;
         notes.clear();
         if (trackFilter < (int)tracks.size()) {
@@ -90,7 +89,6 @@ void SongGrid::rebuildNotes()
         clampSelection();
         return;
     }
-    // All-tracks view: map absolute track index to visual row
     std::vector<Note> all = timeline->buildNotes();
     notes.clear();
     for (auto n : all) {
@@ -118,78 +116,69 @@ void SongGrid::setTrackView(int tf, bool br)
 
 void SongGrid::onTimelineChanged()
 {
-    if (!isDragging)
+    if (!isActiveDrag())
         rebuildNotes();
     redraw();
 }
 
-std::function<void()> SongGrid::makeDeleteCallback()
+std::function<void()> SongGrid::makeDeleteCallback(int noteIdx)
 {
     if (!timeline) return nullptr;
-    int id = notes[selectedNote].id;
+    int id = notes[noteIdx].id;
     return [this, id]() { timeline->removePattern(id); };
 }
 
-void SongGrid::onBeginDrag()
+void SongGrid::onBeginDrag(int noteIdx)
 {
-    draggingPatternId = notes[selectedNote].id;
-    originalLength    = notes[selectedNote].length;
-    isDragging        = true;
-    if (timeline) { int dummy; timeline->timeSigAt((int)notes[selectedNote].beat, dragBeatsPerBar, dummy); }
-    // Capture absolute song-bar position of the pattern's beat-0 tick.
+    if (timeline) { int dummy; timeline->timeSigAt((int)notes[noteIdx].beat, dragBeatsPerBar, dummy); }
     float startOffset = 0.0f;
-    if (const PatternInstance* inst = timeline->instanceById(notes[selectedNote].id))
+    if (const PatternInstance* inst = timeline->instanceById(notes[noteIdx].id))
         startOffset = inst->startOffset;
-    tickBarPos = notes[selectedNote].beat - startOffset / dragBeatsPerBar;
+    tickBarPos = notes[noteIdx].beat - startOffset / dragBeatsPerBar;
 }
 
-void SongGrid::resizing()
+void SongGrid::resizing(StateDragResize& s)
 {
-    Grid::resizing();
-    if (side == LEFT) {
-        // Keep the beat-0 tick fixed in song position.
-        float newOffset = (notes[selectedNote].beat - tickBarPos) * dragBeatsPerBar;
+    Grid::resizing(s);
+    if (s.side == LEFT) {
+        float newOffset = (notes[s.noteIdx].beat - tickBarPos) * dragBeatsPerBar;
         dragStartOffset = newOffset;
     }
 }
 
-void SongGrid::onCommitDrag()
+void SongGrid::onCommitMove(const StateDragMove& s)
 {
-    if (!timeline || draggingPatternId < 0) return;
-    isDragging = false;  // clear before timeline call so onTimelineChanged can rebuild
-    if (hoverState == MOVING)
-        timeline->movePattern(draggingPatternId, (int)notes[selectedNote].pitch + rowOffset, notes[selectedNote].beat);
-    else if (hoverState == RESIZING) {
-        if (side == LEFT)
-            timeline->resizePatternLeft(draggingPatternId,
-                                        notes[selectedNote].beat,
-                                        notes[selectedNote].length,
-                                        dragStartOffset);
-        else
-            timeline->resizePattern(draggingPatternId, notes[selectedNote].length);
-    }
-    draggingPatternId = -1;
+    if (!timeline) return;
+    int id = notes[s.noteIdx].id;
+    timeline->movePattern(id, (int)notes[s.noteIdx].pitch + rowOffset, notes[s.noteIdx].beat);
 }
 
-void SongGrid::onNoteDoubleClick()
+void SongGrid::onCommitResize(const StateDragResize& s)
 {
-    if (selectedNote < (int)notes.size() && onPatternDoubleClick)
-        onPatternDoubleClick((int)notes[selectedNote].pitch + rowOffset);
+    if (!timeline) return;
+    int id = notes[s.noteIdx].id;
+    if (s.side == LEFT)
+        timeline->resizePatternLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length, dragStartOffset);
+    else
+        timeline->resizePattern(id, notes[s.noteIdx].length);
+}
+
+void SongGrid::onNoteDoubleClick(int noteIdx)
+{
+    if (onPatternDoubleClick)
+        onPatternDoubleClick((int)notes[noteIdx].pitch + rowOffset);
 }
 
 void SongGrid::toggleNote()
 {
-    if (trackFilter >= 0) return;  // read-only when displaying a single track view
-    int   ex       = Fl::event_x() - x();
-    int   ey       = Fl::event_y() - y();
+    if (trackFilter >= 0) return;
+    int   ex        = Fl::event_x() - x();
+    int   ey        = Fl::event_y() - y();
     int   visualRow = ey / rowHeight;
     int   absRow    = visualRow + rowOffset;
     float col       = (float)(ex / colWidth) + colOffset;
 
-    if (!timeline) {
-        Grid::toggleNote();
-        return;
-    }
+    if (!timeline) { Grid::toggleNote(); return; }
 
     for (auto& n : notes) {
         if ((int)n.pitch == visualRow && n.beat == col) {

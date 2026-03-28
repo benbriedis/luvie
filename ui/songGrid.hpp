@@ -8,24 +8,21 @@ class SongGrid : public Grid, public ITimelineObserver {
     ObservableTimeline* timeline          = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;
-    int                 draggingPatternId = -1;
-    float               originalLength    = 1.0f;
-    bool                isDragging        = false;
     float               tickBarPos        = 0.0f;
     float               dragStartOffset   = 0.0f;
     int                 dragBeatsPerBar   = 4;
-
-    int rowOffset = 0;
+    int                 rowOffset         = 0;
 
     void rebuildNotes();
 
 protected:
     void draw() override;
-    void resizing() override;
-    std::function<void()> makeDeleteCallback() override;
-    void onBeginDrag() override;
-    void onCommitDrag() override;
-    void onNoteDoubleClick() override;
+    void resizing(StateDragResize& s) override;
+    std::function<void()> makeDeleteCallback(int noteIdx) override;
+    void onBeginDrag(int noteIdx) override;
+    void onCommitMove(const StateDragMove& s) override;
+    void onCommitResize(const StateDragResize& s) override;
+    void onNoteDoubleClick(int noteIdx) override;
     void toggleNote() override;
 
 public:

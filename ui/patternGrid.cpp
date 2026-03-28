@@ -36,7 +36,7 @@ void PatternGrid::rebuildNotes()
 
 void PatternGrid::onTimelineChanged()
 {
-    if (!isDragging)
+    if (!isActiveDrag())
         rebuildNotes();
     redraw();
 }
@@ -69,33 +69,29 @@ void PatternGrid::toggleNote()
         timeline->addNote(patternId, col, (float)abs_row, 1.0f);
 }
 
-std::function<void()> PatternGrid::makeDeleteCallback()
+std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)
 {
     if (!timeline) return nullptr;
-    int id = notes[selectedNote].id;
+    int id = notes[noteIdx].id;
     return [this, id]() { timeline->removeNote(id); };
 }
 
-void PatternGrid::onBeginDrag()
+void PatternGrid::onCommitMove(const StateDragMove& s)
 {
-    draggingNoteId = notes[selectedNote].id;
-    isDragging     = true;
+    if (!timeline) return;
+    int   id      = notes[s.noteIdx].id;
+    float abs_row = (float)((rowOffset + numRows - 1) - (int)notes[s.noteIdx].pitch);
+    timeline->moveNote(id, notes[s.noteIdx].beat, abs_row);
 }
 
-void PatternGrid::onCommitDrag()
+void PatternGrid::onCommitResize(const StateDragResize& s)
 {
-    if (!timeline || draggingNoteId < 0) return;
-    isDragging = false;
-    if (hoverState == MOVING) {
-        float abs_row = (float)((rowOffset + numRows - 1) - notes[selectedNote].pitch);
-        timeline->moveNote(draggingNoteId, notes[selectedNote].beat, abs_row);
-    } else if (hoverState == RESIZING) {
-        if (side == LEFT)
-            timeline->resizeNoteLeft(draggingNoteId, notes[selectedNote].beat, notes[selectedNote].length);
-        else
-            timeline->resizeNoteRight(draggingNoteId, notes[selectedNote].length);
-    }
-    draggingNoteId = -1;
+    if (!timeline) return;
+    int id = notes[s.noteIdx].id;
+    if (s.side == LEFT)
+        timeline->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
+    else
+        timeline->resizeNoteRight(id, notes[s.noteIdx].length);
 }
 
 void PatternGrid::setRowOffset(int offset)
