@@ -1,46 +1,9 @@
 #include "luvie_dsp.h"
+#include "timeline_serial.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
-/* -----------------------------------------------------------------------
-   Hardcoded test timeline: one track, one pattern, a short arpeggio.
-   Pitches are absolute MIDI note numbers.
-   ----------------------------------------------------------------------- */
-
-static DspNote testNotes[] = {
-    /* bar, beat, length, pitch (MIDI), velocity, channel */
-    { 0, 0.0f, 0.5f, 60, 100, 0 },   /* C4 */
-    { 0, 1.0f, 0.5f, 64, 100, 0 },   /* E4 */
-    { 0, 2.0f, 0.5f, 67, 100, 0 },   /* G4 */
-    { 0, 3.0f, 0.5f, 72, 100, 0 },   /* C5 */
-};
-
-static DspPattern testPattern = {
-    .id         = 1,
-    .lengthBeats = 4.0f,
-    .numNotes   = 4,
-    .notes      = testNotes
-};
-
-static DspPatternInstance testInstance = {
-    .id          = 1,
-    .patternId   = 1,
-    .startBar    = 0,
-    .length      = 999.0f,   /* effectively unlimited */
-    .startOffset = 0.0f
-};
-
-static DspTrack testTrack = {
-    .id           = 1,
-    .channel      = 0,
-    .numInstances = 1,
-    .instances    = &testInstance
-};
-
-static DspTimeSig testTimeSig = { .bar = 0, .beatsPerBar = 4, .beatUnit = 4 };
-static DspBpmMarker testBpm   = { .bar = 0, .bpm = 120.0f };
 
 /* -----------------------------------------------------------------------
    MIDI helpers
@@ -75,6 +38,119 @@ static void sendNoteOff(Self* self, uint32_t frame, uint8_t pitch,
     ev.msg[1] = pitch;
     ev.msg[2] = 0;
     lv2_atom_sequence_append_event(self->midiOut, capacity, &ev.event);
+}
+
+/* -----------------------------------------------------------------------
+   Timeline lifecycle
+   ----------------------------------------------------------------------- */
+
+static void freeDspTimeline(DspTimeline* tl)
+{
+    free(tl->timeSigs);
+    free(tl->bpms);
+    for (int i = 0; i < tl->numPatterns; i++)
+        free(tl->patterns[i].notes);
+    free(tl->patterns);
+    for (int i = 0; i < tl->numTracks; i++)
+        free(tl->tracks[i].instances);
+    free(tl->tracks);
+    memset(tl, 0, sizeof(*tl));
+}
+
+/* Returns 1 on success, 0 on invalid/truncated data.
+   On success *out is a freshly-allocated timeline; caller owns it. */
+static int deserializeTimeline(DspTimeline* out, const uint8_t* buf, uint32_t size)
+{
+    if (size < sizeof(TimelineHeader))
+        return 0;
+
+    const TimelineHeader* hdr = (const TimelineHeader*)buf;
+    const uint8_t* p   = buf + sizeof(TimelineHeader);
+    const uint8_t* end = buf + size;
+
+    DspTimeline tl;
+    memset(&tl, 0, sizeof(tl));
+
+    /* Time signatures */
+    if (hdr->numTimeSigs > 0) {
+        size_t sz = hdr->numTimeSigs * sizeof(DspTimeSig);
+        if (p + sz > end) goto fail;
+        tl.timeSigs = (DspTimeSig*)malloc(sz);
+        if (!tl.timeSigs) goto fail;
+        memcpy(tl.timeSigs, p, sz);
+        tl.numTimeSigs = (int)hdr->numTimeSigs;
+        p += sz;
+    }
+
+    /* BPM markers */
+    if (hdr->numBpms > 0) {
+        size_t sz = hdr->numBpms * sizeof(DspBpmMarker);
+        if (p + sz > end) goto fail;
+        tl.bpms = (DspBpmMarker*)malloc(sz);
+        if (!tl.bpms) goto fail;
+        memcpy(tl.bpms, p, sz);
+        tl.numBpms = (int)hdr->numBpms;
+        p += sz;
+    }
+
+    /* Patterns */
+    if (hdr->numPatterns > 0) {
+        tl.patterns = (DspPattern*)calloc(hdr->numPatterns, sizeof(DspPattern));
+        if (!tl.patterns) goto fail;
+        tl.numPatterns = (int)hdr->numPatterns;
+
+        for (uint32_t i = 0; i < hdr->numPatterns; i++) {
+            if (p + sizeof(SerialPatternHeader) > end) goto fail;
+            const SerialPatternHeader* sph = (const SerialPatternHeader*)p;
+            p += sizeof(SerialPatternHeader);
+
+            tl.patterns[i].id          = sph->id;
+            tl.patterns[i].lengthBeats = sph->lengthBeats;
+            tl.patterns[i].numNotes    = (int)sph->numNotes;
+
+            if (sph->numNotes > 0) {
+                size_t sz = sph->numNotes * sizeof(DspNote);
+                if (p + sz > end) goto fail;
+                tl.patterns[i].notes = (DspNote*)malloc(sz);
+                if (!tl.patterns[i].notes) goto fail;
+                memcpy(tl.patterns[i].notes, p, sz);
+                p += sz;
+            }
+        }
+    }
+
+    /* Tracks */
+    if (hdr->numTracks > 0) {
+        tl.tracks = (DspTrack*)calloc(hdr->numTracks, sizeof(DspTrack));
+        if (!tl.tracks) goto fail;
+        tl.numTracks = (int)hdr->numTracks;
+
+        for (uint32_t i = 0; i < hdr->numTracks; i++) {
+            if (p + sizeof(SerialTrackHeader) > end) goto fail;
+            const SerialTrackHeader* sth = (const SerialTrackHeader*)p;
+            p += sizeof(SerialTrackHeader);
+
+            tl.tracks[i].id           = sth->id;
+            tl.tracks[i].channel      = sth->channel;
+            tl.tracks[i].numInstances = (int)sth->numInstances;
+
+            if (sth->numInstances > 0) {
+                size_t sz = sth->numInstances * sizeof(DspPatternInstance);
+                if (p + sz > end) goto fail;
+                tl.tracks[i].instances = (DspPatternInstance*)malloc(sz);
+                if (!tl.tracks[i].instances) goto fail;
+                memcpy(tl.tracks[i].instances, p, sz);
+                p += sz;
+            }
+        }
+    }
+
+    *out = tl;
+    return 1;
+
+fail:
+    freeDspTimeline(&tl);
+    return 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -123,9 +199,6 @@ static DspPattern* findPattern(DspTimeline* tl, int id)
 
 /*
  * Play notes whose trigger beat falls in [fromBeat, toBeat).
- * `frame` is the sample offset within the current process block to stamp
- * on outgoing MIDI events (approximate — uses frame of the time:Position
- * event that bracketed this range).
  */
 static void playRange(Self* self, float fromBeat, float toBeat,
                       uint32_t frame, uint32_t capacity)
@@ -145,33 +218,26 @@ static void playRange(Self* self, float fromBeat, float toBeat,
             DspPattern* pat = findPattern(tl, inst->patternId);
             if (!pat) continue;
 
-            /* Instance beat range (using first time sig — simplification) */
             float beatsPerBar = (tl->numTimeSigs > 0)
                 ? (float)tl->timeSigs[0].beatsPerBar : 4.0f;
-            float instStart = (float)inst->startBar * beatsPerBar;
+            float instStart = inst->startBar * beatsPerBar;
             float instEnd   = instStart + inst->length * beatsPerBar;
 
-            /* Skip if instance doesn't overlap our window */
             if (instEnd <= fromBeat || instStart >= toBeat)
                 continue;
 
             for (int n = 0; n < pat->numNotes; n++) {
                 DspNote* note = &pat->notes[n];
 
-                /* Absolute beat when this note fires, accounting for pattern
-                   looping within the instance. */
-                float notePatBeat = (float)note->bar * beatsPerBar + note->beat
-                                    - inst->startOffset;
+                /* Beat within pattern where this note fires (offset-adjusted) */
+                float notePatBeat = note->beat - inst->startOffset;
                 float patLen = pat->lengthBeats;
-
-                /* How many full pattern cycles have occurred at fromBeat? */
-                float relFrom = fromBeat - instStart;
-                float relTo   = toBeat   - instStart;
-
                 if (patLen <= 0.0f)
                     continue;
 
-                /* First cycle index where this note could fall */
+                float relFrom = fromBeat - instStart;
+                float relTo   = toBeat   - instStart;
+
                 int cycleStart = (relFrom > 0) ? (int)floorf(relFrom / patLen) : 0;
                 int cycleEnd   = (int)floorf((relTo - 0.001f) / patLen);
 
@@ -201,6 +267,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->atom_Object        = map->map(map->handle, LV2_ATOM__Object);
     uris->atom_Sequence      = map->map(map->handle, LV2_ATOM__Sequence);
     uris->atom_URID          = map->map(map->handle, LV2_ATOM__URID);
+    uris->atom_Chunk         = map->map(map->handle, LV2_ATOM__Chunk);
     uris->time_Position      = map->map(map->handle, LV2_TIME__Position);
     uris->time_bar           = map->map(map->handle, LV2_TIME__bar);
     uris->time_barBeat       = map->map(map->handle, LV2_TIME__barBeat);
@@ -208,18 +275,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->time_beatsPerMinute= map->map(map->handle, LV2_TIME__beatsPerMinute);
     uris->time_speed         = map->map(map->handle, LV2_TIME__speed);
     uris->midi_Event         = map->map(map->handle, LV2_MIDI__MidiEvent);
-}
-
-static void buildTestTimeline(DspTimeline* tl)
-{
-    tl->numTimeSigs = 1;
-    tl->timeSigs    = &testTimeSig;
-    tl->numBpms     = 1;
-    tl->bpms        = &testBpm;
-    tl->numPatterns = 1;
-    tl->patterns    = &testPattern;
-    tl->numTracks   = 1;
-    tl->tracks      = &testTrack;
+    uris->luvie_timeline     = map->map(map->handle, LUVIE_TIMELINE_URI);
 }
 
 static LV2_Handle instantiate(
@@ -256,7 +312,7 @@ static LV2_Handle instantiate(
     self->bar         = 0;
     self->barBeat     = 0.0f;
 
-    buildTestTimeline(&self->timeline);
+    /* timeline starts empty — will be populated by first UI message */
 
     return (LV2_Handle)self;
 }
@@ -294,6 +350,36 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     LV2_ATOM_SEQUENCE_FOREACH(self->controlIn, ev) {
         uint32_t evFrame = (uint32_t)ev->time.frames;
 
+        /* --- Timeline update from UI --- */
+        if (ev->body.type == uris->luvie_timeline) {
+            /* Play any pending audio up to this point first */
+            if (self->speed > 0.0f && evFrame > prevFrame) {
+                float thisBeat = prevBeat + (float)(evFrame - prevFrame)
+                                 * self->bpm / (60.0f * (float)self->sampleRate);
+                playRange(self, prevBeat, thisBeat, prevFrame, capacity);
+                prevBeat  = thisBeat;
+                prevFrame = evFrame;
+            }
+
+            /* Cancel all active notes */
+            for (int i = 0; i < self->numActiveNotes; i++)
+                sendNoteOff(self, evFrame,
+                            self->activeNotes[i].pitch,
+                            self->activeNotes[i].channel,
+                            capacity);
+            self->numActiveNotes = 0;
+
+            /* Deserialize new timeline */
+            const uint8_t* data = (const uint8_t*)LV2_ATOM_BODY(&ev->body);
+            DspTimeline newTl;
+            if (deserializeTimeline(&newTl, data, ev->body.size)) {
+                freeDspTimeline(&self->timeline);
+                self->timeline = newTl;
+            }
+            continue;
+        }
+
+        /* --- Time position from host --- */
         if (self->speed > 0.0f && evFrame > prevFrame)
             playRange(self, prevBeat, absoluteBeat(self->bar, self->barBeat, self->beatsPerBar)
                       + (float)(evFrame - prevFrame) * self->bpm / (60.0f * (float)self->sampleRate),
@@ -361,7 +447,9 @@ static void deactivate(LV2_Handle instance) { (void)instance; }
 
 static void cleanup(LV2_Handle instance)
 {
-    free(instance);
+    Self* self = (Self*)instance;
+    freeDspTimeline(&self->timeline);
+    free(self);
 }
 
 static const void* extension_data(const char* uri)

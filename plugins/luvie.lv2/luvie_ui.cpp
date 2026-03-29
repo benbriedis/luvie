@@ -1,11 +1,14 @@
 #include "lv2_external_ui.h"
 #include <lv2/core/lv2.h>
 #include <lv2/urid/urid.h>
+#include <lv2/atom/atom.h>
 
 #include <FL/Fl.H>
 #include <FL/Fl_Group.H>
 #include <string>
 #include <cstring>
+#include <vector>
+#include <algorithm>
 
 #include "../../src/appWindow.hpp"
 #include "../../src/songEditor.hpp"
@@ -20,24 +23,38 @@
 #include "../../src/patternPanel.hpp"
 #include "../../src/trackContextPopup.hpp"
 #include "../../src/noteLabels.hpp"
+#include "../../src/chords.hpp"
+#include "timeline_serial.h"
 
 /* -----------------------------------------------------------------------
-   LuvieUI — the ExternalUI instance.  The struct's first member is
-   LV2_External_UI_Widget, so a LuvieUI* casts cleanly to the widget type
-   that the host expects back from instantiate().
+   Forward declarations
+   ----------------------------------------------------------------------- */
+
+struct LuvieUI;
+static void sendTimeline(LuvieUI* ui);
+
+/* -----------------------------------------------------------------------
+   LuvieUI — the ExternalUI instance.
    ----------------------------------------------------------------------- */
 
 struct LuvieUI {
     /* Must be first — the host casts our handle to this type. */
     LV2_External_UI_Widget widget;
 
-    LV2UI_Controller        controller = nullptr;
-    LV2_External_UI_Host*   extHost    = nullptr;
+    LV2UI_Controller        controller  = nullptr;
+    LV2UI_Write_Function    writeFunc   = nullptr;
+    LV2_External_UI_Host*   extHost     = nullptr;
+    LV2_URID_Map*           map         = nullptr;
+    LV2_URID                atom_eventTransfer  = 0;
+    LV2_URID                luvie_timeline_urid = 0;
 
     /* Owned heap objects */
     AppWindow*          window         = nullptr;
     ObservableTimeline* songTimeline   = nullptr;
     SimpleTransport*    simpleTransport= nullptr;
+
+    /* Non-owning pointer — widget is owned by FLTK/window */
+    PatternPanel*       patternPanel   = nullptr;
 
     /* Popups — stored as members so they live long enough */
     Popup*              popup1         = nullptr;
@@ -46,7 +63,15 @@ struct LuvieUI {
     MarkerPopup*        timeSigPopup   = nullptr;
     TrackContextPopup*  trackCtxPopup  = nullptr;
 
+    /* Observer that forwards timeline changes to the DSP */
+    struct TimelineSender : ITimelineObserver {
+        LuvieUI* ui;
+        explicit TimelineSender(LuvieUI* u) : ui(u) {}
+        void onTimelineChanged() override { sendTimeline(ui); }
+    } timelineSender{this};
+
     ~LuvieUI() {
+        if (songTimeline) songTimeline->removeObserver(&timelineSender);
         /* Fl_Widget children are owned by the window; delete window first. */
         delete window;
         delete popup1;
@@ -58,6 +83,113 @@ struct LuvieUI {
         delete songTimeline;
     }
 };
+
+/* -----------------------------------------------------------------------
+   Timeline serialization + send
+   ----------------------------------------------------------------------- */
+
+static void sendTimeline(LuvieUI* ui)
+{
+    if (!ui->writeFunc || !ui->songTimeline || !ui->patternPanel)
+        return;
+
+    const Timeline& tl        = ui->songTimeline->get();
+    const int rootPitch        = ui->patternPanel->rootPitch();
+    const int chordType        = ui->patternPanel->chordType();
+    const ChordDef& chord      = chordDefs[chordType];
+    const int chordSize        = chord.size;
+    const int rootSemitone     = (rootPitch + 9) % 12;
+    const int rootMidi0        = 12 + rootSemitone;
+
+    const uint32_t numTimeSigs = (uint32_t)tl.timeSigs.size();
+    const uint32_t numBpms     = (uint32_t)tl.bpms.size();
+    const uint32_t numPatterns = (uint32_t)tl.patterns.size();
+    const uint32_t numTracks   = (uint32_t)tl.tracks.size();
+
+    /* Pre-count enabled notes per pattern */
+    std::vector<uint32_t> noteCounts(numPatterns, 0);
+    for (uint32_t p = 0; p < numPatterns; p++)
+        for (const auto& n : tl.patterns[p].notes)
+            if (!n.disabled) noteCounts[p]++;
+
+    /* Calculate total binary size */
+    size_t dataSize = sizeof(TimelineHeader)
+                    + numTimeSigs * sizeof(DspTimeSig)
+                    + numBpms    * sizeof(DspBpmMarker);
+    for (uint32_t p = 0; p < numPatterns; p++)
+        dataSize += sizeof(SerialPatternHeader) + noteCounts[p] * sizeof(DspNote);
+    for (const auto& track : tl.tracks)
+        dataSize += sizeof(SerialTrackHeader) + track.patterns.size() * sizeof(DspPatternInstance);
+
+    /* Build buffer: LV2_Atom header followed by binary data */
+    const size_t totalSize = sizeof(LV2_Atom) + dataSize;
+    std::vector<uint8_t> buf(totalSize);
+
+    LV2_Atom* atom = reinterpret_cast<LV2_Atom*>(buf.data());
+    atom->type = ui->luvie_timeline_urid;
+    atom->size = (uint32_t)dataSize;
+
+    uint8_t* p = buf.data() + sizeof(LV2_Atom);
+
+    /* TimelineHeader */
+    TimelineHeader hdr = { numTimeSigs, numBpms, numPatterns, numTracks };
+    memcpy(p, &hdr, sizeof(hdr)); p += sizeof(hdr);
+
+    /* DspTimeSig[] */
+    for (const auto& ts : tl.timeSigs) {
+        DspTimeSig dts = { ts.bar, ts.top, ts.bottom };
+        memcpy(p, &dts, sizeof(dts)); p += sizeof(dts);
+    }
+
+    /* DspBpmMarker[] */
+    for (const auto& bm : tl.bpms) {
+        DspBpmMarker dbm = { bm.bar, bm.bpm };
+        memcpy(p, &dbm, sizeof(dbm)); p += sizeof(dbm);
+    }
+
+    /* Patterns */
+    for (uint32_t pi = 0; pi < numPatterns; pi++) {
+        const auto& pat = tl.patterns[pi];
+        SerialPatternHeader sph = { pat.id, pat.lengthBeats, noteCounts[pi] };
+        memcpy(p, &sph, sizeof(sph)); p += sizeof(sph);
+
+        for (const auto& n : pat.notes) {
+            if (n.disabled) continue;
+            const int ni     = (int)n.pitch;
+            const int degree = ni % chordSize;
+            const int octave = ni / chordSize;
+            const int midi   = std::clamp(
+                rootMidi0 + chord.intervals[degree] + octave * 12, 0, 127);
+            const float vel  = n.velocity > 0.0f ? n.velocity : 0.8f;
+            DspNote dn = { n.beat, n.length,
+                           (uint8_t)midi,
+                           (uint8_t)std::clamp((int)(vel * 127.0f + 0.5f), 1, 127),
+                           {0, 0} };
+            memcpy(p, &dn, sizeof(dn)); p += sizeof(dn);
+        }
+    }
+
+    /* Tracks */
+    for (const auto& track : tl.tracks) {
+        SerialTrackHeader sth = { track.id, 0, {0,0,0},
+                                  (uint32_t)track.patterns.size() };
+        memcpy(p, &sth, sizeof(sth)); p += sizeof(sth);
+
+        for (const auto& inst : track.patterns) {
+            DspPatternInstance dpi = {
+                inst.id, inst.patternId, inst.startBar,
+                inst.length, inst.startOffset
+            };
+            memcpy(p, &dpi, sizeof(dpi)); p += sizeof(dpi);
+        }
+    }
+
+    ui->writeFunc(ui->controller,
+                  0 /* PORT_CONTROL_IN */,
+                  (uint32_t)totalSize,
+                  ui->atom_eventTransfer,
+                  buf.data());
+}
 
 /* -----------------------------------------------------------------------
    ExternalUI function-pointer callbacks
@@ -100,7 +232,7 @@ static LV2UI_Handle instantiate(
     const LV2UI_Descriptor*   /*descriptor*/,
     const char*               /*plugin_uri*/,
     const char*               /*bundle_path*/,
-    LV2UI_Write_Function      /*write_function*/,
+    LV2UI_Write_Function      write_function,
     LV2UI_Controller          controller,
     LV2UI_Widget*             widget,
     const LV2_Feature* const* features)
@@ -110,14 +242,22 @@ static LV2UI_Handle instantiate(
     ui->widget.show = ui_show;
     ui->widget.hide = ui_hide;
     ui->controller  = controller;
+    ui->writeFunc   = write_function;
 
-    /* Scan features for ExternalUI host */
+    /* Scan features */
     for (int i = 0; features[i]; i++) {
         if (std::strcmp(features[i]->URI, LV2_EXTERNAL_UI_HOST_URI) == 0)
             ui->extHost = static_cast<LV2_External_UI_Host*>(features[i]->data);
         else if (std::strcmp(features[i]->URI, LV2_EXTERNAL_UI_DEPRECATED_URI) == 0
                  && !ui->extHost)
             ui->extHost = static_cast<LV2_External_UI_Host*>(features[i]->data);
+        else if (std::strcmp(features[i]->URI, LV2_URID__map) == 0)
+            ui->map = static_cast<LV2_URID_Map*>(features[i]->data);
+    }
+
+    if (ui->map) {
+        ui->atom_eventTransfer  = ui->map->map(ui->map->handle, LV2_ATOM__eventTransfer);
+        ui->luvie_timeline_urid = ui->map->map(ui->map->handle, LUVIE_TIMELINE_URI);
     }
 
     /* ---- Layout constants (same as standalone main.cpp) ---- */
@@ -197,10 +337,9 @@ static LV2UI_Handle instantiate(
     tab2->add(patternPanel);
     tab2->end();
 
+    ui->patternPanel = patternPanel;
+
     /* ---- Transport ---- */
-    /* Clear current group so Transport doesn't auto-add to tabs (Fl_Tabs would
-       hide it as a non-active child, and the hidden flag would persist after
-       reparenting to the window). */
     Fl_Group::current(nullptr);
     ui->simpleTransport = new SimpleTransport;
     ui->simpleTransport->setTimeline(ui->songTimeline);
@@ -232,7 +371,10 @@ static LV2UI_Handle instantiate(
                            patternPanel->chordType(),
                            patternPanel->isSharp());
     };
-    patternPanel->onParamsChanged = syncNoteLabels;
+    patternPanel->onParamsChanged = [ui, syncNoteLabels]() {
+        syncNoteLabels();
+        sendTimeline(ui);
+    };
     syncNoteLabels();
 
     /* ---- Popups must be added last (reverse-order FLTK dispatch) ---- */
@@ -251,6 +393,10 @@ static LV2UI_Handle instantiate(
     const int minH = tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
     ui->window->size_range(minW, minH);
 
+    /* ---- Register timeline observer and send initial state to DSP ---- */
+    ui->songTimeline->addObserver(&ui->timelineSender);
+    sendTimeline(ui);
+
     /* Return the widget pointer as the LV2UI handle */
     *widget = &ui->widget;
     return reinterpret_cast<LV2UI_Handle>(ui);
@@ -265,7 +411,7 @@ static void port_event(LV2UI_Handle /*handle*/, uint32_t /*port_index*/,
                        uint32_t /*buffer_size*/, uint32_t /*format*/,
                        const void* /*buffer*/)
 {
-    /* TODO: receive timeline state from DSP */
+    /* TODO: receive timeline state from DSP (for future state restore) */
 }
 
 static const void* extension_data(const char* uri)

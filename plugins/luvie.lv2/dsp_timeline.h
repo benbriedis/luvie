@@ -8,12 +8,11 @@
    Beat positions are floating-point, bar-relative. */
 
 typedef struct {
-    int    bar;        /* 0-indexed */
-    float  beat;       /* 0-indexed within bar */
-    float  length;     /* duration in beats */
+    float   beat;      /* beat within pattern (absolute, 0-indexed) */
+    float   length;    /* duration in beats */
     uint8_t pitch;     /* absolute MIDI note number */
     uint8_t velocity;
-    uint8_t channel;
+    uint8_t _pad[2];
 } DspNote;
 
 typedef struct {
@@ -26,7 +25,7 @@ typedef struct {
 typedef struct {
     int   id;
     int   patternId;
-    int   startBar;
+    float startBar;
     float length;       /* in bars */
     float startOffset;  /* beat offset into pattern at instance start */
 } DspPatternInstance;

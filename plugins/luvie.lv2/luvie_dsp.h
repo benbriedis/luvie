@@ -33,6 +33,8 @@ typedef struct {
     LV2_URID time_beatsPerMinute;
     LV2_URID time_speed;
     LV2_URID midi_Event;
+    LV2_URID atom_Chunk;
+    LV2_URID luvie_timeline;
 } URIs;
 
 /* Active note being played (awaiting note-off) */

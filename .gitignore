@@ -3,3 +3,4 @@ build/
 target/
 *.d
 *.o
+*.so
