@@ -17,8 +17,9 @@
 
 /* Port indices */
 enum {
-    PORT_CONTROL_IN = 0,
-    PORT_MIDI_OUT   = 1
+    PORT_CONTROL_IN  = 0,
+    PORT_MIDI_OUT    = 1,
+    PORT_NOTIFY_OUT  = 2
 };
 
 typedef struct {
@@ -49,10 +50,12 @@ typedef struct {
 typedef struct {
     LV2_URID_Map*  map;
     LV2_Log_Logger logger;
+    LV2_Atom_Forge forge;
 
     /* Ports */
     const LV2_Atom_Sequence* controlIn;
     LV2_Atom_Sequence*       midiOut;
+    LV2_Atom_Sequence*       notifyOut;
 
     URIs uris;
 

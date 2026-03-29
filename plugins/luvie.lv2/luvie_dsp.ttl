@@ -28,6 +28,13 @@
         lv2:index 1 ;
         lv2:symbol "midi_out" ;
         lv2:name "MIDI Out"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports time:Position ;
+        lv2:index 2 ;
+        lv2:symbol "notify_out" ;
+        lv2:name "Notify Out"
     ] ;
 
     ui:ui <https://github.com/benbriedis/luvie/luvie_ui> .

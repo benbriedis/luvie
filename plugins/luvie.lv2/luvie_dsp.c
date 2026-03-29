@@ -304,6 +304,7 @@ static LV2_Handle instantiate(
     }
 
     mapURIs(self->map, &self->uris);
+    lv2_atom_forge_init(&self->forge, self->map);
 
     self->sampleRate  = sampleRate;
     self->speed       = 0.0f;
@@ -321,8 +322,9 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
 {
     Self* self = (Self*)instance;
     switch (port) {
-        case PORT_CONTROL_IN: self->controlIn = (const LV2_Atom_Sequence*)data; break;
-        case PORT_MIDI_OUT:   self->midiOut   = (LV2_Atom_Sequence*)data;       break;
+        case PORT_CONTROL_IN: self->controlIn  = (const LV2_Atom_Sequence*)data; break;
+        case PORT_MIDI_OUT:   self->midiOut    = (LV2_Atom_Sequence*)data;       break;
+        case PORT_NOTIFY_OUT: self->notifyOut  = (LV2_Atom_Sequence*)data;       break;
     }
 }
 
@@ -343,6 +345,16 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     const uint32_t capacity = self->midiOut->atom.size;
     lv2_atom_sequence_clear(self->midiOut);
     self->midiOut->atom.type = uris->atom_Sequence;
+
+    /* Set up forge to write into notifyOut */
+    const uint32_t notifyCapacity = self->notifyOut->atom.size;
+    lv2_atom_sequence_clear(self->notifyOut);
+    self->notifyOut->atom.type = uris->atom_Sequence;
+    lv2_atom_forge_set_buffer(&self->forge,
+                              (uint8_t*)self->notifyOut,
+                              sizeof(LV2_Atom) + notifyCapacity);
+    LV2_Atom_Forge_Frame notifyFrame;
+    lv2_atom_forge_sequence_head(&self->forge, &notifyFrame, 0);
 
     float prevBeat = absoluteBeat(self->bar, self->barBeat, self->beatsPerBar);
     uint32_t prevFrame = 0;
@@ -423,9 +435,16 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
                 prevBeat  = absoluteBeat(self->bar, self->barBeat, self->beatsPerBar);
                 prevFrame = evFrame;
+
+                /* Forward time:Position to the UI */
+                lv2_atom_forge_frame_time(&self->forge, ev->time.frames);
+                lv2_atom_forge_write(&self->forge, &ev->body,
+                                     sizeof(LV2_Atom) + ev->body.size);
             }
         }
     }
+
+    lv2_atom_forge_pop(&self->forge, &notifyFrame);
 
     /* Play remainder of block */
     if (self->speed > 0.0f) {

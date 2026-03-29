@@ -22,6 +22,9 @@ public:
 
 	float position()  const override;
 	bool  isPlaying() const override { return playing; }
+
+	/* Snap to host transport position (called from LV2 port_event). */
+	void syncFromHost(float bars, bool hostPlaying);
 };
 
 #endif

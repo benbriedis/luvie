@@ -1,0 +1,138 @@
+
+❯ I thought as much. There is a significant UX problem of running it without any control of    
+the transport and that is that the user will generally want to position the playhead in the    
+Luvie song editor as you can't see the position of the patterns in the Ardour track editor, so 
+ its hard to orient yourself in that editor. So just to double check: neither the UI nor the   
+DSP portions of Luvie can reposition the playhead in Ardour? So far if we want to support this 
+ important functionality then using Jack is our only option. What others are there? We know we 
+ have some access to MIDI as we are already using it. I just want to be thorough so I know I'm 
+ making the best decisions here.                                                               
+
+● Correct on both counts — neither the DSP nor the UI has any LV2 mechanism to reposition the
+  host. The spec simply doesn't provide it. So the full set of realistic options:
+
+  1. JACK transport (already discussed)
+
+  Bidirectional, clean, works with Ardour. The strong choice for serious Linux DAW users.
+  Degrades gracefully if JACK isn't present (detect at startup with jack_client_open() using
+  JackNoStartServer).
+
+  2. MIDI Machine Control (MMC)
+
+  A standard SysEx protocol that many DAWs (Ardour, Reaper, Bitwig, Cubase…) implement for
+  transport control. Commands include Stop, Play, and crucially Locate — which repositions the
+  transport to a specific SMPTE timecode.
+
+  Luvie already has a MIDI output port, so the DSP could send MMC SysEx events on it with no
+  extra LV2 ports. Play/stop is trivial. Locate requires converting bars/beats → seconds →
+  SMPTE frames, but Luvie already knows BPM and sample rate from time:Position, so the maths
+  are there.
+
+  The friction: the user has to manually route Luvie's MIDI out back to the host's MMC input
+  (in Ardour: Preferences → MIDI → MMC, then patch in the JACK/ALSA MIDI graph). This is doable
+   but awkward, and some users won't know to do it.
+
+  3. OSC (Open Sound Control)
+
+  Ardour has a full OSC interface including /ardour/transport_play, /ardour/transport_stop,
+  /ardour/locate. But this requires UDP networking even on localhost, needs to know Ardour's
+  OSC port, is entirely Ardour-specific, and has no standard LV2 integration point. Not worth
+  pursuing.
+
+  4. Anything else?
+
+  No. X11/Wayland IPC, ReWire (dead), VST3 transport APIs — none apply here. You've found the
+  complete list.
+
+  ---
+  The honest picture
+
+  ┌─────────────┬─────────────────┬──────────┬───────────────────────┬───────────────────┐
+  │   Option    │  Bidirectional  │  Locate  │    Setup friction     │    Portability    │
+  ├─────────────┼─────────────────┼──────────┼───────────────────────┼───────────────────┤
+  │ JACK        │ ✓               │ ✓        │ Low (detect           │ JACK environments │
+  │ transport   │                 │          │ automatically)        │  only             │
+  ├─────────────┼─────────────────┼──────────┼───────────────────────┼───────────────────┤
+  │ MMC (MIDI   │ Play/stop +     │ ✓        │ Moderate (user must   │ Any MMC-capable   │
+  │ out)        │ locate          │ (SMPTE)  │ patch)                │ host              │
+  ├─────────────┼─────────────────┼──────────┼───────────────────────┼───────────────────┤
+  │ Pure LV2    │ Receive only    │ —        │ None                  │ Universal         │
+  └─────────────┴─────────────────┴──────────┴───────────────────────┴───────────────────┘
+
+  The natural combination is: JACK transport where available, MMC as a fallback, with the Luvie
+   transport buttons greyed out and labelled "No transport sync" if neither is active. That
+  covers the full range from casual ALSA-only setups to professional JACK rigs without breaking
+   anything.
+
+
+❯ So the main advantage of using here Jack seems to be that Luvie can auto-detect it's       
+presence and connect to it. Is there any way Luvie could perform the patching required for   
+the MMC solution?                                                                            
+                                                                                             
+● Technically yes — if JACK is present, the JACK API has jack_get_ports() to enumerate MIDI  
+  ports and jack_connect() to wire them up. Luvie could search for a port matching a pattern 
+  like "ardour:MMC*" and connect automatically.                                              
+   
+  But this reveals the circular problem: auto-patching MIDI via JACK requires JACK, at which 
+  point you'd just use JACK transport directly and skip MMC entirely.
+                                                                                             
+  In non-JACK environments (PipeWire native mode, plain ALSA) the ALSA sequencer API can     
+  enumerate and connect ports, but it's significantly more complex, less reliable, and you'd
+  still need to guess the right port name pattern per-host. It also only helps hosts that    
+  expose a named MMC input port in a discoverable way — not all do.
+
+  So the realistic picture collapses to:
+
+  - JACK/PipeWire-with-JACK-compat (covers most serious Linux DAW setups): use JACK          
+  transport, auto-detect, auto-connect. MMC irrelevant.
+  - Everything else: no reliable auto-patching, MMC requires manual user setup, and the user 
+  base is probably small enough that "configure it yourself" is acceptable documentation.    
+   
+  The main practical advantage of JACK transport isn't really the auto-detection — it's that 
+  it's a transport protocol rather than a MIDI protocol routed through the DAW's instrument 
+  graph. JACK transport operates at the session level; both Ardour and Luvie are peers       
+  talking to the same JACK server. MMC requires Ardour to be specifically configured to act
+  on it, which is an extra step regardless of patching.
+
+  Given all this, JACK transport as primary with a manual-setup MMC fallback documented for  
+  non-JACK users seems like the right call.
+
+
+BENS PLAN:
+==========
+Use LV2 to control the Luvie transport.
+Probably require Jack for full functionality.
+Disable transport.
+Keep MMC in mind as a possible backend solution in future, but would require instructions.
+
+
+● That's a sensible design. A few things worth keeping in mind for when you implement it:
+
+  JACK client in the UI, not the DSP
+
+  The UI process is the right place to open the JACK client (just for transport — not audio). The
+  DSP already runs inside the host's JACK graph and you don't control that client. Opening a
+  separate lightweight JACK client from the UI just for jack_transport_* calls is the standard
+  approach.
+
+  PipeWire compatibility
+
+  On modern Ubuntu/Fedora/etc., libjack is typically provided by pipewire-jack and
+  jack_client_open() will succeed even without a "real" JACK server running. So your auto-detect
+  will work on most current Linux desktops, not just dedicated JACK setups. Worth testing, but it's
+   likely better coverage than you might expect.
+
+  Ardour needs to be a JACK transport slave
+
+  Ardour defaults to being transport master. The user needs Session → Properties (or Preferences,
+  depending on version) → Sync → "JACK Transport" to make it follow external transport commands.
+  Worth documenting as a one-time setup step.
+
+  Seek granularity
+
+  jack_transport_locate() takes a frame position (samples). You'll need the sample rate and current
+   BPM/time-sig to convert a bar/beat position to frames. The DSP already receives all of this via
+  time:Position, so you'll need to forward it to the UI (via the notify_out port discussed earlier)
+   before seeking can work correctly. Play/stop needs nothing extra.
+
+

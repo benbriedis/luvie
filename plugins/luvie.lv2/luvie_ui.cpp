@@ -2,6 +2,8 @@
 #include <lv2/core/lv2.h>
 #include <lv2/urid/urid.h>
 #include <lv2/atom/atom.h>
+#include <lv2/atom/util.h>
+#include <lv2/time/time.h>
 
 #include <FL/Fl.H>
 #include <FL/Fl_Group.H>
@@ -47,6 +49,14 @@ struct LuvieUI {
     LV2_URID_Map*           map         = nullptr;
     LV2_URID                atom_eventTransfer  = 0;
     LV2_URID                luvie_timeline_urid = 0;
+    LV2_URID                atom_Object         = 0;
+    LV2_URID                atom_Blank          = 0;
+    LV2_URID                time_Position       = 0;
+    LV2_URID                time_bar            = 0;
+    LV2_URID                time_barBeat        = 0;
+    LV2_URID                time_beatsPerBar    = 0;
+    LV2_URID                time_beatsPerMinute = 0;
+    LV2_URID                time_speed          = 0;
 
     /* Owned heap objects */
     AppWindow*          window         = nullptr;
@@ -256,8 +266,17 @@ static LV2UI_Handle instantiate(
     }
 
     if (ui->map) {
-        ui->atom_eventTransfer  = ui->map->map(ui->map->handle, LV2_ATOM__eventTransfer);
-        ui->luvie_timeline_urid = ui->map->map(ui->map->handle, LUVIE_TIMELINE_URI);
+        auto m = [&](const char* uri) { return ui->map->map(ui->map->handle, uri); };
+        ui->atom_eventTransfer  = m(LV2_ATOM__eventTransfer);
+        ui->luvie_timeline_urid = m(LUVIE_TIMELINE_URI);
+        ui->atom_Object         = m(LV2_ATOM__Object);
+        ui->atom_Blank          = m(LV2_ATOM__Blank);
+        ui->time_Position       = m(LV2_TIME__Position);
+        ui->time_bar            = m(LV2_TIME__bar);
+        ui->time_barBeat        = m(LV2_TIME__barBeat);
+        ui->time_beatsPerBar    = m(LV2_TIME__beatsPerBar);
+        ui->time_beatsPerMinute = m(LV2_TIME__beatsPerMinute);
+        ui->time_speed          = m(LV2_TIME__speed);
     }
 
     /* ---- Layout constants (same as standalone main.cpp) ---- */
@@ -407,11 +426,45 @@ static void cleanup(LV2UI_Handle handle)
     delete reinterpret_cast<LuvieUI*>(handle);
 }
 
-static void port_event(LV2UI_Handle /*handle*/, uint32_t /*port_index*/,
-                       uint32_t /*buffer_size*/, uint32_t /*format*/,
-                       const void* /*buffer*/)
+static void port_event(LV2UI_Handle handle, uint32_t port_index,
+                       uint32_t /*buffer_size*/, uint32_t format,
+                       const void* buffer)
 {
-    /* TODO: receive timeline state from DSP (for future state restore) */
+    LuvieUI* ui = reinterpret_cast<LuvieUI*>(handle);
+    if (port_index != 2 || format != ui->atom_eventTransfer)
+        return;
+
+    const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);
+    if ((atom->type != ui->atom_Object && atom->type != ui->atom_Blank) ||
+        !ui->simpleTransport)
+        return;
+
+    const LV2_Atom_Object* obj = reinterpret_cast<const LV2_Atom_Object*>(atom);
+    if (obj->body.otype != ui->time_Position)
+        return;
+
+    const LV2_Atom_Long*  aBar   = nullptr;
+    const LV2_Atom_Float* aBeat  = nullptr;
+    const LV2_Atom_Float* aBpb   = nullptr;
+    const LV2_Atom_Float* aSpeed = nullptr;
+    lv2_atom_object_get(obj,
+        ui->time_bar,         &aBar,
+        ui->time_barBeat,     &aBeat,
+        ui->time_beatsPerBar, &aBpb,
+        ui->time_speed,       &aSpeed,
+        0);
+
+    if (!aBar && !aBeat)
+        return;
+
+    float bar     = aBar  ? (float)aBar->body  : 0.0f;
+    float barBeat = aBeat ? aBeat->body         : 0.0f;
+    float bpb     = aBpb  ? aBpb->body          : 4.0f;
+    bool  playing = aSpeed && aSpeed->body != 0.0f;
+
+    /* Convert bar + barBeat to an absolute bar position (fractional bars) */
+    float bars = bar + barBeat / bpb;
+    ui->simpleTransport->syncFromHost(bars, playing);
 }
 
 static const void* extension_data(const char* uri)

@@ -30,6 +30,17 @@ void SimpleTransport::seek(float bars) {
 	}
 }
 
+void SimpleTransport::syncFromHost(float bars, bool hostPlaying) {
+	savedPositionBars = bars;
+	if (hostPlaying) {
+		playStartSeconds = timeline ? timeline->barToSeconds(bars) : 0.0;
+		playStart        = std::chrono::steady_clock::now();
+		playing          = true;
+	} else {
+		playing = false;
+	}
+}
+
 float SimpleTransport::position() const {
 	if (!playing) return savedPositionBars;
 	auto   now     = std::chrono::steady_clock::now();
