@@ -13,5 +13,6 @@
     ui:portNotification [
         ui:plugin <https://github.com/benbriedis/luvie/luvie_dsp> ;
         lv2:symbol "notify_out" ;
+        lv2:index 2 ;
         ui:protocol atom:eventTransfer
     ] .

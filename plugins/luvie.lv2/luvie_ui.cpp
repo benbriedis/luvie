@@ -427,11 +427,11 @@ static void cleanup(LV2UI_Handle handle)
 }
 
 static void port_event(LV2UI_Handle handle, uint32_t port_index,
-                       uint32_t /*buffer_size*/, uint32_t format,
+                       uint32_t /*buffer_size*/, uint32_t /*format*/,
                        const void* buffer)
 {
     LuvieUI* ui = reinterpret_cast<LuvieUI*>(handle);
-    if (port_index != 2 || format != ui->atom_eventTransfer)
+    if (port_index != 2)
         return;
 
     const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);
