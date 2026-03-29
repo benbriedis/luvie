@@ -1,12 +1,10 @@
-@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .
-@prefix urid: <http://lv2plug.in/ns/ext/urid#> .
+@prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
 
 @prefix extui: <http://kxstudio.sf.net/ns/lv2ext/external-ui#> .
 
 <https://github.com/benbriedis/luvie/luvie_ui>
     a extui:Widget ;
     rdfs:label "Luvie UI" ;
-    lv2:requiredFeature urid:map ;
-    lv2:extensionData extui:Widget .
+    lv2:requiredFeature urid:map .

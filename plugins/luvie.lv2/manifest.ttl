@@ -1,6 +1,7 @@
 @prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .
+
+@prefix extui: <http://kxstudio.sf.net/ns/lv2ext/external-ui#> .
 
 <https://github.com/benbriedis/luvie/luvie_dsp>
     a lv2:Plugin ;
@@ -8,6 +9,6 @@
     rdfs:seeAlso <luvie_dsp.ttl> .
 
 <https://github.com/benbriedis/luvie/luvie_ui>
-    a ui:UI ;
+    a extui:Widget ;
     lv2:binary <luvie_ui.so> ;
     rdfs:seeAlso <luvie_ui.ttl> .

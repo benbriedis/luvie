@@ -271,7 +271,7 @@ static const void* extension_data(const char* uri)
 }
 
 static const LV2UI_Descriptor descriptor = {
-    LV2_EXTERNAL_UI_WIDGET,
+    "https://github.com/benbriedis/luvie/luvie_ui",
     instantiate,
     cleanup,
     port_event,
