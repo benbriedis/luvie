@@ -6,7 +6,7 @@ cd $(dirname "$0")
 #NOTE removing the build directory works if changing settings
 
 cd ../sources/fltk
-cmake -B build -DCMAKE_INSTALL_PREFIX=../../installation
+cmake -B build -DCMAKE_INSTALL_PREFIX=../../installation -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 cmake --build build
 cd build
 make install

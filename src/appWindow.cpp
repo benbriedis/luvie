@@ -30,9 +30,8 @@ enum wld_resize_edge {
 
 struct libdecor_frame;  // opaque; we only hold a pointer
 
-// FLTK bundles libdecor and renames all symbols with the fl_ prefix.
-// The symbol fl_libdecor_frame_resize is compiled into libfltk.a.
-extern "C" void fl_libdecor_frame_resize(
+// System libdecor (new FLTK 1.5 builds use system libdecor directly).
+extern "C" void libdecor_frame_resize(
     struct libdecor_frame*, struct wl_seat*, uint32_t, int edge);
 
 // Minimal mirror of FLTK's internal struct wld_window (Fl_Wayland_Window_Driver.H).
@@ -125,7 +124,7 @@ void AppWindow::startWmResize(int dir)
         auto* win = reinterpret_cast<wld_window_fl*>(fl_wl_xid(this));
         if (!win || win->kind != 0 /*DECORATED*/ || !win->frame) return;
         auto* scr = reinterpret_cast<Fl_Wayland_Screen_Driver*>(Fl::screen_driver());
-        fl_libdecor_frame_resize(win->frame, scr->get_wl_seat(),
+        libdecor_frame_resize(win->frame, scr->get_wl_seat(),
                                  scr->get_serial(), wld_edge_map[dir]);
         Fl::pushed(nullptr);
         return;

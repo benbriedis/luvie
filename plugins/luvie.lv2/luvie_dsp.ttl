@@ -3,6 +3,7 @@
 @prefix midi:  <http://lv2plug.in/ns/ext/midi#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix time:  <http://lv2plug.in/ns/ext/time#> .
+@prefix ui:    <http://lv2plug.in/ns/extensions/ui#> .
 @prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
 
 <https://github.com/benbriedis/luvie/luvie_dsp>
@@ -26,4 +27,6 @@
         lv2:index 1 ;
         lv2:symbol "midi_out" ;
         rdfs:label "MIDI Out"
-    ] .
+    ] ;
+
+    ui:ui <https://github.com/benbriedis/luvie/luvie_ui> .
