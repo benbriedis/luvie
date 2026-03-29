@@ -198,6 +198,10 @@ static LV2UI_Handle instantiate(
     tab2->end();
 
     /* ---- Transport ---- */
+    /* Clear current group so Transport doesn't auto-add to tabs (Fl_Tabs would
+       hide it as a non-active child, and the hidden flag would persist after
+       reparenting to the window). */
+    Fl_Group::current(nullptr);
     ui->simpleTransport = new SimpleTransport;
     ui->simpleTransport->setTimeline(ui->songTimeline);
     Transport* bottomPane = new Transport(0, tabsH, winW, bottomH,
