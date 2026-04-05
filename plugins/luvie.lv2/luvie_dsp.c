@@ -163,12 +163,19 @@ static inline float absoluteBeat(int64_t bar, float barBeat, float beatsPerBar)
     return (float)bar * beatsPerBar + barBeat;
 }
 
-/* Fire note-offs for any active notes whose end beat has been passed. */
-static void checkNoteOffs(Self* self, float upToBeat, uint32_t frame, uint32_t capacity)
+/* Fire note-offs for active notes that end by upToBeat.
+   Uses fromBeat + samplesPerBeat to assign each NoteOff its accurate frame. */
+static void checkNoteOffs(Self* self, float upToBeat,
+                           float fromBeat, uint32_t frameBase, float samplesPerBeat,
+                           uint32_t capacity)
 {
     for (int i = self->numActiveNotes - 1; i >= 0; i--) {
         if (upToBeat >= self->activeNotes[i].endBeat) {
-            sendNoteOff(self, frame,
+            float beatOff = self->activeNotes[i].endBeat - fromBeat;
+            uint32_t evFrame = (beatOff > 0.0f)
+                ? frameBase + (uint32_t)(beatOff * samplesPerBeat)
+                : frameBase;
+            sendNoteOff(self, evFrame,
                         self->activeNotes[i].pitch,
                         self->activeNotes[i].channel,
                         capacity);
@@ -206,7 +213,8 @@ static void playRange(Self* self, float fromBeat, float toBeat,
     if (toBeat <= fromBeat)
         return;
 
-    checkNoteOffs(self, toBeat, frame, capacity);
+    const float samplesPerBeat = (float)self->sampleRate * 60.0f / self->bpm;
+    checkNoteOffs(self, toBeat, fromBeat, frame, samplesPerBeat, capacity);
 
     DspTimeline* tl = &self->timeline;
 
@@ -239,7 +247,7 @@ static void playRange(Self* self, float fromBeat, float toBeat,
                 float relTo   = toBeat   - instStart;
 
                 int cycleStart = (relFrom > 0) ? (int)floorf(relFrom / patLen) : 0;
-                int cycleEnd   = (int)floorf((relTo - 0.001f) / patLen);
+                int cycleEnd   = (int)floorf(relTo / patLen);
 
                 for (int c = cycleStart; c <= cycleEnd; c++) {
                     float noteFire = instStart + (float)c * patLen + notePatBeat;
@@ -247,7 +255,9 @@ static void playRange(Self* self, float fromBeat, float toBeat,
                         continue;
                     if (noteFire >= fromBeat && noteFire < toBeat) {
                         float noteEnd = noteFire + note->length;
-                        sendNoteOn(self, frame, note->pitch, note->velocity,
+                        uint32_t noteFrame = frame
+                            + (uint32_t)((noteFire - fromBeat) * samplesPerBeat);
+                        sendNoteOn(self, noteFrame, note->pitch, note->velocity,
                                    track->channel, capacity);
                         addActiveNote(self, note->pitch, track->channel, noteEnd);
                     }

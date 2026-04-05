@@ -82,13 +82,8 @@ struct LuvieUI {
 
     ~LuvieUI() {
         if (songTimeline) songTimeline->removeObserver(&timelineSender);
-        /* Fl_Widget children are owned by the window; delete window first. */
+        /* Popups are added to window via add(), so window owns and deletes them. */
         delete window;
-        delete popup1;
-        delete popup2;
-        delete tempoPopup;
-        delete timeSigPopup;
-        delete trackCtxPopup;
         delete simpleTransport;
         delete songTimeline;
     }
