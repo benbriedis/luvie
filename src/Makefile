@@ -6,13 +6,16 @@ FLTK_CONFIG    = ../deps/installation/bin/fltk-config
 FLTK_CXXFLAGS := $(shell $(FLTK_CONFIG) --cxxflags)
 FLTK_LDFLAGS  := $(shell $(FLTK_CONFIG) --ldflags) $(shell $(FLTK_CONFIG) --libs)
 
-CXXFLAGS = $(FLTK_CXXFLAGS) -std=c++23 -g -fPIC -MMD -MP
-LDFLAGS  = $(FLTK_LDFLAGS)
+JACK_CFLAGS := $(shell pkg-config --cflags jack 2>/dev/null)
+JACK_LIBS   := $(shell pkg-config --libs   jack 2>/dev/null)
+
+CXXFLAGS = $(FLTK_CXXFLAGS) $(JACK_CFLAGS) -std=c++23 -g -fPIC -MMD -MP
+LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS)
 
 BUILDDIR = build
 TARGET   = $(BUILDDIR)/main
 
-SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp
 
 OBJS     = $(SRCS:%.cpp=$(BUILDDIR)/%.o)
 DEPS     = $(SRCS:%.cpp=$(BUILDDIR)/%.d)

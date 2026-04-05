@@ -8,6 +8,7 @@
 #include "modernTabs.hpp"
 #include "transport.hpp"
 #include "simpleTransport.hpp"
+#include "jackTransport.hpp"
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
 #include "observableTimeline.hpp"
@@ -90,12 +91,21 @@ int main(int argc, char **argv) {
     patternPanel.setTimeline(&songTimeline);
     tab2.add(patternPanel);
 
+    JackTransport  jackTransport;
     SimpleTransport simpleTransport;
-    simpleTransport.setTimeline(&songTimeline);
-    Transport bottomPane(0, tabsH, winW, bottomH, &simpleTransport, &songTimeline);
+    bool useJack = jackTransport.open();
+    ITransport* transport = useJack
+        ? static_cast<ITransport*>(&jackTransport)
+        : static_cast<ITransport*>(&simpleTransport);
+    if (useJack) {
+        jackTransport.setTimeline(&songTimeline);
+    } else {
+        simpleTransport.setTimeline(&songTimeline);
+    }
+    Transport bottomPane(0, tabsH, winW, bottomH, transport, &songTimeline);
     window.add(bottomPane);
 
-    og2.setTransport(&simpleTransport, &songTimeline);
+    og2.setTransport(transport, &songTimeline);
     if (verbose) {
         og2.setVerbose(true);
         og2.setPitchName([&patternPanel](int pitch) {
@@ -119,11 +129,13 @@ int main(int argc, char **argv) {
         tabs.redraw();
     };
 
-    og1.setPatternPlayhead(&simpleTransport, &songTimeline, 0);
+    og1.setPatternPlayhead(transport, &songTimeline, 0);
     songTimeline.selectTrack(0);  // triggers PatternEditor to load track 0's pattern
 
     auto syncNoteLabels = [&]() {
         og1.setNoteParams(patternPanel.rootPitch(), patternPanel.chordType(), patternPanel.isSharp());
+        if (useJack)
+            jackTransport.setNoteParams(patternPanel.rootPitch(), patternPanel.chordType());
     };
     patternPanel.onParamsChanged = syncNoteLabels;
     syncNoteLabels();
