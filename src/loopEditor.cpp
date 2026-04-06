@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 // ======================================================
 // LoopPanel layout
@@ -51,6 +52,11 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     bpmInput.color(0x37415100);
     bpmInput.textcolor(panelText);
     bpmInput.cursor_color(panelText);
+    bpmInput.when(FL_WHEN_ENTER_KEY);
+    bpmInput.callback([](Fl_Widget*, void* d) {
+        static_cast<LoopPanel*>(d)->commitBpm();
+    }, this);
+    bpmInput.onUnfocus([this]() { commitBpm(); });
 
     timeSigLabel.box(FL_NO_BOX);
     timeSigLabel.labelcolor(panelText);
@@ -82,6 +88,16 @@ void LoopPanel::setTimeline(ObservableTimeline* tl)
 {
     swapObserver(timeline, tl, this);
     onTimelineChanged();
+}
+
+void LoopPanel::commitBpm()
+{
+    if (!timeline) return;
+    float bpm = std::atof(bpmInput.value());
+    if (bpm >= 20.0f && bpm <= 400.0f)
+        timeline->setBpm(0, bpm);
+    else
+        onTimelineChanged();  // revert display to current value
 }
 
 void LoopPanel::onTimelineChanged()

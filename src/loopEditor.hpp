@@ -20,6 +20,8 @@ class LoopPanel : public Fl_Group, public ITimelineObserver {
     Fl_Box      timeSigSlash;
     InlineInput timeSigBotInput;
 
+    void commitBpm();
+
     void draw() override;
 
 public:
