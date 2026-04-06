@@ -16,6 +16,7 @@
 #include "trackContextPopup.hpp"
 #include "noteLabels.hpp"
 #include "drumPatternEditor.hpp"
+#include "loopEditor.hpp"
 
 int main(int argc, char **argv) {
     bool verbose = false;
@@ -77,6 +78,13 @@ int main(int argc, char **argv) {
 
     const int panelH = 50;
 
+    Fl_Group tabLoop(0, tabBarH, winW, tabsH - tabBarH, "Loop Editor");
+    tabLoop.color(bgColor);
+    tabs.add(tabLoop);
+
+    LoopEditor loopEd(0, tabBarH, winW, tabsH - tabBarH);
+    tabLoop.add(loopEd);
+
     Fl_Group tab2(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2.color(bgColor);
     tabs.add(tab2);
@@ -136,6 +144,8 @@ int main(int argc, char **argv) {
         tempoRuler.setClipLeft(clipLeft);
     };
     og2.setContextPopup(&trackContextPopup);
+    loopEd.setTimeline(&songTimeline);
+    loopEd.setContextPopup(&trackContextPopup);
     og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };
     og2.onPatternDoubleClick = [&](int trackIndex) {
@@ -188,6 +198,7 @@ int main(int argc, char **argv) {
 
     // Resizable chain: window → tabs → each tab → editor
     tab1.resizable(og2);
+    tabLoop.resizable(loopEd);
     tab2.resizable(og1);
     window.resizable(tabs);
 
