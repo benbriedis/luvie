@@ -47,7 +47,8 @@ void TransportButton::drawIcon(int cx, int cy, int s, Icon icon) {
 }
 
 void TransportButton::draw() {
-	bool pressed = value();
+	bool pressed  = value();
+	bool inactive = !active_r();
 	int  r  = (std::min(w(), h()) - 4) / 2;
 	int  cx = x() + w() / 2;
 	int  cy = y() + h() / 2;
@@ -55,19 +56,26 @@ void TransportButton::draw() {
 	fl_color(bgColor);
 	fl_rectf(x(), y(), w(), h());
 
-	if (pressed) {
+	Fl_Color border = inactive
+	    ? fl_color_average(borderColor, bgColor, 0.35f)
+	    : borderColor;
+	Fl_Color icon_col = inactive
+	    ? fl_color_average(iconColor, bgColor, 0.35f)
+	    : (pressed ? FL_WHITE : iconColor);
+
+	if (pressed && !inactive) {
 		fl_color(pressedColor);
 		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
 	} else {
 		fl_color(bgColor);
 		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
-		fl_color(borderColor);
+		fl_color(border);
 		fl_line_style(FL_SOLID, 2);
 		fl_arc(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
 		fl_line_style(0);
 	}
 
-	fl_color(pressed ? FL_WHITE : iconColor);
+	fl_color(icon_col);
 	drawIcon(cx, cy, r / 2, useAlt ? altIcon : icon);
 }
 
@@ -132,6 +140,23 @@ void Transport::onTimelineChanged()
 	updatePosition();
 }
 
+void Transport::disableButtons()
+{
+	rewindBtn->deactivate();
+	playPauseBtn->deactivate();
+	rewindBtn->redraw();
+	playPauseBtn->redraw();
+}
+
+void Transport::setControlTransport(ITransport* ct)
+{
+	controlTransport = ct;
+	rewindBtn->activate();
+	playPauseBtn->activate();
+	rewindBtn->redraw();
+	playPauseBtn->redraw();
+}
+
 Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeline* tl)
 	: Fl_Group(x, y, w, h), transport(t), timeline(tl)
 {
@@ -148,8 +173,9 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 	                                TransportButton::REWIND);
 	rewindBtn->callback([](Fl_Widget*, void* data) {
 		Transport* t = (Transport*)data;
-		if (!t->transport) return;
-		t->transport->rewind();
+		ITransport* ct = t->controlTransport ? t->controlTransport : t->transport;
+		if (!ct) return;
+		ct->rewind();
 		Fl::remove_timeout(pollCb, t);
 		t->stoppedAtEnd = false;
 		t->playPauseBtn->setAlt(false);
@@ -162,17 +188,18 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 	playPauseBtn->callback([](Fl_Widget* w, void* data) {
 		Transport* t   = (Transport*)data;
 		auto*      btn = (TransportButton*)w;
-		if (!t->transport) return;
+		ITransport* ct = t->controlTransport ? t->controlTransport : t->transport;
+		if (!ct) return;
 		if (t->transport->isPlaying()) {
-			t->transport->pause();
+			ct->pause();
 			btn->setAlt(false);
 			Fl::remove_timeout(pollCb, t);
 		} else {
 			if (t->stoppedAtEnd) {
-				t->transport->rewind();
+				ct->rewind();
 				t->stoppedAtEnd = false;
 			}
-			t->transport->play();
+			ct->play();
 			btn->setAlt(true);
 			Fl::add_timeout(1.0, pollCb, t);
 		}

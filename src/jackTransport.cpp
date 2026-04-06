@@ -12,7 +12,7 @@ JackTransport::JackTransport() {}
 JackTransport::~JackTransport()
 {
     if (timeline) timeline->removeObserver(this);
-    if (client) {
+    if (client && jackAlive.load()) {
         jack_deactivate(client);
         jack_client_close(client);
     }
@@ -20,8 +20,10 @@ JackTransport::~JackTransport()
 
 // ── Open ──────────────────────────────────────────────────────────────────────
 
-bool JackTransport::open(const char* clientName)
+bool JackTransport::open(const char* clientName, bool enableMidi)
 {
+    midiEnabled = enableMidi;
+
     jack_status_t status;
     client = jack_client_open(clientName, JackNullOption, &status);
     if (!client) {
@@ -31,13 +33,15 @@ bool JackTransport::open(const char* clientName)
 
     sampleRate = jack_get_sample_rate(client);
 
-    midiOut = jack_port_register(client, "midi_out",
-                                  JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-    if (!midiOut) {
-        fprintf(stderr, "JackTransport: could not register MIDI output port\n");
-        jack_client_close(client);
-        client = nullptr;
-        return false;
+    if (midiEnabled) {
+        midiOut = jack_port_register(client, "midi_out",
+                                      JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+        if (!midiOut) {
+            fprintf(stderr, "JackTransport: could not register MIDI output port\n");
+            jack_client_close(client);
+            client = nullptr;
+            return false;
+        }
     }
 
     jack_set_process_callback(client, processCallback, this);
@@ -49,6 +53,7 @@ bool JackTransport::open(const char* clientName)
         return false;
     }
 
+    jackAlive.store(true);
     return true;
 }
 
@@ -196,22 +201,22 @@ float JackTransport::snapSecondsToBar(double secs) const
 
 void JackTransport::play()
 {
-    if (client) jack_transport_start(client);
+    if (client && jackAlive.load()) jack_transport_start(client);
 }
 
 void JackTransport::pause()
 {
-    if (client) jack_transport_stop(client);
+    if (client && jackAlive.load()) jack_transport_stop(client);
 }
 
 void JackTransport::rewind()
 {
-    if (client) jack_transport_locate(client, 0);
+    if (client && jackAlive.load()) jack_transport_locate(client, 0);
 }
 
 void JackTransport::seek(float bars)
 {
-    if (!client || !timeline) return;
+    if (!client || !jackAlive.load() || !timeline) return;
     double secs  = timeline->barToSeconds(std::max(0.0f, bars));
     auto   frame = static_cast<jack_nframes_t>(secs * sampleRate);
     jack_transport_locate(client, frame);
@@ -237,15 +242,18 @@ int JackTransport::process(jack_nframes_t nframes)
     jack_transport_state_t state = jack_transport_query(client, &pos);
     bool nowPlaying = (state == JackTransportRolling);
 
-    void* portBuf = jack_port_get_buffer(midiOut, nframes);
-    jack_midi_clear_buffer(portBuf);
+    void* portBuf = nullptr;
+    if (midiEnabled) {
+        portBuf = jack_port_get_buffer(midiOut, nframes);
+        jack_midi_clear_buffer(portBuf);
+    }
 
     // Detect a seek/jump (frame didn't advance by the expected amount).
     bool jumped = !firstCall && wasPlaying
                   && (pos.frame != lastFrame + nframes);
 
     // On stop or jump: silence all active notes immediately.
-    if ((!nowPlaying && wasPlaying) || jumped) {
+    if (midiEnabled && ((!nowPlaying && wasPlaying) || jumped)) {
         for (auto& an : activeNotes) {
             uint8_t msg[3] = {
                 static_cast<uint8_t>(0x80 | (an.channel & 0x0F)),
@@ -257,7 +265,7 @@ int JackTransport::process(jack_nframes_t nframes)
         activeNotes.clear();
     }
 
-    if (nowPlaying) {
+    if (nowPlaying && midiEnabled) {
         jack_nframes_t blockEnd = pos.frame + nframes;
 
         // Fire note-offs for notes ending within this block.

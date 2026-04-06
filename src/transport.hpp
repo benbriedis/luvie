@@ -31,6 +31,7 @@ class Transport : public Fl_Group, public ITimelineObserver {
 	Fl_Box*             posLabel;
 
 	ITransport*         transport;
+	ITransport*         controlTransport = nullptr;  // if set, buttons use this; otherwise transport
 	ObservableTimeline* timeline;
 	bool                stoppedAtEnd = false;
 	char                posText[64];
@@ -45,6 +46,11 @@ public:
 	void notifySeek() { stoppedAtEnd = false; }
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;
+
+	// LV2 use: disable buttons until JACK becomes available.
+	void disableButtons();
+	// Enable buttons and route their actions through ct.
+	void setControlTransport(ITransport* ct);
 };
 
 #endif

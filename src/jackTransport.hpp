@@ -26,12 +26,14 @@ public:
     JackTransport();
     ~JackTransport();
 
-    // Open JACK client and register MIDI output port. Returns false on failure.
-    bool open(const char* clientName = "luvie");
+    // Open JACK client. enableMidi=false skips MIDI port (transport control only).
+    // Returns false on failure.
+    bool open(const char* clientName = "luvie", bool enableMidi = true);
 
     // Called from UI thread when timeline or note params change.
     void setTimeline(ObservableTimeline* tl);
     void setNoteParams(int rootPitch, int chordType);
+
 
     // ITimelineObserver
     void onTimelineChanged() override { rebuildSnapshot(); }
@@ -46,13 +48,15 @@ public:
 
 private:
     // ── JACK handles ──────────────────────────────────────────────────────────
-    jack_client_t* client     = nullptr;
-    jack_port_t*   midiOut    = nullptr;
-    jack_nframes_t sampleRate = 48000;
+    jack_client_t* client      = nullptr;
+    jack_port_t*   midiOut     = nullptr;
+    jack_nframes_t sampleRate  = 48000;
+    bool           midiEnabled = true;
 
     // ── Atomics (shared between RT and UI threads) ────────────────────────────
     std::atomic<jack_nframes_t> posFrames{0};
     std::atomic<bool>           playing_{false};
+    std::atomic<bool>           jackAlive{false};  // false after JACK server shutdown
 
     // ── UI-thread-only state ──────────────────────────────────────────────────
     ObservableTimeline* timeline  = nullptr;

@@ -19,6 +19,7 @@
 #include "../../src/modernTabs.hpp"
 #include "../../src/transport.hpp"
 #include "../../src/simpleTransport.hpp"
+#include "../../src/jackTransport.hpp"
 #include "../../src/markerPopup.hpp"
 #include "../../src/markerRuler.hpp"
 #include "../../src/observableTimeline.hpp"
@@ -65,6 +66,10 @@ struct LuvieUI {
 
     /* Non-owning pointer — widget is owned by FLTK/window */
     PatternPanel*       patternPanel   = nullptr;
+    Transport*          bottomPane     = nullptr;
+
+    /* JACK transport control (nullptr when JACK is unavailable) */
+    JackTransport*      jackTransport  = nullptr;
 
     /* Popups — stored as members so they live long enough */
     Popup*              popup1         = nullptr;
@@ -84,8 +89,22 @@ struct LuvieUI {
         if (songTimeline) songTimeline->removeObserver(&timelineSender);
         /* Popups are added to window via add(), so window owns and deletes them. */
         delete window;
+        delete jackTransport;
         delete simpleTransport;
         delete songTimeline;
+    }
+
+    /* Try once to open JACK (control-only, no MIDI). Enables buttons on success,
+       leaves them disabled if JACK is not available. */
+    void tryConnectJack() {
+        auto* jt = new JackTransport();
+        if (jt->open("luvie_lv2", /*enableMidi=*/false)) {
+            jackTransport = jt;
+            jackTransport->setTimeline(songTimeline);
+            if (bottomPane) bottomPane->setControlTransport(jackTransport);
+        } else {
+            delete jt;
+        }
     }
 };
 
@@ -360,6 +379,8 @@ static LV2UI_Handle instantiate(
     Transport* bottomPane = new Transport(0, tabsH, winW, bottomH,
                                           ui->simpleTransport, ui->songTimeline);
     ui->window->add(bottomPane);
+    ui->bottomPane = bottomPane;
+    bottomPane->disableButtons();  // enabled only when JACK connects
 
     /* ---- Wire up editors ---- */
     og2->setTransport(ui->simpleTransport, ui->songTimeline);
@@ -371,7 +392,11 @@ static LV2UI_Handle instantiate(
     };
     og2->setContextPopup(trackCtxPopup);
     og2->onEndReached = [bottomPane]() { bottomPane->notifyEndReached(); };
-    og2->onSeek       = [bottomPane]() { bottomPane->notifySeek(); };
+    og2->onSeek       = [bottomPane, ui]() {
+        bottomPane->notifySeek();
+        if (ui->jackTransport)
+            ui->jackTransport->seek(ui->simpleTransport->position());
+    };
     og2->onPatternDoubleClick = [tabs, tab2](int /*trackIndex*/) {
         tabs->value(tab2);
         tabs->redraw();
@@ -410,6 +435,9 @@ static LV2UI_Handle instantiate(
     /* ---- Register timeline observer and send initial state to DSP ---- */
     ui->songTimeline->addObserver(&ui->timelineSender);
     sendTimeline(ui);
+
+    /* ---- Try to connect to JACK for transport control ---- */
+    ui->tryConnectJack();
 
     /* Return the widget pointer as the LV2UI handle */
     *widget = &ui->widget;
