@@ -82,14 +82,22 @@ void TransportButton::draw() {
 // ---------------------------------------------------------------------------
 
 void Transport::pollCb(void* data) {
-	auto* self = static_cast<Transport*>(data);
+	auto* self    = static_cast<Transport*>(data);
+	bool  playing = self->transport && self->transport->isPlaying();
+
+	// Sync play/pause button icon with actual transport state.
+	if (playing != self->lastPlayingState) {
+		self->lastPlayingState = playing;
+		self->playPauseBtn->setAlt(playing);
+		self->playPauseBtn->redraw();
+		if (playing) self->stoppedAtEnd = false;
+	}
+
 	self->updatePosition();
-	if (self->transport && self->transport->isPlaying())
-		Fl::repeat_timeout(1.0, pollCb, data);
+	Fl::repeat_timeout(playing ? 1.0 : 0.2, pollCb, data);
 }
 
 void Transport::notifyEndReached() {
-	Fl::remove_timeout(pollCb, this);
 	stoppedAtEnd = true;
 	playPauseBtn->setAlt(false);
 	playPauseBtn->redraw();
@@ -176,7 +184,6 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 		ITransport* ct = t->controlTransport ? t->controlTransport : t->transport;
 		if (!ct) return;
 		ct->rewind();
-		Fl::remove_timeout(pollCb, t);
 		t->stoppedAtEnd = false;
 		t->playPauseBtn->setAlt(false);
 		t->playPauseBtn->redraw();
@@ -193,7 +200,6 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 		if (t->transport->isPlaying()) {
 			ct->pause();
 			btn->setAlt(false);
-			Fl::remove_timeout(pollCb, t);
 		} else {
 			if (t->stoppedAtEnd) {
 				ct->rewind();
@@ -201,7 +207,6 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 			}
 			ct->play();
 			btn->setAlt(true);
-			Fl::add_timeout(1.0, pollCb, t);
 		}
 		t->updatePosition();
 		btn->redraw();
@@ -220,5 +225,6 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 	} else {
 		updatePosition();
 	}
+	Fl::add_timeout(0.2, pollCb, this);
 	end();
 }

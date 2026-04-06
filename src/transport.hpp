@@ -33,7 +33,8 @@ class Transport : public Fl_Group, public ITimelineObserver {
 	ITransport*         transport;
 	ITransport*         controlTransport = nullptr;  // if set, buttons use this; otherwise transport
 	ObservableTimeline* timeline;
-	bool                stoppedAtEnd = false;
+	bool                stoppedAtEnd     = false;
+	bool                lastPlayingState = false;
 	char                posText[64];
 
 	static void pollCb(void* data);
