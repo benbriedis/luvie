@@ -117,7 +117,7 @@ void DrumGrid::draw()
     }
 
     // Draw drum notes as filled circles at the beat position (not cell center)
-    const int dotR = std::max(2, rowHeight / 6);
+    const int dotR = std::max(2, rowHeight / 3);
     for (int i = 0; i < (int)notes.size(); i++) {
         const auto& n = notes[i];
         int vr = rowOffset + numRows - 1 - n.note;

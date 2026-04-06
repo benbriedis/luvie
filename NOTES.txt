@@ -250,13 +250,10 @@ vcs
 	   - Want to be able supply a session name on the command line.
 
 4. Drum patterns
-	1. NB notes are 'absolute' - not relative to chord and base note. Also hide affected controls in the drummer pattern editor.
-	   No dark octave bars.
-	2. There is a standard MIDI drum mapping. How best to support other mappings... look at DrumGizmo & the jazz drum kit plugin.
+	1. There is a standard MIDI drum mapping. How best to support other mappings... look at DrumGizmo & the jazz drum kit plugin.
 	   What standards exist?
-	3. Share the same outer pattern editor I think.
-	4. Creating a pattern from the song editor is an issue: which type to create? Perhaps don't show in pattern editor until a type is assigned?
-
+	2. Hand cursor tends to obscure the note during the move operation.
+	3. cf optimising the control rows at the bottom as the drum pattern editor lacks the pitch-related controls.
 
 
 

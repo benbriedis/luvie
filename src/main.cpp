@@ -82,8 +82,8 @@ int main(int argc, char **argv) {
     tabs.add(tab2);
 
     const int rowHeight     = 30;
-    const int drumRowHeight = rowHeight * 2 / 3;  // 20px — more rows visible in drum editor
     const int numRows       = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
+    const int drumRowHeight = 20;
     const int drumNumRows   = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowHeight;
 
     std::vector<Note> notes(0);
