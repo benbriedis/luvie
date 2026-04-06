@@ -47,7 +47,14 @@ int main(int argc, char **argv) {
 
     const int tabsH = winH - bottomH;
 
+    static constexpr Fl_Color songColor = 0x22C55E00;
+    static constexpr Fl_Color loopColor = 0x3B82F600;
+
     ModernTabs tabs(0, 0, winW, tabsH);
+    tabs.enableModeToggle(songColor, loopColor);
+    tabs.setTabAccent(0, songColor);   // Song Editor tab → green
+    tabs.setTabAccent(1, loopColor);   // Loop Editor tab → blue
+    tabs.setTabAccent(2, 0xF9731600);  // Pattern Editor tab → orange
     window.add(tabs);
 
     Fl_Group tab1(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
