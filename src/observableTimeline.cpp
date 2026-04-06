@@ -226,9 +226,14 @@ int ObservableTimeline::copyPattern(int srcPatId)
 	Pattern copy;
 	copy.id = nextId++;
 	copy.lengthBeats = src->lengthBeats;
+	copy.type = src->type;
 	for (auto n : src->notes) {
 		n.id = nextId++;
 		copy.notes.push_back(n);
+	}
+	for (auto n : src->drumNotes) {
+		n.id = nextId++;
+		copy.drumNotes.push_back(n);
 	}
 	data.patterns.push_back(copy);
 	return copy.id;
@@ -263,6 +268,50 @@ int ObservableTimeline::createPattern(float lengthBeats)
 	data.patterns.push_back({id, lengthBeats});
 	notify();
 	return id;
+}
+
+int ObservableTimeline::createDrumPattern(float lengthBeats)
+{
+	int id = nextId++;
+	Pattern p;
+	p.id = id;
+	p.lengthBeats = lengthBeats;
+	p.type = PatternType::DRUM;
+	data.patterns.push_back(std::move(p));
+	notify();
+	return id;
+}
+
+void ObservableTimeline::addDrumNote(int patternId, int note, float beat, float velocity)
+{
+	for (auto& pat : data.patterns) {
+		if (pat.id == patternId) {
+			pat.drumNotes.push_back({nextId++, note, beat, velocity});
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::removeDrumNote(int drumNoteId)
+{
+	for (auto& pat : data.patterns) {
+		auto it = std::find_if(pat.drumNotes.begin(), pat.drumNotes.end(),
+			[drumNoteId](const DrumNote& n) { return n.id == drumNoteId; });
+		if (it != pat.drumNotes.end()) {
+			pat.drumNotes.erase(it);
+			notify();
+			return;
+		}
+	}
+}
+
+std::vector<DrumNote> ObservableTimeline::buildDrumPatternNotes(int patternId) const
+{
+	for (const auto& pat : data.patterns)
+		if (pat.id == patternId)
+			return pat.drumNotes;
+	return {};
 }
 
 const PatternInstance* ObservableTimeline::instanceById(int instanceId) const

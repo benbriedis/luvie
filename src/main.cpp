@@ -15,6 +15,7 @@
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "noteLabels.hpp"
+#include "drumPatternEditor.hpp"
 
 int main(int argc, char **argv) {
     bool verbose = false;
@@ -80,12 +81,18 @@ int main(int argc, char **argv) {
     tab2.color(bgColor);
     tabs.add(tab2);
 
-    const int rowHeight = 30;
-    const int numRows   = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
+    const int rowHeight     = 30;
+    const int drumRowHeight = rowHeight * 2 / 3;  // 20px — more rows visible in drum editor
+    const int numRows       = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
+    const int drumNumRows   = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowHeight;
 
     std::vector<Note> notes(0);
     PatternEditor og1(0, tabBarH, winW, notes, numRows, numPatternBeats, rowHeight, 40, 0.25, popup1);
     tab2.add(og1);
+
+    DrumPatternEditor drumEd(0, tabBarH, winW, drumNumRows, numPatternBeats, drumRowHeight, 40, 0.25f, popup1);
+    tab2.add(drumEd);
+    drumEd.hide();
 
     PatternPanel patternPanel(0, tabsH - panelH, winW, panelH);
     patternPanel.setTimeline(&songTimeline);
@@ -104,6 +111,14 @@ int main(int argc, char **argv) {
     }
     Transport bottomPane(0, tabsH, winW, bottomH, transport, &songTimeline);
     window.add(bottomPane);
+
+    if (useJack) {
+        jackTransport.onTransportEvent = [&]() {
+            Fl::awake([](void* data) {
+                static_cast<Transport*>(data)->syncPlayState();
+            }, &bottomPane);
+        };
+    }
 
     og2.setTransport(transport, &songTimeline);
     if (verbose) {
@@ -130,6 +145,31 @@ int main(int argc, char **argv) {
     };
 
     og1.setPatternPlayhead(transport, &songTimeline, 0);
+    drumEd.setPatternPlayhead(transport, &songTimeline, 0);
+
+    // Switch between standard and drum editors based on selected track's pattern type
+    struct EditorSwitcher : ITimelineObserver {
+        PatternEditor*      stdEd;
+        DrumPatternEditor*  drumEd;
+        ObservableTimeline* tl;
+        void onTimelineChanged() override {
+            const auto& data = tl->get();
+            int sel = data.selectedTrackIndex;
+            bool isDrum = false;
+            if (sel >= 0 && sel < (int)data.tracks.size()) {
+                int patId = data.tracks[sel].patternId;
+                for (const auto& p : data.patterns)
+                    if (p.id == patId) { isDrum = (p.type == PatternType::DRUM); break; }
+            }
+            if (isDrum) { stdEd->hide(); drumEd->show(); }
+            else        { stdEd->show(); drumEd->hide(); }
+        }
+    } editorSwitcher;
+    editorSwitcher.stdEd  = &og1;
+    editorSwitcher.drumEd = &drumEd;
+    editorSwitcher.tl     = &songTimeline;
+    songTimeline.addObserver(&editorSwitcher);
+
     songTimeline.selectTrack(0);  // triggers PatternEditor to load track 0's pattern
 
     auto syncNoteLabels = [&]() {

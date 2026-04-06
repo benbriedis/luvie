@@ -47,6 +47,7 @@ public:
     bool isSharp()   const { return useSharp; }
 
     void setTimeline(ObservableTimeline* tl);
+    void setDrumMode(bool drum);
     void onTimelineChanged() override;
 };
 

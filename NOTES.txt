@@ -218,3 +218,48 @@ Maybe put horizontal scrollbar lower?
 
 sivcas   'so i vibe-coded a sequencer'
 vcs
+
+
+------------------------------TODOs---------------------------
+
+1. Transport
+	a. BUG: Luvie play/pause should update when the Jack transport is started or stopped by a different client.
+	b. Improvement: positioning the playhead is bit approximate (possibly due to the buffers). Could it be made smoother?
+	   Google talks about using pre-rolls. NB Ardour manages to achieve smoothness, but other programs can also be gittery.
+	c. When no Jack connection the transport position labels don't update, but probably could.
+	d. Document somehow that Ardour should be using the Jack sync rather than internal sync.
+	   NB having Ardour set to Master doesn't seem to affect anything at the moment.
+	e. BUG: Moving a note around on the Pattern editor moves the playhead forward a pixel or so (standalone, no jack)
+	
+
+2. Loop editor
+	a. Swap between it an song editor based on displayed tab.
+	   Disable swapping between them when playing.
+	b. This editor needs its own tempo and time signature fields to replace those provided by the song editor.
+	NOTE the pattern editor really needs a #beats field (rather than a #bars, which can be inconsistent between song editor and loop editor...
+	   a bit forced though - is there a better way? Dont REALLY want to have to have a time signature field for every pattern which is probably
+	   the "proper" way.
+	)
+
+3. Save
+	Three types:
+	1. LV2 host sessions
+	2. NON 
+	3. Standalone.
+	   - cf allow import and export of sessions via this mechanism too when using LV2 or NON.
+	   - Want to be able supply a session name on the command line.
+
+4. Drum patterns
+	1. NB notes are 'absolute' - not relative to chord and base note. Also hide affected controls in the drummer pattern editor.
+	   No dark octave bars.
+	2. There is a standard MIDI drum mapping. How best to support other mappings... look at DrumGizmo & the jazz drum kit plugin.
+	   What standards exist?
+	3. Share the same outer pattern editor I think.
+	4. Creating a pattern from the song editor is an issue: which type to create? Perhaps don't show in pattern editor until a type is assigned?
+
+
+
+
+
+
+

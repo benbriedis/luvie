@@ -113,15 +113,40 @@ void PatternPanel::setTimeline(ObservableTimeline* tl)
     onTimelineChanged();
 }
 
+void PatternPanel::setDrumMode(bool drum)
+{
+    if (drum) {
+        baseLabel.hide();
+        sharpFlatBtn.hide();
+        rootChoice.hide();
+        chordLabel.hide();
+        chordChoice.hide();
+    } else {
+        baseLabel.show();
+        sharpFlatBtn.show();
+        rootChoice.show();
+        chordLabel.show();
+        chordChoice.show();
+    }
+    redraw();
+}
+
 void PatternPanel::onTimelineChanged()
 {
     if (!timeline) return;
     const auto& tl  = timeline->get();
     int sel = tl.selectedTrackIndex;
-    if (sel >= 0 && sel < (int)tl.tracks.size())
+    if (sel >= 0 && sel < (int)tl.tracks.size()) {
         patternName.copy_label(tl.tracks[sel].label.c_str());
-    else
+        int patId = tl.tracks[sel].patternId;
+        bool isDrum = false;
+        for (const auto& p : tl.patterns)
+            if (p.id == patId) { isDrum = (p.type == PatternType::DRUM); break; }
+        setDrumMode(isDrum);
+    } else {
         patternName.copy_label("");
+        setDrumMode(false);
+    }
     redraw();
 }
 

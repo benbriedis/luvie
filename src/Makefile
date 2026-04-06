@@ -15,7 +15,7 @@ LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS)
 BUILDDIR = build
 TARGET   = $(BUILDDIR)/main
 
-SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp
 
 OBJS     = $(SRCS:%.cpp=$(BUILDDIR)/%.o)
 DEPS     = $(SRCS:%.cpp=$(BUILDDIR)/%.d)

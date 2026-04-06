@@ -20,6 +20,10 @@ public:
 	void open(int selected, std::vector<Note>* notes, Grid* grid,
 	          std::function<void()> onDelete = nullptr);
 
+	// Generic variant: caller provides the note's pixel position and delete callback.
+	void openAt(int dotX, int dotY, Fl_Widget* w, int rowH,
+	            std::function<void()> onDelete);
+
 private:
 	int selected;
 	std::vector<Note>* notes;

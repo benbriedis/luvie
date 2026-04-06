@@ -46,6 +46,7 @@ public:
 
 	// Pattern definition management
 	int createPattern(float lengthBeats);
+	int createDrumPattern(float lengthBeats);
 	const Pattern*         patternForInstance(int instanceId) const;
 	const PatternInstance* instanceById(int instanceId) const;
 
@@ -56,6 +57,11 @@ public:
 	void resizePattern(int instanceId, float newLength);
 	void resizePatternLeft(int instanceId, float newStartBar, float newLength, float newStartOffset);
 	void setPatternStartOffset(int instanceId, float startOffset);
+
+	// Drum note CRUD
+	void addDrumNote(int patternId, int note, float beat, float velocity = 0.8f);
+	void removeDrumNote(int drumNoteId);
+	std::vector<DrumNote> buildDrumPatternNotes(int patternId) const;
 
 	// Pattern note CRUD
 	void remapPatternNotes(int patId, int oldSize, int newSize);

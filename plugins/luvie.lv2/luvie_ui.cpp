@@ -101,6 +101,11 @@ struct LuvieUI {
         if (jt->open("luvie_lv2", /*enableMidi=*/false)) {
             jackTransport = jt;
             jackTransport->setTimeline(songTimeline);
+            jackTransport->onTransportEvent = [this]() {
+                Fl::awake([](void* data) {
+                    static_cast<LuvieUI*>(data)->bottomPane->syncPlayState();
+                }, this);
+            };
             if (bottomPane) bottomPane->setControlTransport(jackTransport);
         } else {
             delete jt;
@@ -488,6 +493,7 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
     /* Convert bar + barBeat to an absolute bar position (fractional bars) */
     float bars = bar + barBeat / bpb;
     ui->simpleTransport->syncFromHost(bars, playing);
+    if (ui->bottomPane) ui->bottomPane->syncPlayState();
 }
 
 static const void* extension_data(const char* uri)

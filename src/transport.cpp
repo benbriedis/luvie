@@ -82,19 +82,11 @@ void TransportButton::draw() {
 // ---------------------------------------------------------------------------
 
 void Transport::pollCb(void* data) {
-	auto* self    = static_cast<Transport*>(data);
-	bool  playing = self->transport && self->transport->isPlaying();
-
-	// Sync play/pause button icon with actual transport state.
-	if (playing != self->lastPlayingState) {
-		self->lastPlayingState = playing;
-		self->playPauseBtn->setAlt(playing);
-		self->playPauseBtn->redraw();
-		if (playing) self->stoppedAtEnd = false;
-	}
-
+	auto* self = static_cast<Transport*>(data);
 	self->updatePosition();
-	Fl::repeat_timeout(playing ? 1.0 : 0.2, pollCb, data);
+	if (self->transport && self->transport->isPlaying())
+		Fl::repeat_timeout(1.0, pollCb, data);
+	// Timer stops when not playing; syncPlayState() restarts it on next play.
 }
 
 void Transport::notifyEndReached() {
@@ -148,6 +140,27 @@ void Transport::onTimelineChanged()
 	updatePosition();
 }
 
+void Transport::syncPlayState()
+{
+	bool playing = transport && transport->isPlaying();
+	if (playing != lastPlayingState) {
+		lastPlayingState = playing;
+		playPauseBtn->setAlt(playing);
+		playPauseBtn->redraw();
+		if (playing) {
+			stoppedAtEnd = false;
+			Fl::remove_timeout(pollCb, this);        // avoid duplicates
+			Fl::add_timeout(1.0, pollCb, this);      // start position label updates
+		} else {
+			Fl::remove_timeout(pollCb, this);
+			updatePosition();
+		}
+	} else if (playing) {
+		// Same play state but position may have jumped — refresh the label.
+		updatePosition();
+	}
+}
+
 void Transport::disableButtons()
 {
 	rewindBtn->deactivate();
@@ -184,7 +197,8 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 		ITransport* ct = t->controlTransport ? t->controlTransport : t->transport;
 		if (!ct) return;
 		ct->rewind();
-		t->stoppedAtEnd = false;
+		t->stoppedAtEnd     = false;
+		t->lastPlayingState = false;
 		t->playPauseBtn->setAlt(false);
 		t->playPauseBtn->redraw();
 		t->updatePosition();
@@ -199,6 +213,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 		if (!ct) return;
 		if (t->transport->isPlaying()) {
 			ct->pause();
+			t->lastPlayingState = false;
 			btn->setAlt(false);
 		} else {
 			if (t->stoppedAtEnd) {
@@ -206,7 +221,9 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 				t->stoppedAtEnd = false;
 			}
 			ct->play();
+			t->lastPlayingState = true;
 			btn->setAlt(true);
+			Fl::add_timeout(1.0, pollCb, t);  // start position label updates
 		}
 		t->updatePosition();
 		btn->redraw();
@@ -225,6 +242,5 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeli
 	} else {
 		updatePosition();
 	}
-	Fl::add_timeout(0.2, pollCb, this);
 	end();
 }

@@ -52,6 +52,10 @@ public:
 	void disableButtons();
 	// Enable buttons and route their actions through ct.
 	void setControlTransport(ITransport* ct);
+
+	// Call from the FLTK main thread (e.g. via Fl::awake) when JACK transport
+	// state or position has changed externally.
+	void syncPlayState();
 };
 
 #endif

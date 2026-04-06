@@ -8,6 +8,7 @@
 #include "FL/Fl_Flex.H"
 #include "FL/Fl_Slider.H"
 #include "grid.hpp"
+#include <algorithm>
 
 Popup::Popup() : BasePopup(0,0,0,0)
 {
@@ -80,6 +81,25 @@ void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
 	position(pos.x, pos.y);
 
 	if (auto* aw = dynamic_cast<AppWindow*>(window()))
+		aw->openPopup(this);
+	else
+		show();
+}
+
+void Popup::openAt(int dotX, int dotY, Fl_Widget* w, int rowH, std::function<void()> onDelete)
+{
+	onDeleteFn = std::move(onDelete);
+	notes = nullptr;
+	grid  = nullptr;
+
+	Fl_Window* win   = w->window();
+	const int  vpad  = 4, hpad = 10;
+	bool placeAbove  = (dotY >= h() + vpad);
+	int  py          = placeAbove ? dotY - h() - vpad : dotY + rowH + vpad;
+	int  px          = std::clamp(dotX, hpad, win->w() - this->w() - hpad);
+	position(px, py);
+
+	if (auto* aw = dynamic_cast<AppWindow*>(win))
 		aw->openPopup(this);
 	else
 		show();

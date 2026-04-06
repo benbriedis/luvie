@@ -4,6 +4,15 @@
 #include <string>
 #include <vector>
 
+enum class PatternType { STANDARD = 0, DRUM = 1 };
+
+struct DrumNote {
+	int   id;
+	int   note;        // MIDI note number (0–127)
+	float beat;
+	float velocity = 0.8f;
+};
+
 struct Note {
 	int   id;
 	int   pitch;           // abs_row in current chord encoding; when disabled: stores octave only
@@ -28,7 +37,9 @@ struct TimeSigMarker {
 struct Pattern {
 	int   id;
 	float lengthBeats;
-	std::vector<Note> notes;
+	PatternType       type = PatternType::STANDARD;
+	std::vector<Note>     notes;
+	std::vector<DrumNote> drumNotes;
 };
 
 struct PatternInstance {

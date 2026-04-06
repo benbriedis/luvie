@@ -7,6 +7,7 @@
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <atomic>
+#include <functional>
 #include <mutex>
 #include <vector>
 
@@ -33,6 +34,10 @@ public:
     // Called from UI thread when timeline or note params change.
     void setTimeline(ObservableTimeline* tl);
     void setNoteParams(int rootPitch, int chordType);
+
+    // Called from the RT process thread when play/stop state changes or transport
+    // jumps. Must be lightweight (e.g. just call Fl::awake). Set before open().
+    std::function<void()> onTransportEvent;
 
 
     // ITimelineObserver
@@ -110,7 +115,7 @@ private:
     bool                    wasPlaying = false;
     bool                    firstCall  = true;
 
-    // ── JACK callbacks ────────────────────────────────────────────────────────
+    // ── JACK process callback (private) ──────────────────────────────────────
     static int processCallback(jack_nframes_t nframes, void* arg);
     int process(jack_nframes_t nframes);
 

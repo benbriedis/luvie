@@ -299,6 +299,10 @@ int JackTransport::process(jack_nframes_t nframes)
 
     posFrames.store(pos.frame + nframes);
     playing_.store(nowPlaying);
+
+    if ((nowPlaying != wasPlaying || jumped) && onTransportEvent)
+        onTransportEvent();
+
     lastFrame  = pos.frame;
     wasPlaying = nowPlaying;
     firstCall  = false;
