@@ -152,6 +152,7 @@ int main(int argc, char **argv) {
     };
     og2.setContextPopup(&trackContextPopup);
     loopEd.setTimeline(&songTimeline);
+    loopEd.setTransport(transport);
     loopEd.setContextPopup(&trackContextPopup);
     og2.onEndReached = [&bottomPane]() { bottomPane.notifyEndReached(); };
     og2.onSeek       = [&bottomPane]() { bottomPane.notifySeek(); };

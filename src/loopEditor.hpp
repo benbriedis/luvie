@@ -6,6 +6,7 @@
 #include <vector>
 #include "observableTimeline.hpp"
 #include "trackContextPopup.hpp"
+#include "itransport.hpp"
 #include "inlineInput.hpp"
 
 // Dark control bar at the bottom of the Loop Editor
@@ -45,14 +46,18 @@ private:
 
     ObservableTimeline* timeline     = nullptr;
     TrackContextPopup*  contextPopup = nullptr;
+    ITransport*         transport    = nullptr;
     LoopPanel*          panel        = nullptr;
 
     int hoveredIdx = -1;
     std::vector<bool> toggled;
 
-    int  gridAreaH() const { return h() - panelH; }
-    void btnRect(int idx, int& bx, int& by, int& bw, int& bh) const;
-    int  trackAt(int mx, int my) const;
+    static void timerCb(void* data);
+
+    int   gridAreaH()  const { return h() - panelH; }
+    float beatProgress(int trackIdx) const;  // 0.0–1.0 loop position for track's pattern
+    void  btnRect(int idx, int& bx, int& by, int& bw, int& bh) const;
+    int   trackAt(int mx, int my) const;
 
     void draw()   override;
     int  handle(int event) override;
@@ -63,7 +68,9 @@ public:
     ~LoopEditor();
 
     void setTimeline(ObservableTimeline* tl);
+    void setTransport(ITransport* t);
     void setContextPopup(TrackContextPopup* popup);
+    bool isEnabled(int trackIdx) const;
     void onTimelineChanged() override;
 };
 

@@ -4,6 +4,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 // ======================================================
@@ -145,6 +146,7 @@ LoopEditor::LoopEditor(int x, int y, int w, int h)
 
 LoopEditor::~LoopEditor()
 {
+    Fl::remove_timeout(timerCb, this);
     swapObserver(timeline, nullptr, this);
 }
 
@@ -153,6 +155,53 @@ void LoopEditor::setTimeline(ObservableTimeline* tl)
     swapObserver(timeline, tl, this);
     panel->setTimeline(tl);
     onTimelineChanged();
+}
+
+void LoopEditor::setTransport(ITransport* t)
+{
+    Fl::remove_timeout(timerCb, this);
+    transport = t;
+    if (t) Fl::add_timeout(0.05, timerCb, this);
+}
+
+void LoopEditor::timerCb(void* data)
+{
+    auto* self = static_cast<LoopEditor*>(data);
+    if (self->visible_r()) self->redraw();
+
+    double interval = 0.1;
+    if (self->transport && self->transport->isPlaying() && self->timeline) {
+        float bpm = self->timeline->bpmAt((int)self->transport->position());
+        // update fast enough that a beat never skips visually in a button
+        interval = std::clamp(30.0 / bpm, 0.016, 0.05);
+    }
+    Fl::repeat_timeout(interval, timerCb, data);
+}
+
+bool LoopEditor::isEnabled(int trackIdx) const
+{
+    return trackIdx >= 0 && trackIdx < (int)toggled.size() && toggled[trackIdx];
+}
+
+float LoopEditor::beatProgress(int trackIdx) const
+{
+    if (!transport || !timeline) return 0.0f;
+    const auto& tl = timeline->get();
+    if (trackIdx < 0 || trackIdx >= (int)tl.tracks.size()) return 0.0f;
+
+    int patId = tl.tracks[trackIdx].patternId;
+    const Pattern* pat = nullptr;
+    for (const auto& p : tl.patterns)
+        if (p.id == patId) { pat = &p; break; }
+    if (!pat || pat->lengthBeats <= 0.0f) return 0.0f;
+
+    float bars = transport->position();
+    int top, bottom;
+    timeline->timeSigAt((int)bars, top, bottom);
+    float globalBeats    = bars * (float)top;
+    float posInPattern   = std::fmod(globalBeats, pat->lengthBeats);
+    if (posInPattern < 0.0f) posInPattern += pat->lengthBeats;
+    return posInPattern / pat->lengthBeats;
 }
 
 void LoopEditor::setContextPopup(TrackContextPopup* popup)
@@ -223,6 +272,14 @@ void LoopEditor::draw()
             fl_color(FL_WHITE);
             fl_draw(tracks[i].label.c_str(), bx + 4, by, bw - 8, bh,
                     FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+
+            // Playhead line – always running, regardless of toggle state
+            float progress = beatProgress(i);
+            int   lineX    = bx + (int)(progress * (bw - 1));
+            fl_color(0xEF444400);
+            fl_line_style(FL_SOLID, 2);
+            fl_line(lineX, by + 4, lineX, by + bh - 4);
+            fl_line_style(0);
         }
     }
 

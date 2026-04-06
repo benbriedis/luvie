@@ -256,6 +256,27 @@ vcs
 	3. cf optimising the control rows at the bottom as the drum pattern editor lacks the pitch-related controls.
 
 
+MIDI channels?
+
+Mute & solo selectors and indicators.
+
+Loop mode: maybe remove rewind button and position labels in the transports
+
+In song mode maybe have maybe have loop editor show what's currently playing 
+   (in which case preserve the loop state) 
+   
+May need vertical scroll in loop editor
+  
+cf moving transport outside tabs
+
+When in loop mode disable song playhead?? Or let run - may be useful to recording in Ardour or something
+
+cf Removing Time from Loop Editor?  Put in Pattern Editor?? Remove line or make dotted?
+   Or use initial time or put into settings?
+
+Link BPM and time up in loop editor
+
+Loop playhead broke after a while
 
 
 
