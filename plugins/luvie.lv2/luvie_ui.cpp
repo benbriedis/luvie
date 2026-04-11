@@ -8,29 +8,19 @@
 #include <unistd.h>
 
 #include <FL/Fl.H>
-#include <FL/Fl_Group.H>
 #include <string>
 #include <cstring>
 #include <vector>
 #include <algorithm>
 
 #include "../../src/appWindow.hpp"
-#include "../../src/songEditor.hpp"
-#include "../../src/patternEditor.hpp"
-#include "../../src/popup.hpp"
-#include "../../src/modernTabs.hpp"
 #include "../../src/transport.hpp"
 #include "../../src/simpleTransport.hpp"
 #include "../../src/jackTransport.hpp"
-#include "../../src/markerPopup.hpp"
-#include "../../src/markerRuler.hpp"
 #include "../../src/observableTimeline.hpp"
 #include "../../src/patternPanel.hpp"
-#include "../../src/trackContextPopup.hpp"
-#include "../../src/noteLabels.hpp"
 #include "../../src/chords.hpp"
-#include "../../src/loopEditor.hpp"
-#include "../../src/drumPatternEditor.hpp"
+#include "../../src/luvieApp.hpp"
 #include "timeline_serial.h"
 #include <nlohmann/json.hpp>
 
@@ -79,63 +69,17 @@ struct LuvieUI {
     AppWindow*          window         = nullptr;
     ObservableTimeline* songTimeline   = nullptr;
     SimpleTransport*    simpleTransport= nullptr;
-
-    /* Non-owning pointers — widgets are owned by FLTK/window */
-    PatternEditor*      og1            = nullptr;
-    PatternPanel*       patternPanel   = nullptr;
-    Transport*          bottomPane     = nullptr;
-    LoopEditor*         loopEd         = nullptr;
-    DrumPatternEditor*  drumEd         = nullptr;
-
-    /* JACK transport control (nullptr when JACK is unavailable) */
     JackTransport*      jackTransport  = nullptr;
 
-    /* Popups — stored as members so they live long enough */
-    Popup*              popup1         = nullptr;
-    Popup*              popup2         = nullptr;
-    MarkerPopup*        tempoPopup     = nullptr;
-    MarkerPopup*        timeSigPopup   = nullptr;
-    TrackContextPopup*  trackCtxPopup  = nullptr;
+    /* UI layout (owns FLTK widgets via window) */
+    LuvieApp            app;
 
     /* Set during state restore to suppress re-sending while rebuilding */
     bool restoringState = false;
 
-    /* Switches between standard and drum editors when selected track changes */
-    struct EditorSwitcher : ITimelineObserver {
-        LuvieUI* ui;
-        explicit EditorSwitcher(LuvieUI* u) : ui(u) {}
-        void onTimelineChanged() override {
-            if (!ui->songTimeline || !ui->og1 || !ui->drumEd) return;
-            const auto& data = ui->songTimeline->get();
-            int sel = data.selectedTrackIndex;
-            bool isDrum = false;
-            if (sel >= 0 && sel < (int)data.tracks.size()) {
-                int patId = data.tracks[sel].patternId;
-                for (const auto& p : data.patterns)
-                    if (p.id == patId) { isDrum = (p.type == PatternType::DRUM); break; }
-            }
-            if (isDrum) { ui->og1->hide(); ui->drumEd->show(); }
-            else        { ui->og1->show(); ui->drumEd->hide(); }
-        }
-    } editorSwitcher{this};
-
-    /* Observer that forwards timeline changes to the DSP */
-    struct TimelineSender : ITimelineObserver {
-        LuvieUI* ui;
-        explicit TimelineSender(LuvieUI* u) : ui(u) {}
-        void onTimelineChanged() override {
-            if (ui->restoringState) return;
-            sendTimeline(ui);
-            sendFullState(ui);
-        }
-    } timelineSender{this};
-
     ~LuvieUI() {
-        if (songTimeline) {
-            songTimeline->removeObserver(&timelineSender);
-            songTimeline->removeObserver(&editorSwitcher);
-        }
-        /* Popups are added to window via add(), so window owns and deletes them. */
+        /* app destructor removes timeline observers */
+        /* Widgets are owned by window (added via add()), deleted with window */
         delete window;
         delete jackTransport;
         delete simpleTransport;
@@ -151,10 +95,10 @@ struct LuvieUI {
             jackTransport->setTimeline(songTimeline);
             jackTransport->onTransportEvent = [this]() {
                 Fl::awake([](void* data) {
-                    static_cast<LuvieUI*>(data)->bottomPane->syncPlayState();
+                    static_cast<LuvieUI*>(data)->app.bottomPane->syncPlayState();
                 }, this);
             };
-            if (bottomPane) bottomPane->setControlTransport(jackTransport);
+            if (app.bottomPane) app.bottomPane->setControlTransport(jackTransport);
         } else {
             delete jt;
         }
@@ -167,12 +111,12 @@ struct LuvieUI {
 
 static void sendTimeline(LuvieUI* ui)
 {
-    if (!ui->writeFunc || !ui->songTimeline || !ui->patternPanel)
+    if (!ui->writeFunc || !ui->songTimeline || !ui->app.patternPanel)
         return;
 
     const Timeline& tl        = ui->songTimeline->get();
-    const int rootPitch        = ui->patternPanel->rootPitch();
-    const int chordType        = ui->patternPanel->chordType();
+    const int rootPitch        = ui->app.patternPanel->rootPitch();
+    const int chordType        = ui->app.patternPanel->chordType();
     const ChordDef& chord      = chordDefs[chordType];
     const int chordSize        = chord.size;
     const int rootSemitone     = (rootPitch + 9) % 12;
@@ -274,16 +218,16 @@ static void sendTimeline(LuvieUI* ui)
 
 static std::string serializeStateToString(LuvieUI* ui)
 {
-    if (!ui->songTimeline || !ui->patternPanel)
+    if (!ui->songTimeline || !ui->app.patternPanel)
         return {};
 
     const Timeline& tl = ui->songTimeline->get();
 
     json j;
     j["version"]            = 1;
-    j["rootPitch"]          = ui->patternPanel->rootPitch();
-    j["chordType"]          = ui->patternPanel->chordType();
-    j["useSharp"]           = ui->patternPanel->isSharp();
+    j["rootPitch"]          = ui->app.patternPanel->rootPitch();
+    j["chordType"]          = ui->app.patternPanel->chordType();
+    j["useSharp"]           = ui->app.patternPanel->isSharp();
     j["selectedTrackIndex"] = tl.selectedTrackIndex;
 
     json timeSigs = json::array();
@@ -378,7 +322,7 @@ static void sendFullState(LuvieUI* ui)
 
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
 {
-    if (!ui->songTimeline || !ui->patternPanel || size == 0) return;
+    if (!ui->songTimeline || !ui->app.patternPanel || size == 0) return;
 
     json j;
     try {
@@ -448,7 +392,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
 
     /* Apply restored state without triggering intermediate sends */
     ui->restoringState = true;
-    ui->patternPanel->setParams(
+    ui->app.patternPanel->setParams(
         j.value("rootPitch", 0),
         j.value("chordType", 0),
         j.value("useSharp", true));
@@ -546,186 +490,50 @@ static LV2UI_Handle instantiate(
         ui->time_speed          = m(LV2_TIME__speed);
     }
 
-    /* ---- Layout constants (same as standalone main.cpp) ---- */
-    const int tabBarH      = 35;
-    const int bottomH      = 50;
-    const int markerRulerH = 18;
-    const int winW         = 920;
-    const int winH         = tabBarH + 2*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
-
     /* ---- Window ---- */
     const char* title = (ui->extHost && ui->extHost->plugin_human_id)
                         ? ui->extHost->plugin_human_id : "Luvie";
-    ui->window = new AppWindow(winW, winH);
+    ui->window = new AppWindow(LuvieApp::winW, LuvieApp::defaultWinH());
     ui->window->label(title);
     ui->window->color(bgColor);
     ui->window->callback(window_close_cb, ui);
-    ui->window->end();   /* don't auto-add children until we call begin() */
+    ui->window->end();
 
-    /* ---- Popups ---- */
-    ui->popup1       = new Popup{};
-    ui->popup2       = new Popup{};
-    ui->tempoPopup   = new MarkerPopup(MarkerPopup::TEMPO);
-    ui->timeSigPopup = new MarkerPopup(MarkerPopup::TIME_SIG);
-    ui->trackCtxPopup= new TrackContextPopup;
-
-    const int tabsH = winH - bottomH;
-
-    /* ---- Tabs ---- */
-    static constexpr Fl_Color songColor = 0x22C55E00;
-    static constexpr Fl_Color loopColor = 0x3B82F600;
-
-    ModernTabs* tabs = new ModernTabs(0, 0, winW, tabsH);
-    tabs->enableModeToggle(songColor, loopColor);
-    tabs->setTabAccent(0, songColor);
-    tabs->setTabAccent(1, loopColor);
-    tabs->setTabAccent(2, 0xF9731600);
-    ui->window->add(tabs);
-
-    /* ---- Song Editor tab ---- */
-    Fl_Group* tab1 = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
-    tab1->color(bgColor);
-    tabs->add(*tab1);
-
-    const int numPatternBeats = 8;
-
+    /* ---- Timeline + transport ---- */
     ui->songTimeline = new ObservableTimeline(120.0f, 4, 4);
     for (int i = 1; i <= 8; i++) {
-        int patId = ui->songTimeline->createPattern(numPatternBeats);
+        int patId = ui->songTimeline->createPattern(LuvieApp::numPatternBeats);
         ui->songTimeline->addTrack("Pattern " + std::to_string(i), patId);
     }
-
-    MarkerRuler* timeSigRuler = new MarkerRuler(0, tabBarH, winW, markerRulerH,
-        80, 60, MarkerRuler::TIME_SIG, ui->songTimeline, ui->timeSigPopup);
-    tab1->add(timeSigRuler);
-
-    MarkerRuler* tempoRuler = new MarkerRuler(0, tabBarH + markerRulerH, winW, markerRulerH,
-        80, 60, MarkerRuler::TEMPO, ui->songTimeline, ui->tempoPopup);
-    tab1->add(tempoRuler);
-
-    TrackContextPopup* trackCtxPopup = ui->trackCtxPopup;
-
-    std::vector<Note> patterns2;
-    SongEditor* og2 = new SongEditor(0, tabBarH + 2*markerRulerH, winW, patterns2,
-                                     10, 80, 45, 60, 0.25, *ui->popup2);
-    tab1->add(og2);
-    tab1->end();
-
-    /* ---- Loop Editor tab ---- */
-    Fl_Group* tabLoop = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Loop Editor");
-    tabLoop->color(bgColor);
-    tabs->add(*tabLoop);
-
-    LoopEditor* loopEd = new LoopEditor(0, tabBarH, winW, tabsH - tabBarH);
-    tabLoop->add(loopEd);
-    tabLoop->end();
-
-    ui->loopEd = loopEd;
-
-    /* ---- Pattern Editor tab ---- */
-    const int panelH      = 50;
-    const int rowHeight   = 30;
-    const int numRows     = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
-    const int drumRowH    = 20;
-    const int drumNumRows = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowH;
-
-    Fl_Group* tab2 = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
-    tab2->color(bgColor);
-    tabs->add(*tab2);
-
-    std::vector<Note> notes2;
-    PatternEditor* og1 = new PatternEditor(0, tabBarH, winW, notes2, numRows,
-                                           numPatternBeats, rowHeight, 40, 0.25, *ui->popup1);
-    tab2->add(og1);
-
-    DrumPatternEditor* drumEd = new DrumPatternEditor(0, tabBarH, winW, drumNumRows,
-                                                      numPatternBeats, drumRowH, 40, 0.25f, *ui->popup1);
-    tab2->add(drumEd);
-    drumEd->hide();
-
-    PatternPanel* patternPanel = new PatternPanel(0, tabsH - panelH, winW, panelH);
-    patternPanel->setTimeline(ui->songTimeline);
-    tab2->add(patternPanel);
-    tab2->end();
-
-    ui->og1         = og1;
-    ui->drumEd      = drumEd;
-    ui->patternPanel = patternPanel;
-
-    /* ---- Transport ---- */
-    Fl_Group::current(nullptr);
     ui->simpleTransport = new SimpleTransport;
     ui->simpleTransport->setTimeline(ui->songTimeline);
-    Transport* bottomPane = new Transport(0, tabsH, winW, bottomH,
-                                          ui->simpleTransport, ui->songTimeline);
-    ui->window->add(bottomPane);
-    ui->bottomPane = bottomPane;
-    bottomPane->disableButtons();  // enabled only when JACK connects
 
-    /* ---- Wire up editors ---- */
-    og2->setTransport(ui->simpleTransport, ui->songTimeline);
-    og2->onRulerOffsetChanged = [timeSigRuler, tempoRuler](int off, int clipLeft) {
-        timeSigRuler->setOffsetX(off);
-        timeSigRuler->setClipLeft(clipLeft);
-        tempoRuler->setOffsetX(off);
-        tempoRuler->setClipLeft(clipLeft);
-    };
-    og2->setContextPopup(trackCtxPopup);
-    og2->onEndReached = [bottomPane]() { bottomPane->notifyEndReached(); };
-    og2->onSeek       = [bottomPane, ui]() {
-        bottomPane->notifySeek();
-        if (ui->jackTransport)
-            ui->jackTransport->seek(ui->simpleTransport->position());
-    };
-    og2->onPatternDoubleClick = [tabs, tab2](int /*trackIndex*/) {
-        tabs->value(tab2);
-        tabs->redraw();
-    };
+    /* ---- LuvieApp callbacks ---- */
+    ui->app.disableTransportButtons = true;
 
-    loopEd->setTimeline(ui->songTimeline);
-    loopEd->setTransport(ui->simpleTransport);
-    loopEd->setContextPopup(trackCtxPopup);
-
-    og1->setPatternPlayhead(ui->simpleTransport, ui->songTimeline, 0);
-    drumEd->setPatternPlayhead(ui->simpleTransport, ui->songTimeline, 0);
-    ui->songTimeline->selectTrack(0);
-
-    auto syncNoteLabels = [og1, patternPanel]() {
-        og1->setNoteParams(patternPanel->rootPitch(),
-                           patternPanel->chordType(),
-                           patternPanel->isSharp());
-    };
-    patternPanel->onParamsChanged = [ui, syncNoteLabels]() {
-        syncNoteLabels();
+    ui->app.onExtraTimelineChange = [ui]() {
         if (!ui->restoringState) {
             sendTimeline(ui);
             sendFullState(ui);
         }
     };
-    syncNoteLabels();
 
-    /* ---- Popups must be added last (reverse-order FLTK dispatch) ---- */
-    ui->window->add(ui->popup1);        ui->window->registerPopup(ui->popup1);
-    ui->window->add(ui->popup2);        ui->window->registerPopup(ui->popup2);
-    ui->window->add(ui->tempoPopup);    ui->window->registerPopup(ui->tempoPopup);
-    ui->window->add(ui->timeSigPopup);  ui->window->registerPopup(ui->timeSigPopup);
-    ui->window->add(ui->trackCtxPopup); ui->window->registerPopup(ui->trackCtxPopup);
+    ui->app.onExtraSeek = [ui]() {
+        if (ui->jackTransport)
+            ui->jackTransport->seek(ui->simpleTransport->position());
+    };
 
-    /* ---- Resizable chain ---- */
-    tab1->resizable(og2);
-    tabLoop->resizable(loopEd);
-    tab2->resizable(og1);
-    ui->window->resizable(tabs);
+    ui->app.onExtraParamsChanged = [ui]() {
+        if (!ui->restoringState) {
+            sendTimeline(ui);
+            sendFullState(ui);
+        }
+    };
 
-    const int minW = 14 + 36 + 5*40;
-    const int minH = tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
-    ui->window->size_range(minW, minH);
+    /* ---- Build all shared UI ---- */
+    ui->app.build(ui->window, ui->songTimeline, ui->simpleTransport);
 
-    /* ---- Register timeline observer and send initial state to DSP ---- */
-    ui->songTimeline->addObserver(&ui->timelineSender);
-    ui->songTimeline->addObserver(&ui->editorSwitcher);
-
-    /* Restore from file if available (written by dsp_restore or previous UI close) */
+    /* ---- Restore from file if available ---- */
     if (!g_stateFilePath.empty()) {
         FILE* f = fopen(g_stateFilePath.c_str(), "rb");
         if (f) {
@@ -817,7 +625,7 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
     /* Convert bar + barBeat to an absolute bar position (fractional bars) */
     float bars = bar + barBeat / bpb;
     ui->simpleTransport->syncFromHost(bars, playing);
-    if (ui->bottomPane) ui->bottomPane->syncPlayState();
+    if (ui->app.bottomPane) ui->app.bottomPane->syncPlayState();
 }
 
 static const void* extension_data(const char* uri)
