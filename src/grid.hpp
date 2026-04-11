@@ -10,8 +10,8 @@
 
 class Playhead;
 
-enum Side { LEFT, RIGHT };
-typedef struct { int row; float col; } Point;
+enum class Side { Left, Right };
+struct Point { int row; float col; };
 
 // ---------------------------------------------------------------------------
 // Interaction state — each variant carries only the fields relevant to it.
@@ -78,8 +78,7 @@ protected:
     virtual void toggleNote();
 
 public:
-    Grid(std::vector<Note> notes, int numRows, int numCols,
-           int rowHeight, int colWidth, float snap, Popup& popup);
+    Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
 
     void setPlayhead(Playhead* p) { playhead  = p; }
     void setColOffset(int off)    { colOffset = off; redraw(); }

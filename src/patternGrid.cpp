@@ -5,9 +5,8 @@
 #include <algorithm>
 #include <set>
 
-PatternGrid::PatternGrid(std::vector<Note> notes, int numRows, int numCols,
-                         int rowHeight, int colWidth, float snap, Popup& popup)
-    : Grid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
+PatternGrid::PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
+    : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 
 PatternGrid::~PatternGrid()
@@ -153,7 +152,7 @@ void PatternGrid::onCommitResize(const StateDragResize& s)
 {
     if (!timeline || notes[s.noteIdx].disabled) return;
     int id = notes[s.noteIdx].id;
-    if (s.side == LEFT)
+    if (s.side == Side::Left)
         timeline->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
     else
         timeline->resizeNoteRight(id, notes[s.noteIdx].length);

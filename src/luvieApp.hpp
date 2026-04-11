@@ -4,7 +4,9 @@
 #include <FL/Fl_Group.H>
 #include "editor.hpp"
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "itimelineobserver.hpp"
+
+class ObservableTimeline;
 
 class AppWindow;
 class ModernTabs;

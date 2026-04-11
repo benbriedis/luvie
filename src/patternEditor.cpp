@@ -5,11 +5,11 @@
 #include <climits>
 #include <set>
 
-PatternEditor::PatternEditor(int x, int y, int visibleW, std::vector<Note> notes, int numRows, int numCols,
+PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
-      patternGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
+      patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     rulerOffsetX = scrollbarW + labelsW;
 

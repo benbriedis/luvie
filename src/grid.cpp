@@ -16,8 +16,8 @@
 
 using std::vector;
 
-Grid::Grid(vector<Note> notes, int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup) :
-    notes(notes), numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
+Grid::Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup) :
+    numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
     Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight, nullptr)
 {}
 
@@ -192,7 +192,7 @@ void Grid::resizing(StateDragResize& s)
     float minLength = 10.0f / colWidth;
     Note* note      = &notes[s.noteIdx];
     float ex        = Fl::event_x() - x();
-    if (s.side == LEFT) {
+    if (s.side == Side::Left) {
         float endCol = note->beat + note->length;
         note->beat    = ex / (float)colWidth + colOffset;
         if (snap) note->beat = std::round(note->beat / snap) * snap;
@@ -221,7 +221,7 @@ void Grid::findNoteForCursor()
     int   row = ey / rowHeight;
 
     int  resizeIdx  = -1;
-    Side resizeSide = LEFT;
+    Side resizeSide = Side::Left;
 
     for (const auto [i, n] : std::views::enumerate(notes)) {
         if ((int)n.pitch != row) continue;
@@ -229,9 +229,9 @@ void Grid::findNoteForCursor()
         float rightEdge = (n.beat + n.length - colOffset) * colWidth;
 
         if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
-            resizeIdx = i; resizeSide = LEFT;
+            resizeIdx = i; resizeSide = Side::Left;
         } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
-            resizeIdx = i; resizeSide = RIGHT;
+            resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
             state = StateHoverMove{(int)i, ex - leftEdge, ey - (int)n.pitch * rowHeight};
             window()->cursor(FL_CURSOR_HAND);

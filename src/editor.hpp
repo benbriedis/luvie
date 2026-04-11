@@ -6,7 +6,7 @@
 #include <FL/Fl_Group.H>
 #include <functional>
 
-const Fl_Color bgColor = FL_WHITE;
+inline constexpr Fl_Color bgColor = FL_WHITE;
 
 class Editor : public Fl_Group {
 public:

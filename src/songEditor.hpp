@@ -31,7 +31,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     void drawRulerLabels() override;
 
 public:
-    SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
+    SongEditor(int x, int y, int visibleW,
                int numRows, int numCols, int rowHeight, int colWidth,
                float snap, Popup& popup);
     ~SongEditor();

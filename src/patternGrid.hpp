@@ -33,8 +33,7 @@ public:
     // Fired on every rebuild; args: (disabledDegrees, groupSize, occupiedDisabledVirtualPositions)
     std::function<void(const std::vector<int>&, int, const std::set<int>&)> onDisabledDegreesChanged;
 
-    PatternGrid(std::vector<Note> notes, int numRows, int numCols,
-                int rowHeight, int colWidth, float snap, Popup& popup);
+    PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternGrid();
 
     void setTimeline(ObservableTimeline* tl, int patId);

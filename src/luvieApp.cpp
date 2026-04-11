@@ -1,4 +1,5 @@
 #include "luvieApp.hpp"
+#include "observableTimeline.hpp"
 #include "appWindow.hpp"
 #include "songEditor.hpp"
 #include "patternEditor.hpp"
@@ -11,7 +12,6 @@
 #include "trackContextPopup.hpp"
 #include "drumPatternEditor.hpp"
 #include "loopEditor.hpp"
-#include "timeline.hpp"
 
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
     if (!app->patternEd || !app->drumEd || !app->timeline_) return;
@@ -70,8 +70,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         80, 60, MarkerRuler::TEMPO, timeline, tPop);
     tab1->add(tempoRuler);
 
-    std::vector<Note> songNotes;
-    auto* og2 = new SongEditor(0, tabBarH + 2*markerRulerH, winW, songNotes,
+    auto* og2 = new SongEditor(0, tabBarH + 2*markerRulerH, winW,
                                10, 80, 45, 60, 0.25, *p2);
     tab1->add(og2);
     tab1->resizable(og2);
@@ -93,8 +92,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     tab2->color(bgColor);
     patternTab = tab2;
 
-    std::vector<Note> patNotes;
-    patternEd = new PatternEditor(0, tabBarH, winW, patNotes, numRows,
+    patternEd = new PatternEditor(0, tabBarH, winW, numRows,
                                   numPatternBeats, rowHeight, 40, 0.25, *p1);
     tab2->add(patternEd);
 

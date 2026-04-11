@@ -26,8 +26,7 @@ protected:
     void toggleNote() override;
 
 public:
-    SongGrid(std::vector<Note> notes, int numRows, int numCols,
-             int rowHeight, int colWidth, float snap, Popup& popup);
+    SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
     ~SongGrid();
 
     std::function<void(int trackIndex)> onPatternDoubleClick;

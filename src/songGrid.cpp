@@ -5,9 +5,8 @@
 #include <algorithm>
 #include <cmath>
 
-SongGrid::SongGrid(std::vector<Note> notes, int numRows, int numCols,
-                   int rowHeight, int colWidth, float snap, Popup& popup)
-    : Grid(notes, numRows, numCols, rowHeight, colWidth, snap, popup)
+SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
+    : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 
 void SongGrid::draw()
@@ -26,7 +25,7 @@ void SongGrid::draw()
         float startOffset = 0.0f;
         // While left-resizing, show dragStartOffset so the tick stays fixed visually
         if (auto* s = std::get_if<StateDragResize>(&state))
-            if (s->side == LEFT && note.id == notes[s->noteIdx].id)
+            if (s->side == Side::Left && note.id == notes[s->noteIdx].id)
                 startOffset = dragStartOffset;
         if (startOffset == 0.0f)
             if (const PatternInstance* inst = timeline->instanceById(note.id))
@@ -140,7 +139,7 @@ void SongGrid::onBeginDrag(int noteIdx)
 void SongGrid::resizing(StateDragResize& s)
 {
     Grid::resizing(s);
-    if (s.side == LEFT) {
+    if (s.side == Side::Left) {
         float newOffset = (notes[s.noteIdx].beat - tickBarPos) * dragBeatsPerBar;
         dragStartOffset = newOffset;
     }
@@ -157,7 +156,7 @@ void SongGrid::onCommitResize(const StateDragResize& s)
 {
     if (!timeline) return;
     int id = notes[s.noteIdx].id;
-    if (s.side == LEFT)
+    if (s.side == Side::Left)
         timeline->resizePatternLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length, dragStartOffset);
     else
         timeline->resizePattern(id, notes[s.noteIdx].length);

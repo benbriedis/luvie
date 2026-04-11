@@ -5,12 +5,12 @@
 #include <algorithm>
 #include <cstdio>
 
-SongEditor::SongEditor(int x, int y, int visibleW, std::vector<Note> notes,
+SongEditor::SongEditor(int x, int y, int visibleW,
                        int numRows, int numCols, int rowHeight, int colWidth,
                        float snap, Popup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
-      songGrid(notes, numRows, numCols, rowHeight, colWidth, snap, popup),
+      songGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
       numVisibleRows(numRows)
 {
     baseX        = x;

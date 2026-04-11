@@ -1,16 +1,10 @@
 #ifndef OBSERVABLE_TIMELINE_HPP
 #define OBSERVABLE_TIMELINE_HPP
 
+#include "itimelineobserver.hpp"
 #include "timeline.hpp"
 #include <string>
 #include <vector>
-
-class ITimelineObserver {
-public:
-	virtual ~ITimelineObserver() = default;
-	virtual void onTimelineChanged() = 0;
-};
-
 
 class ObservableTimeline {
 public:
@@ -105,7 +99,9 @@ private:
 	void sortTimeSigs();
 };
 
-inline void swapObserver(ObservableTimeline*& stored, ObservableTimeline* next, ITimelineObserver* self)
+// Swap helper: unregisters self from old timeline, registers with new one.
+inline void swapObserver(ObservableTimeline*& stored, ObservableTimeline* next,
+                         ITimelineObserver* self)
 {
     if (stored) stored->removeObserver(self);
     stored = next;

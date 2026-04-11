@@ -21,7 +21,8 @@ void ObservableTimeline::removeObserver(ITimelineObserver* o)
 
 void ObservableTimeline::notify()
 {
-	for (auto* o : observers) o->onTimelineChanged();
+	auto copy = observers;
+	for (auto* o : copy) o->onTimelineChanged();
 }
 
 void ObservableTimeline::loadTimeline(const Timeline& tl)

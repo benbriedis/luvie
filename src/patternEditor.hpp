@@ -30,7 +30,7 @@ class PatternEditor : public Editor, public ITimelineObserver {
     int  handle(int event) override;
 
 public:
-    PatternEditor(int x, int y, int visibleW, std::vector<Note> notes, int numRows, int numCols,
+    PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                   int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternEditor();
 
