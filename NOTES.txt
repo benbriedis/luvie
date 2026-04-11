@@ -271,6 +271,10 @@ cf moving transport outside tabs
 
 When in loop mode disable song playhead?? Or let run - may be useful to recording in Ardour or something
 
+Loop mode: not so sure what to do with the BPM - would be nice if it matched the song editor time, maybe...
+  cf maybe used for live song editor doesn't really matter.
+  Compositionally maybe could specify a matching song editor position for BPM and time signature...
+
 cf Removing Time from Loop Editor?  Put in Pattern Editor?? Remove line or make dotted?
    Or use initial time or put into settings?
 

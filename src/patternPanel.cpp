@@ -89,6 +89,15 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     end();
 }
 
+void PatternPanel::setParams(int root, int chord, bool sharp)
+{
+	useSharp = sharp;
+	sharpFlatBtn.label(useSharp ? "#" : "b");
+	updateRootChoiceLabels(root);  // clears + repopulates rootChoice, sets value(root)
+	chordChoice.value(chord);
+	redraw();
+}
+
 void PatternPanel::updateRootChoiceLabels(int idx)
 {
     rootChoice.clear();

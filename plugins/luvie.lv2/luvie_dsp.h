@@ -36,6 +36,7 @@ typedef struct {
     LV2_URID midi_Event;
     LV2_URID atom_Chunk;
     LV2_URID luvie_timeline;
+    LV2_URID luvie_state;         /* full JSON state blob */
 } URIs;
 
 /* Active note being played (awaiting note-off) */
@@ -70,6 +71,10 @@ typedef struct {
 
     ActiveNote activeNotes[MAX_ACTIVE_NOTES];
     int        numActiveNotes;
+
+    /* Saved JSON state for LV2 state save/restore */
+    char*    stateJson;      /* heap-allocated, NULL if none */
+    uint32_t stateJsonSize;  /* strlen + 1 (includes null terminator) */
 } Self;
 
 #endif /* LUVIE_DSP_H */

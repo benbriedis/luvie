@@ -24,6 +24,25 @@ void ObservableTimeline::notify()
 	for (auto* o : observers) o->onTimelineChanged();
 }
 
+void ObservableTimeline::loadTimeline(const Timeline& tl)
+{
+	data = tl;
+	nextId = 1;
+	for (const auto& p : data.patterns) {
+		if (p.id >= nextId) nextId = p.id + 1;
+		for (const auto& n : p.notes)
+			if (n.id >= nextId) nextId = n.id + 1;
+		for (const auto& dn : p.drumNotes)
+			if (dn.id >= nextId) nextId = dn.id + 1;
+	}
+	for (const auto& t : data.tracks) {
+		if (t.id >= nextId) nextId = t.id + 1;
+		for (const auto& inst : t.patterns)
+			if (inst.id >= nextId) nextId = inst.id + 1;
+	}
+	notify();
+}
+
 void ObservableTimeline::sortBpms()
 {
 	std::sort(data.bpms.begin(), data.bpms.end(),

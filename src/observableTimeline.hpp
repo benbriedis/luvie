@@ -78,6 +78,10 @@ public:
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;
 
+	// Replace the entire timeline at once and notify observers.
+	// Updates nextId so new IDs won't collide with existing ones.
+	void loadTimeline(const Timeline& tl);
+
 	// Copy a pattern definition (notes + length); returns new pattern id.
 	// Does NOT notify — caller must add a track (which notifies) or call notify manually.
 	int copyPattern(int srcPatId);

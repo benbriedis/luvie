@@ -46,6 +46,9 @@ public:
     int  chordType() const { return chordChoice.value(); }
     bool isSharp()   const { return useSharp; }
 
+    // Set chord/root/sharp without triggering onParamsChanged.
+    void setParams(int root, int chord, bool sharp);
+
     void setTimeline(ObservableTimeline* tl);
     void setDrumMode(bool drum);
     void onTimelineChanged() override;

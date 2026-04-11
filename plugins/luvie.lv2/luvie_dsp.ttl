@@ -3,6 +3,7 @@
 @prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
 @prefix midi:  <http://lv2plug.in/ns/ext/midi#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
 @prefix time:  <http://lv2plug.in/ns/ext/time#> .
 @prefix ui:    <http://lv2plug.in/ns/extensions/ui#> .
 @prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
@@ -13,6 +14,7 @@
 
     lv2:requiredFeature urid:map ;
     lv2:optionalFeature lv2:hardRTCapable ;
+    lv2:extensionData state:interface ;
 
     lv2:port [
         a lv2:InputPort, atom:AtomPort ;

@@ -1,9 +1,13 @@
 #include "luvie_dsp.h"
 #include "timeline_serial.h"
+#include <lv2/state/state.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <unistd.h>
+
+#define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 
 /* -----------------------------------------------------------------------
    MIDI helpers
@@ -286,6 +290,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->time_speed         = map->map(map->handle, LV2_TIME__speed);
     uris->midi_Event         = map->map(map->handle, LV2_MIDI__MidiEvent);
     uris->luvie_timeline     = map->map(map->handle, LUVIE_TIMELINE_URI);
+    uris->luvie_state        = map->map(map->handle, LUVIE_STATE_URI);
 }
 
 static LV2_Handle instantiate(
@@ -374,6 +379,18 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
     LV2_ATOM_SEQUENCE_FOREACH(self->controlIn, ev) {
         uint32_t evFrame = (uint32_t)ev->time.frames;
+
+        /* --- Full JSON state update from UI (store for LV2 state saving) --- */
+        if (ev->body.type == uris->luvie_state) {
+            uint32_t size = ev->body.size;
+            free(self->stateJson);
+            self->stateJson = (char*)malloc(size);
+            if (self->stateJson) {
+                memcpy(self->stateJson, LV2_ATOM_BODY(&ev->body), size);
+                self->stateJsonSize = size;
+            }
+            continue;
+        }
 
         /* --- Timeline update from UI --- */
         if (ev->body.type == uris->luvie_timeline) {
@@ -484,12 +501,72 @@ static void cleanup(LV2_Handle instance)
 {
     Self* self = (Self*)instance;
     freeDspTimeline(&self->timeline);
+    free(self->stateJson);
     free(self);
+}
+
+static LV2_State_Status dsp_save(
+    LV2_Handle                 instance,
+    LV2_State_Store_Function   store,
+    LV2_State_Handle           handle,
+    uint32_t                   flags,
+    const LV2_Feature* const*  features)
+{
+    (void)flags; (void)features;
+    Self* self = (Self*)instance;
+    if (!self->stateJson || self->stateJsonSize == 0)
+        return LV2_STATE_SUCCESS;
+
+    return store(handle,
+                 self->uris.luvie_state,
+                 self->stateJson,
+                 self->stateJsonSize,
+                 self->uris.atom_Chunk,
+                 LV2_STATE_IS_POD);
+}
+
+static LV2_State_Status dsp_restore(
+    LV2_Handle                    instance,
+    LV2_State_Retrieve_Function   retrieve,
+    LV2_State_Handle              handle,
+    uint32_t                      flags,
+    const LV2_Feature* const*     features)
+{
+    (void)flags; (void)features;
+    Self* self = (Self*)instance;
+
+    size_t   size     = 0;
+    uint32_t type     = 0;
+    uint32_t valflags = 0;
+    const void* data = retrieve(handle, self->uris.luvie_state, &size, &type, &valflags);
+    if (!data || type != self->uris.atom_Chunk || size == 0)
+        return LV2_STATE_SUCCESS;
+
+    free(self->stateJson);
+    self->stateJson = (char*)malloc(size);
+    if (!self->stateJson)
+        return LV2_STATE_ERR_NO_SPACE;
+    memcpy(self->stateJson, data, size);
+    self->stateJsonSize = (uint32_t)size;
+
+    /* Write JSON to a file so the UI can read it when it next opens */
+    char path[256];
+    snprintf(path, sizeof(path), "/tmp/luvie_state_%d.json", (int)getpid());
+    FILE* f = fopen(path, "wb");
+    if (f) {
+        /* stateJsonSize includes null terminator; write without it */
+        fwrite(data, 1, size > 0 ? size - 1 : 0, f);
+        fclose(f);
+    }
+
+    return LV2_STATE_SUCCESS;
 }
 
 static const void* extension_data(const char* uri)
 {
-    (void)uri;
+    static const LV2_State_Interface state_iface = { dsp_save, dsp_restore };
+    if (!strcmp(uri, LV2_STATE__interface))
+        return &state_iface;
     return NULL;
 }
 

@@ -4,6 +4,8 @@
 #include <lv2/atom/atom.h>
 #include <lv2/atom/util.h>
 #include <lv2/time/time.h>
+#include <cstdio>
+#include <unistd.h>
 
 #include <FL/Fl.H>
 #include <FL/Fl_Group.H>
@@ -27,7 +29,17 @@
 #include "../../src/trackContextPopup.hpp"
 #include "../../src/noteLabels.hpp"
 #include "../../src/chords.hpp"
+#include "../../src/loopEditor.hpp"
+#include "../../src/drumPatternEditor.hpp"
 #include "timeline_serial.h"
+#include <nlohmann/json.hpp>
+
+#define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
+
+/* File used to pass state between DSP restore and UI open, and between UI sessions */
+static std::string g_stateFilePath;
+
+using json = nlohmann::json;
 
 /* -----------------------------------------------------------------------
    Forward declarations
@@ -35,6 +47,9 @@
 
 struct LuvieUI;
 static void sendTimeline(LuvieUI* ui);
+static std::string serializeStateToString(LuvieUI* ui);
+static void sendFullState(LuvieUI* ui);
+static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size);
 
 /* -----------------------------------------------------------------------
    LuvieUI — the ExternalUI instance.
@@ -50,6 +65,7 @@ struct LuvieUI {
     LV2_URID_Map*           map         = nullptr;
     LV2_URID                atom_eventTransfer  = 0;
     LV2_URID                luvie_timeline_urid = 0;
+    LV2_URID                luvie_state_urid    = 0;
     LV2_URID                atom_Object         = 0;
     LV2_URID                atom_Blank          = 0;
     LV2_URID                time_Position       = 0;
@@ -64,9 +80,12 @@ struct LuvieUI {
     ObservableTimeline* songTimeline   = nullptr;
     SimpleTransport*    simpleTransport= nullptr;
 
-    /* Non-owning pointer — widget is owned by FLTK/window */
+    /* Non-owning pointers — widgets are owned by FLTK/window */
+    PatternEditor*      og1            = nullptr;
     PatternPanel*       patternPanel   = nullptr;
     Transport*          bottomPane     = nullptr;
+    LoopEditor*         loopEd         = nullptr;
+    DrumPatternEditor*  drumEd         = nullptr;
 
     /* JACK transport control (nullptr when JACK is unavailable) */
     JackTransport*      jackTransport  = nullptr;
@@ -78,15 +97,44 @@ struct LuvieUI {
     MarkerPopup*        timeSigPopup   = nullptr;
     TrackContextPopup*  trackCtxPopup  = nullptr;
 
+    /* Set during state restore to suppress re-sending while rebuilding */
+    bool restoringState = false;
+
+    /* Switches between standard and drum editors when selected track changes */
+    struct EditorSwitcher : ITimelineObserver {
+        LuvieUI* ui;
+        explicit EditorSwitcher(LuvieUI* u) : ui(u) {}
+        void onTimelineChanged() override {
+            if (!ui->songTimeline || !ui->og1 || !ui->drumEd) return;
+            const auto& data = ui->songTimeline->get();
+            int sel = data.selectedTrackIndex;
+            bool isDrum = false;
+            if (sel >= 0 && sel < (int)data.tracks.size()) {
+                int patId = data.tracks[sel].patternId;
+                for (const auto& p : data.patterns)
+                    if (p.id == patId) { isDrum = (p.type == PatternType::DRUM); break; }
+            }
+            if (isDrum) { ui->og1->hide(); ui->drumEd->show(); }
+            else        { ui->og1->show(); ui->drumEd->hide(); }
+        }
+    } editorSwitcher{this};
+
     /* Observer that forwards timeline changes to the DSP */
     struct TimelineSender : ITimelineObserver {
         LuvieUI* ui;
         explicit TimelineSender(LuvieUI* u) : ui(u) {}
-        void onTimelineChanged() override { sendTimeline(ui); }
+        void onTimelineChanged() override {
+            if (ui->restoringState) return;
+            sendTimeline(ui);
+            sendFullState(ui);
+        }
     } timelineSender{this};
 
     ~LuvieUI() {
-        if (songTimeline) songTimeline->removeObserver(&timelineSender);
+        if (songTimeline) {
+            songTimeline->removeObserver(&timelineSender);
+            songTimeline->removeObserver(&editorSwitcher);
+        }
         /* Popups are added to window via add(), so window owns and deletes them. */
         delete window;
         delete jackTransport;
@@ -221,6 +269,198 @@ static void sendTimeline(LuvieUI* ui)
 }
 
 /* -----------------------------------------------------------------------
+   Full JSON state serialization / deserialization
+   ----------------------------------------------------------------------- */
+
+static std::string serializeStateToString(LuvieUI* ui)
+{
+    if (!ui->songTimeline || !ui->patternPanel)
+        return {};
+
+    const Timeline& tl = ui->songTimeline->get();
+
+    json j;
+    j["version"]            = 1;
+    j["rootPitch"]          = ui->patternPanel->rootPitch();
+    j["chordType"]          = ui->patternPanel->chordType();
+    j["useSharp"]           = ui->patternPanel->isSharp();
+    j["selectedTrackIndex"] = tl.selectedTrackIndex;
+
+    json timeSigs = json::array();
+    for (const auto& ts : tl.timeSigs)
+        timeSigs.push_back({{"bar", ts.bar}, {"top", ts.top}, {"bottom", ts.bottom}});
+    j["timeSigs"] = timeSigs;
+
+    json bpms = json::array();
+    for (const auto& bm : tl.bpms)
+        bpms.push_back({{"bar", bm.bar}, {"bpm", bm.bpm}});
+    j["bpms"] = bpms;
+
+    json patterns = json::array();
+    for (const auto& pat : tl.patterns) {
+        json notes = json::array();
+        for (const auto& n : pat.notes)
+            notes.push_back({
+                {"id",             n.id},
+                {"pitch",          n.pitch},
+                {"beat",           n.beat},
+                {"length",         n.length},
+                {"velocity",       n.velocity},
+                {"disabled",       n.disabled},
+                {"disabledDegree", n.disabledDegree}
+            });
+
+        json drumNotes = json::array();
+        for (const auto& dn : pat.drumNotes)
+            drumNotes.push_back({
+                {"id",       dn.id},
+                {"note",     dn.note},
+                {"beat",     dn.beat},
+                {"velocity", dn.velocity}
+            });
+
+        patterns.push_back({
+            {"id",          pat.id},
+            {"lengthBeats", pat.lengthBeats},
+            {"type",        (int)pat.type},
+            {"notes",       notes},
+            {"drumNotes",   drumNotes}
+        });
+    }
+    j["patterns"] = patterns;
+
+    json tracks = json::array();
+    for (const auto& track : tl.tracks) {
+        json instances = json::array();
+        for (const auto& inst : track.patterns)
+            instances.push_back({
+                {"id",          inst.id},
+                {"patternId",   inst.patternId},
+                {"startBar",    inst.startBar},
+                {"length",      inst.length},
+                {"startOffset", inst.startOffset}
+            });
+
+        tracks.push_back({
+            {"id",        track.id},
+            {"label",     track.label},
+            {"patternId", track.patternId},
+            {"instances", instances}
+        });
+    }
+    j["tracks"] = tracks;
+
+    return j.dump();
+}
+
+static void sendFullState(LuvieUI* ui)
+{
+    if (!ui->writeFunc) return;
+
+    std::string jsonStr = serializeStateToString(ui);
+    if (jsonStr.empty()) return;
+
+    /* Include null terminator so the DSP can treat it as a C string */
+    uint32_t jsonSize = (uint32_t)jsonStr.size() + 1;
+
+    std::vector<uint8_t> atomBuf(sizeof(LV2_Atom) + jsonSize);
+    LV2_Atom* atom = reinterpret_cast<LV2_Atom*>(atomBuf.data());
+    atom->type = ui->luvie_state_urid;
+    atom->size = jsonSize;
+    memcpy(atomBuf.data() + sizeof(LV2_Atom), jsonStr.c_str(), jsonSize);
+
+    ui->writeFunc(ui->controller,
+                  0 /* PORT_CONTROL_IN */,
+                  (uint32_t)atomBuf.size(),
+                  ui->atom_eventTransfer,
+                  atomBuf.data());
+}
+
+static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
+{
+    if (!ui->songTimeline || !ui->patternPanel || size == 0) return;
+
+    json j;
+    try {
+        j = json::parse(data, data + size);
+    } catch (...) {
+        fprintf(stderr, "[luvie_ui] deserializeFullState: JSON parse failed\n");
+        return;
+    }
+
+    if (j.value("version", 0) != 1) {
+        fprintf(stderr, "[luvie_ui] deserializeFullState: bad version\n");
+        return;
+    }
+
+    Timeline tl;
+    tl.selectedTrackIndex = j.value("selectedTrackIndex", -1);
+
+    for (const auto& ts : j.value("timeSigs", json::array()))
+        tl.timeSigs.push_back({ts["bar"], ts["top"], ts["bottom"]});
+
+    for (const auto& bm : j.value("bpms", json::array()))
+        tl.bpms.push_back({bm["bar"], bm.value("bpm", 120.0f)});
+
+    for (const auto& p : j.value("patterns", json::array())) {
+        Pattern pat;
+        pat.id          = p["id"];
+        pat.lengthBeats = p.value("lengthBeats", 8.0f);
+        pat.type        = (PatternType)p.value("type", 0);
+        for (const auto& n : p.value("notes", json::array())) {
+            Note note;
+            note.id             = n["id"];
+            note.pitch          = n.value("pitch", 0);
+            note.beat           = n.value("beat", 0.0f);
+            note.length         = n.value("length", 1.0f);
+            note.velocity       = n.value("velocity", 0.0f);
+            note.disabled       = n.value("disabled", false);
+            note.disabledDegree = n.value("disabledDegree", -1);
+            pat.notes.push_back(note);
+        }
+        for (const auto& dn : p.value("drumNotes", json::array())) {
+            DrumNote drumNote;
+            drumNote.id       = dn["id"];
+            drumNote.note     = dn.value("note", 0);
+            drumNote.beat     = dn.value("beat", 0.0f);
+            drumNote.velocity = dn.value("velocity", 0.8f);
+            pat.drumNotes.push_back(drumNote);
+        }
+        tl.patterns.push_back(std::move(pat));
+    }
+
+    for (const auto& t : j.value("tracks", json::array())) {
+        Track track;
+        track.id        = t["id"];
+        track.label     = t.value("label", "");
+        track.patternId = t.value("patternId", 0);
+        for (const auto& inst : t.value("instances", json::array())) {
+            PatternInstance pi;
+            pi.id          = inst["id"];
+            pi.patternId   = inst.value("patternId", 0);
+            pi.startBar    = inst.value("startBar", 0.0f);
+            pi.length      = inst.value("length", 4.0f);
+            pi.startOffset = inst.value("startOffset", 0.0f);
+            track.patterns.push_back(pi);
+        }
+        tl.tracks.push_back(std::move(track));
+    }
+
+    /* Apply restored state without triggering intermediate sends */
+    ui->restoringState = true;
+    ui->patternPanel->setParams(
+        j.value("rootPitch", 0),
+        j.value("chordType", 0),
+        j.value("useSharp", true));
+    ui->songTimeline->loadTimeline(tl);
+    ui->restoringState = false;
+
+    /* Now send the correct state to the DSP */
+    sendTimeline(ui);
+    sendFullState(ui);
+}
+
+/* -----------------------------------------------------------------------
    ExternalUI function-pointer callbacks
    ----------------------------------------------------------------------- */
 
@@ -284,10 +524,18 @@ static LV2UI_Handle instantiate(
             ui->map = static_cast<LV2_URID_Map*>(features[i]->data);
     }
 
+    /* Build the per-process state file path once (PID is stable for the session) */
+    if (g_stateFilePath.empty()) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "/tmp/luvie_state_%d.json", (int)getpid());
+        g_stateFilePath = buf;
+    }
+
     if (ui->map) {
         auto m = [&](const char* uri) { return ui->map->map(ui->map->handle, uri); };
         ui->atom_eventTransfer  = m(LV2_ATOM__eventTransfer);
         ui->luvie_timeline_urid = m(LUVIE_TIMELINE_URI);
+        ui->luvie_state_urid    = m(LUVIE_STATE_URI);
         ui->atom_Object         = m(LV2_ATOM__Object);
         ui->atom_Blank          = m(LV2_ATOM__Blank);
         ui->time_Position       = m(LV2_TIME__Position);
@@ -324,7 +572,14 @@ static LV2UI_Handle instantiate(
     const int tabsH = winH - bottomH;
 
     /* ---- Tabs ---- */
+    static constexpr Fl_Color songColor = 0x22C55E00;
+    static constexpr Fl_Color loopColor = 0x3B82F600;
+
     ModernTabs* tabs = new ModernTabs(0, 0, winW, tabsH);
+    tabs->enableModeToggle(songColor, loopColor);
+    tabs->setTabAccent(0, songColor);
+    tabs->setTabAccent(1, loopColor);
+    tabs->setTabAccent(2, 0xF9731600);
     ui->window->add(tabs);
 
     /* ---- Song Editor tab ---- */
@@ -356,10 +611,23 @@ static LV2UI_Handle instantiate(
     tab1->add(og2);
     tab1->end();
 
+    /* ---- Loop Editor tab ---- */
+    Fl_Group* tabLoop = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Loop Editor");
+    tabLoop->color(bgColor);
+    tabs->add(*tabLoop);
+
+    LoopEditor* loopEd = new LoopEditor(0, tabBarH, winW, tabsH - tabBarH);
+    tabLoop->add(loopEd);
+    tabLoop->end();
+
+    ui->loopEd = loopEd;
+
     /* ---- Pattern Editor tab ---- */
-    const int panelH   = 50;
-    const int rowHeight = 30;
-    const int numRows   = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
+    const int panelH      = 50;
+    const int rowHeight   = 30;
+    const int numRows     = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
+    const int drumRowH    = 20;
+    const int drumNumRows = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowH;
 
     Fl_Group* tab2 = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2->color(bgColor);
@@ -370,11 +638,18 @@ static LV2UI_Handle instantiate(
                                            numPatternBeats, rowHeight, 40, 0.25, *ui->popup1);
     tab2->add(og1);
 
+    DrumPatternEditor* drumEd = new DrumPatternEditor(0, tabBarH, winW, drumNumRows,
+                                                      numPatternBeats, drumRowH, 40, 0.25f, *ui->popup1);
+    tab2->add(drumEd);
+    drumEd->hide();
+
     PatternPanel* patternPanel = new PatternPanel(0, tabsH - panelH, winW, panelH);
     patternPanel->setTimeline(ui->songTimeline);
     tab2->add(patternPanel);
     tab2->end();
 
+    ui->og1         = og1;
+    ui->drumEd      = drumEd;
     ui->patternPanel = patternPanel;
 
     /* ---- Transport ---- */
@@ -407,7 +682,12 @@ static LV2UI_Handle instantiate(
         tabs->redraw();
     };
 
+    loopEd->setTimeline(ui->songTimeline);
+    loopEd->setTransport(ui->simpleTransport);
+    loopEd->setContextPopup(trackCtxPopup);
+
     og1->setPatternPlayhead(ui->simpleTransport, ui->songTimeline, 0);
+    drumEd->setPatternPlayhead(ui->simpleTransport, ui->songTimeline, 0);
     ui->songTimeline->selectTrack(0);
 
     auto syncNoteLabels = [og1, patternPanel]() {
@@ -417,7 +697,10 @@ static LV2UI_Handle instantiate(
     };
     patternPanel->onParamsChanged = [ui, syncNoteLabels]() {
         syncNoteLabels();
-        sendTimeline(ui);
+        if (!ui->restoringState) {
+            sendTimeline(ui);
+            sendFullState(ui);
+        }
     };
     syncNoteLabels();
 
@@ -430,6 +713,7 @@ static LV2UI_Handle instantiate(
 
     /* ---- Resizable chain ---- */
     tab1->resizable(og2);
+    tabLoop->resizable(loopEd);
     tab2->resizable(og1);
     ui->window->resizable(tabs);
 
@@ -439,6 +723,24 @@ static LV2UI_Handle instantiate(
 
     /* ---- Register timeline observer and send initial state to DSP ---- */
     ui->songTimeline->addObserver(&ui->timelineSender);
+    ui->songTimeline->addObserver(&ui->editorSwitcher);
+
+    /* Restore from file if available (written by dsp_restore or previous UI close) */
+    if (!g_stateFilePath.empty()) {
+        FILE* f = fopen(g_stateFilePath.c_str(), "rb");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long sz = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            if (sz > 0) {
+                std::vector<uint8_t> buf((size_t)sz);
+                if (fread(buf.data(), 1, (size_t)sz, f) != (size_t)sz) buf.clear();
+                deserializeFullState(ui, buf.data(), (uint32_t)sz);
+            }
+            fclose(f);
+        }
+    }
+
     sendTimeline(ui);
 
     /* ---- Try to connect to JACK for transport control ---- */
@@ -451,7 +753,21 @@ static LV2UI_Handle instantiate(
 
 static void cleanup(LV2UI_Handle handle)
 {
-    delete reinterpret_cast<LuvieUI*>(handle);
+    LuvieUI* ui = reinterpret_cast<LuvieUI*>(handle);
+
+    /* Save current state to file so the next instantiate can restore it */
+    if (!g_stateFilePath.empty()) {
+        std::string json = serializeStateToString(ui);
+        if (!json.empty()) {
+            FILE* f = fopen(g_stateFilePath.c_str(), "wb");
+            if (f) {
+                fwrite(json.c_str(), 1, json.size(), f);
+                fclose(f);
+            }
+        }
+    }
+
+    delete ui;
 }
 
 static void port_event(LV2UI_Handle handle, uint32_t port_index,
@@ -463,6 +779,14 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
         return;
 
     const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);
+
+    /* Handle state sent back from DSP (belt-and-suspenders: file is primary path) */
+    if (atom->type == ui->luvie_state_urid) {
+        const uint8_t* body = reinterpret_cast<const uint8_t*>(atom) + sizeof(LV2_Atom);
+        deserializeFullState(ui, body, atom->size);
+        return;
+    }
+
     if ((atom->type != ui->atom_Object && atom->type != ui->atom_Blank) ||
         !ui->simpleTransport)
         return;
