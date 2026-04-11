@@ -128,7 +128,7 @@ void PatternGrid::toggleNote()
                                   && col < n.beat + n.length
                                   && col + 1.0f > n.beat; });
     if (clear)
-        timeline->addNote(patternId, col, (float)abs_row, 1.0f);
+        timeline->addNote(patternId, col, abs_row, 1.0f);
 }
 
 std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)

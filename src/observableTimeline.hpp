@@ -59,7 +59,7 @@ public:
 
 	// Pattern note CRUD
 	void remapPatternNotes(int patId, int oldSize, int newSize);
-	void addNote(int patternId, float start, float pitch, float length, float velocity = 0.8f);
+	void addNote(int patternId, float start, int pitch, float length, float velocity = 0.8f);
 	void removeNote(int noteId);
 	void moveNote(int noteId, float newStart, float newPitch);
 	void resizeNoteRight(int noteId, float newLength);

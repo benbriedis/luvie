@@ -115,7 +115,7 @@ Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW,
 	if (y + popupH > available.height - vpad)
 		y = anchor.y - popupH - vpad;
 	if (y < vpad) y = vpad;
-	return Point2(x, y);
+	return Point2{x, y};
 }
 
 Point2 Popup::popupPosition(Size size, Point2 pos)
@@ -132,5 +132,5 @@ Point2 Popup::popupPosition(Size size, Point2 pos)
 	float x = pos.x > maxX ? maxX : pos.x;
 	x = x < sidePadding ? sidePadding : x;
 
-	return Point2(x, y);
+	return Point2{(int)x, (int)y};
 }

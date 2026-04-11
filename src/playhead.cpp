@@ -14,19 +14,14 @@ Playhead::Playhead(int numCols, int colWidth)
 Playhead::~Playhead()
 {
 	Fl::remove_timeout(timerCb, this);
-	if (obsTl) obsTl->removeObserver(this);
+	swapObserver(obsTl, nullptr, this);
 }
 
 void Playhead::setTransport(ITransport* t, ObservableTimeline* tl)
 {
 	Fl::remove_timeout(timerCb, this);
-	if (obsTl) obsTl->removeObserver(this);
-
 	transport = t;
-	obsTl     = tl;
-
-	if (obsTl) obsTl->addObserver(this);
-
+	swapObserver(obsTl, tl, this);
 	Fl::add_timeout(0.1, timerCb, this);
 }
 

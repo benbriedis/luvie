@@ -483,11 +483,11 @@ void ObservableTimeline::remapPatternNotes(int patId, int oldSize, int newSize)
 	notify();
 }
 
-void ObservableTimeline::addNote(int patternId, float start, float pitch, float length, float velocity)
+void ObservableTimeline::addNote(int patternId, float start, int pitch, float length, float velocity)
 {
 	for (auto& pat : data.patterns) {
 		if (pat.id == patternId) {
-			pat.notes.push_back({nextId++, (int)pitch, start, length, velocity});
+			pat.notes.push_back({nextId++, pitch, start, length, velocity});
 			notify();
 			return;
 		}
