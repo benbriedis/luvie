@@ -2,6 +2,7 @@
 #include <functional>
 #include <string>
 #include <FL/Fl_Group.H>
+#include <FL/Fl_Menu_Bar.H>
 #include "editor.hpp"
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
@@ -30,6 +31,7 @@ public:
     ~LuvieApp();
 
     // Layout constants
+    static constexpr int menuBarH        = 22;
     static constexpr int tabBarH         = 35;
     static constexpr int bottomH         = 50;
     static constexpr int markerRulerH    = 18;
@@ -39,7 +41,7 @@ public:
     static constexpr int rowHeight       = 30;
 
     static int defaultWinH() {
-        return tabBarH + 2*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
+        return menuBarH + tabBarH + 2*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
     }
 
     // Options — set before calling build()
@@ -51,6 +53,7 @@ public:
     std::function<void()>           onExtraTimelineChange;
 
     // Widgets — valid after build()
+    Fl_Menu_Bar*       menuBar      = nullptr;
     ModernTabs*        tabs         = nullptr;
     Fl_Group*          patternTab   = nullptr;
     PatternEditor*     patternEd    = nullptr;

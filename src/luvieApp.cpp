@@ -1,4 +1,5 @@
 #include "luvieApp.hpp"
+#include "FL/Fl_Menu_Item.H"
 #include "observableTimeline.hpp"
 #include "appWindow.hpp"
 #include "songEditor.hpp"
@@ -30,13 +31,26 @@ void LuvieApp::EditorSwitcher::onTimelineChanged() {
 void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport* transport) {
     timeline_ = timeline;
 
-    const int tabsH      = defaultWinH() - bottomH;
+    const int off        = menuBarH;
+    const int tabsH      = defaultWinH() - bottomH - menuBarH;
     const int drumRowH   = 20;
     const int numRows     = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
     const int drumNumRows = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowH;
 
     // Reset current group so nothing auto-parents unexpectedly
     Fl_Group::current(nullptr);
+
+    // ---- Menu bar ----
+    menuBar = new Fl_Menu_Bar(0, 0, winW, menuBarH);
+    menuBar->box(FL_FLAT_BOX);
+    menuBar->color(0xF3F4F600);
+    menuBar->textcolor(0x37415100);
+    menuBar->textsize(13);
+    menuBar->add("File/Save",    FL_COMMAND + 's', nullptr, nullptr, 0);
+    menuBar->add("File/Save As", 0,                nullptr, nullptr, FL_MENU_DIVIDER);
+    menuBar->add("File/Import",  0,                nullptr, nullptr);
+    menuBar->add("File/Export",  0,                nullptr, nullptr, 0);
+    window->add(menuBar);
 
     // ---- Popups (created before any group so they stay unparented until explicit add) ----
     auto* p1     = new Popup{};
@@ -49,7 +63,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     static constexpr Fl_Color songColor = 0x22C55E00;
     static constexpr Fl_Color loopColor = 0x3B82F600;
 
-    tabs = new ModernTabs(0, 0, winW, tabsH);
+    tabs = new ModernTabs(0, off, winW, tabsH);
     tabs->end();
     tabs->enableModeToggle(songColor, loopColor);
     tabs->setTabAccent(0, songColor);
@@ -58,50 +72,50 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->add(tabs);
 
     // ---- Song Editor tab ----
-    auto* tab1 = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Song Editor");
+    auto* tab1 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Song Editor");
     tab1->end();
     tab1->color(bgColor);
 
-    auto* timeSigRuler = new MarkerRuler(0, tabBarH, winW, markerRulerH,
+    auto* timeSigRuler = new MarkerRuler(0, off + tabBarH, winW, markerRulerH,
         80, 60, MarkerRuler::TIME_SIG, timeline, tsPop);
     tab1->add(timeSigRuler);
 
-    auto* tempoRuler = new MarkerRuler(0, tabBarH + markerRulerH, winW, markerRulerH,
+    auto* tempoRuler = new MarkerRuler(0, off + tabBarH + markerRulerH, winW, markerRulerH,
         80, 60, MarkerRuler::TEMPO, timeline, tPop);
     tab1->add(tempoRuler);
 
-    auto* og2 = new SongEditor(0, tabBarH + 2*markerRulerH, winW,
+    auto* og2 = new SongEditor(0, off + tabBarH + 2*markerRulerH, winW,
                                10, 80, 45, 60, 0.25, *p2);
     tab1->add(og2);
     tab1->resizable(og2);
     tabs->add(*tab1);
 
     // ---- Loop Editor tab ----
-    auto* tabLoop = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Loop Editor");
+    auto* tabLoop = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Loop Editor");
     tabLoop->end();
     tabLoop->color(bgColor);
 
-    loopEd = new LoopEditor(0, tabBarH, winW, tabsH - tabBarH);
+    loopEd = new LoopEditor(0, off + tabBarH, winW, tabsH - tabBarH);
     tabLoop->add(loopEd);
     tabLoop->resizable(loopEd);
     tabs->add(*tabLoop);
 
     // ---- Pattern Editor tab ----
-    auto* tab2 = new Fl_Group(0, tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
+    auto* tab2 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2->end();
     tab2->color(bgColor);
     patternTab = tab2;
 
-    patternEd = new PatternEditor(0, tabBarH, winW, numRows,
+    patternEd = new PatternEditor(0, off + tabBarH, winW, numRows,
                                   numPatternBeats, rowHeight, 40, 0.25, *p1);
     tab2->add(patternEd);
 
-    drumEd = new DrumPatternEditor(0, tabBarH, winW, drumNumRows,
+    drumEd = new DrumPatternEditor(0, off + tabBarH, winW, drumNumRows,
                                    numPatternBeats, drumRowH, 40, 0.25f, *p1);
     tab2->add(drumEd);
     drumEd->hide();
 
-    patternPanel = new PatternPanel(0, tabsH - panelH, winW, panelH);
+    patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
     patternPanel->setTimeline(timeline);
     tab2->add(patternPanel);
     tab2->resizable(patternEd);
@@ -109,7 +123,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
 
     // ---- Transport bar ----
     Fl_Group::current(nullptr);
-    bottomPane = new Transport(0, tabsH, winW, bottomH, transport, timeline);
+    bottomPane = new Transport(0, off + tabsH, winW, bottomH, transport, timeline);
     window->add(bottomPane);
     if (disableTransportButtons)
         bottomPane->disableButtons();
@@ -168,7 +182,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     // ---- Resizable chain + minimum size ----
     window->resizable(tabs);
     const int minW = 14 + 36 + 5*40;
-    const int minH = tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
+    const int minH = menuBarH + tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
     window->size_range(minW, minH);
 
     // ---- Timeline observers ----

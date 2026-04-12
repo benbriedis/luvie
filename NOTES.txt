@@ -226,12 +226,9 @@ Nice if we had an install script that installed everything locally (FLTK, JSON, 
 
 Look in future for any polling loops it may have added in.
 
-Re RaySession etc
------------------
-  For the "Application" button (the curated list): that's populated from .desktop files installed 
-  to ~/.local/share/applications/ or /usr/share/applications/. If you want Luvie to appear there
-  you'd need a luvie.desktop file — that's more of a packaging/installation step rather than      
-  something to bake into the source.
+TODO add application icon
+
+cf make install (required for RaySession) may be Linux specific...
 
 ------------------------------TODOs---------------------------
 
@@ -253,14 +250,6 @@ Re RaySession etc
 	   a bit forced though - is there a better way? Dont REALLY want to have to have a time signature field for every pattern which is probably
 	   the "proper" way.
 	)
-
-3. Save
-	Three types:
-	1. LV2 host sessions
-	2. NON 
-	3. Standalone.
-	   - cf allow import and export of sessions via this mechanism too when using LV2 or NON.
-	   - Want to be able supply a session name on the command line.
 
 4. Drum patterns
 	1. There is a standard MIDI drum mapping. How best to support other mappings... look at DrumGizmo & the jazz drum kit plugin.
@@ -296,5 +285,19 @@ Link BPM and time up in loop editor
 Loop playhead broke after a while
 
 
+ISSUE: In RaySession our transport does not seem to update (OK in Ardour)
 
+Add export and import
+Add standalone save (reuse export and import code)
+
+A WEIRDNESS in Pattern Editor once unable to cick into Song Editor and have it stick - would bounce back
+
+3. Save
+	Three types:
+	1. LV2 host sessions
+	2. NSM 
+	3. Standalone.
+	   - cf allow import and export of sessions via this mechanism too when using LV2 or NON.
+	   - Want to be able supply a session name on the command line.
+  
 
