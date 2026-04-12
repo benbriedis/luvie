@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Luvie
+GenericName=MIDI Sequencer
+Comment=MIDI pattern sequencer and song editor
+Exec=luvie
+TryExec=luvie
+Terminal=false
+StartupNotify=false
+Categories=AudioVideo;Audio;Sequencer;Midi;
+X-NSM-Capable=true

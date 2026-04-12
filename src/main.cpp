@@ -8,6 +8,8 @@
 #include "transport.hpp"
 #include "noteLabels.hpp"
 #include "luvieApp.hpp"
+#include "nsm.hpp"
+#include "timelineIO.hpp"
 
 int main(int argc, char **argv) {
     bool verbose = false;
@@ -68,6 +70,49 @@ int main(int argc, char **argv) {
             }, app.bottomPane);
         };
     }
+
+    // --- NSM session management -------------------------------------------
+    static NsmClient nsm;
+    std::string nsmSessionPath;
+
+    nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
+        nsmSessionPath = path;
+        AppState state;
+        if (loadAppState(path + ".json", state)) {
+            songTimeline.loadTimeline(state.timeline);
+            if (app.patternPanel)
+                app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+        }
+        // onOpen must succeed even if there is no existing file yet.
+        return true;
+    };
+
+    nsm.onSave = [&]() -> bool {
+        if (nsmSessionPath.empty()) return false;
+        AppState state;
+        state.timeline  = songTimeline.get();
+        if (app.patternPanel) {
+            state.rootPitch = app.patternPanel->rootPitch();
+            state.chordType = app.patternPanel->chordType();
+            state.sharp     = app.patternPanel->isSharp();
+        }
+        return saveAppState(state, nsmSessionPath + ".json");
+    };
+
+    // Derive the executable basename for the announce message.
+    std::string exeName = argv[0];
+    auto slash = exeName.rfind('/');
+    if (slash != std::string::npos) exeName = exeName.substr(slash + 1);
+
+    nsm.init("Luvie", exeName.c_str());
+
+    // When the window is closed directly (not via the session manager's save
+    // + quit sequence), save the session so data isn't lost.
+    window.callback([](Fl_Widget* w, void*) {
+        if (nsm.isActive() && nsm.onSave)
+            nsm.onSave();
+        w->hide();
+    }, nullptr);
 
     window.show(argc, argv);
     return Fl::run();
