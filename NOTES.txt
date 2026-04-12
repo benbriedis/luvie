@@ -306,4 +306,8 @@ cf Show recent projects - Probably need program settings to remember between run
 TODO review the format of the JSON file
      cf a Zod-like description?
      cf a version number?
-     
+
+Does top Makefile need install target added to it? src/Makefile has install target.
+
+Implement undo/redo. Only enable Save & Save As if a change has been made (and not undone).
+

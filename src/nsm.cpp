@@ -20,7 +20,11 @@ NsmClient::~NsmClient() {
 
 bool NsmClient::init(const char* appName, const char* exe) {
     const char* url = std::getenv("NSM_URL");
-    if (!url) return false;
+    if (!url) {
+        fprintf(stderr, "[nsm] NSM_URL not set — running without NSM\n");
+        return false;
+    }
+    fprintf(stderr, "[nsm] NSM_URL = %s\n", url);
 
     // Create OSC server on a random port (NULL = OS-assigned).
     auto errHandler = [](int num, const char* msg, const char* path) {

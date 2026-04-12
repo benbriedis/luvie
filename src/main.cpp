@@ -111,6 +111,7 @@ int main(int argc, char **argv) {
     nsm.init("Luvie", exeName.c_str());
 
     // --- Wire Save / Save As based on mode --------------------------------
+    fprintf(stderr, "[luvie] nsm.isActive() = %d\n", (int)nsm.isActive());
     if (nsm.isActive()) {
         // NSM manages the session file; Save As makes no sense here.
         app.disableSaveMenu(/*save=*/false, /*saveAs=*/true);
