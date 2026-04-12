@@ -52,6 +52,15 @@ public:
     std::function<void()>           onExtraParamsChanged;
     std::function<void()>           onExtraTimelineChange;
 
+    static std::string lastFileDir;  // remembered across Save As / Import / Export
+
+    // Set before or after build() to wire up Save / Save As.
+    // onSave / onSaveAs are called when the matching menu item is chosen.
+    // disableSaveMenu() greys out the items; call after build().
+    std::function<void()> onSave;
+    std::function<void()> onSaveAs;
+    void disableSaveMenu(bool save, bool saveAs);
+
     // Widgets — valid after build()
     Fl_Menu_Bar*       menuBar      = nullptr;
     ModernTabs*        tabs         = nullptr;
@@ -66,6 +75,11 @@ public:
 
 private:
     ObservableTimeline* timeline_ = nullptr;
+
+    static void saveCb   (Fl_Widget*, void* data);
+    static void saveAsCb (Fl_Widget*, void* data);
+    static void importCb (Fl_Widget*, void* data);
+    static void exportCb (Fl_Widget*, void* data);
 
     struct EditorSwitcher : ITimelineObserver {
         LuvieApp* app;

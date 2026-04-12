@@ -532,6 +532,7 @@ static LV2UI_Handle instantiate(
 
     /* ---- Build all shared UI ---- */
     ui->app.build(ui->window, ui->songTimeline, ui->simpleTransport);
+    ui->app.disableSaveMenu(/*save=*/true, /*saveAs=*/true);
 
     /* ---- Restore from file if available ---- */
     if (!g_stateFilePath.empty()) {

@@ -230,6 +230,14 @@ TODO add application icon
 
 cf make install (required for RaySession) may be Linux specific...
 
+
+IMPLEMENT - NEED NOTES 
+======================
+- Have New Session Manager support
+
+- Have a standalone version that can take a project file as an argument - eg:  luvie myproject.json
+  MAYBE add a "luvie -h" option in. For some reason getting the Fltk options again...
+
 ------------------------------TODOs---------------------------
 
 1. Transport
@@ -292,12 +300,10 @@ Add standalone save (reuse export and import code)
 
 A WEIRDNESS in Pattern Editor once unable to cick into Song Editor and have it stick - would bounce back
 
-3. Save
-	Three types:
-	1. LV2 host sessions
-	2. NSM 
-	3. Standalone.
-	   - cf allow import and export of sessions via this mechanism too when using LV2 or NON.
-	   - Want to be able supply a session name on the command line.
-  
+cf Show recent projects - Probably need program settings to remember between runs...
+   Ditto if I want to remember the last Save As / Export / Import directory.
 
+TODO review the format of the JSON file
+     cf a Zod-like description?
+     cf a version number?
+     

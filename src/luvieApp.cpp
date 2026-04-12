@@ -1,6 +1,9 @@
 #include "luvieApp.hpp"
 #include "FL/Fl_Menu_Item.H"
+#include "FL/Fl_Native_File_Chooser.H"
+#include "timelineIO.hpp"
 #include "observableTimeline.hpp"
+#include <filesystem>
 #include "appWindow.hpp"
 #include "songEditor.hpp"
 #include "patternEditor.hpp"
@@ -14,6 +17,8 @@
 #include "drumPatternEditor.hpp"
 #include "loopEditor.hpp"
 
+std::string LuvieApp::lastFileDir;
+
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
     if (!app->patternEd || !app->drumEd || !app->timeline_) return;
     const auto& data = app->timeline_->get();
@@ -26,6 +31,65 @@ void LuvieApp::EditorSwitcher::onTimelineChanged() {
     }
     if (isDrum) { app->patternEd->hide(); app->drumEd->show(); }
     else        { app->patternEd->show(); app->drumEd->hide(); }
+}
+
+void LuvieApp::saveCb(Fl_Widget*, void* data) {
+    auto* app = static_cast<LuvieApp*>(data);
+    if (app->onSave) app->onSave();
+}
+
+void LuvieApp::saveAsCb(Fl_Widget*, void* data) {
+    auto* app = static_cast<LuvieApp*>(data);
+    if (app->onSaveAs) app->onSaveAs();
+}
+
+void LuvieApp::importCb(Fl_Widget*, void* data) {
+    auto* app = static_cast<LuvieApp*>(data);
+
+    Fl_Native_File_Chooser fc;
+    fc.title("Import Session");
+    fc.type(Fl_Native_File_Chooser::BROWSE_FILE);
+    fc.filter("JSON Files\t*.json\nAll Files\t*");
+    if (!lastFileDir.empty()) fc.directory(lastFileDir.c_str());
+    if (fc.show() != 0) return;
+
+    const char* path = fc.filename();
+    if (!path || !path[0]) return;
+    lastFileDir = std::filesystem::path(path).parent_path().string();
+
+    AppState state;
+    if (!loadAppState(path, state)) return;
+
+    app->timeline_->loadTimeline(state.timeline);
+    if (app->patternPanel)
+        app->patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+}
+
+void LuvieApp::exportCb(Fl_Widget*, void* data) {
+    auto* app = static_cast<LuvieApp*>(data);
+
+    Fl_Native_File_Chooser fc;
+    fc.title("Export Session");
+    fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
+    fc.filter("JSON Files\t*.json\nAll Files\t*");
+    fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
+    if (!lastFileDir.empty()) fc.directory(lastFileDir.c_str());
+    if (fc.show() != 0) return;
+
+    std::string path = fc.filename();
+    if (path.empty()) return;
+    if (path.size() < 5 || path.substr(path.size() - 5) != ".json")
+        path += ".json";
+    lastFileDir = std::filesystem::path(path).parent_path().string();
+
+    AppState state;
+    state.timeline = app->timeline_->get();
+    if (app->patternPanel) {
+        state.rootPitch = app->patternPanel->rootPitch();
+        state.chordType = app->patternPanel->chordType();
+        state.sharp     = app->patternPanel->isSharp();
+    }
+    saveAppState(state, path);
 }
 
 void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport* transport) {
@@ -172,6 +236,16 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     patternPanel->onParamsChanged = syncNoteLabels;
     syncNoteLabels();
 
+    // ---- Menu callbacks ----
+    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Save")))
+        item->callback(saveCb, this);
+    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Save As")))
+        item->callback(saveAsCb, this);
+    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Import")))
+        item->callback(importCb, this);
+    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Export")))
+        item->callback(exportCb, this);
+
     // ---- Popups — added last (FLTK dispatches in reverse order) ----
     window->add(p1);     window->registerPopup(p1);
     window->add(p2);     window->registerPopup(p2);
@@ -192,6 +266,22 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
 
     // ---- Initial state ----
     timeline->selectTrack(0);
+}
+
+void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
+    if (!menuBar) return;
+    auto setActive = [this](const char* path, bool active) {
+        auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item(path));
+        if (!item) return;
+        if (active) item->activate(); else item->deactivate();
+    };
+    if (save) {
+        setActive("File/Save", false);
+        setActive("File/Save As", false);
+    } else if (saveAs) {
+        setActive("File/Save As", false);
+    }
+    menuBar->redraw();
 }
 
 LuvieApp::~LuvieApp() {

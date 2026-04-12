@@ -1,4 +1,6 @@
 #include <FL/Fl.H>
+#include <FL/Fl_Native_File_Chooser.H>
+#include <filesystem>
 #include <string>
 #include "appWindow.hpp"
 #include "simpleTransport.hpp"
@@ -13,11 +15,15 @@
 
 int main(int argc, char **argv) {
     bool verbose = false;
+    std::string projectPath;   // optional CLI project file (standalone only)
     int  fltk_argc = 1;
+
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg == "--verbose" || arg == "-v")
             verbose = true;
+        else if (!arg.empty() && arg[0] != '-' && projectPath.empty())
+            projectPath = arg;   // first non-flag arg treated as project file
         else
             argv[fltk_argc++] = argv[i];
     }
@@ -83,7 +89,6 @@ int main(int argc, char **argv) {
             if (app.patternPanel)
                 app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
         }
-        // onOpen must succeed even if there is no existing file yet.
         return true;
     };
 
@@ -99,15 +104,76 @@ int main(int argc, char **argv) {
         return saveAppState(state, nsmSessionPath + ".json");
     };
 
-    // Derive the executable basename for the announce message.
     std::string exeName = argv[0];
     auto slash = exeName.rfind('/');
     if (slash != std::string::npos) exeName = exeName.substr(slash + 1);
 
     nsm.init("Luvie", exeName.c_str());
 
-    // When the window is closed directly (not via the session manager's save
-    // + quit sequence), save the session so data isn't lost.
+    // --- Wire Save / Save As based on mode --------------------------------
+    if (nsm.isActive()) {
+        // NSM manages the session file; Save As makes no sense here.
+        app.disableSaveMenu(/*save=*/false, /*saveAs=*/true);
+        app.onSave = [&]() { if (nsm.onSave) nsm.onSave(); };
+
+    } else {
+        // Standalone mode: load from CLI path if provided, then set up Save.
+        if (!projectPath.empty()) {
+            AppState state;
+            if (loadAppState(projectPath, state)) {
+                songTimeline.loadTimeline(state.timeline);
+                if (app.patternPanel)
+                    app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+            }
+        }
+
+        // Helper: shows a Save As dialog, returns chosen path (with .json),
+        // or empty string if cancelled.
+        auto pickSavePath = [&]() -> std::string {
+            Fl_Native_File_Chooser fc;
+            fc.title("Save Project As");
+            fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
+            fc.filter("JSON Files\t*.json\nAll Files\t*");
+            fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
+            if (!LuvieApp::lastFileDir.empty()) fc.directory(LuvieApp::lastFileDir.c_str());
+            if (fc.show() != 0) return {};
+            std::string p = fc.filename();
+            if (p.size() < 5 || p.substr(p.size() - 5) != ".json") p += ".json";
+            LuvieApp::lastFileDir = std::filesystem::path(p).parent_path().string();
+            return p;
+        };
+
+        // Helper: writes the current session to path.
+        auto saveToPath = [&](const std::string& path) {
+            AppState state;
+            state.timeline = songTimeline.get();
+            if (app.patternPanel) {
+                state.rootPitch = app.patternPanel->rootPitch();
+                state.chordType = app.patternPanel->chordType();
+                state.sharp     = app.patternPanel->isSharp();
+            }
+            saveAppState(state, path);
+        };
+
+        app.onSaveAs = [&, pickSavePath, saveToPath]() mutable {
+            std::string p = pickSavePath();
+            if (p.empty()) return;
+            projectPath = p;
+            saveToPath(projectPath);
+        };
+
+        app.onSave = [&, pickSavePath, saveToPath]() mutable {
+            if (projectPath.empty()) {
+                // No file yet — behave as Save As.
+                std::string p = pickSavePath();
+                if (p.empty()) return;
+                projectPath = p;
+            }
+            saveToPath(projectPath);
+        };
+    }
+
+    // When the window is closed save the session (NSM or standalone with a path).
     window.callback([](Fl_Widget* w, void*) {
         if (nsm.isActive() && nsm.onSave)
             nsm.onSave();
