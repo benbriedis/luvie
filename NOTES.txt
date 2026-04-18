@@ -13,36 +13,6 @@ valgrind   for memory issues
 ninja!	Try this to speed up builds
 
 
-Plugin structures
------------------
-1. Monolithic, but with internal API
-   PRO can share the graphics library
-   PRO gui can easily be split into tabs etc
-   PRO dont have multiple plugins appear in Ardour that are somehow loosely connected
-
-2. Both an LV2 host and client.
-   Clients have extensions... eg option/requirement to share the host GUI.
-   Probably have some 'built in' plugins.
-   PRO child plugins could possibly be run separately if desired.
-   PRO allows for separate development of parts.
-   PRO other plugins could perhaps be run with constraints. 
-       eg play one pattern per instance, bring their own GUIs.
-	   We probably control their transport.
-	   This is could a type 'trigger' situation. Still a place for a MIDI trigger plugin.
-        
-
-3. The Song editor is a 'peer' plugin
-   Extensions required for discovery between plugins and maybe saving data.
-   PRO maybe easier...
-   CON probably liable to be confusing at the end of the day.
-
-Thoughts from 12/11/2015
-------------------------
-LV2, Lilv etc are pretty painful, so don't really want them at the core of the application.
-MAY make more sense I think to create a minimal interface to connect the host and plugins.
-If desired later can provider adapters to allow LV2 or Clap plugins.
-
-
 
 Alternatives to using JSON for storage
 --------------------------------------
@@ -60,25 +30,6 @@ https://distrho.github.io/DPF/index.html
 https://github.com/DISTRHO/DPF/blob/main/FEATURES.md
 
 	... Suspect using this would make the song editor harder. Would probably need to add extensions etc
-
-Display Idea
-============
-If a pattern is offset in the song editor (also cf the live looper), show where the pattern and/or its bars 
-(if there are multiple bars in the pattern) start and end with some lines:
-
-          +-!-----+
- +------+-|-!--+--|---+------+------+------+------+
- +------+-|-!--+--|---+------+------+------+------+
-          +-!-----+
-
-Can/should I support other plugins from the song editor?
-========================================================
-- May be able to run a simple sequencer or drum machine by wrapping it in something simple.
-
-Can/should I allow my plugins to be run without the song editor?
-================================================================
-- If its not too hard, perhaps support in 'single pattern' and/or 'single play' mode or something.
-
 
 
 Ingen 

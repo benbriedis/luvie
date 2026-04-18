@@ -27,10 +27,11 @@ void Playhead::setTransport(ITransport* t, ObservableTimeline* tl)
 
 void Playhead::onTimelineChanged()
 {
-	// Re-anchor the transport so bar position stays stable across BPM/timeSig changes.
 	if (transport) {
-		float bars = transport->position();
-		transport->seek(std::clamp(bars, 0.0f, (float)numCols));
+		float bars    = transport->position();
+		float clamped = std::clamp(bars, 0.0f, (float)numCols);
+		if (clamped != bars)
+			transport->seek(clamped);
 	}
 	if (owner && owner->visible_r()) owner->redraw();
 }
