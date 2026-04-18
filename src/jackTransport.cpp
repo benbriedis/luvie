@@ -260,15 +260,12 @@ int JackTransport::process(jack_nframes_t nframes)
 
     // Collect port buffers, keyed by name for per-channel routing.
     std::vector<NamedBuf> namedBufs;
-    std::vector<void*>    allBufs;
     if (midiEnabled && portsMutex.try_lock()) {
         namedBufs.reserve(midiPorts_.size());
-        allBufs.reserve(midiPorts_.size());
         for (auto& [name, port] : midiPorts_) {
             void* b = jack_port_get_buffer(port, nframes);
             jack_midi_clear_buffer(b);
             namedBufs.push_back({name, b});
-            allBufs.push_back(b);
         }
         portsMutex.unlock();
     }
@@ -276,26 +273,20 @@ int JackTransport::process(jack_nframes_t nframes)
     bool jumped = !firstCall && wasPlaying && (pos.frame != lastFrame + nframes);
 
     // On stop or jump: silence all active notes.
-    if (!allBufs.empty() && ((!nowPlaying && wasPlaying) || jumped)) {
+    if (!namedBufs.empty() && ((!nowPlaying && wasPlaying) || jumped)) {
         for (auto& an : activeNotes) {
             uint8_t msg[3] = {
                 static_cast<uint8_t>(0x80 | (an.channel & 0x0F)),
                 static_cast<uint8_t>(an.midiPitch),
                 0
             };
-            // Send note-off to the specific port (or all if unrouted).
-            if (an.portName.empty()) {
-                for (void* b : allBufs) jack_midi_event_write(b, 0, msg, 3);
-            } else {
-                void* b = findBuf(namedBufs, an.portName);
-                if (b) jack_midi_event_write(b, 0, msg, 3);
-                else for (void* fb : allBufs) jack_midi_event_write(fb, 0, msg, 3);
-            }
+            void* b = findBuf(namedBufs, an.portName);
+            if (b) jack_midi_event_write(b, 0, msg, 3);
         }
         activeNotes.clear();
     }
 
-    if (nowPlaying && !allBufs.empty()) {
+    if (nowPlaying && !namedBufs.empty()) {
         jack_nframes_t blockEnd = pos.frame + nframes;
 
         // Fire note-offs for notes ending in this block.
@@ -309,13 +300,8 @@ int JackTransport::process(jack_nframes_t nframes)
                     static_cast<uint8_t>(it->midiPitch),
                     0
                 };
-                if (it->portName.empty()) {
-                    for (void* b : allBufs) jack_midi_event_write(b, off, msg, 3);
-                } else {
-                    void* b = findBuf(namedBufs, it->portName);
-                    if (b) jack_midi_event_write(b, off, msg, 3);
-                    else for (void* fb : allBufs) jack_midi_event_write(fb, off, msg, 3);
-                }
+                void* b = findBuf(namedBufs, it->portName);
+                if (b) jack_midi_event_write(b, off, msg, 3);
                 it = activeNotes.erase(it);
             } else {
                 ++it;
@@ -327,7 +313,7 @@ int JackTransport::process(jack_nframes_t nframes)
                                  (firstCall || jumped) ? pos.frame : lastFrame) / sampleRate);
             float curBars  = snapSecondsToBar(static_cast<double>(blockEnd) / sampleRate);
 
-            fireNoteEvents(namedBufs, allBufs, nframes, pos.frame, prevBars, curBars);
+            fireNoteEvents(namedBufs, nframes, pos.frame, prevBars, curBars);
             snapMutex.unlock();
         }
     }
@@ -348,7 +334,6 @@ int JackTransport::process(jack_nframes_t nframes)
 // ── Note event generation (RT thread, called with snapMutex held) ─────────────
 
 void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
-                                    const std::vector<void*>& allBufs,
                                     jack_nframes_t nframes,
                                     jack_nframes_t blockStart,
                                     float prevBars, float curBars)
@@ -360,10 +345,8 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
             if (inst.patternBeats <= 0.0f)               continue;
             if (inst.notes.empty())                      continue;
 
-            // Resolve output buffer for this instance.
-            void* instBuf = nullptr;
-            if (!inst.portName.empty())
-                instBuf = findBuf(namedBufs, inst.portName);
+            void* instBuf = findBuf(namedBufs, inst.portName);
+            if (!instBuf) continue;
 
             float windowStart = std::max(prevBars, inst.startBar);
             float windowEnd   = std::min(curBars,  inst.startBar + inst.length);
@@ -394,11 +377,7 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
                         static_cast<uint8_t>(note.midiPitch),
                         vel
                     };
-                    if (instBuf) {
-                        jack_midi_event_write(instBuf, onOff, onMsg, 3);
-                    } else {
-                        for (void* b : allBufs) jack_midi_event_write(b, onOff, onMsg, 3);
-                    }
+                    jack_midi_event_write(instBuf, onOff, onMsg, 3);
 
                     float offBar = inst.startBar
                                  + (firstFire + note.length - inst.startOffset) / inst.beatsPerBar;

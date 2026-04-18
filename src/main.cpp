@@ -11,6 +11,7 @@
 #include "noteLabels.hpp"
 #include "luvieApp.hpp"
 #include "connectionsOverlay.hpp"
+#include "itimelineobserver.hpp"
 #include "nsm.hpp"
 #include "timelineIO.hpp"
 
@@ -30,11 +31,18 @@ int main(int argc, char **argv) {
     }
     argc = fltk_argc;
 
+    struct TimelineWatcher : ITimelineObserver {
+        std::function<void()> onChange;
+        void onTimelineChanged() override { if (onChange) onChange(); }
+    };
+    TimelineWatcher timelineWatcher;
+
     AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
     window.color(bgColor);
     window.end();
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
+    songTimeline.defaultOutputChannel = "midi_out_1:1";
     for (int i = 1; i <= 8; i++) {
         int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
         songTimeline.addTrack("Pattern " + std::to_string(i), patId);
@@ -84,6 +92,9 @@ int main(int argc, char **argv) {
     // Helper: push current channel list to jackTransport and patternPanel.
     auto pushChannelRoutings = [&]() {
         if (!connOverlay) return;
+        const auto& chans = connOverlay->getChannels();
+        if (!chans.empty())
+            songTimeline.defaultOutputChannel = chans[0].name;
         if (useJack) {
             std::vector<JackTransport::ChannelRouting> routings;
             for (const auto& ci : connOverlay->getChannels())
@@ -111,7 +122,18 @@ int main(int argc, char **argv) {
         connOverlay->onChannelRenamed = [&](const std::string& oldName, const std::string& newName) {
             songTimeline.renamePatternOutputChannel(oldName, newName);
         };
-        connOverlay->onChannelsChanged = [&]() { pushChannelRoutings(); };
+        connOverlay->isChannelInUse = [&](const std::string& name) {
+            for (const auto& p : songTimeline.get().patterns)
+                if (p.outputChannelName == name) return true;
+            return false;
+        };
+        connOverlay->onChannelsChanged = [&]() {
+            pushChannelRoutings();
+            connOverlay->refreshChannelButtons();
+        };
+
+        timelineWatcher.onChange = [&]() { connOverlay->refreshChannelButtons(); };
+        songTimeline.addObserver(&timelineWatcher);
 
         // Register the default port and push initial channel routings.
         if (useJack) {

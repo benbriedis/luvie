@@ -239,8 +239,12 @@ void ConnectionsOverlay::rebuildRows() {
         del->labelcolor(delRedCol);
         del->color(bgCol);
         del->setBorderWidth(0);
-        if ((int)connections_.size() <= 1) del->deactivate();
         del->callback(deleteCb, this);
+
+        const std::string& pname = connections_[i].portName;
+        bool referenced = std::any_of(channels_.begin(), channels_.end(),
+            [&](const Channel& ch){ return ch.portName == pname; });
+        if (referenced) del->deactivate();
 
         rows_.push_back({inp, del, connections_[i].portName});
         y += rowH;
@@ -319,6 +323,9 @@ void ConnectionsOverlay::rebuildChannelRows() {
         del->setBorderWidth(0);
         del->callback(chanDeleteCb, this);
 
+        if (channels_.size() <= 1 || (isChannelInUse && isChannelInUse(channels_[i].name)))
+            del->deactivate();
+
         chanRows_.push_back({nameInp, portCh, midiCh, del, channels_[i].name});
         y += rowH;
     }
@@ -342,6 +349,15 @@ void ConnectionsOverlay::rebuildPortChoices() {
             ch->value(selIdx);
             channels_[i].portName = connections_[selIdx].portName;
         }
+    }
+    // Update delete button state for each port.
+    for (int i = 0; i < (int)rows_.size() && i < (int)connections_.size(); i++) {
+        if (!rows_[i].deleteBtn) continue;
+        const std::string& pname = connections_[i].portName;
+        bool referenced = std::any_of(channels_.begin(), channels_.end(),
+            [&](const Channel& ch){ return ch.portName == pname; });
+        if (referenced) rows_[i].deleteBtn->deactivate();
+        else            rows_[i].deleteBtn->activate();
     }
     redraw();
 }
@@ -400,12 +416,24 @@ void ConnectionsOverlay::chanNameCb(Fl_Widget* w, void* d) {
     }
 }
 
+void ConnectionsOverlay::refreshChannelButtons() {
+    for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
+        if (!chanRows_[i].deleteBtn) continue;
+        bool inUse = isChannelInUse && isChannelInUse(channels_[i].name);
+        if (channels_.size() <= 1 || inUse) chanRows_[i].deleteBtn->deactivate();
+        else                                chanRows_[i].deleteBtn->activate();
+    }
+    redraw();
+}
+
 void ConnectionsOverlay::chanDeleteCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
     for (int i = 0; i < (int)self->chanRows_.size(); i++) {
         if (w != self->chanRows_[i].deleteBtn) continue;
+        if (self->isChannelInUse && self->isChannelInUse(self->channels_[i].name)) return;
         self->channels_.erase(self->channels_.begin() + i);
         self->rebuildChannelRows();
+        self->rebuildPortChoices();
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }
@@ -418,6 +446,7 @@ void ConnectionsOverlay::portChoiceCb(Fl_Widget* w, void* d) {
         int idx = static_cast<Fl_Choice*>(w)->value();
         if (idx >= 0 && idx < (int)self->connections_.size())
             self->channels_[i].portName = self->connections_[idx].portName;
+        self->rebuildPortChoices();
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }

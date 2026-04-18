@@ -95,5 +95,9 @@ public:
     // Fired whenever the channels list or any channel's fields change.
     std::function<void()> onChannelsChanged;
     std::function<void(const std::string& oldName, const std::string& newName)> onChannelRenamed;
+
+    // Optional: return true if the named channel is currently used by a pattern.
+    std::function<bool(const std::string& name)> isChannelInUse;
+    void refreshChannelButtons();
     std::function<void()> onClose;
 };

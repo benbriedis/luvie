@@ -85,7 +85,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     outLabel.labelcolor(panelText);
     outLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    outChoice.add("(none)");
     outChoice.value(0);
     outChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
@@ -95,8 +94,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
         int idx = self->outChoice.value();
-        std::string name = (idx > 0 && idx - 1 < (int)self->channelNames_.size())
-            ? self->channelNames_[idx - 1] : "";
+        std::string name = (idx >= 0 && idx < (int)self->channelNames_.size())
+            ? self->channelNames_[idx] : "";
         self->timeline->setPatternOutputChannel(patId, name);
     }, this);
 
@@ -127,7 +126,6 @@ void PatternPanel::setChannels(const std::vector<std::string>& names)
 {
     channelNames_ = names;
     outChoice.clear();
-    outChoice.add("(none)");
     for (const auto& n : names) outChoice.add(n.c_str());
     refreshOutChoice();
 }
@@ -144,7 +142,7 @@ void PatternPanel::refreshOutChoice()
         if (p.id != patId) continue;
         for (int i = 0; i < (int)channelNames_.size(); i++) {
             if (channelNames_[i] == p.outputChannelName) {
-                outChoice.value(i + 1);  // +1 for "(none)"
+                outChoice.value(i);
                 break;
             }
         }

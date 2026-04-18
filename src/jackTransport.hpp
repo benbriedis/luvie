@@ -136,7 +136,6 @@ private:
 
     using NamedBuf = std::pair<std::string, void*>;
     void fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
-                        const std::vector<void*>& allBufs,
                         jack_nframes_t nframes,
                         jack_nframes_t blockStart, float prevBars, float curBars);
 };

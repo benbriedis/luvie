@@ -285,7 +285,11 @@ void ObservableTimeline::removeTrackAndPattern(int trackId)
 int ObservableTimeline::createPattern(float lengthBeats)
 {
 	int id = nextId++;
-	data.patterns.push_back({id, lengthBeats});
+	Pattern p;
+	p.id = id;
+	p.lengthBeats = lengthBeats;
+	p.outputChannelName = defaultOutputChannel;
+	data.patterns.push_back(p);
 	notify();
 	return id;
 }
@@ -297,6 +301,7 @@ int ObservableTimeline::createDrumPattern(float lengthBeats)
 	p.id = id;
 	p.lengthBeats = lengthBeats;
 	p.type = PatternType::DRUM;
+	p.outputChannelName = defaultOutputChannel;
 	data.patterns.push_back(std::move(p));
 	notify();
 	return id;
