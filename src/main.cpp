@@ -10,6 +10,7 @@
 #include "transport.hpp"
 #include "noteLabels.hpp"
 #include "luvieApp.hpp"
+#include "connectionsOverlay.hpp"
 #include "nsm.hpp"
 #include "timelineIO.hpp"
 
@@ -77,6 +78,52 @@ int main(int argc, char **argv) {
         };
     }
 
+    // --- JACK port management ---------------------------------------------
+    ConnectionsOverlay* connOverlay = app.connectionsOverlay;
+
+    if (connOverlay) {
+        connOverlay->onPortAdded = [&](const std::string& name) {
+            if (useJack) jackTransport.addMidiPort(name);
+        };
+        connOverlay->onPortRemoved = [&](const std::string& name) {
+            if (useJack) jackTransport.removeMidiPort(name);
+        };
+        connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
+            if (useJack) jackTransport.renameMidiPort(oldName, newName);
+        };
+
+        // Register the default port that the overlay created in its constructor.
+        if (useJack) {
+            for (const auto& name : connOverlay->getConnections())
+                jackTransport.addMidiPort(name);
+        }
+    }
+
+    // Helper: unregister all current ports, then register ports from the overlay.
+    auto applyLoadedConnections = [&](const AppState& state) {
+        if (!connOverlay) return;
+        // Unregister existing ports
+        if (useJack)
+            for (const auto& name : connOverlay->getConnections())
+                jackTransport.removeMidiPort(name);
+        // Load new list
+        std::vector<std::string> names;
+        for (const auto& c : state.jackConnections) names.push_back(c.portName);
+        connOverlay->setConnections(names);
+        // Register loaded ports
+        if (useJack)
+            for (const auto& name : connOverlay->getConnections())
+                jackTransport.addMidiPort(name);
+    };
+
+    // Helper: fill jackConnections in an AppState from the overlay.
+    auto collectConnections = [&](AppState& state) {
+        if (!connOverlay) return;
+        state.jackConnections.clear();
+        for (const auto& name : connOverlay->getConnections())
+            state.jackConnections.push_back({name});
+    };
+
     // --- NSM session management -------------------------------------------
     static NsmClient nsm;
     std::string nsmSessionPath;
@@ -88,6 +135,7 @@ int main(int argc, char **argv) {
             songTimeline.loadTimeline(state.timeline);
             if (app.patternPanel)
                 app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+            applyLoadedConnections(state);
         }
         return true;
     };
@@ -101,6 +149,7 @@ int main(int argc, char **argv) {
             state.chordType = app.patternPanel->chordType();
             state.sharp     = app.patternPanel->isSharp();
         }
+        collectConnections(state);
         return saveAppState(state, nsmSessionPath + ".json");
     };
 
@@ -125,6 +174,7 @@ int main(int argc, char **argv) {
                 songTimeline.loadTimeline(state.timeline);
                 if (app.patternPanel)
                     app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+                applyLoadedConnections(state);
             }
         }
 
@@ -153,6 +203,7 @@ int main(int argc, char **argv) {
                 state.chordType = app.patternPanel->chordType();
                 state.sharp     = app.patternPanel->isSharp();
             }
+            collectConnections(state);
             saveAppState(state, path);
         };
 

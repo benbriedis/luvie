@@ -264,3 +264,6 @@ Allow the window close to be clicked even if a popup of menu is showing.
 
 Implement undo/redo. Only enable Save & Save As if a change has been made (and not undone).
 
+
+Connections X is not all the way to the right. (Putting on a left an alternative)
+

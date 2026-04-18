@@ -8,7 +8,9 @@
 #include <jack/midiport.h>
 #include <atomic>
 #include <functional>
+#include <map>
 #include <mutex>
+#include <string>
 #include <vector>
 
 /*
@@ -35,6 +37,12 @@ public:
     void setTimeline(ObservableTimeline* tl);
     void setNoteParams(int rootPitch, int chordType);
 
+    // MIDI port management — call from UI thread.
+    // addMidiPort registers a new JACK MIDI output port and returns true on success.
+    bool addMidiPort(const std::string& name);
+    bool removeMidiPort(const std::string& name);
+    bool renameMidiPort(const std::string& oldName, const std::string& newName);
+
     // Called from the RT process thread when play/stop state changes or transport
     // jumps. Must be lightweight (e.g. just call Fl::awake). Set before open().
     std::function<void()> onTransportEvent;
@@ -54,9 +62,12 @@ public:
 private:
     // ── JACK handles ──────────────────────────────────────────────────────────
     jack_client_t* client      = nullptr;
-    jack_port_t*   midiOut     = nullptr;
     jack_nframes_t sampleRate  = 48000;
     bool           midiEnabled = true;
+
+    // Protected by portsMutex — modified on UI thread, read on RT thread.
+    std::mutex                           portsMutex;
+    std::map<std::string, jack_port_t*>  midiPorts_;
 
     // ── Atomics (shared between RT and UI threads) ────────────────────────────
     std::atomic<jack_nframes_t> posFrames{0};
@@ -119,7 +130,7 @@ private:
     static int processCallback(jack_nframes_t nframes, void* arg);
     int process(jack_nframes_t nframes);
 
-    void fireNoteEvents(void* portBuf, jack_nframes_t nframes,
+    void fireNoteEvents(const std::vector<void*>& bufs, jack_nframes_t nframes,
                         jack_nframes_t blockStart, float prevBars, float curBars);
 };
 

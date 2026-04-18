@@ -161,12 +161,16 @@ static Timeline timelineFromJson(const json& j) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 bool saveAppState(const AppState& state, const std::string& filePath) {
+    json jconns = json::array();
+    for (const auto& c : state.jackConnections)
+        jconns.push_back({{"portName", c.portName}});
     json j = {
-        {"version",   1},
-        {"rootPitch", state.rootPitch},
-        {"chordType", state.chordType},
-        {"sharp",     state.sharp},
-        {"timeline",  timelineToJson(state.timeline)},
+        {"version",         1},
+        {"rootPitch",       state.rootPitch},
+        {"chordType",       state.chordType},
+        {"sharp",           state.sharp},
+        {"timeline",        timelineToJson(state.timeline)},
+        {"jackConnections", jconns},
     };
     std::ofstream f(filePath);
     if (!f) return false;
@@ -188,5 +192,7 @@ bool loadAppState(const std::string& filePath, AppState& state) {
     state.sharp     = j.value("sharp",     true);
     if (j.contains("timeline"))
         state.timeline = timelineFromJson(j.at("timeline"));
+    for (const auto& jc : j.value("jackConnections", json::array()))
+        state.jackConnections.push_back({jc.value("portName", "")});
     return true;
 }

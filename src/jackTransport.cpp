@@ -14,6 +14,8 @@ JackTransport::~JackTransport()
     if (timeline) timeline->removeObserver(this);
     if (client && jackAlive.load()) {
         jack_deactivate(client);
+        for (auto& [name, port] : midiPorts_)
+            jack_port_unregister(client, port);
         jack_client_close(client);
     }
 }
@@ -32,17 +34,6 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
     }
 
     sampleRate = jack_get_sample_rate(client);
-
-    if (midiEnabled) {
-        midiOut = jack_port_register(client, "midi_out",
-                                      JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-        if (!midiOut) {
-            fprintf(stderr, "JackTransport: could not register MIDI output port\n");
-            jack_client_close(client);
-            client = nullptr;
-            return false;
-        }
-    }
 
     jack_set_process_callback(client, processCallback, this);
 
@@ -242,10 +233,16 @@ int JackTransport::process(jack_nframes_t nframes)
     jack_transport_state_t state = jack_transport_query(client, &pos);
     bool nowPlaying = (state == JackTransportRolling);
 
-    void* portBuf = nullptr;
-    if (midiEnabled) {
-        portBuf = jack_port_get_buffer(midiOut, nframes);
-        jack_midi_clear_buffer(portBuf);
+    // Collect port buffers non-blockingly; skip MIDI this cycle if UI thread holds the lock.
+    std::vector<void*> bufs;
+    if (midiEnabled && portsMutex.try_lock()) {
+        bufs.reserve(midiPorts_.size());
+        for (auto& [name, port] : midiPorts_) {
+            void* b = jack_port_get_buffer(port, nframes);
+            jack_midi_clear_buffer(b);
+            bufs.push_back(b);
+        }
+        portsMutex.unlock();
     }
 
     // Detect a seek/jump (frame didn't advance by the expected amount).
@@ -253,19 +250,19 @@ int JackTransport::process(jack_nframes_t nframes)
                   && (pos.frame != lastFrame + nframes);
 
     // On stop or jump: silence all active notes immediately.
-    if (midiEnabled && ((!nowPlaying && wasPlaying) || jumped)) {
+    if (!bufs.empty() && ((!nowPlaying && wasPlaying) || jumped)) {
         for (auto& an : activeNotes) {
             uint8_t msg[3] = {
                 static_cast<uint8_t>(0x80 | (an.channel & 0x0F)),
                 static_cast<uint8_t>(an.midiPitch),
                 0
             };
-            jack_midi_event_write(portBuf, 0, msg, 3);
+            for (void* b : bufs) jack_midi_event_write(b, 0, msg, 3);
         }
         activeNotes.clear();
     }
 
-    if (nowPlaying && midiEnabled) {
+    if (nowPlaying && !bufs.empty()) {
         jack_nframes_t blockEnd = pos.frame + nframes;
 
         // Fire note-offs for notes ending within this block.
@@ -279,7 +276,7 @@ int JackTransport::process(jack_nframes_t nframes)
                     static_cast<uint8_t>(it->midiPitch),
                     0
                 };
-                jack_midi_event_write(portBuf, off, msg, 3);
+                for (void* b : bufs) jack_midi_event_write(b, off, msg, 3);
                 it = activeNotes.erase(it);
             } else {
                 ++it;
@@ -292,7 +289,7 @@ int JackTransport::process(jack_nframes_t nframes)
                                  (firstCall || jumped) ? pos.frame : lastFrame) / sampleRate);
             float curBars  = snapSecondsToBar(static_cast<double>(blockEnd) / sampleRate);
 
-            fireNoteEvents(portBuf, nframes, pos.frame, prevBars, curBars);
+            fireNoteEvents(bufs, nframes, pos.frame, prevBars, curBars);
             snapMutex.unlock();
         }
     }
@@ -312,7 +309,8 @@ int JackTransport::process(jack_nframes_t nframes)
 
 // ── Note event generation (RT thread, called with snapMutex held) ─────────────
 
-void JackTransport::fireNoteEvents(void* portBuf, jack_nframes_t nframes,
+void JackTransport::fireNoteEvents(const std::vector<void*>& bufs,
+                                    jack_nframes_t nframes,
                                     jack_nframes_t blockStart,
                                     float prevBars, float curBars)
 {
@@ -354,7 +352,7 @@ void JackTransport::fireNoteEvents(void* portBuf, jack_nframes_t nframes,
                         static_cast<uint8_t>(note.midiPitch),
                         vel
                     };
-                    jack_midi_event_write(portBuf, onOff, onMsg, 3);
+                    for (void* b : bufs) jack_midi_event_write(b, onOff, onMsg, 3);
 
                     // Schedule note-off.
                     float offBar = inst.startBar
@@ -369,4 +367,49 @@ void JackTransport::fireNoteEvents(void* portBuf, jack_nframes_t nframes,
             }
         }
     }
+}
+
+// ── Port management (UI thread) ───────────────────────────────────────────────
+
+bool JackTransport::addMidiPort(const std::string& name) {
+    if (!client || !midiEnabled || name.empty()) return false;
+    jack_port_t* p = jack_port_register(client, name.c_str(),
+                                         JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+    if (!p) {
+        fprintf(stderr, "JackTransport: could not register port '%s'\n", name.c_str());
+        return false;
+    }
+    std::lock_guard<std::mutex> lk(portsMutex);
+    midiPorts_[name] = p;
+    return true;
+}
+
+bool JackTransport::removeMidiPort(const std::string& name) {
+    if (!client) return false;
+    jack_port_t* p = nullptr;
+    {
+        std::lock_guard<std::mutex> lk(portsMutex);
+        auto it = midiPorts_.find(name);
+        if (it == midiPorts_.end()) return false;
+        p = it->second;
+        midiPorts_.erase(it);
+    }
+    jack_port_unregister(client, p);
+    return true;
+}
+
+bool JackTransport::renameMidiPort(const std::string& oldName, const std::string& newName) {
+    if (!client || newName.empty()) return false;
+    std::lock_guard<std::mutex> lk(portsMutex);
+    auto it = midiPorts_.find(oldName);
+    if (it == midiPorts_.end()) return false;
+    jack_port_t* p = it->second;
+    if (jack_port_rename(client, p, newName.c_str()) != 0) {
+        fprintf(stderr, "JackTransport: could not rename port '%s' -> '%s'\n",
+                oldName.c_str(), newName.c_str());
+        return false;
+    }
+    midiPorts_.erase(it);
+    midiPorts_[newName] = p;
+    return true;
 }
