@@ -145,6 +145,9 @@ int ModernTabs::handle(int event) {
 		redraw();
 	}
 
+	if (event == FL_RELEASE && inBar)
+		return 1;
+
 	if (event == FL_PUSH && inBar) {
 		int n = children();
 		if (n > 0) {
