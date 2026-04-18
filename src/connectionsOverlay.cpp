@@ -95,9 +95,7 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         const std::string portName = self->connections_.empty()
             ? "" : self->connections_[0].portName;
         const int midiCh = 1;
-        const std::string base = portName.empty()
-            ? "channel_1" : portName + ":" + std::to_string(midiCh);
-        const std::string name = self->uniqueChanName(base);
+        const std::string name = self->nextLetterChanName();
         self->channels_.push_back({self->nextChanId_++, name, portName, midiCh});
         self->rebuildChannelRows();
         if (self->onChannelsChanged) self->onChannelsChanged();
@@ -106,7 +104,7 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
     end();
 
     connections_.push_back({nextPortId_++, "midi_out_1"});
-    channels_.push_back({nextChanId_++, "midi_out_1:1", "midi_out_1", 1});
+    channels_.push_back({nextChanId_++, "A", "midi_out_1", 1});
     rebuildRows();
     hide();
 }
@@ -201,6 +199,21 @@ std::string ConnectionsOverlay::uniqueChanName(const std::string& base, int excl
     for (int n = 2; ; n++) {
         std::string c = base + "_" + std::to_string(n);
         if (isUnique(c)) return c;
+    }
+}
+
+std::string ConnectionsOverlay::nextLetterChanName() const {
+    auto inUse = [&](const std::string& name) {
+        for (const auto& ch : channels_)
+            if (ch.name == name) return true;
+        return false;
+    };
+    for (int round = 1; ; round++) {
+        std::string suffix = round == 1 ? "" : std::to_string(round);
+        for (char c = 'A'; c <= 'Z'; c++) {
+            std::string name = std::string(1, c) + suffix;
+            if (!inUse(name)) return name;
+        }
     }
 }
 

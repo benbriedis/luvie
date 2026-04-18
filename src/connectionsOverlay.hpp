@@ -60,6 +60,7 @@ class ConnectionsOverlay : public BasePopup {
 
     std::string uniquePortName(const std::string& base, int excludeIdx = -1) const;
     std::string uniqueChanName(const std::string& base, int excludeIdx = -1) const;
+    std::string nextLetterChanName() const;
 
     static void inputCb         (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
