@@ -129,9 +129,11 @@ void ConnectionsOverlay::hide() {
     for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
         if (!chanRows_[i].nameInput) continue;
         std::string newName = chanRows_[i].nameInput->value();
-        if (!newName.empty() && newName != chanRows_[i].committedName) {
+        const std::string oldChanName = chanRows_[i].committedName;
+        if (!newName.empty() && newName != oldChanName) {
             newName = uniqueChanName(newName, i);
             channels_[i].name = newName;
+            if (onChannelRenamed) onChannelRenamed(oldChanName, newName);
             chanChanged = true;
         }
     }
@@ -392,6 +394,7 @@ void ConnectionsOverlay::chanNameCb(Fl_Widget* w, void* d) {
         static_cast<Fl_Input*>(w)->value(newName.c_str());
         self->chanRows_[i].committedName = newName;
         self->channels_[i].name = newName;
+        if (self->onChannelRenamed) self->onChannelRenamed(oldName, newName);
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }

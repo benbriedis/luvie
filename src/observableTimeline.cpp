@@ -559,6 +559,18 @@ void ObservableTimeline::setPatternOutputChannel(int patId, const std::string& c
 	}
 }
 
+void ObservableTimeline::renamePatternOutputChannel(const std::string& oldName, const std::string& newName)
+{
+	bool changed = false;
+	for (auto& p : data.patterns) {
+		if (p.outputChannelName == oldName) {
+			p.outputChannelName = newName;
+			changed = true;
+		}
+	}
+	if (changed) notify();
+}
+
 void ObservableTimeline::placePattern(int trackIndex, int patternId, float startBar, float length)
 {
 	if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;

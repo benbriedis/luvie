@@ -108,6 +108,9 @@ int main(int argc, char **argv) {
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             if (useJack) jackTransport.renameMidiPort(oldName, newName);
         };
+        connOverlay->onChannelRenamed = [&](const std::string& oldName, const std::string& newName) {
+            songTimeline.renamePatternOutputChannel(oldName, newName);
+        };
         connOverlay->onChannelsChanged = [&]() { pushChannelRoutings(); };
 
         // Register the default port and push initial channel routings.

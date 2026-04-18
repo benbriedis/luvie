@@ -68,6 +68,7 @@ public:
 
 	// Set the output channel assignment for a pattern (empty = unassigned).
 	void setPatternOutputChannel(int patId, const std::string& channelName);
+	void renamePatternOutputChannel(const std::string& oldName, const std::string& newName);
 
 	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)
 	void placePattern(int trackIndex, int patternId, float startBar, float length);
