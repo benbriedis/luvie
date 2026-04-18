@@ -1,8 +1,8 @@
 #include "connectionsOverlay.hpp"
 #include "modernButton.hpp"
+#include "modernChoice.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Input.H>
-#include <FL/Fl_Choice.H>
 #include <FL/Fl.H>
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -38,11 +38,11 @@ static constexpr Fl_Color inputBgCol = 0xF9FAFB00;
 static constexpr Fl_Color delRedCol  = 0xEF444400;
 static constexpr Fl_Color addBtnBg   = 0xF3F4F600;
 
-// ── PortNameInput ─────────────────────────────────────────────────────────────
+// ── NameInput ─────────────────────────────────────────────────────────────
 
-class PortNameInput : public Fl_Input {
+class NameInput : public Fl_Input {
 public:
-    PortNameInput(int x, int y, int w, int h) : Fl_Input(x, y, w, h) {}
+    NameInput(int x, int y, int w, int h) : Fl_Input(x, y, w, h) {}
     int handle(int event) override {
         int r = Fl_Input::handle(event);
         if (event == FL_UNFOCUS) do_callback();
@@ -236,7 +236,7 @@ void ConnectionsOverlay::rebuildRows() {
     for (int i = 0; i < (int)connections_.size(); i++) {
         const int iy = y + (rowH - inputH) / 2;
 
-        auto* inp = new PortNameInput(pad, iy, inputW, inputH);
+        auto* inp = new NameInput(pad, iy, inputW, inputH);
         inp->box(FL_BORDER_BOX);
         inp->color(inputBgCol);
         inp->textcolor(textCol);
@@ -293,7 +293,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
     for (int i = 0; i < (int)channels_.size(); i++) {
         const int iy = y + (rowH - inputH) / 2;
 
-        auto* nameInp = new PortNameInput(pad, iy, chanNameW_, inputH);
+        auto* nameInp = new NameInput(pad, iy, chanNameW_, inputH);
         nameInp->box(FL_BORDER_BOX);
         nameInp->color(inputBgCol);
         nameInp->textcolor(textCol);
@@ -303,11 +303,13 @@ void ConnectionsOverlay::rebuildChannelRows() {
         nameInp->callback(chanNameCb, this);
 
         const int portX = pad + chanNameW_ + chanGap;
-        auto* portCh = new Fl_Choice(portX, iy, chanPortW_, inputH);
-        portCh->box(FL_BORDER_BOX);
+        auto* portCh = new ModernChoice(portX, iy, chanPortW_, inputH);
         portCh->color(inputBgCol);
-        portCh->textcolor(textCol);
+        portCh->labelcolor(textCol);
         portCh->textsize(12);
+        portCh->setBorderColor(borderCol);
+        portCh->setArrowColor(subTextCol);
+        portCh->setHoverColor(0xF3F4F600);
         int selPort = 0;
         for (int j = 0; j < (int)connections_.size(); j++) {
             portCh->add(connections_[j].portName.c_str());
@@ -317,11 +319,13 @@ void ConnectionsOverlay::rebuildChannelRows() {
         portCh->callback(portChoiceCb, this);
 
         const int midiX = portX + chanPortW_ + chanGap;
-        auto* midiCh = new Fl_Choice(midiX, iy, chanMidiW, inputH);
-        midiCh->box(FL_BORDER_BOX);
+        auto* midiCh = new ModernChoice(midiX, iy, chanMidiW, inputH);
         midiCh->color(inputBgCol);
-        midiCh->textcolor(textCol);
+        midiCh->labelcolor(textCol);
         midiCh->textsize(12);
+        midiCh->setBorderColor(borderCol);
+        midiCh->setArrowColor(subTextCol);
+        midiCh->setHoverColor(0xF3F4F600);
         for (int ch = 1; ch <= 16; ch++)
             midiCh->add(std::to_string(ch).c_str());
         midiCh->value(channels_[i].midiChannel - 1);
