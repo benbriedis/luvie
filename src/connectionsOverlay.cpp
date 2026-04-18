@@ -2,6 +2,7 @@
 #include "modernButton.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Input.H>
+#include <FL/Fl_Choice.H>
 #include <FL/Fl.H>
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -20,6 +21,11 @@ static constexpr int addBtnW  = 150;
 static constexpr int addBtnPad= 10;
 static constexpr int pad      = 16;
 static constexpr int delBtnSz = 26;
+
+static constexpr int chanSecH  = 44;
+static constexpr int chanColH2 = 22;
+static constexpr int chanGap   = 6;
+static constexpr int chanMidiW = 70;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +69,7 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         static_cast<ConnectionsOverlay*>(d)->hide();
     }, this);
 
-    addBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Connection");
+    addBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Port");
     addBtn->labelsize(12);
     addBtn->labelcolor(textCol);
     addBtn->color(addBtnBg);
@@ -71,16 +77,35 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
     addBtn->setBorderColor(borderCol);
     addBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<ConnectionsOverlay*>(d);
-        std::string name = "midi_out_" + std::to_string(self->connections_.size() + 1);
-        self->connections_.push_back({name});
+        std::string name = self->uniquePortName(
+            "midi_out_" + std::to_string(self->connections_.size() + 1));
+        self->connections_.push_back({self->nextPortId_++, name});
         self->rebuildRows();
         if (self->onPortAdded) self->onPortAdded(name);
     }, this);
 
+    addChanBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Channel");
+    addChanBtn->labelsize(12);
+    addChanBtn->labelcolor(textCol);
+    addChanBtn->color(addBtnBg);
+    addChanBtn->setBorderWidth(1);
+    addChanBtn->setBorderColor(borderCol);
+    addChanBtn->callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<ConnectionsOverlay*>(d);
+        const std::string portName = self->connections_.empty()
+            ? "" : self->connections_[0].portName;
+        const int midiCh = 1;
+        const std::string base = portName.empty()
+            ? "channel_1" : portName + ":" + std::to_string(midiCh);
+        const std::string name = self->uniqueChanName(base);
+        self->channels_.push_back({self->nextChanId_++, name, portName, midiCh});
+        self->rebuildChannelRows();
+    }, this);
+
     end();
 
-    // Default connection — caller must register this with JACK after wiring callbacks.
-    connections_.push_back({"midi_out_1"});
+    connections_.push_back({nextPortId_++, "midi_out_1"});
+    channels_.push_back({nextChanId_++, "midi_out_1:1", "midi_out_1", 1});
     rebuildRows();
     hide();
 }
@@ -89,13 +114,23 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
 
 void ConnectionsOverlay::hide() {
     syncFromInputs();
-    // Apply any uncommitted renames (user typed but didn't press Enter)
+    // Port rename safety net (for inputs that didn't fire unfocus before hide)
     for (int i = 0; i < (int)rows_.size() && i < (int)connections_.size(); i++) {
         const std::string newName = connections_[i].portName;
         const std::string oldName = rows_[i].committedName;
         if (newName == oldName) continue;
+        for (auto& ch : channels_)
+            if (ch.portName == oldName) ch.portName = newName;
         if (onPortRenamed) onPortRenamed(oldName, newName);
-        // rows_ rebuilt on next show; committedName update not needed
+    }
+    // Channel name safety net
+    for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
+        if (!chanRows_[i].nameInput) continue;
+        std::string newName = chanRows_[i].nameInput->value();
+        if (!newName.empty() && newName != chanRows_[i].committedName) {
+            newName = uniqueChanName(newName, i);
+            channels_[i].name = newName;
+        }
     }
     if (onClose) onClose();
     BasePopup::hide();
@@ -104,9 +139,9 @@ void ConnectionsOverlay::hide() {
 void ConnectionsOverlay::setConnections(const std::vector<std::string>& portNames) {
     connections_.clear();
     for (const auto& n : portNames)
-        if (!n.empty()) connections_.push_back({n});
+        if (!n.empty()) connections_.push_back({nextPortId_++, n});
     if (connections_.empty())
-        connections_.push_back({"midi_out_1"});
+        connections_.push_back({nextPortId_++, "midi_out_1"});
     rebuildRows();
 }
 
@@ -117,7 +152,51 @@ std::vector<std::string> ConnectionsOverlay::getConnections() const {
     return result;
 }
 
+void ConnectionsOverlay::setChannels(const std::vector<ChannelInfo>& chans) {
+    channels_.clear();
+    for (const auto& ci : chans)
+        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel});
+    rebuildChannelRows();
+}
+
+std::vector<ConnectionsOverlay::ChannelInfo> ConnectionsOverlay::getChannels() const {
+    std::vector<ChannelInfo> result;
+    for (const auto& ch : channels_)
+        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel});
+    return result;
+}
+
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+std::string ConnectionsOverlay::uniquePortName(const std::string& base, int excludeIdx) const {
+    auto isUnique = [&](const std::string& name) {
+        for (int i = 0; i < (int)connections_.size(); i++) {
+            if (i == excludeIdx) continue;
+            if (connections_[i].portName == name) return false;
+        }
+        return true;
+    };
+    if (isUnique(base)) return base;
+    for (int n = 2; ; n++) {
+        std::string c = base + "_" + std::to_string(n);
+        if (isUnique(c)) return c;
+    }
+}
+
+std::string ConnectionsOverlay::uniqueChanName(const std::string& base, int excludeIdx) const {
+    auto isUnique = [&](const std::string& name) {
+        for (int i = 0; i < (int)channels_.size(); i++) {
+            if (i == excludeIdx) continue;
+            if (channels_[i].name == name) return false;
+        }
+        return true;
+    };
+    if (isUnique(base)) return base;
+    for (int n = 2; ; n++) {
+        std::string c = base + "_" + std::to_string(n);
+        if (isUnique(c)) return c;
+    }
+}
 
 void ConnectionsOverlay::syncFromInputs() {
     for (int i = 0; i < (int)rows_.size() && i < (int)connections_.size(); i++)
@@ -160,9 +239,104 @@ void ConnectionsOverlay::rebuildRows() {
         rows_.push_back({inp, del, connections_[i].portName});
         y += rowH;
     }
+    end();
 
     addBtn->position(w() - pad - addBtnW, y + addBtnPad);
+    y += addBtnPad + addBtnH + addBtnPad;
+
+    chanSectionTopY_ = y;
+    chanRowsTopY_    = y + chanSecH + chanColH2;
+
+    rebuildChannelRows();
+}
+
+void ConnectionsOverlay::rebuildChannelRows() {
+    for (auto& row : chanRows_) {
+        if (row.nameInput)    { remove(row.nameInput);    Fl::delete_widget(row.nameInput); }
+        if (row.portChoice)   { remove(row.portChoice);   Fl::delete_widget(row.portChoice); }
+        if (row.midiChanChoice){ remove(row.midiChanChoice); Fl::delete_widget(row.midiChanChoice); }
+        if (row.deleteBtn)    { remove(row.deleteBtn);    Fl::delete_widget(row.deleteBtn); }
+    }
+    chanRows_.clear();
+
+    const int usableW = w() - 2*pad - delBtnSz - 8 - 2*chanGap;
+    const int remaining = usableW - chanMidiW;
+    chanNameW_ = remaining * 45 / 100;
+    chanPortW_ = remaining - chanNameW_;
+
+    int y = chanRowsTopY_;
+
+    begin();
+    for (int i = 0; i < (int)channels_.size(); i++) {
+        const int iy = y + (rowH - inputH) / 2;
+
+        auto* nameInp = new PortNameInput(pad, iy, chanNameW_, inputH);
+        nameInp->box(FL_BORDER_BOX);
+        nameInp->color(inputBgCol);
+        nameInp->textcolor(textCol);
+        nameInp->textsize(12);
+        nameInp->when(FL_WHEN_ENTER_KEY_ALWAYS);
+        nameInp->value(channels_[i].name.c_str());
+        nameInp->callback(chanNameCb, this);
+
+        const int portX = pad + chanNameW_ + chanGap;
+        auto* portCh = new Fl_Choice(portX, iy, chanPortW_, inputH);
+        portCh->box(FL_BORDER_BOX);
+        portCh->color(inputBgCol);
+        portCh->textcolor(textCol);
+        portCh->textsize(12);
+        int selPort = 0;
+        for (int j = 0; j < (int)connections_.size(); j++) {
+            portCh->add(connections_[j].portName.c_str());
+            if (connections_[j].portName == channels_[i].portName) selPort = j;
+        }
+        portCh->value(selPort);
+        portCh->callback(portChoiceCb, this);
+
+        const int midiX = portX + chanPortW_ + chanGap;
+        auto* midiCh = new Fl_Choice(midiX, iy, chanMidiW, inputH);
+        midiCh->box(FL_BORDER_BOX);
+        midiCh->color(inputBgCol);
+        midiCh->textcolor(textCol);
+        midiCh->textsize(12);
+        for (int ch = 1; ch <= 16; ch++)
+            midiCh->add(std::to_string(ch).c_str());
+        midiCh->value(channels_[i].midiChannel - 1);
+        midiCh->callback(midiChanChoiceCb, this);
+
+        auto* del = new ModernButton(
+            w() - pad - delBtnSz, y + (rowH - delBtnSz) / 2,
+            delBtnSz, delBtnSz, "\xc3\x97");
+        del->labelsize(14);
+        del->labelcolor(delRedCol);
+        del->color(bgCol);
+        del->setBorderWidth(0);
+        del->callback(chanDeleteCb, this);
+
+        chanRows_.push_back({nameInp, portCh, midiCh, del, channels_[i].name});
+        y += rowH;
+    }
     end();
+
+    addChanBtn->position(w() - pad - addBtnW, y + addBtnPad);
+    redraw();
+}
+
+void ConnectionsOverlay::rebuildPortChoices() {
+    for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
+        auto* ch = chanRows_[i].portChoice;
+        if (!ch) continue;
+        ch->clear();
+        int selIdx = 0;
+        for (int j = 0; j < (int)connections_.size(); j++) {
+            ch->add(connections_[j].portName.c_str());
+            if (connections_[j].portName == channels_[i].portName) selIdx = j;
+        }
+        if (!connections_.empty()) {
+            ch->value(selIdx);
+            channels_[i].portName = connections_[selIdx].portName;
+        }
+    }
     redraw();
 }
 
@@ -172,12 +346,17 @@ void ConnectionsOverlay::inputCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
     for (int i = 0; i < (int)self->rows_.size(); i++) {
         if (w != self->rows_[i].input) continue;
-        const std::string newName = static_cast<Fl_Input*>(w)->value();
+        std::string newName = static_cast<Fl_Input*>(w)->value();
         const std::string oldName = self->rows_[i].committedName;
         if (newName.empty() || newName == oldName) return;
+        newName = self->uniquePortName(newName, i);
+        static_cast<Fl_Input*>(w)->value(newName.c_str());
         self->rows_[i].committedName   = newName;
         self->connections_[i].portName = newName;
+        for (auto& ch : self->channels_)
+            if (ch.portName == oldName) ch.portName = newName;
         if (self->onPortRenamed) self->onPortRenamed(oldName, newName);
+        self->rebuildPortChoices();
         return;
     }
 }
@@ -190,6 +369,55 @@ void ConnectionsOverlay::deleteCb(Fl_Widget* w, void* d) {
         self->connections_.erase(self->connections_.begin() + i);
         self->rebuildRows();
         if (self->onPortRemoved) self->onPortRemoved(name);
+        return;
+    }
+}
+
+void ConnectionsOverlay::chanNameCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].nameInput) continue;
+        std::string newName = static_cast<Fl_Input*>(w)->value();
+        const std::string oldName = self->chanRows_[i].committedName;
+        if (newName.empty()) {
+            static_cast<Fl_Input*>(w)->value(oldName.c_str());
+            return;
+        }
+        if (newName == oldName) return;
+        newName = self->uniqueChanName(newName, i);
+        static_cast<Fl_Input*>(w)->value(newName.c_str());
+        self->chanRows_[i].committedName = newName;
+        self->channels_[i].name = newName;
+        return;
+    }
+}
+
+void ConnectionsOverlay::chanDeleteCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].deleteBtn) continue;
+        self->channels_.erase(self->channels_.begin() + i);
+        self->rebuildChannelRows();
+        return;
+    }
+}
+
+void ConnectionsOverlay::portChoiceCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].portChoice) continue;
+        int idx = static_cast<Fl_Choice*>(w)->value();
+        if (idx >= 0 && idx < (int)self->connections_.size())
+            self->channels_[i].portName = self->connections_[idx].portName;
+        return;
+    }
+}
+
+void ConnectionsOverlay::midiChanChoiceCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].midiChanChoice) continue;
+        self->channels_[i].midiChannel = static_cast<Fl_Choice*>(w)->value() + 1;
         return;
     }
 }
@@ -231,6 +459,33 @@ void ConnectionsOverlay::draw() {
         fl_line_style(FL_SOLID, 1);
         fl_line(pad, rowsTopY, w() - pad, rowsTopY);
         fl_line_style(0);
+
+        // ── Channel section ──────────────────────────────────────────────────
+        if (chanSectionTopY_ > 0) {
+            fl_color(dividerCol);
+            fl_line_style(FL_SOLID, 1);
+            fl_line(0, chanSectionTopY_, w(), chanSectionTopY_);
+            fl_line_style(0);
+
+            fl_font(FL_HELVETICA_BOLD, 13);
+            fl_color(textCol);
+            fl_draw("Channels", titlePad, chanSectionTopY_ + 12,
+                    w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+            const int chanColY = chanRowsTopY_ - chanColH2;
+            const int portX    = pad + chanNameW_ + chanGap;
+            const int midiX    = portX + chanPortW_ + chanGap;
+            fl_font(FL_HELVETICA, 10);
+            fl_color(subTextCol);
+            fl_draw("NAME",            pad,   chanColY, chanNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("MIDI OUTPUT PORT", portX, chanColY, chanPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("MIDI CH",          midiX, chanColY, chanMidiW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+            fl_color(dividerCol);
+            fl_line_style(FL_SOLID, 1);
+            fl_line(pad, chanRowsTopY_, w() - pad, chanRowsTopY_);
+            fl_line_style(0);
+        }
     }
     draw_children();
 }

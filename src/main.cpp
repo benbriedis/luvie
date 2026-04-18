@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
         if (useJack)
             for (const auto& name : connOverlay->getConnections())
                 jackTransport.removeMidiPort(name);
-        // Load new list
+        // Load new port list
         std::vector<std::string> names;
         for (const auto& c : state.jackConnections) names.push_back(c.portName);
         connOverlay->setConnections(names);
@@ -114,14 +114,22 @@ int main(int argc, char **argv) {
         if (useJack)
             for (const auto& name : connOverlay->getConnections())
                 jackTransport.addMidiPort(name);
+        // Load channels
+        std::vector<ConnectionsOverlay::ChannelInfo> chans;
+        for (const auto& c : state.jackChannels)
+            chans.push_back({0, c.name, c.portName, c.midiChannel});
+        connOverlay->setChannels(chans);
     };
 
-    // Helper: fill jackConnections in an AppState from the overlay.
+    // Helper: fill jackConnections and jackChannels in an AppState from the overlay.
     auto collectConnections = [&](AppState& state) {
         if (!connOverlay) return;
         state.jackConnections.clear();
         for (const auto& name : connOverlay->getConnections())
             state.jackConnections.push_back({name});
+        state.jackChannels.clear();
+        for (const auto& ci : connOverlay->getChannels())
+            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel});
     };
 
     // --- NSM session management -------------------------------------------

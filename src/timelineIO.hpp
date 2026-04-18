@@ -7,6 +7,12 @@ struct JackConnection {
     std::string portName; // name of our registered JACK output port
 };
 
+struct JackChannel {
+    std::string name;
+    std::string portName;
+    int         midiChannel = 1;
+};
+
 // App-level state that gets persisted to / loaded from disk.
 struct AppState {
     Timeline timeline;
@@ -14,6 +20,7 @@ struct AppState {
     int  chordType = 0;
     bool sharp     = true;
     std::vector<JackConnection> jackConnections;
+    std::vector<JackChannel>    jackChannels;
 };
 
 // Save/load the full AppState to/from a JSON file.

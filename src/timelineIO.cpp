@@ -164,6 +164,9 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
     json jconns = json::array();
     for (const auto& c : state.jackConnections)
         jconns.push_back({{"portName", c.portName}});
+    json jchans = json::array();
+    for (const auto& c : state.jackChannels)
+        jchans.push_back({{"name", c.name}, {"portName", c.portName}, {"midiChannel", c.midiChannel}});
     json j = {
         {"version",         1},
         {"rootPitch",       state.rootPitch},
@@ -171,6 +174,7 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
         {"sharp",           state.sharp},
         {"timeline",        timelineToJson(state.timeline)},
         {"jackConnections", jconns},
+        {"jackChannels",    jchans},
     };
     std::ofstream f(filePath);
     if (!f) return false;
@@ -194,5 +198,11 @@ bool loadAppState(const std::string& filePath, AppState& state) {
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackConnections", json::array()))
         state.jackConnections.push_back({jc.value("portName", "")});
+    for (const auto& jc : j.value("jackChannels", json::array()))
+        state.jackChannels.push_back({
+            jc.value("name", ""),
+            jc.value("portName", ""),
+            jc.value("midiChannel", 1)
+        });
     return true;
 }
