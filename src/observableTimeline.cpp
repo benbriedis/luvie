@@ -548,6 +548,17 @@ void ObservableTimeline::resizeNoteLeft(int noteId, float newStart, float newLen
 	}
 }
 
+void ObservableTimeline::setPatternOutputChannel(int patId, const std::string& channelName)
+{
+	for (auto& p : data.patterns) {
+		if (p.id == patId) {
+			p.outputChannelName = channelName;
+			notify();
+			return;
+		}
+	}
+}
+
 void ObservableTimeline::placePattern(int trackIndex, int patternId, float startBar, float length)
 {
 	if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;

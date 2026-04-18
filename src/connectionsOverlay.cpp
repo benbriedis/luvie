@@ -100,6 +100,7 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         const std::string name = self->uniqueChanName(base);
         self->channels_.push_back({self->nextChanId_++, name, portName, midiCh});
         self->rebuildChannelRows();
+        if (self->onChannelsChanged) self->onChannelsChanged();
     }, this);
 
     end();
@@ -124,14 +125,17 @@ void ConnectionsOverlay::hide() {
         if (onPortRenamed) onPortRenamed(oldName, newName);
     }
     // Channel name safety net
+    bool chanChanged = false;
     for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
         if (!chanRows_[i].nameInput) continue;
         std::string newName = chanRows_[i].nameInput->value();
         if (!newName.empty() && newName != chanRows_[i].committedName) {
             newName = uniqueChanName(newName, i);
             channels_[i].name = newName;
+            chanChanged = true;
         }
     }
+    if (chanChanged && onChannelsChanged) onChannelsChanged();
     if (onClose) onClose();
     BasePopup::hide();
 }
@@ -388,6 +392,7 @@ void ConnectionsOverlay::chanNameCb(Fl_Widget* w, void* d) {
         static_cast<Fl_Input*>(w)->value(newName.c_str());
         self->chanRows_[i].committedName = newName;
         self->channels_[i].name = newName;
+        if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }
 }
@@ -398,6 +403,7 @@ void ConnectionsOverlay::chanDeleteCb(Fl_Widget* w, void* d) {
         if (w != self->chanRows_[i].deleteBtn) continue;
         self->channels_.erase(self->channels_.begin() + i);
         self->rebuildChannelRows();
+        if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }
 }
@@ -409,6 +415,7 @@ void ConnectionsOverlay::portChoiceCb(Fl_Widget* w, void* d) {
         int idx = static_cast<Fl_Choice*>(w)->value();
         if (idx >= 0 && idx < (int)self->connections_.size())
             self->channels_[i].portName = self->connections_[idx].portName;
+        if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }
 }
@@ -418,6 +425,7 @@ void ConnectionsOverlay::midiChanChoiceCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->chanRows_.size(); i++) {
         if (w != self->chanRows_[i].midiChanChoice) continue;
         self->channels_[i].midiChannel = static_cast<Fl_Choice*>(w)->value() + 1;
+        if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }
 }

@@ -81,6 +81,23 @@ int main(int argc, char **argv) {
     // --- JACK port management ---------------------------------------------
     ConnectionsOverlay* connOverlay = app.connectionsOverlay;
 
+    // Helper: push current channel list to jackTransport and patternPanel.
+    auto pushChannelRoutings = [&]() {
+        if (!connOverlay) return;
+        if (useJack) {
+            std::vector<JackTransport::ChannelRouting> routings;
+            for (const auto& ci : connOverlay->getChannels())
+                routings.push_back({ci.name, ci.portName, ci.midiChannel});
+            jackTransport.setChannels(routings);
+        }
+        if (app.patternPanel) {
+            std::vector<std::string> names;
+            for (const auto& ci : connOverlay->getChannels())
+                names.push_back(ci.name);
+            app.patternPanel->setChannels(names);
+        }
+    };
+
     if (connOverlay) {
         connOverlay->onPortAdded = [&](const std::string& name) {
             if (useJack) jackTransport.addMidiPort(name);
@@ -91,12 +108,14 @@ int main(int argc, char **argv) {
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             if (useJack) jackTransport.renameMidiPort(oldName, newName);
         };
+        connOverlay->onChannelsChanged = [&]() { pushChannelRoutings(); };
 
-        // Register the default port that the overlay created in its constructor.
+        // Register the default port and push initial channel routings.
         if (useJack) {
             for (const auto& name : connOverlay->getConnections())
                 jackTransport.addMidiPort(name);
         }
+        pushChannelRoutings();
     }
 
     // Helper: unregister all current ports, then register ports from the overlay.
@@ -114,11 +133,12 @@ int main(int argc, char **argv) {
         if (useJack)
             for (const auto& name : connOverlay->getConnections())
                 jackTransport.addMidiPort(name);
-        // Load channels
+        // Load channels and push routings.
         std::vector<ConnectionsOverlay::ChannelInfo> chans;
         for (const auto& c : state.jackChannels)
             chans.push_back({0, c.name, c.portName, c.midiChannel});
         connOverlay->setChannels(chans);
+        pushChannelRoutings();
     };
 
     // Helper: fill jackConnections and jackChannels in an AppState from the overlay.

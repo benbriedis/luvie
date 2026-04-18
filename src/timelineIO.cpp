@@ -58,19 +58,21 @@ static json patternToJson(const Pattern& p) {
     json jdrum = json::array();
     for (const auto& d : p.drumNotes) jdrum.push_back(drumNoteToJson(d));
     return {
-        {"id",           p.id},
-        {"lengthBeats",  p.lengthBeats},
-        {"type",         (int)p.type},
-        {"notes",        jnotes},
-        {"drumNotes",    jdrum},
+        {"id",                p.id},
+        {"lengthBeats",       p.lengthBeats},
+        {"type",              (int)p.type},
+        {"notes",             jnotes},
+        {"drumNotes",         jdrum},
+        {"outputChannelName", p.outputChannelName},
     };
 }
 
 static Pattern patternFromJson(const json& j) {
     Pattern p;
-    p.id          = j.at("id");
-    p.lengthBeats = j.at("lengthBeats");
-    p.type        = (PatternType)j.value("type", 0);
+    p.id                = j.at("id");
+    p.lengthBeats       = j.at("lengthBeats");
+    p.type              = (PatternType)j.value("type", 0);
+    p.outputChannelName = j.value("outputChannelName", "");
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));
     for (const auto& jd : j.value("drumNotes", json::array())) p.drumNotes.push_back(drumNoteFromJson(jd));
     return p;

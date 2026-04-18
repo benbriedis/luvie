@@ -9,6 +9,7 @@
 #include "modernChoice.hpp"
 #include "panelStyle.hpp"
 #include <string>
+#include <vector>
 
 class PatternPanel : public Fl_Group, public ITimelineObserver {
 
@@ -16,6 +17,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     int                 editingTrackId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
+    std::vector<std::string> channelNames_;
 
     Fl_Box      patternName;
     Fl_Box      baseLabel;
@@ -23,12 +25,15 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     ModernChoice rootChoice;
     Fl_Box      chordLabel;
     ModernChoice chordChoice;
+    Fl_Box      outLabel;
+    ModernChoice outChoice;
     InlineInput input;
 
     void startEdit();
     void cancelEdit();
     void checkDuplicate();
     void updateRootChoiceLabels(int preserveIndex);
+    void refreshOutChoice();
 
     void draw() override;
     int  handle(int event) override;
@@ -48,6 +53,9 @@ public:
 
     // Set chord/root/sharp without triggering onParamsChanged.
     void setParams(int root, int chord, bool sharp);
+
+    // Update the available channel list shown in the Out dropdown.
+    void setChannels(const std::vector<std::string>& names);
 
     void setTimeline(ObservableTimeline* tl);
     void setDrumMode(bool drum);

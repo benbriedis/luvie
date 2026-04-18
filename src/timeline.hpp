@@ -40,6 +40,7 @@ struct Pattern {
 	PatternType       type = PatternType::STANDARD;
 	std::vector<Note>     notes;
 	std::vector<DrumNote> drumNotes;
+	std::string outputChannelName;  // empty = no routing assigned
 };
 
 struct PatternInstance {

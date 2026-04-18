@@ -65,7 +65,17 @@ void JackTransport::setNoteParams(int root, int chord)
     rebuildSnapshot();
 }
 
+void JackTransport::setChannels(const std::vector<ChannelRouting>& routings)
+{
+    channelMap_.clear();
+    for (const auto& r : routings)
+        channelMap_[r.channelName] = r;
+    rebuildSnapshot();
+}
+
 // ── Snapshot building (UI thread) ─────────────────────────────────────────────
+
+static constexpr float drumNoteLen = 0.1f;
 
 void JackTransport::rebuildSnapshot()
 {
@@ -113,30 +123,47 @@ void JackTransport::rebuildSnapshot()
     int trackIdx = 0;
     for (const Track& track : tl.tracks) {
         TrackSnap ts;
-        ts.channel = trackIdx % 16;
 
         for (const PatternInstance& inst : track.patterns) {
             const Pattern* pat = timeline->patternForInstance(inst.id);
             if (!pat || pat->lengthBeats <= 0.0f) continue;
 
             InstanceSnap is;
-            is.startBar     = inst.startBar;
-            is.length       = inst.length;
-            is.startOffset  = inst.startOffset;
+            is.startBar    = inst.startBar;
+            is.length      = inst.length;
+            is.startOffset = inst.startOffset;
             is.patternBeats = pat->lengthBeats;
 
             int top, bot;
             timeline->timeSigAt((int)inst.startBar, top, bot);
             is.beatsPerBar = (float)top;
 
-            for (const Note& note : pat->notes) {
-                if (note.disabled) continue;
-                int n = note.pitch;
-                int midi = rootMidi0
-                         + chordDefs[chordType].intervals[n % chordSize]
-                         + (n / chordSize) * 12;
-                midi = std::clamp(midi, 0, 127);
-                is.notes.push_back({midi, note.beat, note.length, note.velocity});
+            // Resolve output channel routing from the pattern's assignment.
+            is.portName   = "";
+            is.midiChannel = trackIdx % 16;  // fallback when no channel assigned
+            if (!pat->outputChannelName.empty()) {
+                auto it = channelMap_.find(pat->outputChannelName);
+                if (it != channelMap_.end()) {
+                    is.portName    = it->second.portName;
+                    is.midiChannel = it->second.midiChannel - 1;  // to 0-based
+                }
+            }
+
+            if (pat->type == PatternType::DRUM) {
+                for (const DrumNote& dn : pat->drumNotes) {
+                    int midi = std::clamp(dn.note, 0, 127);
+                    is.notes.push_back({midi, dn.beat, drumNoteLen, dn.velocity});
+                }
+            } else {
+                for (const Note& note : pat->notes) {
+                    if (note.disabled) continue;
+                    int n = note.pitch;
+                    int midi = rootMidi0
+                             + chordDefs[chordType].intervals[n % chordSize]
+                             + (n / chordSize) * 12;
+                    midi = std::clamp(midi, 0, 127);
+                    is.notes.push_back({midi, note.beat, note.length, note.velocity});
+                }
             }
 
             ts.instances.push_back(std::move(is));
@@ -152,7 +179,7 @@ void JackTransport::rebuildSnapshot()
     }
 }
 
-// ── RT-safe bar/seconds conversion (call with snapMutex held) ─────────────────
+// ── RT-safe bar/seconds conversion ────────────────────────────────────────────
 
 double JackTransport::snapBarToSeconds(float bar) const
 {
@@ -190,20 +217,9 @@ float JackTransport::snapSecondsToBar(double secs) const
 
 // ── ITransport methods (UI thread) ───────────────────────────────────────────
 
-void JackTransport::play()
-{
-    if (client && jackAlive.load()) jack_transport_start(client);
-}
-
-void JackTransport::pause()
-{
-    if (client && jackAlive.load()) jack_transport_stop(client);
-}
-
-void JackTransport::rewind()
-{
-    if (client && jackAlive.load()) jack_transport_locate(client, 0);
-}
+void JackTransport::play()  { if (client && jackAlive.load()) jack_transport_start(client); }
+void JackTransport::pause() { if (client && jackAlive.load()) jack_transport_stop(client); }
+void JackTransport::rewind(){ if (client && jackAlive.load()) jack_transport_locate(client, 0); }
 
 void JackTransport::seek(float bars)
 {
@@ -227,45 +243,62 @@ int JackTransport::processCallback(jack_nframes_t nframes, void* arg)
     return static_cast<JackTransport*>(arg)->process(nframes);
 }
 
+// Find buffer for a named port; returns nullptr if not found.
+static void* findBuf(const std::vector<std::pair<std::string, void*>>& bufs,
+                     const std::string& name)
+{
+    for (const auto& [n, b] : bufs)
+        if (n == name) return b;
+    return nullptr;
+}
+
 int JackTransport::process(jack_nframes_t nframes)
 {
     jack_position_t        pos;
     jack_transport_state_t state = jack_transport_query(client, &pos);
     bool nowPlaying = (state == JackTransportRolling);
 
-    // Collect port buffers non-blockingly; skip MIDI this cycle if UI thread holds the lock.
-    std::vector<void*> bufs;
+    // Collect port buffers, keyed by name for per-channel routing.
+    std::vector<NamedBuf> namedBufs;
+    std::vector<void*>    allBufs;
     if (midiEnabled && portsMutex.try_lock()) {
-        bufs.reserve(midiPorts_.size());
+        namedBufs.reserve(midiPorts_.size());
+        allBufs.reserve(midiPorts_.size());
         for (auto& [name, port] : midiPorts_) {
             void* b = jack_port_get_buffer(port, nframes);
             jack_midi_clear_buffer(b);
-            bufs.push_back(b);
+            namedBufs.push_back({name, b});
+            allBufs.push_back(b);
         }
         portsMutex.unlock();
     }
 
-    // Detect a seek/jump (frame didn't advance by the expected amount).
-    bool jumped = !firstCall && wasPlaying
-                  && (pos.frame != lastFrame + nframes);
+    bool jumped = !firstCall && wasPlaying && (pos.frame != lastFrame + nframes);
 
-    // On stop or jump: silence all active notes immediately.
-    if (!bufs.empty() && ((!nowPlaying && wasPlaying) || jumped)) {
+    // On stop or jump: silence all active notes.
+    if (!allBufs.empty() && ((!nowPlaying && wasPlaying) || jumped)) {
         for (auto& an : activeNotes) {
             uint8_t msg[3] = {
                 static_cast<uint8_t>(0x80 | (an.channel & 0x0F)),
                 static_cast<uint8_t>(an.midiPitch),
                 0
             };
-            for (void* b : bufs) jack_midi_event_write(b, 0, msg, 3);
+            // Send note-off to the specific port (or all if unrouted).
+            if (an.portName.empty()) {
+                for (void* b : allBufs) jack_midi_event_write(b, 0, msg, 3);
+            } else {
+                void* b = findBuf(namedBufs, an.portName);
+                if (b) jack_midi_event_write(b, 0, msg, 3);
+                else for (void* fb : allBufs) jack_midi_event_write(fb, 0, msg, 3);
+            }
         }
         activeNotes.clear();
     }
 
-    if (nowPlaying && !bufs.empty()) {
+    if (nowPlaying && !allBufs.empty()) {
         jack_nframes_t blockEnd = pos.frame + nframes;
 
-        // Fire note-offs for notes ending within this block.
+        // Fire note-offs for notes ending in this block.
         for (auto it = activeNotes.begin(); it != activeNotes.end(); ) {
             if (it->offFrame <= blockEnd) {
                 jack_nframes_t off = (it->offFrame > pos.frame)
@@ -276,20 +309,25 @@ int JackTransport::process(jack_nframes_t nframes)
                     static_cast<uint8_t>(it->midiPitch),
                     0
                 };
-                for (void* b : bufs) jack_midi_event_write(b, off, msg, 3);
+                if (it->portName.empty()) {
+                    for (void* b : allBufs) jack_midi_event_write(b, off, msg, 3);
+                } else {
+                    void* b = findBuf(namedBufs, it->portName);
+                    if (b) jack_midi_event_write(b, off, msg, 3);
+                    else for (void* fb : allBufs) jack_midi_event_write(fb, off, msg, 3);
+                }
                 it = activeNotes.erase(it);
             } else {
                 ++it;
             }
         }
 
-        // Generate note-ons from timeline snapshot (non-blocking lock).
         if (snapMutex.try_lock()) {
             float prevBars = snapSecondsToBar(static_cast<double>(
                                  (firstCall || jumped) ? pos.frame : lastFrame) / sampleRate);
             float curBars  = snapSecondsToBar(static_cast<double>(blockEnd) / sampleRate);
 
-            fireNoteEvents(bufs, nframes, pos.frame, prevBars, curBars);
+            fireNoteEvents(namedBufs, allBufs, nframes, pos.frame, prevBars, curBars);
             snapMutex.unlock();
         }
     }
@@ -309,7 +347,8 @@ int JackTransport::process(jack_nframes_t nframes)
 
 // ── Note event generation (RT thread, called with snapMutex held) ─────────────
 
-void JackTransport::fireNoteEvents(const std::vector<void*>& bufs,
+void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
+                                    const std::vector<void*>& allBufs,
                                     jack_nframes_t nframes,
                                     jack_nframes_t blockStart,
                                     float prevBars, float curBars)
@@ -321,6 +360,11 @@ void JackTransport::fireNoteEvents(const std::vector<void*>& bufs,
             if (inst.patternBeats <= 0.0f)               continue;
             if (inst.notes.empty())                      continue;
 
+            // Resolve output buffer for this instance.
+            void* instBuf = nullptr;
+            if (!inst.portName.empty())
+                instBuf = findBuf(namedBufs, inst.portName);
+
             float windowStart = std::max(prevBars, inst.startBar);
             float windowEnd   = std::min(curBars,  inst.startBar + inst.length);
             float beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
@@ -329,13 +373,11 @@ void JackTransport::fireNoteEvents(const std::vector<void*>& bufs,
             for (const NoteSnap& note : inst.notes) {
                 float len = inst.patternBeats;
 
-                // First firing at or after beatStart (handles pattern looping).
                 float cycles    = std::floor((beatStart - note.beat) / len);
                 float firstFire = note.beat + cycles * len;
                 if (firstFire < beatStart) firstFire += len;
 
                 while (firstFire < beatEnd) {
-                    // Song-bar position of this note-on.
                     float onBar = inst.startBar
                                 + (firstFire - inst.startOffset) / inst.beatsPerBar;
                     double onSecs = snapBarToSeconds(onBar);
@@ -348,21 +390,25 @@ void JackTransport::fireNoteEvents(const std::vector<void*>& bufs,
                     uint8_t vel = static_cast<uint8_t>(
                         std::clamp(static_cast<int>(note.velocity * 127), 1, 127));
                     uint8_t onMsg[3] = {
-                        static_cast<uint8_t>(0x90 | (track.channel & 0x0F)),
+                        static_cast<uint8_t>(0x90 | (inst.midiChannel & 0x0F)),
                         static_cast<uint8_t>(note.midiPitch),
                         vel
                     };
-                    for (void* b : bufs) jack_midi_event_write(b, onOff, onMsg, 3);
+                    if (instBuf) {
+                        jack_midi_event_write(instBuf, onOff, onMsg, 3);
+                    } else {
+                        for (void* b : allBufs) jack_midi_event_write(b, onOff, onMsg, 3);
+                    }
 
-                    // Schedule note-off.
                     float offBar = inst.startBar
                                  + (firstFire + note.length - inst.startOffset) / inst.beatsPerBar;
                     auto offFrame = static_cast<jack_nframes_t>(
                         snapBarToSeconds(offBar) * sampleRate);
 
-                    activeNotes.push_back({note.midiPitch, track.channel, offFrame});
+                    activeNotes.push_back({note.midiPitch, inst.midiChannel, offFrame,
+                                           inst.portName});
 
-                    firstFire += len;  // advance to next pattern loop
+                    firstFire += len;
                 }
             }
         }

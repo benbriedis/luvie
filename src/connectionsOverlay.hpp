@@ -92,5 +92,7 @@ public:
     std::function<void(const std::string& name)>                                onPortRemoved;
     std::function<void(const std::string& oldName, const std::string& newName)> onPortRenamed;
 
+    // Fired whenever the channels list or any channel's fields change.
+    std::function<void()> onChannelsChanged;
     std::function<void()> onClose;
 };

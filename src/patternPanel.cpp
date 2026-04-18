@@ -15,14 +15,18 @@ static constexpr int nameW        = 150;
 static constexpr int toggleBtnW   = 26;
 static constexpr int rootChoiceW  = 110;
 static constexpr int choiceW      = 130;
+static constexpr int outLabelW    = 28;
+static constexpr int outChoiceW   = 155;
 
-static int nameX(int x)          { return x + pad; }
-static int baseLabelX(int x)     { return nameX(x) + nameW + pad; }
-static int sharpFlatBtnX(int x)  { return baseLabelX(x) + labelW + sg; }
-static int rootChoiceX(int x)    { return sharpFlatBtnX(x) + toggleBtnW + sg; }
-static int chordLabelX(int x)    { return rootChoiceX(x) + rootChoiceW + groupGap; }
-static int chordChoiceX(int x)   { return chordLabelX(x) + labelW; }
-static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
+static int nameX(int x)         { return x + pad; }
+static int baseLabelX(int x)    { return nameX(x) + nameW + pad; }
+static int sharpFlatBtnX(int x) { return baseLabelX(x) + labelW + sg; }
+static int rootChoiceX(int x)   { return sharpFlatBtnX(x) + toggleBtnW + sg; }
+static int chordLabelX(int x)   { return rootChoiceX(x) + rootChoiceW + groupGap; }
+static int chordChoiceX(int x)  { return chordLabelX(x) + labelW; }
+static int outLabelX(int x)     { return chordChoiceX(x) + choiceW + groupGap; }
+static int outChoiceX(int x)    { return outLabelX(x) + outLabelW; }
+static int ctrlY(int y, int h)  { return y + (h - ctrlH) / 2; }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
@@ -32,6 +36,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       rootChoice  (rootChoiceX(x),   ctrlY(y,h), rootChoiceW,  ctrlH),
       chordLabel  (chordLabelX(x),   ctrlY(y,h), labelW,        ctrlH, "Chord"),
       chordChoice (chordChoiceX(x),  ctrlY(y,h), choiceW,       ctrlH),
+      outLabel    (outLabelX(x),     ctrlY(y,h), outLabelW,     ctrlH, "Out"),
+      outChoice   (outChoiceX(x),    ctrlY(y,h), outChoiceW,    ctrlH),
       input       (nameX(x),         ctrlY(y,h), nameW,         ctrlH)
 {
     box(FL_NO_BOX);
@@ -75,6 +81,25 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     chordChoice.value(0);
     chordChoice.callback(paramsCb, this);
 
+    outLabel.box(FL_NO_BOX);
+    outLabel.labelcolor(panelText);
+    outLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    outChoice.add("(none)");
+    outChoice.value(0);
+    outChoice.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (!self->timeline) return;
+        const auto& tl = self->timeline->get();
+        int sel = tl.selectedTrackIndex;
+        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+        int patId = tl.tracks[sel].patternId;
+        int idx = self->outChoice.value();
+        std::string name = (idx > 0 && idx - 1 < (int)self->channelNames_.size())
+            ? self->channelNames_[idx - 1] : "";
+        self->timeline->setPatternOutputChannel(patId, name);
+    }, this);
+
     input.hide();
     input.box(FL_FLAT_BOX);
     input.color(0x37415100);
@@ -93,9 +118,39 @@ void PatternPanel::setParams(int root, int chord, bool sharp)
 {
 	useSharp = sharp;
 	sharpFlatBtn.label(useSharp ? "#" : "b");
-	updateRootChoiceLabels(root);  // clears + repopulates rootChoice, sets value(root)
+	updateRootChoiceLabels(root);
 	chordChoice.value(chord);
 	redraw();
+}
+
+void PatternPanel::setChannels(const std::vector<std::string>& names)
+{
+    channelNames_ = names;
+    outChoice.clear();
+    outChoice.add("(none)");
+    for (const auto& n : names) outChoice.add(n.c_str());
+    refreshOutChoice();
+}
+
+void PatternPanel::refreshOutChoice()
+{
+    if (!timeline) { outChoice.value(0); return; }
+    const auto& tl = timeline->get();
+    int sel = tl.selectedTrackIndex;
+    outChoice.value(0);
+    if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+    int patId = tl.tracks[sel].patternId;
+    for (const auto& p : tl.patterns) {
+        if (p.id != patId) continue;
+        for (int i = 0; i < (int)channelNames_.size(); i++) {
+            if (channelNames_[i] == p.outputChannelName) {
+                outChoice.value(i + 1);  // +1 for "(none)"
+                break;
+            }
+        }
+        break;
+    }
+    outChoice.redraw();
 }
 
 void PatternPanel::updateRootChoiceLabels(int idx)
@@ -156,6 +211,7 @@ void PatternPanel::onTimelineChanged()
         patternName.copy_label("");
         setDrumMode(false);
     }
+    refreshOutChoice();
     redraw();
 }
 

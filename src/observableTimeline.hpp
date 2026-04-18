@@ -66,6 +66,9 @@ public:
 	void resizeNoteLeft(int noteId, float newStart, float newLength);
 	std::vector<Note> buildPatternNotes(int patternId) const;
 
+	// Set the output channel assignment for a pattern (empty = unassigned).
+	void setPatternOutputChannel(int patId, const std::string& channelName);
+
 	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)
 	void placePattern(int trackIndex, int patternId, float startBar, float length);
 
