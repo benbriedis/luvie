@@ -260,5 +260,7 @@ TODO review the format of the JSON file
 
 Does top Makefile need install target added to it? src/Makefile has install target.
 
+Allow the window close to be clicked even if a popup of menu is showing.
+
 Implement undo/redo. Only enable Save & Save As if a change has been made (and not undone).
 
