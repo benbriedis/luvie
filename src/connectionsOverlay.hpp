@@ -58,6 +58,9 @@ class ConnectionsOverlay : public BasePopup {
     void rebuildPortChoices();
     void syncFromInputs();
 
+    std::vector<Fl_Widget*> getFocusOrder() const;
+    void advanceFocusBy(int dir);
+
     std::string uniquePortName(const std::string& base, int excludeIdx = -1) const;
     std::string uniqueChanName(const std::string& base, int excludeIdx = -1) const;
     std::string nextLetterChanName() const;
@@ -70,6 +73,7 @@ class ConnectionsOverlay : public BasePopup {
     static void midiChanChoiceCb(Fl_Widget*, void*);
 
     void draw() override;
+    int  handle(int event) override;
 
 public:
     ConnectionsOverlay(int x, int y, int w, int h);

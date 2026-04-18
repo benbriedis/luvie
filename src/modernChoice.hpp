@@ -35,6 +35,13 @@ class ModernChoice : public Fl_Choice {
         fl_line(cx - 4, cy - 2, cx,     cy + 2);
         fl_line(cx,     cy + 2, cx + 4, cy - 2);
         fl_line_style(0);
+
+        if (Fl::focus() == this) {
+            fl_color(0x3B82F600);
+            fl_line_style(FL_SOLID, 2);
+            fl_rect(x() + 2, y() + 2, w() - 4, h() - 4);
+            fl_line_style(0);
+        }
     }
 
     int handle(int event) override {

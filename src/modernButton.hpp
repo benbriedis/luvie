@@ -23,6 +23,13 @@ class ModernButton : public Fl_Button {
             fl_line_style(0);
         }
 
+        if (Fl::focus() == this) {
+            fl_color(0x3B82F600);
+            fl_line_style(FL_SOLID, 2);
+            fl_rect(x() + 1, y() + 1, w() - 2, h() - 2);
+            fl_line_style(0);
+        }
+
         if (label()) {
             fl_font(labelfont(), labelsize());
             fl_color(active() ? labelcolor() : fl_color_average(labelcolor(), bg, 0.4f));
@@ -34,6 +41,10 @@ class ModernButton : public Fl_Button {
         if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
         if (event == FL_HIDE)  { hovered = false; return 0; }
+        if (event == FL_KEYBOARD) {
+            int k = Fl::event_key();
+            if (k == FL_Enter || k == FL_KP_Enter) { do_callback(); return 1; }
+        }
         return Fl_Button::handle(event);
     }
 

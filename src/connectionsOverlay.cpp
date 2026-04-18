@@ -42,8 +42,17 @@ static constexpr Fl_Color addBtnBg   = 0xF3F4F600;
 
 class NameInput : public Fl_Input {
 public:
-    NameInput(int x, int y, int w, int h) : Fl_Input(x, y, w, h) {}
+    NameInput(int x, int y, int w, int h) : Fl_Input(x, y, w, h) {
+        when(FL_WHEN_NEVER);
+    }
     int handle(int event) override {
+        if (event == FL_KEYBOARD) {
+            int k = Fl::event_key();
+            if (k == FL_Enter || k == FL_KP_Enter) {
+                do_callback();
+                return 0;  // bubble to overlay for focus advance
+            }
+        }
         int r = Fl_Input::handle(event);
         if (event == FL_UNFOCUS) do_callback();
         return r;
@@ -241,7 +250,6 @@ void ConnectionsOverlay::rebuildRows() {
         inp->color(inputBgCol);
         inp->textcolor(textCol);
         inp->textsize(12);
-        inp->when(FL_WHEN_ENTER_KEY_ALWAYS);
         inp->value(connections_[i].portName.c_str());
         inp->callback(inputCb, this);
 
@@ -298,7 +306,6 @@ void ConnectionsOverlay::rebuildChannelRows() {
         nameInp->color(inputBgCol);
         nameInp->textcolor(textCol);
         nameInp->textsize(12);
-        nameInp->when(FL_WHEN_ENTER_KEY_ALWAYS);
         nameInp->value(channels_[i].name.c_str());
         nameInp->callback(chanNameCb, this);
 
@@ -479,6 +486,54 @@ void ConnectionsOverlay::midiChanChoiceCb(Fl_Widget* w, void* d) {
     }
 }
 
+// ── Focus navigation ──────────────────────────────────────────────────────────
+
+std::vector<Fl_Widget*> ConnectionsOverlay::getFocusOrder() const {
+    std::vector<Fl_Widget*> order;
+    for (const auto& row : rows_) {
+        if (row.input && row.input->active())     order.push_back(row.input);
+        if (row.deleteBtn && row.deleteBtn->active()) order.push_back(row.deleteBtn);
+    }
+    order.push_back(addBtn);
+    for (const auto& row : chanRows_) {
+        if (row.nameInput && row.nameInput->active())       order.push_back(row.nameInput);
+        if (row.portChoice && row.portChoice->active())     order.push_back(row.portChoice);
+        if (row.midiChanChoice && row.midiChanChoice->active()) order.push_back(row.midiChanChoice);
+        if (row.deleteBtn && row.deleteBtn->active())       order.push_back(row.deleteBtn);
+    }
+    order.push_back(addChanBtn);
+    order.push_back(closeBtn);
+    return order;
+}
+
+void ConnectionsOverlay::advanceFocusBy(int dir) {
+    auto order = getFocusOrder();
+    if (order.empty()) return;
+    Fl_Widget* cur = Fl::focus();
+    int idx = -1;
+    for (int i = 0; i < (int)order.size(); i++)
+        if (order[i] == cur) { idx = i; break; }
+    int next = idx == -1 ? (dir > 0 ? 0 : (int)order.size() - 1)
+                         : (idx + dir + (int)order.size()) % (int)order.size();
+    Fl::focus(order[next]);
+    order[next]->redraw();
+}
+
+int ConnectionsOverlay::handle(int event) {
+    if (event == FL_KEYBOARD) {
+        int k = Fl::event_key();
+        if (k == FL_Tab) {
+            advanceFocusBy(Fl::event_state() & FL_SHIFT ? -1 : 1);
+            return 1;
+        }
+        if (k == FL_Enter || k == FL_KP_Enter) {
+            advanceFocusBy(1);
+            return 1;
+        }
+    }
+    return BasePopup::handle(event);
+}
+
 // ── Drawing ───────────────────────────────────────────────────────────────────
 
 void ConnectionsOverlay::draw() {
@@ -509,7 +564,7 @@ void ConnectionsOverlay::draw() {
         const int colY = headerH + sectionH;
         fl_font(FL_HELVETICA, 10);
         fl_color(subTextCol);
-        fl_draw("PORT NAME  (press Enter to rename)", pad, colY,
+        fl_draw("PORT NAME", pad, colY,
                 w() - 2*pad, colH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
         fl_color(dividerCol);
