@@ -41,9 +41,17 @@ static constexpr Fl_Color addBtnBg   = 0xF3F4F600;
 // ── NameInput ─────────────────────────────────────────────────────────────
 
 class NameInput : public Fl_Input {
+    void draw() override {
+        Fl_Input::draw();
+        fl_color(Fl::focus() == this ? 0x3B82F600 : borderCol);
+        fl_line_style(FL_SOLID, Fl::focus() == this ? 2 : 1);
+        fl_rect(x(), y(), w(), h());
+        fl_line_style(0);
+    }
 public:
     NameInput(int x, int y, int w, int h) : Fl_Input(x, y, w, h) {
         when(FL_WHEN_NEVER);
+        box(FL_BORDER_BOX);
     }
     int handle(int event) override {
         if (event == FL_KEYBOARD) {
@@ -246,7 +254,6 @@ void ConnectionsOverlay::rebuildRows() {
         const int iy = y + (rowH - inputH) / 2;
 
         auto* inp = new NameInput(pad, iy, inputW, inputH);
-        inp->box(FL_BORDER_BOX);
         inp->color(inputBgCol);
         inp->textcolor(textCol);
         inp->textsize(12);
@@ -302,7 +309,6 @@ void ConnectionsOverlay::rebuildChannelRows() {
         const int iy = y + (rowH - inputH) / 2;
 
         auto* nameInp = new NameInput(pad, iy, chanNameW_, inputH);
-        nameInp->box(FL_BORDER_BOX);
         nameInp->color(inputBgCol);
         nameInp->textcolor(textCol);
         nameInp->textsize(12);

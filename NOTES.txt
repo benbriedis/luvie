@@ -189,6 +189,24 @@ IMPLEMENT - NEED NOTES
 - Have a standalone version that can take a project file as an argument - eg:  luvie myproject.json
   MAYBE add a "luvie -h" option in. For some reason getting the Fltk options again...
 
+
+
+DRUM MAPPING 
+============
+
+cf WORKFLOW:
+  - Create a "drum channel" (mark a regular channel... cf automatically use drum patterns?)
+  - Default to GM pattern and maybe store in session file in JSON (probably include the note numbers - more flexible. cf MIDI 2.0 in time)
+  - Can edit the names of drums in the editor.
+  - Can export or import MIDNAM XML files (one per channel)
+    (hopefully can add a name or description)
+
+MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
+- Doesn't look like DrumGizmo supports this yet
+
+( Proprietary SysEx (System Exclusive) Messages: Many drum machines use SysEx messages to transmit their 
+  entire internal patch state, including custom drum mappings, to a sequencer to be saved as a data dump )
+
 ------------------------------TODOs---------------------------
 
 1. Transport
@@ -266,4 +284,25 @@ Implement undo/redo. Only enable Save & Save As if a change has been made (and n
 
 
 Connections X is not all the way to the right. (Putting on a left an alternative)
+
+.........................
+
+    
+- In the Pattern Editor place the "Out" field at the far right
+  
+- Make "Out" and "Channel" naming more consistent? cf "Out channel" / "Out" / "Output" / Connections
+  cf Renaming "Connections" overlay to "Outputs"
+  
+-  Markers are broken: clicking on first markers creates new markers to the right
+
+- Connections overlay: click outside the port field doesnt register unless clicking into another field
+  Should probably lose focus at this point.
+- Connections overlay - focused items don't fully defocus.
+    
+
+----------
+
+Big decision to make soon: do I want a separate piano editor, or do I incorporate it into the current pattern editor?
+    Probably would need a 'translate / fix' button: 
+	   Basically removes the 'base note'.
 
