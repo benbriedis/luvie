@@ -126,8 +126,9 @@ int MarkerRuler::handle(int event)
 	case FL_PUSH: {
 		if (Fl::event_button() == FL_LEFT_MOUSE) {
 			int bar = findBarAt(Fl::event_x());
-			draggingBar = (bar >= 0 && !isFixed(bar)) ? bar : -1;
-			didDrag     = false;
+			pushedOnMarker = (bar >= 0);
+			draggingBar    = (bar >= 0 && !isFixed(bar)) ? bar : -1;
+			didDrag        = false;
 		} else if (Fl::event_button() == FL_RIGHT_MOUSE) {
 			clickedBar = findBarAt(Fl::event_x());
 		}
@@ -160,7 +161,7 @@ int MarkerRuler::handle(int event)
 	}
 	case FL_RELEASE: {
 		if (Fl::event_button() == FL_LEFT_MOUSE) {
-			if (!didDrag && draggingBar < 0) {
+			if (!didDrag && draggingBar < 0 && !pushedOnMarker) {
 				// Left click on empty space: create marker and open popup
 				int bar = std::max(1, pixelToBar(Fl::event_x() - x()));
 				bool occupied = false;
@@ -182,8 +183,9 @@ int MarkerRuler::handle(int event)
 					openPopupFor(bar);
 				}
 			}
-			draggingBar = -1;
-			didDrag     = false;
+			draggingBar    = -1;
+			didDrag        = false;
+			pushedOnMarker = false;
 		} else if (Fl::event_button() == FL_RIGHT_MOUSE) {
 			if (clickedBar >= 0)
 				openPopupFor(clickedBar);

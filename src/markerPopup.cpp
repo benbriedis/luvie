@@ -48,10 +48,13 @@ MarkerPopup::MarkerPopup(Kind k)
 		auto* slash = new Fl_Box(pad + 29 + 44 + 2, row1Y, 10, row1H, "/");
 		slash->labelcolor(popupText);
 		slash->box(FL_NO_BOX);
-		input2 = new Fl_Value_Input(pad + 29 + 44 + 16, row1Y, 44, row1H);
-		input2->range(1, 32);
-		input2->step(1);
-		styleInput(input2);
+		denomChoice = new ModernChoice(pad + 29 + 44 + 16, row1Y, 44, row1H);
+		denomChoice->color(popupInputBg);
+		denomChoice->labelcolor(popupText);
+		denomChoice->setBorderColor(0x4B556300);
+		denomChoice->setArrowColor(popupText);
+		for (const char* v : {"1", "2", "4", "8", "16", "32"})
+			denomChoice->add(v);
 	}
 
 	deleteBtn = new ModernButton(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
@@ -79,7 +82,9 @@ void MarkerPopup::doOk()
 	if (kind == TEMPO) {
 		if (onOkTempo) onOkTempo(input1->value());
 	} else {
-		if (onOkTimeSig) onOkTimeSig((int)input1->value(), (int)input2->value());
+		static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
+		int den = (denomChoice->value() >= 0) ? denoms[denomChoice->value()] : 4;
+		if (onOkTimeSig) onOkTimeSig((int)input1->value(), den);
 	}
 	hide();
 	if (auto* win = window()) win->redraw();
@@ -98,13 +103,8 @@ int MarkerPopup::handle(int event)
 {
 	if (event == FL_KEYDOWN && Fl::event_key() == FL_Enter) {
 		Fl_Widget* f = Fl::focus();
-		if (f == input1 || f == input2) {
-			if (kind == TIME_SIG && f == input1) {
-				input2->take_focus();
-				onSecondField = true;
-			} else {
-				doOk();
-			}
+		if (f == input1) {
+			doOk();
 			return 1;
 		}
 		if (f == deleteBtn) { doDelete(); return 1; }
@@ -136,10 +136,12 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
                                std::function<void(int, int)> onOk,
                                std::function<void()> onDelete)
 {
-	committed     = false;
+	committed = false;
 	input1->value(num);
-	input2->value(den);
-	onSecondField = false;
+	static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
+	int idx = 2; // default to 4
+	for (int i = 0; i < 6; ++i) if (denoms[i] == den) { idx = i; break; }
+	denomChoice->value(idx);
 	fixed ? deleteBtn->deactivate() : deleteBtn->activate();
 	onOkTimeSig = std::move(onOk);
 	onDeleteCb  = std::move(onDelete);

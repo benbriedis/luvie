@@ -3,6 +3,7 @@
 
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
+#include "modernChoice.hpp"
 #include "basePopup.hpp"
 #include <functional>
 
@@ -28,14 +29,13 @@ private:
 	void doDelete();
 	bool committed = false;
 	Kind            kind;
-	Fl_Value_Input* input1    = nullptr;
-	Fl_Value_Input* input2    = nullptr;
-	ModernButton*   deleteBtn = nullptr;
+	Fl_Value_Input* input1      = nullptr;
+	ModernChoice*   denomChoice = nullptr;
+	ModernButton*   deleteBtn   = nullptr;
 
 	std::function<void(double)>   onOkTempo;
 	std::function<void(int, int)> onOkTimeSig;
 	std::function<void()>         onDeleteCb;
-	bool onSecondField = false;
 };
 
 #endif

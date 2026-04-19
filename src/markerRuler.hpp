@@ -23,9 +23,10 @@ private:
 	ObservableTimeline* timeline;
 	MarkerPopup*        popup;
 
-	int  draggingBar = -1;
-	int  clickedBar  = -1;
-	bool didDrag     = false;
+	int  draggingBar    = -1;
+	int  clickedBar     = -1;
+	bool didDrag        = false;
+	bool pushedOnMarker = false;
 
 	static constexpr Fl_Color tempoColor   = 0xF59E0B00;  // amber-400
 	static constexpr Fl_Color timeSigColor = 0x8B5CF600;  // violet-500

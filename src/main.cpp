@@ -43,9 +43,9 @@ int main(int argc, char **argv) {
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
     songTimeline.defaultOutputChannel = "midi_out_1:1";
-    for (int i = 1; i <= 8; i++) {
+    {
         int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
-        songTimeline.addTrack("Pattern " + std::to_string(i), patId);
+        songTimeline.addTrack("Pattern 1", patId);
     }
 
     JackTransport  jackTransport;

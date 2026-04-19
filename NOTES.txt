@@ -293,8 +293,6 @@ Connections X is not all the way to the right. (Putting on a left an alternative
 - Make "Out" and "Channel" naming more consistent? cf "Out channel" / "Out" / "Output" / Connections
   cf Renaming "Connections" overlay to "Outputs"
   
--  Markers are broken: clicking on first markers creates new markers to the right
-
 - Connections overlay: click outside the port field doesnt register unless clicking into another field
   Should probably lose focus at this point.
 - Connections overlay - focused items don't fully defocus.
