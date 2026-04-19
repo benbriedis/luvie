@@ -73,10 +73,9 @@ void JackTransport::setChannels(const std::vector<ChannelRouting>& routings)
     rebuildSnapshot();
 }
 
-void JackTransport::setLoopMode(bool mode, std::function<bool(int)> enabledFn)
+void JackTransport::setLoopMode(bool mode, std::function<bool(int)> /*enabledFn*/)
 {
-    loopMode    = mode;
-    loopEnabled = std::move(enabledFn);
+    loopMode = mode;
     rebuildSnapshot();
 }
 
@@ -155,39 +154,45 @@ void JackTransport::rebuildSnapshot()
         }
     };
 
-    int trackIdx = 0;
-    for (const Track& track : tl.tracks) {
-        TrackSnap ts;
-
-        if (loopMode) {
-            if (loopEnabled && loopEnabled(trackIdx)) {
+    if (loopMode) {
+        const auto& actives = timeline->activePatterns();
+        int trackIdx = 0;
+        for (const Track& track : tl.tracks) {
+            TrackSnap ts;
+            if (actives.count(track.patternId)) {
+                float anchorBar = actives.at(track.patternId);
                 const Pattern* pat = nullptr;
                 for (const auto& p : tl.patterns)
                     if (p.id == track.patternId) { pat = &p; break; }
-
                 if (pat && pat->lengthBeats > 0.0f) {
                     InstanceSnap is;
-                    is.startBar    = 0.0f;
-                    is.length      = 1.0e9f;
-                    is.startOffset = 0.0f;
+                    is.startBar     = anchorBar;
+                    is.length       = 1.0e9f;
+                    is.startOffset  = 0.0f;
                     is.patternBeats = pat->lengthBeats;
                     int top, bot;
-                    timeline->timeSigAt(0, top, bot);
+                    timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
                     is.beatsPerBar = (float)top;
                     buildNotes(is, pat, trackIdx);
                     if (!is.notes.empty())
                         ts.instances.push_back(std::move(is));
                 }
             }
-        } else {
+            newSnap.tracks.push_back(std::move(ts));
+            ++trackIdx;
+        }
+    } else {
+        int trackIdx = 0;
+        for (const Track& track : tl.tracks) {
+            TrackSnap ts;
             for (const PatternInstance& inst : track.patterns) {
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;
 
                 InstanceSnap is;
-                is.startBar    = inst.startBar;
-                is.length      = inst.length;
-                is.startOffset = inst.startOffset;
+                is.startBar     = inst.startBar;
+                is.length       = inst.length;
+                is.startOffset  = inst.startOffset;
                 is.patternBeats = pat->lengthBeats;
                 int top, bot;
                 timeline->timeSigAt((int)inst.startBar, top, bot);
@@ -195,10 +200,9 @@ void JackTransport::rebuildSnapshot()
                 buildNotes(is, pat, trackIdx);
                 ts.instances.push_back(std::move(is));
             }
+            newSnap.tracks.push_back(std::move(ts));
+            ++trackIdx;
         }
-
-        newSnap.tracks.push_back(std::move(ts));
-        ++trackIdx;
     }
 
     {

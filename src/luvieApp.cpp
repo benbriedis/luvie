@@ -224,19 +224,21 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     loopEd->setTransport(transport);
     loopEd->setContextPopup(ctxPop);
 
-    auto rebuildLoopMidi = [transport, this]() {
-        transport->setLoopMode(true, [this](int i) { return loopEd->isEnabled(i); });
+    // activatePattern/deactivatePattern already notify observers (including JackTransport),
+    // so onToggleChanged just needs to keep the transport mode flag set correctly.
+    loopEd->onToggleChanged = [transport]() {
+        transport->setLoopMode(true, nullptr);
     };
-    loopEd->onToggleChanged = rebuildLoopMidi;
 
-    tabs->onModeChanged = [og2, transport, rebuildLoopMidi, this](bool isLoop) {
+    tabs->onModeChanged = [og2, transport, timeline, this](bool isLoop) {
+        timeline->clearActivePatterns();
         auto enabledFn = isLoop ? std::function<bool(int)>([this](int i) { return loopEd->isEnabled(i); })
                                 : std::function<bool(int)>{};
         og2->setPlayheadLoopMode(isLoop, enabledFn);
         patternEd->setPlayheadLoopMode(isLoop);
         drumEd->setPlayheadLoopMode(isLoop);
         if (isLoop)
-            rebuildLoopMidi();
+            transport->setLoopMode(true, nullptr);
         else
             transport->setLoopMode(false, nullptr);
     };

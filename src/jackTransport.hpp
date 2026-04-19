@@ -81,7 +81,6 @@ private:
     int                              rootPitch    = 0;
     int                              chordType    = 0;
     bool                             loopMode     = false;
-    std::function<bool(int)>         loopEnabled;   // trackIdx → enabled in loop mode
     std::map<std::string, ChannelRouting> channelMap_; // channelName → routing
 
     // ── Timeline snapshot for RT use ─────────────────────────────────────────

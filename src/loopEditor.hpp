@@ -52,7 +52,6 @@ private:
     LoopPanel*          panel        = nullptr;
 
     int hoveredIdx = -1;
-    std::vector<bool> toggled;
 
     static void timerCb(void* data);
 

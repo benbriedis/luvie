@@ -4,6 +4,7 @@
 #include "itimelineobserver.hpp"
 #include "timeline.hpp"
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class ObservableTimeline {
@@ -85,6 +86,18 @@ public:
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;
 
+	// Active patterns — the currently-playing set, keyed by patternId.
+	// anchorBar is the transport bar at which beat 0 of the pattern falls.
+	// Song mode: populated silently by syncActivePatterns (called from Playhead::tick).
+	// Loop mode: managed explicitly via activatePattern / deactivatePattern.
+	void  syncActivePatterns(float currentBar);        // silent, no notify
+	void  activatePattern(int patId, float anchorBar); // notifies observers
+	void  deactivatePattern(int patId);                // notifies observers
+	void  clearActivePatterns();                       // notifies if non-empty
+	bool  isPatternActive(int patId) const;
+	float patternAnchorBar(int patId) const;           // 0.0f if not active
+	const std::unordered_map<int, float>& activePatterns() const { return activePatterns_; }
+
 	// Replace the entire timeline at once and notify observers.
 	// Updates nextId so new IDs won't collide with existing ones.
 	void loadTimeline(const Timeline& tl);
@@ -104,6 +117,7 @@ private:
 	};
 	std::vector<TimeSegment> buildSegments() const;
 	Timeline data;
+	std::unordered_map<int, float> activePatterns_;
 	std::vector<ITimelineObserver*> observers;
 	int nextId = 1;
 

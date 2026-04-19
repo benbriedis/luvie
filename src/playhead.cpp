@@ -32,6 +32,8 @@ void Playhead::onTimelineChanged()
 		float clamped = std::clamp(bars, 0.0f, (float)numCols);
 		if (clamped != bars)
 			transport->seek(clamped);
+		if (obsTl && patternTrack < 0 && !loopActive)
+			obsTl->syncActivePatterns(bars);
 	}
 	if (owner && owner->visible_r()) owner->redraw();
 }
@@ -69,6 +71,7 @@ void Playhead::tick()
 				if (verbose && obsTl && curPos >= lastPosition)
 					checkLoopVerboseNotes(lastPosition, curPos);
 			} else {
+				if (obsTl) obsTl->syncActivePatterns(curPos);
 				if (verbose && obsTl && curPos >= lastPosition)
 					checkVerboseNotes(lastPosition, curPos);
 				if (curPos >= (float)numCols) {
@@ -88,84 +91,67 @@ void Playhead::tick()
 
 void Playhead::checkVerboseNotes(float prevPos, float curPos)
 {
-	const Timeline& tl = obsTl->get();
-	for (const Track& track : tl.tracks) {
-		for (const PatternInstance& inst : track.patterns) {
-			if (inst.startBar + inst.length <= prevPos) continue;
-			if (inst.startBar >= curPos) continue;
+	const Timeline& tl      = obsTl->get();
+	const auto&     actives = obsTl->activePatterns();
 
-			const Pattern* pat = obsTl->patternForInstance(inst.id);
-			if (!pat || pat->notes.empty() || pat->lengthBeats <= 0.0f) continue;
+	for (const auto& [patId, anchorBar] : actives) {
+		const Pattern* pat = nullptr;
+		std::string    label;
+		for (const auto& p : tl.patterns)
+			if (p.id == patId) { pat = &p; break; }
+		if (!pat || pat->notes.empty() || pat->lengthBeats <= 0.0f) continue;
+		for (const auto& track : tl.tracks)
+			if (track.patternId == patId) { label = track.label; break; }
 
-			int top, bottom;
-			obsTl->timeSigAt((int)inst.startBar, top, bottom);
-			float beatsPerBar = (float)top;
+		int top, bottom;
+		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
+		float beatsPerBar = (float)top;
+		float len         = pat->lengthBeats;
+		float prevBeats   = (prevPos - anchorBar) * beatsPerBar;
+		float curBeats    = (curPos  - anchorBar) * beatsPerBar;
 
-			// Convert the song-bar window to a pattern-beat window for this instance.
-			float windowStart = std::max(prevPos, inst.startBar);
-			float windowEnd   = std::min(curPos,  inst.startBar + inst.length);
-			float beatStart   = inst.startOffset + (windowStart - inst.startBar) * beatsPerBar;
-			float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * beatsPerBar;
-
-			for (const Note& note : pat->notes) {
-				if (note.disabled) continue;
-				// Find the first firing of this note (accounting for pattern looping)
-				// at or after beatStart.
-				float len      = pat->lengthBeats;
-				float cycles   = std::floor((beatStart - note.beat) / len);
-				float firstFire = note.beat + cycles * len;
-				if (firstFire < beatStart) firstFire += len;
-
-				if (firstFire < beatEnd) {
-					float songBar  = inst.startBar + (firstFire - inst.startOffset) / beatsPerBar;
-					int   bar      = (int)songBar + 1;
-					int   beat     = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
-					std::string name = pitchName ? pitchName(note.pitch)
-					                             : std::to_string(note.pitch);
-					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
-					       bar, beat, track.label.c_str(), name.c_str(), note.beat, note.length);
-				}
+		for (const Note& note : pat->notes) {
+			if (note.disabled) continue;
+			float cycles    = std::floor((prevBeats - note.beat) / len);
+			float firstFire = note.beat + cycles * len;
+			if (firstFire < prevBeats) firstFire += len;
+			if (firstFire < curBeats) {
+				float songBar = anchorBar + firstFire / beatsPerBar;
+				int   bar     = (int)songBar + 1;
+				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+				std::string name = pitchName ? pitchName(note.pitch)
+				                             : std::to_string(note.pitch);
+				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
+				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 			}
 		}
 	}
 }
 
-bool Playhead::isInPattern(float bars) const
+bool Playhead::isInPattern(float /*bars*/) const
 {
-	if (loopActive) return true;
 	if (patternTrack < 0 || !obsTl) return true;
 	const auto& tracks = obsTl->get().tracks;
 	if (patternTrack >= (int)tracks.size()) return false;
-	for (auto& inst : tracks[patternTrack].patterns)
-		if (bars >= inst.startBar && bars < inst.startBar + inst.length)
-			return true;
-	return false;
+	return obsTl->isPatternActive(tracks[patternTrack].patternId);
 }
 
 int Playhead::barsToPixel(float bars) const
 {
 	if (patternTrack >= 0) {
 		if (!obsTl) return 0;
-		if (loopActive) {
-			int top, bottom;
-			obsTl->timeSigAt(0, top, bottom);
-			float beats = std::fmod(bars * (float)top, (float)numCols);
-			if (beats < 0.0f) beats += numCols;
-			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
-		}
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack >= (int)tracks.size()) return 0;
-		for (auto& inst : tracks[patternTrack].patterns) {
-			if (bars >= inst.startBar && bars < inst.startBar + inst.length) {
-				int top, bottom;
-				obsTl->timeSigAt((int)inst.startBar, top, bottom);
-				float raw        = std::fmod(inst.startOffset + (bars - inst.startBar) * top, (float)numCols);
-				float beatOffset = raw < 0.0f ? raw + (float)numCols : raw;
-				int px = (int)(beatOffset * colWidth);
-				return std::clamp(px, 0, numCols * colWidth - 2);
-			}
-		}
-		return 0;
+		int patId = tracks[patternTrack].patternId;
+		if (!obsTl->isPatternActive(patId)) return 0;
+
+		float anchor = obsTl->patternAnchorBar(patId);
+		int top, bottom;
+		obsTl->timeSigAt((int)std::max(0.0f, anchor), top, bottom);
+		float elapsed = (bars - anchor) * (float)top;
+		float beats   = std::fmod(elapsed, (float)numCols);
+		if (beats < 0.0f) beats += numCols;
+		return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
 	}
 
 	int px = (int)(bars * colWidth);
@@ -215,38 +201,39 @@ float Playhead::currentBar() const
 void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 {
 	if (!obsTl) return;
-	const Timeline& tl = obsTl->get();
+	const Timeline& tl      = obsTl->get();
+	const auto&     actives = obsTl->activePatterns();
 
-	int top, bottom;
-	obsTl->timeSigAt(0, top, bottom);
-	float beatsPerBar = (float)top;
-	float prevBeats   = prevPos * beatsPerBar;
-	float curBeats    = curPos  * beatsPerBar;
-
-	int trackIdx = 0;
-	for (const Track& track : tl.tracks) {
-		if (loopEnabledFn && !loopEnabledFn(trackIdx)) { ++trackIdx; continue; }
-
+	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;
+		std::string    label;
 		for (const auto& p : tl.patterns)
-			if (p.id == track.patternId) { pat = &p; break; }
-		if (!pat || pat->lengthBeats <= 0.0f) { ++trackIdx; continue; }
+			if (p.id == patId) { pat = &p; break; }
+		if (!pat || pat->lengthBeats <= 0.0f) continue;
+		for (const auto& track : tl.tracks)
+			if (track.patternId == patId) { label = track.label; break; }
 
-		float len = pat->lengthBeats;
+		int top, bottom;
+		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
+		float beatsPerBar = (float)top;
+		float len         = pat->lengthBeats;
+		float prevBeats   = (prevPos - anchorBar) * beatsPerBar;
+		float curBeats    = (curPos  - anchorBar) * beatsPerBar;
+
 		for (const Note& note : pat->notes) {
 			if (note.disabled) continue;
 			float cycles    = std::floor((prevBeats - note.beat) / len);
 			float firstFire = note.beat + cycles * len;
 			if (firstFire < prevBeats) firstFire += len;
 			if (firstFire < curBeats) {
-				int bar  = (int)(firstFire / beatsPerBar) + 1;
-				int beat = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+				float songBar = anchorBar + firstFire / beatsPerBar;
+				int   bar     = (int)songBar + 1;
+				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
 				std::string name = pitchName ? pitchName(note.pitch) : std::to_string(note.pitch);
 				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
-				       bar, beat, track.label.c_str(), name.c_str(), note.beat, note.length);
+				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 			}
 		}
-		++trackIdx;
 	}
 }
 

@@ -196,7 +196,10 @@ void LoopEditor::timerCb(void* data)
 
 bool LoopEditor::isEnabled(int trackIdx) const
 {
-    return trackIdx >= 0 && trackIdx < (int)toggled.size() && toggled[trackIdx];
+    if (!timeline) return false;
+    const auto& tracks = timeline->get().tracks;
+    if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return false;
+    return timeline->isPatternActive(tracks[trackIdx].patternId);
 }
 
 float LoopEditor::beatProgress(int trackIdx) const
@@ -206,16 +209,19 @@ float LoopEditor::beatProgress(int trackIdx) const
     if (trackIdx < 0 || trackIdx >= (int)tl.tracks.size()) return 0.0f;
 
     int patId = tl.tracks[trackIdx].patternId;
+    if (!timeline->isPatternActive(patId)) return 0.0f;
+
     const Pattern* pat = nullptr;
     for (const auto& p : tl.patterns)
         if (p.id == patId) { pat = &p; break; }
     if (!pat || pat->lengthBeats <= 0.0f) return 0.0f;
 
-    float bars = transport->position();
-    int top, bottom;
-    timeline->timeSigAt((int)bars, top, bottom);
-    float globalBeats    = bars * (float)top;
-    float posInPattern   = std::fmod(globalBeats, pat->lengthBeats);
+    float anchorBar = timeline->patternAnchorBar(patId);
+    float bars      = transport->position();
+    int   top, bottom;
+    timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
+    float elapsed      = (bars - anchorBar) * (float)top;
+    float posInPattern = std::fmod(elapsed, pat->lengthBeats);
     if (posInPattern < 0.0f) posInPattern += pat->lengthBeats;
     return posInPattern / pat->lengthBeats;
 }
@@ -227,10 +233,6 @@ void LoopEditor::setContextPopup(TrackContextPopup* popup)
 
 void LoopEditor::onTimelineChanged()
 {
-    if (!timeline) return;
-    int n = (int)timeline->get().tracks.size();
-    if ((int)toggled.size() < n)
-        toggled.resize(n, false);
     redraw();
 }
 
@@ -274,7 +276,7 @@ void LoopEditor::draw()
             btnRect(i, bx, by, bw, bh);
             if (by >= y() + gridAreaH()) break;
 
-            bool isToggled = i < (int)toggled.size() && toggled[i];
+            bool isToggled = timeline->isPatternActive(tracks[i].patternId);
             bool isHovered = i == hoveredIdx;
 
             Fl_Color bg = isToggled ? (isHovered ? btnActiveHover : btnActiveBg)
@@ -325,8 +327,17 @@ int LoopEditor::handle(int event)
         if (idx < 0) return 0;
         take_focus();
         if (Fl::event_button() == FL_LEFT_MOUSE) {
-            if (idx >= (int)toggled.size()) toggled.resize(idx + 1, false);
-            toggled[idx] = !toggled[idx];
+            if (timeline) {
+                const auto& tracks = timeline->get().tracks;
+                if (idx < (int)tracks.size()) {
+                    int   patId = tracks[idx].patternId;
+                    float bar   = transport ? transport->position() : 0.0f;
+                    if (timeline->isPatternActive(patId))
+                        timeline->deactivatePattern(patId);
+                    else
+                        timeline->activatePattern(patId, bar);
+                }
+            }
             redraw();
             if (onToggleChanged) onToggleChanged();
             return 1;
