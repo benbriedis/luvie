@@ -5,6 +5,7 @@
 #include "timeline.hpp"
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class ObservableTimeline {
@@ -96,7 +97,7 @@ public:
 	void  clearActivePatterns();                       // notifies if non-empty
 	bool  isPatternActive(int patId) const;
 	float patternAnchorBar(int patId) const;           // 0.0f if not active
-	const std::unordered_map<int, float>& activePatterns() const { return activePatterns_; }
+	const std::unordered_map<int, float>& activePatterns() const { return activePats; }
 
 	// Replace the entire timeline at once and notify observers.
 	// Updates nextId so new IDs won't collide with existing ones.
@@ -117,7 +118,10 @@ private:
 	};
 	std::vector<TimeSegment> buildSegments() const;
 	Timeline data;
-	std::unordered_map<int, float> activePatterns_;
+	std::unordered_map<int, float> activePats;        // patternId → anchorBar
+	std::unordered_set<int>        manualActive;      // explicitly enabled via Loop Editor
+	std::unordered_set<int>        manuallyDisabled;  // explicitly disabled via Loop Editor
+	std::unordered_set<int>        songOriginated;    // currently wanted by song timeline
 	std::vector<ITimelineObserver*> observers;
 	int nextId = 1;
 

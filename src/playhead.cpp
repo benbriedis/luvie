@@ -81,7 +81,9 @@ void Playhead::tick()
 			}
 			lastPosition = curPos;
 		} else {
-			lastPosition = transport->position();
+			float curPos = transport->position();
+			if (obsTl && !loopActive) obsTl->syncActivePatterns(curPos);
+			lastPosition = curPos;
 		}
 	} else if (transport) {
 		lastPosition = transport->position();
