@@ -302,7 +302,7 @@ void LoopEditor::draw()
             // Playhead line – always running, regardless of toggle state
             float progress = beatProgress(i);
             int   lineX    = bx + (int)(progress * (bw - 1));
-            fl_color(0xEF444400);
+            fl_color(isToggled ? 0xEF444400 : FL_WHITE);
             fl_line_style(FL_SOLID, 2);
             fl_line(lineX, by + 4, lineX, by + bh - 4);
             fl_line_style(0);
