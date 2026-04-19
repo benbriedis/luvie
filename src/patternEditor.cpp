@@ -265,6 +265,7 @@ void PatternEditor::onTimelineChanged()
     if (lb != lastLengthBeats && lb > 0.0f) {
         lastLengthBeats      = lb;
         patternGrid.numCols  = (int)lb;
+        playhead.setNumCols((int)lb);
         setColOffset(colOffset);
         redraw();
     }

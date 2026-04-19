@@ -41,6 +41,7 @@ public:
 	void setVerbose(bool v)       { verbose = v; }
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
 	void setPatternTrack(int track) { patternTrack = track; }
+	void setNumCols(int n)        { numCols = n; }
 
 	void onTimelineChanged() override;
 
