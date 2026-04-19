@@ -73,6 +73,13 @@ void JackTransport::setChannels(const std::vector<ChannelRouting>& routings)
     rebuildSnapshot();
 }
 
+void JackTransport::setLoopMode(bool mode, std::function<bool(int)> enabledFn)
+{
+    loopMode    = mode;
+    loopEnabled = std::move(enabledFn);
+    rebuildSnapshot();
+}
+
 // ── Snapshot building (UI thread) ─────────────────────────────────────────────
 
 static constexpr float drumNoteLen = 0.1f;
@@ -120,53 +127,74 @@ void JackTransport::rebuildSnapshot()
     int rootSemi  = (rootPitch + 9) % 12;
     int rootMidi0 = 12 + rootSemi;
 
+    auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx) {
+        is.portName    = "";
+        is.midiChannel = trackIdx % 16;
+        if (!pat->outputChannelName.empty()) {
+            auto it = channelMap_.find(pat->outputChannelName);
+            if (it != channelMap_.end()) {
+                is.portName    = it->second.portName;
+                is.midiChannel = it->second.midiChannel - 1;
+            }
+        }
+        if (pat->type == PatternType::DRUM) {
+            for (const DrumNote& dn : pat->drumNotes) {
+                int midi = std::clamp(dn.note, 0, 127);
+                is.notes.push_back({midi, dn.beat, drumNoteLen, dn.velocity});
+            }
+        } else {
+            for (const Note& note : pat->notes) {
+                if (note.disabled) continue;
+                int n    = note.pitch;
+                int midi = rootMidi0
+                         + chordDefs[chordType].intervals[n % chordSize]
+                         + (n / chordSize) * 12;
+                midi = std::clamp(midi, 0, 127);
+                is.notes.push_back({midi, note.beat, note.length, note.velocity});
+            }
+        }
+    };
+
     int trackIdx = 0;
     for (const Track& track : tl.tracks) {
         TrackSnap ts;
 
-        for (const PatternInstance& inst : track.patterns) {
-            const Pattern* pat = timeline->patternForInstance(inst.id);
-            if (!pat || pat->lengthBeats <= 0.0f) continue;
+        if (loopMode) {
+            if (loopEnabled && loopEnabled(trackIdx)) {
+                const Pattern* pat = nullptr;
+                for (const auto& p : tl.patterns)
+                    if (p.id == track.patternId) { pat = &p; break; }
 
-            InstanceSnap is;
-            is.startBar    = inst.startBar;
-            is.length      = inst.length;
-            is.startOffset = inst.startOffset;
-            is.patternBeats = pat->lengthBeats;
-
-            int top, bot;
-            timeline->timeSigAt((int)inst.startBar, top, bot);
-            is.beatsPerBar = (float)top;
-
-            // Resolve output channel routing from the pattern's assignment.
-            is.portName   = "";
-            is.midiChannel = trackIdx % 16;  // fallback when no channel assigned
-            if (!pat->outputChannelName.empty()) {
-                auto it = channelMap_.find(pat->outputChannelName);
-                if (it != channelMap_.end()) {
-                    is.portName    = it->second.portName;
-                    is.midiChannel = it->second.midiChannel - 1;  // to 0-based
+                if (pat && pat->lengthBeats > 0.0f) {
+                    InstanceSnap is;
+                    is.startBar    = 0.0f;
+                    is.length      = 1.0e9f;
+                    is.startOffset = 0.0f;
+                    is.patternBeats = pat->lengthBeats;
+                    int top, bot;
+                    timeline->timeSigAt(0, top, bot);
+                    is.beatsPerBar = (float)top;
+                    buildNotes(is, pat, trackIdx);
+                    if (!is.notes.empty())
+                        ts.instances.push_back(std::move(is));
                 }
             }
+        } else {
+            for (const PatternInstance& inst : track.patterns) {
+                const Pattern* pat = timeline->patternForInstance(inst.id);
+                if (!pat || pat->lengthBeats <= 0.0f) continue;
 
-            if (pat->type == PatternType::DRUM) {
-                for (const DrumNote& dn : pat->drumNotes) {
-                    int midi = std::clamp(dn.note, 0, 127);
-                    is.notes.push_back({midi, dn.beat, drumNoteLen, dn.velocity});
-                }
-            } else {
-                for (const Note& note : pat->notes) {
-                    if (note.disabled) continue;
-                    int n = note.pitch;
-                    int midi = rootMidi0
-                             + chordDefs[chordType].intervals[n % chordSize]
-                             + (n / chordSize) * 12;
-                    midi = std::clamp(midi, 0, 127);
-                    is.notes.push_back({midi, note.beat, note.length, note.velocity});
-                }
+                InstanceSnap is;
+                is.startBar    = inst.startBar;
+                is.length      = inst.length;
+                is.startOffset = inst.startOffset;
+                is.patternBeats = pat->lengthBeats;
+                int top, bot;
+                timeline->timeSigAt((int)inst.startBar, top, bot);
+                is.beatsPerBar = (float)top;
+                buildNotes(is, pat, trackIdx);
+                ts.instances.push_back(std::move(is));
             }
-
-            ts.instances.push_back(std::move(is));
         }
 
         newSnap.tracks.push_back(std::move(ts));

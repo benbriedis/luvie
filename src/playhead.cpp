@@ -53,20 +53,34 @@ void Playhead::timerCb(void* data)
 	Fl::repeat_timeout(interval, timerCb, data);
 }
 
+void Playhead::setLoopActive(bool a, std::function<bool(int)> enabledFn)
+{
+	loopActive     = a;
+	loopEnabledFn  = std::move(enabledFn);
+	if (owner) owner->redraw();
+}
+
 void Playhead::tick()
 {
-	// Only gate the transport in normal mode; pattern-view playheads are display-only.
-	if (patternTrack < 0 && transport && transport->isPlaying()) {
-		float curPos = transport->position();
-		if (verbose && obsTl && curPos >= lastPosition)
-			checkVerboseNotes(lastPosition, curPos);
-		lastPosition = curPos;
-		if (curPos >= (float)numCols) {
-			transport->pause();
-			if (onEndReached) onEndReached();
+	if (patternTrack < 0 && transport) {
+		if (transport->isPlaying()) {
+			float curPos = transport->position();
+			if (loopActive) {
+				if (verbose && obsTl && curPos >= lastPosition)
+					checkLoopVerboseNotes(lastPosition, curPos);
+			} else {
+				if (verbose && obsTl && curPos >= lastPosition)
+					checkVerboseNotes(lastPosition, curPos);
+				if (curPos >= (float)numCols) {
+					transport->pause();
+					if (onEndReached) onEndReached();
+				}
+			}
+			lastPosition = curPos;
+		} else {
+			lastPosition = transport->position();
 		}
 	} else if (transport) {
-		// Keep lastPosition in sync while paused so resuming doesn't re-fire past notes.
 		lastPosition = transport->position();
 	}
 	if (owner && owner->visible_r()) owner->redraw();
@@ -118,6 +132,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 bool Playhead::isInPattern(float bars) const
 {
+	if (loopActive) return true;
 	if (patternTrack < 0 || !obsTl) return true;
 	const auto& tracks = obsTl->get().tracks;
 	if (patternTrack >= (int)tracks.size()) return false;
@@ -131,6 +146,13 @@ int Playhead::barsToPixel(float bars) const
 {
 	if (patternTrack >= 0) {
 		if (!obsTl) return 0;
+		if (loopActive) {
+			int top, bottom;
+			obsTl->timeSigAt(0, top, bottom);
+			float beats = std::fmod(bars * (float)top, (float)numCols);
+			if (beats < 0.0f) beats += numCols;
+			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
+		}
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack >= (int)tracks.size()) return 0;
 		for (auto& inst : tracks[patternTrack].patterns) {
@@ -158,6 +180,7 @@ float Playhead::pixelToBars(int px) const
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
 	if (!transport) return;
+	if (loopActive && patternTrack < 0) return;
 	float bars = transport->position();
 	if (!isInPattern(bars)) return;
 	int px  = rulerX + barsToPixel(bars);
@@ -171,6 +194,7 @@ void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 void Playhead::drawLine(int gridX, int gridY, int gridH)
 {
 	if (!transport) return;
+	if (loopActive && patternTrack < 0) return;
 	float bars = transport->position();
 	if (!isInPattern(bars)) return;
 	int px = gridX + barsToPixel(bars);
@@ -186,6 +210,44 @@ int Playhead::xOffset() const
 float Playhead::currentBar() const
 {
 	return transport ? transport->position() : 0.0f;
+}
+
+void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
+{
+	if (!obsTl) return;
+	const Timeline& tl = obsTl->get();
+
+	int top, bottom;
+	obsTl->timeSigAt(0, top, bottom);
+	float beatsPerBar = (float)top;
+	float prevBeats   = prevPos * beatsPerBar;
+	float curBeats    = curPos  * beatsPerBar;
+
+	int trackIdx = 0;
+	for (const Track& track : tl.tracks) {
+		if (loopEnabledFn && !loopEnabledFn(trackIdx)) { ++trackIdx; continue; }
+
+		const Pattern* pat = nullptr;
+		for (const auto& p : tl.patterns)
+			if (p.id == track.patternId) { pat = &p; break; }
+		if (!pat || pat->lengthBeats <= 0.0f) { ++trackIdx; continue; }
+
+		float len = pat->lengthBeats;
+		for (const Note& note : pat->notes) {
+			if (note.disabled) continue;
+			float cycles    = std::floor((prevBeats - note.beat) / len);
+			float firstFire = note.beat + cycles * len;
+			if (firstFire < prevBeats) firstFire += len;
+			if (firstFire < curBeats) {
+				int bar  = (int)(firstFire / beatsPerBar) + 1;
+				int beat = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+				std::string name = pitchName ? pitchName(note.pitch) : std::to_string(note.pitch);
+				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
+				       bar, beat, track.label.c_str(), name.c_str(), note.beat, note.length);
+			}
+		}
+		++trackIdx;
+	}
 }
 
 void Playhead::seek(int mouseX, int rulerX)

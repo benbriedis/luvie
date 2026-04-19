@@ -35,6 +35,7 @@ public:
     std::function<void()> onSeek;
 
     void setSeekingEnabled(bool e)                           { seekingEnabled      = e; }
+    void setPlayheadLoopMode(bool a, std::function<bool(int)> fn = nullptr) { playhead.setLoopActive(a, std::move(fn)); }
     void setVerbose(bool v)                                  { playhead.setVerbose(v); }
     void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName  = std::move(fn); }
 };

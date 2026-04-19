@@ -224,6 +224,23 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     loopEd->setTransport(transport);
     loopEd->setContextPopup(ctxPop);
 
+    auto rebuildLoopMidi = [transport, this]() {
+        transport->setLoopMode(true, [this](int i) { return loopEd->isEnabled(i); });
+    };
+    loopEd->onToggleChanged = rebuildLoopMidi;
+
+    tabs->onModeChanged = [og2, transport, rebuildLoopMidi, this](bool isLoop) {
+        auto enabledFn = isLoop ? std::function<bool(int)>([this](int i) { return loopEd->isEnabled(i); })
+                                : std::function<bool(int)>{};
+        og2->setPlayheadLoopMode(isLoop, enabledFn);
+        patternEd->setPlayheadLoopMode(isLoop);
+        drumEd->setPlayheadLoopMode(isLoop);
+        if (isLoop)
+            rebuildLoopMidi();
+        else
+            transport->setLoopMode(false, nullptr);
+    };
+
     // ---- Wire up pattern editors ----
     patternEd->setPatternPlayhead(transport, timeline, 0);
     drumEd->setPatternPlayhead(transport, timeline, 0);

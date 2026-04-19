@@ -328,6 +328,7 @@ int LoopEditor::handle(int event)
             if (idx >= (int)toggled.size()) toggled.resize(idx + 1, false);
             toggled[idx] = !toggled[idx];
             redraw();
+            if (onToggleChanged) onToggleChanged();
             return 1;
         }
         if (Fl::event_button() == FL_RIGHT_MOUSE && contextPopup) {

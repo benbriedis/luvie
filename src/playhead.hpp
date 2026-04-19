@@ -16,12 +16,15 @@ class Playhead : public ITimelineObserver {
 	int                 patternTrack = -1;  // >= 0: beat-relative view of that track
 
 	bool  verbose      = false;
+	bool  loopActive   = false;
 	float lastPosition = 0.0f;
+	std::function<bool(int)> loopEnabledFn;
 
 	static void timerCb(void* data);
 	void tick();
 	bool isInPattern(float bars) const;
 	void checkVerboseNotes(float prevPos, float curPos);
+	void checkLoopVerboseNotes(float prevPos, float curPos);
 
 	int   barsToPixel(float bars) const;
 	float pixelToBars(int px)     const;
@@ -36,6 +39,7 @@ public:
 	void setTransport(ITransport* t, ObservableTimeline* tl);
 	void setOwner(Fl_Widget* w)   { owner   = w; }
 	void setVerbose(bool v)       { verbose = v; }
+	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
 	void setPatternTrack(int track) { patternTrack = track; }
 
 	void onTimelineChanged() override;

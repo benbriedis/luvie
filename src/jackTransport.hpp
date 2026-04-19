@@ -60,6 +60,7 @@ public:
     void  seek(float bars) override;
     float position()  const override;
     bool  isPlaying() const override { return playing_.load(); }
+    void  setLoopMode(bool loopMode, std::function<bool(int)> enabledFn) override;
 
 private:
     // ── JACK handles ──────────────────────────────────────────────────────────
@@ -76,9 +77,11 @@ private:
     std::atomic<bool>           jackAlive{false};
 
     // ── UI-thread-only state ──────────────────────────────────────────────────
-    ObservableTimeline*              timeline  = nullptr;
-    int                              rootPitch = 0;
-    int                              chordType = 0;
+    ObservableTimeline*              timeline     = nullptr;
+    int                              rootPitch    = 0;
+    int                              chordType    = 0;
+    bool                             loopMode     = false;
+    std::function<bool(int)>         loopEnabled;   // trackIdx → enabled in loop mode
     std::map<std::string, ChannelRouting> channelMap_; // channelName → routing
 
     // ── Timeline snapshot for RT use ─────────────────────────────────────────

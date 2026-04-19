@@ -69,6 +69,8 @@ public:
     LoopEditor(int x, int y, int w, int h);
     ~LoopEditor();
 
+    std::function<void()> onToggleChanged;
+
     void setTimeline(ObservableTimeline* tl);
     void setTransport(ITransport* t);
     void setContextPopup(TrackContextPopup* popup);
