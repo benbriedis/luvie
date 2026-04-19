@@ -5,7 +5,8 @@
 #include <cmath>
 #include <cstdio>
 
-static constexpr Fl_Color headColor = 0xEF444400;  // red
+static constexpr Fl_Color headColor     = 0xEF444400;  // red
+static constexpr Fl_Color headColorDim  = 0xD1D5DB00;  // light grey
 
 Playhead::Playhead(int numCols, int colWidth)
 	: numCols(numCols), colWidth(colWidth)
@@ -174,6 +175,19 @@ float Playhead::pixelToBars(int px) const
 	return (float)px / colWidth;
 }
 
+Fl_Color Playhead::currentHeadColor() const
+{
+	if (patternTrack >= 0 && obsTl && aps) {
+		const auto& tracks = obsTl->get().tracks;
+		if (patternTrack < (int)tracks.size()) {
+			int patId = tracks[patternTrack].patternId;
+			if (!aps->isPatternActive(patId))
+				return headColorDim;
+		}
+	}
+	return headColor;
+}
+
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
 	if (!transport) return;
@@ -184,7 +198,7 @@ void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 	int tw  = 11;
 	int top = rulerY + 2;
 	int tip = rulerY + rulerH - 3;
-	fl_color(headColor);
+	fl_color(currentHeadColor());
 	fl_polygon(px - tw/2, top, px + tw/2, top, px, tip);
 }
 
@@ -195,7 +209,7 @@ void Playhead::drawLine(int gridX, int gridY, int gridH)
 	float bars = transport->position();
 	if (!isInPattern(bars)) return;
 	int px = gridX + barsToPixel(bars);
-	fl_color(headColor);
+	fl_color(currentHeadColor());
 	fl_line(px, gridY, px, gridY + gridH);
 }
 

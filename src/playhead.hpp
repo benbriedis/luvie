@@ -28,8 +28,9 @@ class Playhead : public ITimelineObserver {
 	void checkVerboseNotes(float prevPos, float curPos);
 	void checkLoopVerboseNotes(float prevPos, float curPos);
 
-	int   barsToPixel(float bars) const;
-	float pixelToBars(int px)     const;
+	int       barsToPixel(float bars) const;
+	float     pixelToBars(int px)     const;
+	Fl_Color  currentHeadColor()      const;
 
 public:
 	std::function<void()>        onEndReached;
