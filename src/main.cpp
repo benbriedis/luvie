@@ -78,6 +78,9 @@ int main(int argc, char **argv) {
 
     app.build(&window, &songTimeline, transport);
 
+    if (useJack)
+        jackTransport.setActivePatterns(&app.aps);
+
     if (useJack) {
         jackTransport.onTransportEvent = [&]() {
             Fl::awake([](void* data) {

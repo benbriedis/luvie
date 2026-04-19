@@ -5,6 +5,7 @@
 #include <FL/Fl_Box.H>
 #include <vector>
 #include "observableTimeline.hpp"
+#include "activePatternSet.hpp"
 #include "trackContextPopup.hpp"
 #include "itransport.hpp"
 #include "inlineInput.hpp"
@@ -35,7 +36,7 @@ public:
 };
 
 // Grid of large pattern toggle buttons
-class LoopEditor : public Fl_Group, public ITimelineObserver {
+class LoopEditor : public Fl_Group, public ITimelineObserver, public IActivePatternObserver {
 public:
     static constexpr int panelH = 50;
 
@@ -47,6 +48,7 @@ private:
     static constexpr int cols    = 4;
 
     ObservableTimeline* timeline     = nullptr;
+    ActivePatternSet*   aps          = nullptr;
     TrackContextPopup*  contextPopup = nullptr;
     ITransport*         transport    = nullptr;
     LoopPanel*          panel        = nullptr;
@@ -71,10 +73,12 @@ public:
     std::function<void()> onToggleChanged;
 
     void setTimeline(ObservableTimeline* tl);
+    void setActivePatterns(ActivePatternSet* a);
     void setTransport(ITransport* t);
     void setContextPopup(TrackContextPopup* popup);
     bool isEnabled(int trackIdx) const;
-    void onTimelineChanged() override;
+    void onTimelineChanged()       override;
+    void onActivePatternsChanged() override;
 };
 
 #endif

@@ -3,6 +3,7 @@
 
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
+#include "activePatternSet.hpp"
 #include "timeline.hpp"
 #include <jack/jack.h>
 #include <jack/midiport.h>
@@ -24,7 +25,7 @@
  *   - The Snapshot struct is protected by snapMutex. The RT thread uses try_lock;
  *     if it fails it skips note generation for that cycle (avoids priority inversion).
  */
-class JackTransport : public ITransport, public ITimelineObserver {
+class JackTransport : public ITransport, public ITimelineObserver, public IActivePatternObserver {
 public:
     JackTransport();
     ~JackTransport();
@@ -32,6 +33,7 @@ public:
     bool open(const char* clientName = "luvie", bool enableMidi = true);
 
     void setTimeline(ObservableTimeline* tl);
+    void setActivePatterns(ActivePatternSet* aps);
     void setNoteParams(int rootPitch, int chordType);
 
     // Channel routing: maps channel name → (portName, 1-based MIDI channel).
@@ -51,7 +53,10 @@ public:
     std::function<void()> onTransportEvent;
 
     // ITimelineObserver
-    void onTimelineChanged() override { rebuildSnapshot(); }
+    void onTimelineChanged()       override { rebuildSnapshot(); }
+
+    // IActivePatternObserver
+    void onActivePatternsChanged() override { rebuildSnapshot(); }
 
     // ITransport — called from UI thread
     void  play()           override;
@@ -60,7 +65,7 @@ public:
     void  seek(float bars) override;
     float position()  const override;
     bool  isPlaying() const override { return playing_.load(); }
-    void  setLoopMode(bool loopMode, std::function<bool(int)> enabledFn) override;
+    void  setLoopMode(bool loopMode) override;
 
 private:
     // ── JACK handles ──────────────────────────────────────────────────────────
@@ -78,6 +83,7 @@ private:
 
     // ── UI-thread-only state ──────────────────────────────────────────────────
     ObservableTimeline*              timeline     = nullptr;
+    ActivePatternSet*                aps          = nullptr;
     int                              rootPitch    = 0;
     int                              chordType    = 0;
     bool                             loopMode     = false;

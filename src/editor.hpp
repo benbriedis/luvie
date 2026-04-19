@@ -2,6 +2,7 @@
 #define EDITOR_HPP
 
 #include "playhead.hpp"
+#include "activePatternSet.hpp"
 #include "gridScrollPane.hpp"
 #include <FL/Fl_Group.H>
 #include <functional>
@@ -34,10 +35,11 @@ public:
     std::function<void()> onEndReached;
     std::function<void()> onSeek;
 
-    void setSeekingEnabled(bool e)                           { seekingEnabled      = e; }
-    void setPlayheadLoopMode(bool a, std::function<bool(int)> fn = nullptr) { playhead.setLoopActive(a, std::move(fn)); }
+    void setSeekingEnabled(bool e)                           { seekingEnabled = e; }
+    void setPlayheadActivePatterns(ActivePatternSet* a)      { playhead.setActivePatterns(a); }
+    void setPlayheadLoopMode(bool a)                         { playhead.setLoopActive(a); }
     void setVerbose(bool v)                                  { playhead.setVerbose(v); }
-    void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName  = std::move(fn); }
+    void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName = std::move(fn); }
 };
 
 #endif

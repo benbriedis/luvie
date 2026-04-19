@@ -11,6 +11,7 @@ JackTransport::JackTransport() {}
 
 JackTransport::~JackTransport()
 {
+    if (aps)      aps->removeObserver(this);
     if (timeline) timeline->removeObserver(this);
     if (client && jackAlive.load()) {
         jack_deactivate(client);
@@ -73,7 +74,15 @@ void JackTransport::setChannels(const std::vector<ChannelRouting>& routings)
     rebuildSnapshot();
 }
 
-void JackTransport::setLoopMode(bool mode, std::function<bool(int)> /*enabledFn*/)
+void JackTransport::setActivePatterns(ActivePatternSet* a)
+{
+    if (aps) aps->removeObserver(this);
+    aps = a;
+    if (aps) aps->addObserver(this);
+    rebuildSnapshot();
+}
+
+void JackTransport::setLoopMode(bool mode)
 {
     loopMode = mode;
     rebuildSnapshot();
@@ -155,7 +164,8 @@ void JackTransport::rebuildSnapshot()
     };
 
     if (loopMode) {
-        const auto& actives = timeline->activePatterns();
+        if (!aps) return;
+        const auto& actives = aps->patterns();
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;

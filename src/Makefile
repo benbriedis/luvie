@@ -18,7 +18,7 @@ LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS) $(LO_LIBS)
 BUILDDIR = build
 TARGET   = $(BUILDDIR)/luvie
 
-SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp connectionsOverlay.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp connectionsOverlay.cpp
 
 OBJS     = $(SRCS:%.cpp=$(BUILDDIR)/%.o)
 DEPS     = $(SRCS:%.cpp=$(BUILDDIR)/%.d)

@@ -16,8 +16,7 @@ public:
 	virtual bool   isPlaying() const = 0;
 
 	// Loop mode: when active, generate MIDI only for enabled patterns, looping indefinitely.
-	// enabledFn(trackIdx) returns true if that track's pattern should play.
-	virtual void setLoopMode(bool /*loopMode*/, std::function<bool(int)> /*enabledFn*/) {}
+	virtual void setLoopMode(bool /*loopMode*/) {}
 };
 
 #endif

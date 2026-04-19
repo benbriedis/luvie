@@ -3,6 +3,7 @@
 
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
+#include "activePatternSet.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
 #include <string>
@@ -10,6 +11,7 @@
 class Playhead : public ITimelineObserver {
 	ITransport*         transport    = nullptr;
 	ObservableTimeline* obsTl        = nullptr;
+	ActivePatternSet*   aps          = nullptr;
 	int                 numCols;
 	int                 colWidth;
 	Fl_Widget*          owner        = nullptr;
@@ -37,6 +39,7 @@ public:
 	~Playhead();
 
 	void setTransport(ITransport* t, ObservableTimeline* tl);
+	void setActivePatterns(ActivePatternSet* a) { aps = a; }
 	void setOwner(Fl_Widget* w)   { owner   = w; }
 	void setVerbose(bool v)       { verbose = v; }
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);

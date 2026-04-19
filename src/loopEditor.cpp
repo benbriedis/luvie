@@ -164,6 +164,7 @@ LoopEditor::~LoopEditor()
 {
     Fl::remove_timeout(timerCb, this);
     swapObserver(timeline, nullptr, this);
+    swapActiveObserver(aps, nullptr, this);
 }
 
 void LoopEditor::setTimeline(ObservableTimeline* tl)
@@ -171,6 +172,12 @@ void LoopEditor::setTimeline(ObservableTimeline* tl)
     swapObserver(timeline, tl, this);
     panel->setTimeline(tl);
     onTimelineChanged();
+}
+
+void LoopEditor::setActivePatterns(ActivePatternSet* a)
+{
+    swapActiveObserver(aps, a, this);
+    redraw();
 }
 
 void LoopEditor::setTransport(ITransport* t)
@@ -196,15 +203,15 @@ void LoopEditor::timerCb(void* data)
 
 bool LoopEditor::isEnabled(int trackIdx) const
 {
-    if (!timeline) return false;
+    if (!timeline || !aps) return false;
     const auto& tracks = timeline->get().tracks;
     if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return false;
-    return timeline->isPatternActive(tracks[trackIdx].patternId);
+    return aps->isPatternActive(tracks[trackIdx].patternId);
 }
 
 float LoopEditor::beatProgress(int trackIdx) const
 {
-    if (!transport || !timeline) return 0.0f;
+    if (!transport || !timeline || !aps) return 0.0f;
     const auto& tl = timeline->get();
     if (trackIdx < 0 || trackIdx >= (int)tl.tracks.size()) return 0.0f;
 
@@ -218,8 +225,8 @@ float LoopEditor::beatProgress(int trackIdx) const
     int   top, bottom;
     timeline->timeSigAt((int)std::max(0.0f, bars), top, bottom);
 
-    if (timeline->isPatternActive(patId)) {
-        float anchorBar    = timeline->patternAnchorBar(patId);
+    if (aps->isPatternActive(patId)) {
+        float anchorBar    = aps->patternAnchorBar(patId);
         float elapsed      = (bars - anchorBar) * (float)top;
         float posInPattern = std::fmod(elapsed, pat->lengthBeats);
         if (posInPattern < 0.0f) posInPattern += pat->lengthBeats;
@@ -240,6 +247,11 @@ void LoopEditor::setContextPopup(TrackContextPopup* popup)
 }
 
 void LoopEditor::onTimelineChanged()
+{
+    redraw();
+}
+
+void LoopEditor::onActivePatternsChanged()
 {
     redraw();
 }
@@ -284,7 +296,7 @@ void LoopEditor::draw()
             btnRect(i, bx, by, bw, bh);
             if (by >= y() + gridAreaH()) break;
 
-            bool isToggled = timeline->isPatternActive(tracks[i].patternId);
+            bool isToggled = aps && aps->isPatternActive(tracks[i].patternId);
             bool isHovered = i == hoveredIdx;
 
             Fl_Color bg = isToggled ? (isHovered ? btnActiveHover : btnActiveBg)
@@ -335,13 +347,13 @@ int LoopEditor::handle(int event)
         if (idx < 0) return 0;
         take_focus();
         if (Fl::event_button() == FL_LEFT_MOUSE) {
-            if (timeline) {
+            if (timeline && aps) {
                 const auto& tracks = timeline->get().tracks;
                 if (idx < (int)tracks.size()) {
                     int   patId = tracks[idx].patternId;
                     float bar   = transport ? transport->position() : 0.0f;
-                    if (timeline->isPatternActive(patId)) {
-                        timeline->deactivatePattern(patId);
+                    if (aps->isPatternActive(patId)) {
+                        aps->deactivate(patId);
                     } else {
                         float anchorBar = bar;
                         if (transport && transport->isPlaying()) {
@@ -357,7 +369,7 @@ int LoopEditor::handle(int event)
                                 anchorBar = bar - virtualBeat / (float)top;
                             }
                         }
-                        timeline->activatePattern(patId, anchorBar);
+                        aps->activate(patId, anchorBar);
                     }
                 }
             }

@@ -32,8 +32,8 @@ void Playhead::onTimelineChanged()
 		float clamped = std::clamp(bars, 0.0f, (float)numCols);
 		if (clamped != bars)
 			transport->seek(clamped);
-		if (obsTl && patternTrack < 0 && !loopActive)
-			obsTl->syncActivePatterns(bars);
+		if (aps && obsTl && patternTrack < 0 && !loopActive)
+			aps->sync(*obsTl, bars);
 	}
 	if (owner && owner->visible_r()) owner->redraw();
 }
@@ -71,7 +71,7 @@ void Playhead::tick()
 				if (verbose && obsTl && curPos >= lastPosition)
 					checkLoopVerboseNotes(lastPosition, curPos);
 			} else {
-				if (obsTl) obsTl->syncActivePatterns(curPos);
+				if (aps && obsTl) aps->sync(*obsTl, curPos);
 				if (verbose && obsTl && curPos >= lastPosition)
 					checkVerboseNotes(lastPosition, curPos);
 				if (curPos >= (float)numCols) {
@@ -82,7 +82,7 @@ void Playhead::tick()
 			lastPosition = curPos;
 		} else {
 			float curPos = transport->position();
-			if (obsTl && !loopActive) obsTl->syncActivePatterns(curPos);
+			if (aps && obsTl && !loopActive) aps->sync(*obsTl, curPos);
 			lastPosition = curPos;
 		}
 	} else if (transport) {
@@ -94,7 +94,7 @@ void Playhead::tick()
 void Playhead::checkVerboseNotes(float prevPos, float curPos)
 {
 	const Timeline& tl      = obsTl->get();
-	const auto&     actives = obsTl->activePatterns();
+	const auto&     actives = aps->patterns();
 
 	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;
@@ -149,8 +149,8 @@ int Playhead::barsToPixel(float bars) const
 		int top, bottom;
 		obsTl->timeSigAt(loopActive ? 0 : (int)std::max(0.0f, bars), top, bottom);
 
-		if (obsTl->isPatternActive(patId)) {
-			float anchor  = obsTl->patternAnchorBar(patId);
+		if (aps && aps->isPatternActive(patId)) {
+			float anchor  = aps->patternAnchorBar(patId);
 			float elapsed = (bars - anchor) * (float)top;
 			float beats   = std::fmod(elapsed, (float)numCols);
 			if (beats < 0.0f) beats += numCols;
@@ -213,7 +213,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 {
 	if (!obsTl) return;
 	const Timeline& tl      = obsTl->get();
-	const auto&     actives = obsTl->activePatterns();
+	const auto&     actives = aps->patterns();
 
 	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;

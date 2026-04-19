@@ -6,6 +6,7 @@
 #include "editor.hpp"
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
+#include "activePatternSet.hpp"
 
 class ObservableTimeline;
 
@@ -61,6 +62,9 @@ public:
     std::function<void()> onSave;
     std::function<void()> onSaveAs;
     void disableSaveMenu(bool save, bool saveAs);
+
+    // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
+    ActivePatternSet aps;
 
     // Widgets — valid after build()
     Fl_Menu_Bar*       menuBar      = nullptr;
