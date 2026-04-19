@@ -41,6 +41,8 @@ struct Pattern {
 	std::vector<Note>     notes;
 	std::vector<DrumNote> drumNotes;
 	std::string outputChannelName;  // empty = no routing assigned
+	int timeSigTop    = 4;
+	int timeSigBottom = 4;
 };
 
 struct PatternInstance {

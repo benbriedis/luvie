@@ -5,6 +5,7 @@
 #include "inlineInput.hpp"
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
 #include "panelStyle.hpp"
@@ -19,21 +20,29 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     bool                useSharp      = true;
     std::vector<std::string> channelNames_;
 
-    Fl_Box      patternName;
-    Fl_Box      baseLabel;
-    ModernButton sharpFlatBtn;
-    ModernChoice rootChoice;
-    Fl_Box      chordLabel;
-    ModernChoice chordChoice;
-    Fl_Box      outLabel;
-    ModernChoice outChoice;
-    InlineInput input;
+    Fl_Box         patternName;
+    Fl_Box         baseLabel;
+    ModernButton   sharpFlatBtn;
+    ModernChoice   rootChoice;
+    Fl_Box         chordLabel;
+    ModernChoice   chordChoice;
+    Fl_Box         timeSigLabel;
+    Fl_Value_Input timeSigNum;
+    Fl_Box         timeSigSlash;
+    ModernChoice   timeSigDen;
+    Fl_Box         barsLabel;
+    Fl_Value_Input barsInput;
+    Fl_Box         outLabel;
+    ModernChoice   outChoice;
+    InlineInput    input;
 
     void startEdit();
     void cancelEdit();
     void checkDuplicate();
     void updateRootChoiceLabels(int preserveIndex);
     void refreshOutChoice();
+    void refreshTimeSig();
+    void refreshBars();
 
     void draw() override;
     int  handle(int event) override;

@@ -289,6 +289,7 @@ int ObservableTimeline::createPattern(float lengthBeats)
 	p.id = id;
 	p.lengthBeats = lengthBeats;
 	p.outputChannelName = defaultOutputChannel;
+	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
 	data.patterns.push_back(p);
 	notify();
 	return id;
@@ -302,9 +303,45 @@ int ObservableTimeline::createDrumPattern(float lengthBeats)
 	p.lengthBeats = lengthBeats;
 	p.type = PatternType::DRUM;
 	p.outputChannelName = defaultOutputChannel;
+	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
 	data.patterns.push_back(std::move(p));
 	notify();
 	return id;
+}
+
+static void truncatePatternNotes(Pattern& p)
+{
+	p.notes.erase(std::remove_if(p.notes.begin(), p.notes.end(),
+		[&p](const Note& n) { return n.beat + n.length > p.lengthBeats; }), p.notes.end());
+	p.drumNotes.erase(std::remove_if(p.drumNotes.begin(), p.drumNotes.end(),
+		[&p](const DrumNote& n) { return n.beat >= p.lengthBeats; }), p.drumNotes.end());
+}
+
+void ObservableTimeline::setPatternTimeSig(int patId, int top, int bottom)
+{
+	for (auto& p : data.patterns) {
+		if (p.id == patId) {
+			int bars = std::max(1, (int)std::round(p.lengthBeats / (float)p.timeSigTop));
+			p.timeSigTop    = top;
+			p.timeSigBottom = bottom;
+			p.lengthBeats   = (float)(bars * top);
+			truncatePatternNotes(p);
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::setPatternLength(int patId, float lengthBeats)
+{
+	for (auto& p : data.patterns) {
+		if (p.id == patId) {
+			p.lengthBeats = lengthBeats;
+			truncatePatternNotes(p);
+			notify();
+			return;
+		}
+	}
 }
 
 void ObservableTimeline::addDrumNote(int patternId, int note, float beat, float velocity)

@@ -71,6 +71,12 @@ public:
 
 	// Set the output channel assignment for a pattern (empty = unassigned).
 	void setPatternOutputChannel(int patId, const std::string& channelName);
+
+	// Set the per-pattern time signature (also adjusts lengthBeats to keep bar count constant).
+	void setPatternTimeSig(int patId, int top, int bottom);
+
+	// Set the pattern definition length in beats.
+	void setPatternLength(int patId, float lengthBeats);
 	void renamePatternOutputChannel(const std::string& oldName, const std::string& newName);
 
 	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)

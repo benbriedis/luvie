@@ -243,16 +243,29 @@ void PatternEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl, in
 void PatternEditor::onTimelineChanged()
 {
     if (!timeline) return;
-    int sel = timeline->get().selectedTrackIndex;
-    if (sel == lastSelectedTrack) return;
+    const auto& tl  = timeline->get();
+    int sel         = tl.selectedTrackIndex;
+    bool trackChanged = (sel != lastSelectedTrack);
     lastSelectedTrack = sel;
-    const auto& tracks = timeline->get().tracks;
-    if (sel >= 0 && sel < (int)tracks.size()) {
+
+    if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+    int patId = tl.tracks[sel].patternId;
+
+    if (trackChanged && patId > 0) {
         playhead.setPatternTrack(sel);
-        int patId = tracks[sel].patternId;
-        if (patId > 0) {
-            patternGrid.setTimeline(timeline, patId);
-            setRowOffset(computeDefaultOffset(patId));
-        }
+        patternGrid.setTimeline(timeline, patId);
+        setRowOffset(computeDefaultOffset(patId));
+        lastLengthBeats = -1.0f;
+    }
+
+    float lb = 0.0f;
+    for (const auto& p : tl.patterns)
+        if (p.id == patId) { lb = p.lengthBeats; break; }
+
+    if (lb != lastLengthBeats && lb > 0.0f) {
+        lastLengthBeats      = lb;
+        patternGrid.numCols  = (int)lb;
+        setColOffset(colOffset);
+        redraw();
     }
 }

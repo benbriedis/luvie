@@ -5,6 +5,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
+#include <cmath>
 
 static constexpr int pad          = 3;
 static constexpr int sg           = 3;    // small gap within base group
@@ -15,30 +16,48 @@ static constexpr int nameW        = 150;
 static constexpr int toggleBtnW   = 26;
 static constexpr int rootChoiceW  = 110;
 static constexpr int choiceW      = 130;
+static constexpr int timeSigLabelW = 28;
+static constexpr int timeSigNumW   = 40;
+static constexpr int slashW        = 12;
+static constexpr int timeSigDenW   = 50;
+static constexpr int barsLabelW    = 36;
+static constexpr int barsInputW    = 40;
 static constexpr int outLabelW    = 28;
 static constexpr int outChoiceW   = 155;
 
-static int nameX(int x)         { return x + pad; }
-static int baseLabelX(int x)    { return nameX(x) + nameW + pad; }
-static int sharpFlatBtnX(int x) { return baseLabelX(x) + labelW + sg; }
-static int rootChoiceX(int x)   { return sharpFlatBtnX(x) + toggleBtnW + sg; }
-static int chordLabelX(int x)   { return rootChoiceX(x) + rootChoiceW + groupGap; }
-static int chordChoiceX(int x)  { return chordLabelX(x) + labelW; }
-static int outLabelX(int x)     { return chordChoiceX(x) + choiceW + groupGap; }
-static int outChoiceX(int x)    { return outLabelX(x) + outLabelW; }
-static int ctrlY(int y, int h)  { return y + (h - ctrlH) / 2; }
+static int nameX(int x)          { return x + pad; }
+static int baseLabelX(int x)     { return nameX(x) + nameW + pad; }
+static int sharpFlatBtnX(int x)  { return baseLabelX(x) + labelW + sg; }
+static int rootChoiceX(int x)    { return sharpFlatBtnX(x) + toggleBtnW + sg; }
+static int chordLabelX(int x)    { return rootChoiceX(x) + rootChoiceW + groupGap; }
+static int chordChoiceX(int x)   { return chordLabelX(x) + labelW; }
+static int timeSigLabelX(int x)  { return chordChoiceX(x) + choiceW + groupGap; }
+static int timeSigNumX(int x)    { return timeSigLabelX(x) + timeSigLabelW; }
+static int timeSigSlashX(int x)  { return timeSigNumX(x) + timeSigNumW; }
+static int timeSigDenX(int x)    { return timeSigSlashX(x) + slashW; }
+static int barsLabelX(int x)     { return timeSigDenX(x) + timeSigDenW + groupGap; }
+static int barsInputX(int x)     { return barsLabelX(x) + barsLabelW; }
+static int outLabelX(int x)      { return barsInputX(x) + barsInputW + groupGap; }
+static int outChoiceX(int x)     { return outLabelX(x) + outLabelW; }
+static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
-      patternName (nameX(x),         ctrlY(y,h), nameW,         ctrlH),
-      baseLabel   (baseLabelX(x),    ctrlY(y,h), labelW,        ctrlH, "Base"),
-      sharpFlatBtn(sharpFlatBtnX(x), ctrlY(y,h), toggleBtnW,   ctrlH, "#"),
-      rootChoice  (rootChoiceX(x),   ctrlY(y,h), rootChoiceW,  ctrlH),
-      chordLabel  (chordLabelX(x),   ctrlY(y,h), labelW,        ctrlH, "Chord"),
-      chordChoice (chordChoiceX(x),  ctrlY(y,h), choiceW,       ctrlH),
-      outLabel    (outLabelX(x),     ctrlY(y,h), outLabelW,     ctrlH, "Out"),
-      outChoice   (outChoiceX(x),    ctrlY(y,h), outChoiceW,    ctrlH),
-      input       (nameX(x),         ctrlY(y,h), nameW,         ctrlH)
+      patternName (nameX(x),          ctrlY(y,h), nameW,         ctrlH),
+      baseLabel   (baseLabelX(x),     ctrlY(y,h), labelW,        ctrlH, "Base"),
+      sharpFlatBtn(sharpFlatBtnX(x),  ctrlY(y,h), toggleBtnW,    ctrlH, "#"),
+      rootChoice  (rootChoiceX(x),    ctrlY(y,h), rootChoiceW,   ctrlH),
+      chordLabel  (chordLabelX(x),    ctrlY(y,h), labelW,        ctrlH, "Chord"),
+      chordChoice (chordChoiceX(x),   ctrlY(y,h), choiceW,       ctrlH),
+      timeSigLabel(timeSigLabelX(x),  ctrlY(y,h), timeSigLabelW, ctrlH, "Sig"),
+      timeSigNum  (timeSigNumX(x),    ctrlY(y,h), timeSigNumW,   ctrlH),
+      timeSigSlash(timeSigSlashX(x),  ctrlY(y,h), slashW,        ctrlH, "/"),
+      timeSigDen  (timeSigDenX(x),    ctrlY(y,h), timeSigDenW,   ctrlH),
+      barsLabel   (barsLabelX(x),    ctrlY(y,h), barsLabelW,    ctrlH, "Bars"),
+      barsInput   (barsInputX(x),    ctrlY(y,h), barsInputW,    ctrlH),
+      outLabel    (outLabelX(x),      ctrlY(y,h), outLabelW,     ctrlH, "Out"),
+      outChoice   (outChoiceX(x),     ctrlY(y,h), outChoiceW,    ctrlH),
+      input       (nameX(x),          ctrlY(y,h), nameW,         ctrlH)
 {
     box(FL_NO_BOX);
 
@@ -80,6 +99,80 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         chordChoice.add(def.name);
     chordChoice.value(0);
     chordChoice.callback(paramsCb, this);
+
+    timeSigLabel.box(FL_NO_BOX);
+    timeSigLabel.labelcolor(panelText);
+    timeSigLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    timeSigNum.box(FL_FLAT_BOX);
+    timeSigNum.color(panelBorder);
+    timeSigNum.textcolor(panelText);
+    timeSigNum.cursor_color(panelText);
+    timeSigNum.labelcolor(panelText);
+    timeSigNum.range(1, 32);
+    timeSigNum.step(1);
+    timeSigNum.value(4);
+    timeSigNum.when(FL_WHEN_RELEASE);
+    timeSigNum.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (!self->timeline) return;
+        const auto& tl = self->timeline->get();
+        int sel = tl.selectedTrackIndex;
+        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+        int patId = tl.tracks[sel].patternId;
+        static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
+        int den = (self->timeSigDen.value() >= 0) ? denoms[self->timeSigDen.value()] : 4;
+        self->timeline->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
+    }, this);
+
+    timeSigSlash.box(FL_NO_BOX);
+    timeSigSlash.labelcolor(panelText);
+
+    timeSigDen.color(panelBorder);
+    timeSigDen.labelcolor(panelText);
+    timeSigDen.setBorderColor(panelCtrlBorder);
+    for (const char* v : {"1", "2", "4", "8", "16", "32"})
+        timeSigDen.add(v);
+    timeSigDen.value(2); // default: 4
+    timeSigDen.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (!self->timeline) return;
+        const auto& tl = self->timeline->get();
+        int sel = tl.selectedTrackIndex;
+        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+        int patId = tl.tracks[sel].patternId;
+        static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
+        int den = (self->timeSigDen.value() >= 0) ? denoms[self->timeSigDen.value()] : 4;
+        self->timeline->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
+    }, this);
+
+    barsLabel.box(FL_NO_BOX);
+    barsLabel.labelcolor(panelText);
+    barsLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    barsInput.box(FL_FLAT_BOX);
+    barsInput.color(panelBorder);
+    barsInput.textcolor(panelText);
+    barsInput.cursor_color(panelText);
+    barsInput.labelcolor(panelText);
+    barsInput.range(1, 64);
+    barsInput.step(1);
+    barsInput.value(2);
+    barsInput.when(FL_WHEN_RELEASE);
+    barsInput.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (!self->timeline) return;
+        const auto& tl = self->timeline->get();
+        int sel = tl.selectedTrackIndex;
+        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+        int patId = tl.tracks[sel].patternId;
+        int bars = std::max(1, (int)self->barsInput.value());
+        for (const auto& p : tl.patterns) {
+            if (p.id != patId) continue;
+            self->timeline->setPatternLength(patId, (float)(bars * p.timeSigTop));
+            break;
+        }
+    }, this);
 
     outLabel.box(FL_NO_BOX);
     outLabel.labelcolor(panelText);
@@ -151,6 +244,41 @@ void PatternPanel::refreshOutChoice()
     outChoice.redraw();
 }
 
+void PatternPanel::refreshBars()
+{
+    if (!timeline) { barsInput.value(2); return; }
+    const auto& tl = timeline->get();
+    int sel = tl.selectedTrackIndex;
+    if (sel < 0 || sel >= (int)tl.tracks.size()) { barsInput.value(2); return; }
+    int patId = tl.tracks[sel].patternId;
+    for (const auto& p : tl.patterns) {
+        if (p.id != patId) continue;
+        barsInput.value(std::max(1, (int)std::round(p.lengthBeats / (float)p.timeSigTop)));
+        barsInput.redraw();
+        return;
+    }
+}
+
+void PatternPanel::refreshTimeSig()
+{
+    static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
+    if (!timeline) { timeSigNum.value(4); timeSigDen.value(2); return; }
+    const auto& tl = timeline->get();
+    int sel = tl.selectedTrackIndex;
+    if (sel < 0 || sel >= (int)tl.tracks.size()) { timeSigNum.value(4); timeSigDen.value(2); return; }
+    int patId = tl.tracks[sel].patternId;
+    for (const auto& p : tl.patterns) {
+        if (p.id != patId) continue;
+        timeSigNum.value(p.timeSigTop);
+        int idx = 2;
+        for (int i = 0; i < 6; ++i) if (denoms[i] == p.timeSigBottom) { idx = i; break; }
+        timeSigDen.value(idx);
+        timeSigNum.redraw();
+        timeSigDen.redraw();
+        return;
+    }
+}
+
 void PatternPanel::updateRootChoiceLabels(int idx)
 {
     rootChoice.clear();
@@ -210,6 +338,8 @@ void PatternPanel::onTimelineChanged()
         setDrumMode(false);
     }
     refreshOutChoice();
+    refreshTimeSig();
+    refreshBars();
     redraw();
 }
 

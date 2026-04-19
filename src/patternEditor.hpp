@@ -19,6 +19,7 @@ class PatternEditor : public Editor, public ITimelineObserver {
     PatternGrid         patternGrid;
     ObservableTimeline* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
+    float               lastLengthBeats   = -1.0f;
     int                 rootPitch         = 0;
     int                 chordType         = 0;
     int                 colOffset         = 0;
