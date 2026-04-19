@@ -130,10 +130,9 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 bool Playhead::isInPattern(float /*bars*/) const
 {
-	if (patternTrack < 0 || !obsTl) return true;
-	const auto& tracks = obsTl->get().tracks;
-	if (patternTrack >= (int)tracks.size()) return false;
-	return obsTl->isPatternActive(tracks[patternTrack].patternId);
+	// Always show the playhead in the pattern editor — inactive patterns show
+	// a virtual position indicating next-bar-aligned start (see barsToPixel).
+	return true;
 }
 
 int Playhead::barsToPixel(float bars) const
@@ -143,15 +142,25 @@ int Playhead::barsToPixel(float bars) const
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack >= (int)tracks.size()) return 0;
 		int patId = tracks[patternTrack].patternId;
-		if (!obsTl->isPatternActive(patId)) return 0;
 
-		float anchor = obsTl->patternAnchorBar(patId);
+		// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
 		int top, bottom;
-		obsTl->timeSigAt((int)std::max(0.0f, anchor), top, bottom);
-		float elapsed = (bars - anchor) * (float)top;
-		float beats   = std::fmod(elapsed, (float)numCols);
-		if (beats < 0.0f) beats += numCols;
-		return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
+		obsTl->timeSigAt(loopActive ? 0 : (int)std::max(0.0f, bars), top, bottom);
+
+		if (obsTl->isPatternActive(patId)) {
+			float anchor  = obsTl->patternAnchorBar(patId);
+			float elapsed = (bars - anchor) * (float)top;
+			float beats   = std::fmod(elapsed, (float)numCols);
+			if (beats < 0.0f) beats += numCols;
+			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
+		}
+
+		// Virtual position: beat 0 of the pattern will land on the next bar boundary.
+		float nextBar     = std::floor(bars) + 1.0f;
+		float beatsToNext = (nextBar - bars) * (float)top;
+		float virtualBeat = std::fmod((float)numCols - beatsToNext, (float)numCols);
+		if (virtualBeat < 0.0f) virtualBeat += numCols;
+		return std::clamp((int)(virtualBeat * colWidth), 0, numCols * colWidth - 2);
 	}
 
 	int px = (int)(bars * colWidth);

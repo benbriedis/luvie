@@ -209,21 +209,29 @@ float LoopEditor::beatProgress(int trackIdx) const
     if (trackIdx < 0 || trackIdx >= (int)tl.tracks.size()) return 0.0f;
 
     int patId = tl.tracks[trackIdx].patternId;
-    if (!timeline->isPatternActive(patId)) return 0.0f;
-
     const Pattern* pat = nullptr;
     for (const auto& p : tl.patterns)
         if (p.id == patId) { pat = &p; break; }
     if (!pat || pat->lengthBeats <= 0.0f) return 0.0f;
 
-    float anchorBar = timeline->patternAnchorBar(patId);
-    float bars      = transport->position();
+    float bars = transport->position();
     int   top, bottom;
-    timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
-    float elapsed      = (bars - anchorBar) * (float)top;
-    float posInPattern = std::fmod(elapsed, pat->lengthBeats);
-    if (posInPattern < 0.0f) posInPattern += pat->lengthBeats;
-    return posInPattern / pat->lengthBeats;
+    timeline->timeSigAt((int)std::max(0.0f, bars), top, bottom);
+
+    if (timeline->isPatternActive(patId)) {
+        float anchorBar    = timeline->patternAnchorBar(patId);
+        float elapsed      = (bars - anchorBar) * (float)top;
+        float posInPattern = std::fmod(elapsed, pat->lengthBeats);
+        if (posInPattern < 0.0f) posInPattern += pat->lengthBeats;
+        return posInPattern / pat->lengthBeats;
+    }
+
+    // Virtual position: beat 0 will align with the next bar if enabled now.
+    float nextBar      = std::floor(bars) + 1.0f;
+    float beatsToNext  = (nextBar - bars) * (float)top;
+    float virtualBeat  = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
+    if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
+    return virtualBeat / pat->lengthBeats;
 }
 
 void LoopEditor::setContextPopup(TrackContextPopup* popup)
@@ -332,10 +340,25 @@ int LoopEditor::handle(int event)
                 if (idx < (int)tracks.size()) {
                     int   patId = tracks[idx].patternId;
                     float bar   = transport ? transport->position() : 0.0f;
-                    if (timeline->isPatternActive(patId))
+                    if (timeline->isPatternActive(patId)) {
                         timeline->deactivatePattern(patId);
-                    else
-                        timeline->activatePattern(patId, bar);
+                    } else {
+                        float anchorBar = bar;
+                        if (transport && transport->isPlaying()) {
+                            const Pattern* pat = nullptr;
+                            for (const auto& p : timeline->get().patterns)
+                                if (p.id == patId) { pat = &p; break; }
+                            if (pat && pat->lengthBeats > 0.0f) {
+                                int top, bottom;
+                                timeline->timeSigAt((int)std::max(0.0f, bar), top, bottom);
+                                float beatsToNext = (std::floor(bar) + 1.0f - bar) * (float)top;
+                                float virtualBeat = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
+                                if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
+                                anchorBar = bar - virtualBeat / (float)top;
+                            }
+                        }
+                        timeline->activatePattern(patId, anchorBar);
+                    }
                 }
             }
             redraw();
