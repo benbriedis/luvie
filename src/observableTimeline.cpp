@@ -309,6 +309,20 @@ int ObservableTimeline::createDrumPattern(float lengthBeats)
 	return id;
 }
 
+int ObservableTimeline::createPianorollPattern(float lengthBeats)
+{
+	int id = nextId++;
+	Pattern p;
+	p.id = id;
+	p.lengthBeats = lengthBeats;
+	p.type = PatternType::PIANOROLL;
+	p.outputChannelName = defaultOutputChannel;
+	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+	data.patterns.push_back(std::move(p));
+	notify();
+	return id;
+}
+
 static void truncatePatternNotes(Pattern& p)
 {
 	p.notes.erase(std::remove_if(p.notes.begin(), p.notes.end(),

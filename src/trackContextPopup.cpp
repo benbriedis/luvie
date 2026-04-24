@@ -23,16 +23,20 @@ TrackContextPopup::TrackContextPopup()
     color(popupBg);
     box(FL_BORDER_BOX);
 
-    addBtn     = makeItem(1,           popW, "Add Pattern");
-    addDrumBtn = makeItem(1 + btnH,    popW, "Add Drum Pattern");
-    copyBtn    = makeItem(1 + 2*btnH,  popW, "Copy Pattern");
-    deleteBtn  = makeItem(1 + 3*btnH,  popW, "Delete Pattern");
+    addBtn          = makeItem(1,           popW, "Add Pattern");
+    addDrumBtn      = makeItem(1 + btnH,    popW, "Add Drum Pattern");
+    addPianorollBtn = makeItem(1 + 2*btnH,  popW, "Add Pianoroll Pattern");
+    copyBtn         = makeItem(1 + 3*btnH,  popW, "Copy Pattern");
+    deleteBtn       = makeItem(1 + 4*btnH,  popW, "Delete Pattern");
 
     addBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doAdd();
     }, this);
     addDrumBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doAddDrum();
+    }, this);
+    addPianorollBtn->callback([](Fl_Widget*, void* d) {
+        static_cast<TrackContextPopup*>(d)->doAddPianoroll();
     }, this);
     copyBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doCopy();
@@ -78,6 +82,16 @@ void TrackContextPopup::doAddDrum()
     int n     = (int)timeline->get().tracks.size() + 1;
     int patId = timeline->createDrumPattern(numPatternBeats);
     timeline->addTrack("Drum " + std::to_string(n), patId);
+    if (auto* win = window()) win->redraw();
+}
+
+void TrackContextPopup::doAddPianoroll()
+{
+    hide();
+    if (!timeline) return;
+    int n     = (int)timeline->get().tracks.size() + 1;
+    int patId = timeline->createPianorollPattern(numPatternBeats);
+    timeline->addTrack("Pianoroll " + std::to_string(n), patId);
     if (auto* win = window()) win->redraw();
 }
 

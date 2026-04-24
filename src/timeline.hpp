@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-enum class PatternType { STANDARD = 0, DRUM = 1 };
+enum class PatternType { STANDARD = 0, DRUM = 1, PIANOROLL = 2 };
 
 struct DrumNote {
 	int   id;

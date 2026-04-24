@@ -7,7 +7,7 @@
 #include <functional>
 
 class TrackContextPopup : public BasePopup {
-    static constexpr int popH  = 4 * 30 + 2;  // +2 for border
+    static constexpr int popH  = 5 * 30 + 2;  // +2 for border
 
 public:
     static constexpr int popW  = 150;
@@ -17,6 +17,7 @@ private:
 
     ModernButton*       addBtn;
     ModernButton*       addDrumBtn;
+    ModernButton*       addPianorollBtn;
     ModernButton*       copyBtn;
     ModernButton*       deleteBtn;
     ObservableTimeline* timeline  = nullptr;
@@ -26,6 +27,7 @@ private:
 
     void doAdd();
     void doAddDrum();
+    void doAddPianoroll();
     void doCopy();
     void doDelete();
 

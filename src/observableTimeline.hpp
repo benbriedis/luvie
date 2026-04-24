@@ -41,6 +41,7 @@ public:
 	// Pattern definition management
 	int createPattern(float lengthBeats);
 	int createDrumPattern(float lengthBeats);
+	int createPianorollPattern(float lengthBeats);
 	const Pattern*         patternForInstance(int instanceId) const;
 	const PatternInstance* instanceById(int instanceId) const;
 
