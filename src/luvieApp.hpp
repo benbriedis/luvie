@@ -14,6 +14,7 @@ class AppWindow;
 class ModernTabs;
 class PatternEditor;
 class DrumPatternEditor;
+class PianorollEditor;
 class PatternPanel;
 class LoopEditor;
 class Transport;
@@ -72,6 +73,7 @@ public:
     Fl_Group*          patternTab   = nullptr;
     PatternEditor*     patternEd    = nullptr;
     DrumPatternEditor* drumEd       = nullptr;
+    PianorollEditor*   pianorollEd  = nullptr;
     PatternPanel*      patternPanel = nullptr;
     LoopEditor*        loopEd       = nullptr;
     Transport*            bottomPane          = nullptr;

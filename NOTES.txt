@@ -295,12 +295,13 @@ Connections X is not all the way to the right. (Putting on a left an alternative
     
 
 ----------
+Pianoroll pattern (and drum pattern?) should support recording (and import of patterns?) in time.
 
-Big decision to make soon: do I want a separate piano editor, or do I incorporate it into the current pattern editor?
-    Probably would need a 'translate / fix' button: 
-	   Basically removes the 'base note'.
+cf conversion routine to clone a regular pattern to pianoroll. The opposite way would be harder, but something could be attempted in time maybe.
 
 -------------------
+
+Drum patterns and pianoroll should have a 'center' button too.
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
 

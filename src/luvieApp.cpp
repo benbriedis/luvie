@@ -15,23 +15,29 @@
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "drumPatternEditor.hpp"
+#include "pianorollEditor.hpp"
 #include "loopEditor.hpp"
 #include "connectionsOverlay.hpp"
 
 std::string LuvieApp::lastFileDir;
 
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
-    if (!app->patternEd || !app->drumEd || !app->timeline_) return;
+    if (!app->patternEd || !app->drumEd || !app->pianorollEd || !app->timeline_) return;
     const auto& data = app->timeline_->get();
     int sel = data.selectedTrackIndex;
-    bool isDrum = false;
+    PatternType type = PatternType::STANDARD;
     if (sel >= 0 && sel < (int)data.tracks.size()) {
         int patId = data.tracks[sel].patternId;
         for (const auto& p : data.patterns)
-            if (p.id == patId) { isDrum = (p.type == PatternType::DRUM); break; }
+            if (p.id == patId) { type = p.type; break; }
     }
-    if (isDrum) { app->patternEd->hide(); app->drumEd->show(); }
-    else        { app->patternEd->show(); app->drumEd->hide(); }
+    if (type == PatternType::DRUM) {
+        app->patternEd->hide(); app->pianorollEd->hide(); app->drumEd->show();
+    } else if (type == PatternType::PIANOROLL) {
+        app->patternEd->hide(); app->drumEd->hide(); app->pianorollEd->show();
+    } else {
+        app->drumEd->hide(); app->pianorollEd->hide(); app->patternEd->show();
+    }
 }
 
 void LuvieApp::saveCb(Fl_Widget*, void* data) {
@@ -181,6 +187,11 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     tab2->add(drumEd);
     drumEd->hide();
 
+    pianorollEd = new PianorollEditor(0, off + tabBarH, winW, drumNumRows,
+                                      numPatternBeats, drumRowH, 40, 0.25f, *p1);
+    tab2->add(pianorollEd);
+    pianorollEd->hide();
+
     patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
     patternPanel->setTimeline(timeline);
     tab2->add(patternPanel);
@@ -224,6 +235,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     og2->setPlayheadActivePatterns(&aps);
     patternEd->setPlayheadActivePatterns(&aps);
     drumEd->setPlayheadActivePatterns(&aps);
+    pianorollEd->setPlayheadActivePatterns(&aps);
 
     // ---- Wire up loop editor ----
     loopEd->setTimeline(timeline);
@@ -235,12 +247,14 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         og2->setPlayheadLoopMode(isLoop);
         patternEd->setPlayheadLoopMode(isLoop);
         drumEd->setPlayheadLoopMode(isLoop);
+        pianorollEd->setPlayheadLoopMode(isLoop);
         transport->setLoopMode(isLoop);
     };
 
     // ---- Wire up pattern editors ----
     patternEd->setPatternPlayhead(transport, timeline, 0);
     drumEd->setPatternPlayhead(transport, timeline, 0);
+    pianorollEd->setPatternPlayhead(transport, timeline, 0);
 
     // ---- Note label / params sync ----
     auto syncNoteLabels = [this]() {

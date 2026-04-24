@@ -329,10 +329,10 @@ void PatternPanel::onTimelineChanged()
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
         patternName.copy_label(tl.tracks[sel].label.c_str());
         int patId = tl.tracks[sel].patternId;
-        bool isDrum = false;
+        bool hideChord = false;
         for (const auto& p : tl.patterns)
-            if (p.id == patId) { isDrum = (p.type == PatternType::DRUM); break; }
-        setDrumMode(isDrum);
+            if (p.id == patId) { hideChord = (p.type == PatternType::DRUM || p.type == PatternType::PIANOROLL); break; }
+        setDrumMode(hideChord);
     } else {
         patternName.copy_label("");
         setDrumMode(false);

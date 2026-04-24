@@ -9,7 +9,7 @@ static const char* flatNames[]  = {"C","Db","D","Eb","E","F","Gb","G","Ab","A","
 std::string noteName(int n, int rootPitch, int chordType, bool useSharp)
 {
     int rootSemitone = (rootPitch + 9) % 12;
-    int rootMidi0    = 12 + rootSemitone;
+    int rootMidi0    = rootSemitone;
     int size         = chordDefs[chordType].size;
     int midi         = rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
     int noteOct      = midi / 12 - 1;
@@ -24,7 +24,7 @@ NoteLabels::NoteLabels(int x, int y, int w, int numRows, int rowHeight)
 
 int NoteLabels::computeTotalTones() const {
     int rootSemitone = (rootPitch + 9) % 12;
-    int rootMidi0    = 12 + rootSemitone;
+    int rootMidi0    = rootSemitone;
     int size         = chordDefs[chordType].size;
     int enabledTotal = 0;
     for (int n = 0; n < 10 * size; n++) {
