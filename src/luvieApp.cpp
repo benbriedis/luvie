@@ -8,6 +8,7 @@
 #include "songEditor.hpp"
 #include "patternEditor.hpp"
 #include "popup.hpp"
+#include "songPopup.hpp"
 #include "modernTabs.hpp"
 #include "transport.hpp"
 #include "markerPopup.hpp"
@@ -125,11 +126,12 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->add(menuBar);
 
     // ---- Popups (created before any group so they stay unparented until explicit add) ----
-    auto* p1     = new Popup{};
-    auto* p2     = new Popup{};
-    auto* tPop   = new MarkerPopup(MarkerPopup::TEMPO);
-    auto* tsPop  = new MarkerPopup(MarkerPopup::TIME_SIG);
-    auto* ctxPop = new TrackContextPopup;
+    auto* p1      = new Popup{};
+    auto* p2      = new Popup{};
+    auto* sp      = new SongPopup{};
+    auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
+    auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
+    auto* ctxPop  = new TrackContextPopup;
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -219,11 +221,15 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         bottomPane->notifySeek();
         if (onExtraSeek) onExtraSeek();
     };
-    og2->onPatternDoubleClick = [this, timeline, tab2](int trackIndex) {
+    auto openPatternTab = [this, timeline, tab2](int trackIndex) {
         timeline->selectTrack(trackIndex);
         tabs->value(tab2);
         tabs->redraw();
     };
+    og2->onPatternDoubleClick = openPatternTab;
+    og2->onOpenPattern        = openPatternTab;
+    og2->setSongPopup(sp);
+    ctxPop->onOpenPattern     = openPatternTab;
     if (verbose) {
         og2->setVerbose(true);
         if (getPitchName)
@@ -282,6 +288,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     // Small popups first so they take priority in the click-away check.
     window->add(p1);     window->registerPopup(p1);
     window->add(p2);     window->registerPopup(p2);
+    window->add(sp);     window->registerPopup(sp);
     window->add(tPop);   window->registerPopup(tPop);
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);

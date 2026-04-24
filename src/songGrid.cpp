@@ -127,6 +127,16 @@ std::function<void()> SongGrid::makeDeleteCallback(int noteIdx)
     return [this, id]() { timeline->removePattern(id); };
 }
 
+void SongGrid::openContextMenu(int idx)
+{
+    if (!songPopup) { Grid::openContextMenu(idx); return; }
+    int trackIndex = (int)notes[idx].pitch + rowOffset;
+    songPopup->open(&notes, idx, this,
+        makeDeleteCallback(idx),
+        onOpenPattern ? std::function<void()>([this, trackIndex]() { onOpenPattern(trackIndex); })
+                      : nullptr);
+}
+
 void SongGrid::onBeginDrag(int noteIdx)
 {
     if (timeline) { int dummy; timeline->timeSigAt((int)notes[noteIdx].beat, dragBeatsPerBar, dummy); }
@@ -160,6 +170,12 @@ void SongGrid::onCommitResize(const StateDragResize& s)
         timeline->resizePatternLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length, dragStartOffset);
     else
         timeline->resizePattern(id, notes[s.noteIdx].length);
+}
+
+int SongGrid::handle(int event)
+{
+    if (songPopup && songPopup->visible()) return 0;
+    return Grid::handle(event);
 }
 
 void SongGrid::onNoteDoubleClick(int noteIdx)

@@ -3,6 +3,7 @@
 
 #include "editor.hpp"
 #include "songGrid.hpp"
+#include "songPopup.hpp"
 #include "trackLabels.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
@@ -36,8 +37,11 @@ public:
                float snap, Popup& popup);
     ~SongEditor();
 
-    std::function<void(int trackIndex)>        onPatternDoubleClick;
+    std::function<void(int trackIndex)>            onPatternDoubleClick;
+    std::function<void(int trackIndex)>            onOpenPattern;
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
+
+    void setSongPopup(SongPopup* p) { songGrid.setSongPopup(p); }
 
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setContextPopup(TrackContextPopup* p);

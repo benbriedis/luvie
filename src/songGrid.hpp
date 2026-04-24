@@ -3,9 +3,11 @@
 
 #include "grid.hpp"
 #include "observableTimeline.hpp"
+#include "songPopup.hpp"
 
 class SongGrid : public Grid, public ITimelineObserver {
     ObservableTimeline* timeline          = nullptr;
+    SongPopup*          songPopup         = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;
     float               tickBarPos        = 0.0f;
@@ -19,6 +21,7 @@ protected:
     void draw() override;
     void resizing(StateDragResize& s) override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
+    void openContextMenu(int idx) override;
     void onBeginDrag(int noteIdx) override;
     void onCommitMove(const StateDragMove& s) override;
     void onCommitResize(const StateDragResize& s) override;
@@ -30,6 +33,11 @@ public:
     ~SongGrid();
 
     std::function<void(int trackIndex)> onPatternDoubleClick;
+    std::function<void(int trackIndex)> onOpenPattern;
+
+    void setSongPopup(SongPopup* p) { songPopup = p; }
+
+    int handle(int event) override;
 
     void setTimeline(ObservableTimeline* tl);
     void setTrackView(int trackFilter, bool beatResolution);

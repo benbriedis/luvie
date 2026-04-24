@@ -87,7 +87,7 @@ int Grid::handle(int event)
                 if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
                 else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
                 if (idx >= 0)
-                    popup.open(idx, &notes, this, makeDeleteCallback(idx));
+                    openContextMenu(idx);
             } else if (auto* h = std::get_if<StateHoverMove>(&state)) {
                 int   noteIdx = h->noteIdx;
                 float grabX   = h->grabX;
@@ -281,6 +281,11 @@ int Grid::overlappingNote(int noteIdx) const
         if (firstEnd > secondStart) return i;
     }
     return -1;
+}
+
+void Grid::openContextMenu(int idx)
+{
+    popup.open(idx, &notes, this, makeDeleteCallback(idx));
 }
 
 void Grid::clampSelection()

@@ -7,7 +7,7 @@
 #include <functional>
 
 class TrackContextPopup : public BasePopup {
-    static constexpr int popH  = 5 * 30 + 2;  // +2 for border
+    static constexpr int popH  = 6 * 30 + 2;  // +2 for border
 
 public:
     static constexpr int popW  = 150;
@@ -15,6 +15,7 @@ public:
 
 private:
 
+    ModernButton*       openPatternBtn;
     ModernButton*       addBtn;
     ModernButton*       addDrumBtn;
     ModernButton*       addPianorollBtn;
@@ -25,6 +26,7 @@ private:
 
     static constexpr int numPatternBeats = 8;
 
+    void doOpenPattern();
     void doAdd();
     void doAddDrum();
     void doAddPianoroll();
@@ -33,6 +35,8 @@ private:
 
 public:
     TrackContextPopup();
+
+    std::function<void(int trackIndex)> onOpenPattern;
 
     void open(int row, ObservableTimeline* tl, int wx, int wy);
 };
