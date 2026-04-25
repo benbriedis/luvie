@@ -1,9 +1,4 @@
 
-MIDI monitoring: use gmidimonitor  (in Ubuntu repo)
-
-
-- change the URLs to my Github account
-
 
 Tools
 -----
@@ -49,6 +44,11 @@ https://www.cycfi.com/2025/09/cv-to-midi-a-practical-guide/#:~:text=Essentially%
 https://linuxmusicians.com/viewtopic.php?t=20701
 
 
+MIDI monitoring: use gmidimonitor  (in Ubuntu repo)
+
+- change the URLs to my Github account
+
+
 LV2 Position data (ie transport data) notes
 ===========================================
 
@@ -85,20 +85,7 @@ TO TEST
 
 TODOs
 =====
-Will probably want a separate way to save a song - eg transfer between systems etc... Maybe just export?
-  cf warning if deleting the plugin.
-
-Fix up outCapacity in harmony.c  - see
-	https://lv2plug.in/ns/ext/buf-size
-	https://lv2plug.in/ns/ext/resize-port
-
-Set up saving and loading of patterns and writing back of patterns from plugins
-
-Unit tests
-
-Use Patches? and Parameters?
-
----------------------------------
+Unit tests?
 
 NOTE: currently restricting # patterns to a min of 1 so I can continue to add patterns.
       Maybe add add pattern button in future.
@@ -107,6 +94,9 @@ NOTE: currently restricting # patterns to a min of 1 so I can continue to add pa
 ------
 Re time signatures and live looping mode
 ~~~
+Do we get warning if deleting the plugin and notes have been added?
+  In standalone probably want a warning too.
+
 Re: resizing the main window... it may be Wayland that is to blame here... possible I've over-customised for it.
 
 In time I'll probably add a "live mode" like Seq24.
@@ -184,25 +174,16 @@ TODO add application icon
 cf make install (required for RaySession) may be Linux specific...
 
 
-IMPLEMENT - NEED NOTES 
 ======================
-- Have New Session Manager support
+FOR MANUAL: Have New Session Manager support
 
-- Have a standalone version that can take a project file as an argument - eg:  luvie myproject.json
+FOR MANUAL: Have a standalone version that can take a project file as an argument - eg:  luvie myproject.json
   MAYBE add a "luvie -h" option in. For some reason getting the Fltk options again...
 
 
 
-DRUM MAPPING 
-============
-
-cf WORKFLOW:
-  - Create a "drum channel" (mark a regular channel... cf automatically use drum patterns?)
-  - Default to GM pattern and maybe store in session file in JSON (probably include the note numbers - more flexible. cf MIDI 2.0 in time)
-  - Can edit the names of drums in the editor.
-  - Can export or import MIDNAM XML files (one per channel)
-    (hopefully can add a name or description)
-
+Re drum mapping (future)
+------------------------
 MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
 - Doesn't look like DrumGizmo supports this yet
 
@@ -231,19 +212,15 @@ MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
 	)
 
 4. Drum patterns
-	1. There is a standard MIDI drum mapping. How best to support other mappings... look at DrumGizmo & the jazz drum kit plugin.
-	   What standards exist?
 	2. Hand cursor tends to obscure the note during the move operation.
 	3. cf optimising the control rows at the bottom as the drum pattern editor lacks the pitch-related controls.
 
-
-MIDI channels?
 
 Mute & solo selectors and indicators.
 
 Loop mode: maybe remove rewind button and position labels in the transports
 
-In song mode maybe have maybe have loop editor show what's currently playing 
+In song mode maybe have loop editor show what's currently playing 
    (in which case preserve the loop state) 
    
 May need vertical scroll in loop editor
@@ -255,15 +232,8 @@ When in loop mode disable song playhead?? Or let run - may be useful to recordin
 cf Removing Time from Loop Editor?  Put in Pattern Editor?? Remove line or make dotted?
    Or use initial time or put into settings?
 
-Loop playhead broke after a while
-
 
 ISSUE: In RaySession our transport does not seem to update (OK in Ardour)
-
-Add export and import
-Add standalone save (reuse export and import code)
-
-A WEIRDNESS in Pattern Editor once unable to cick into Song Editor and have it stick - would bounce back
 
 cf Show recent projects - Probably need program settings to remember between runs...
    Ditto if I want to remember the last Save As / Export / Import directory.
@@ -276,10 +246,8 @@ Does top Makefile need install target added to it? src/Makefile has install targ
 
 Allow the window close to be clicked even if a popup of menu is showing.
 
-Implement undo/redo. Only enable Save & Save As if a change has been made (and not undone).
-
-
-Connections X is not all the way to the right. (Putting on a left an alternative)
+Implement undo/redo (possible on an editor-by-editor basis? or current edit only?)
+    Only enable Save & Save As if a change has been made (and not undone).
 
 FOR MANUAL: double clicking on note label in drum pattern allows the instrument name to be enterred or modified.
             A drum can be saved later too.
@@ -300,13 +268,13 @@ FOR MANUAL: in the pattern editor double click on the pattern name to edit.
     
 
 ----------
+Song editor - scrollbar should follow playhead (at least by default).
+
 Pianoroll pattern (and drum pattern?) should support recording (and import of patterns?) in time.
 
 cf conversion routine to clone a regular pattern to pianoroll. The opposite way would be harder, but something could be attempted in time maybe.
 
 -------------------
-
-Drum patterns - also support showing notes using A, B, C,... as well as instrument names.
 
 Drum patterns and pianoroll should have a 'center' button too.
 
@@ -338,4 +306,5 @@ In Pattern Editor clicking awy from the numerator of bar fields doesn't lose the
   Also clicking #Bars and dragging the mouse left or right changes the number of bars. Dont think I want.
 
 The load drum map buttons need a better visual indication the buttons are pressed.
-Should be able to tab into them.
+	Should be able to tab into them too.
+
