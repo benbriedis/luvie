@@ -303,8 +303,6 @@ cf conversion routine to clone a regular pattern to pianoroll. The opposite way 
 
 Drum patterns - also support showing notes using A, B, C,... as well as instrument names.
 
-Closing Luvie *may* not be closing its Jack connetion properly - stopping Jack complains that some clients exist...
-
 Drum patterns and pianoroll should have a 'center' button too.
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   

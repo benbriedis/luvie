@@ -186,9 +186,14 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
+        // Determine which list is currently shown
+        PatternType type = PatternType::STANDARD;
+        for (const auto& p : tl.patterns)
+            if (p.id == patId) { type = p.type; break; }
+        const auto& names = (type == PatternType::DRUM)
+            ? self->drumChannelNames_ : self->stdChannelNames_;
         int idx = self->outChoice.value();
-        std::string name = (idx >= 0 && idx < (int)self->channelNames_.size())
-            ? self->channelNames_[idx] : "";
+        std::string name = (idx >= 0 && idx < (int)names.size()) ? names[idx] : "";
         self->timeline->setPatternOutputChannel(patId, name);
     }, this);
 
@@ -215,11 +220,11 @@ void PatternPanel::setParams(int root, int chord, bool sharp)
 	redraw();
 }
 
-void PatternPanel::setChannels(const std::vector<std::string>& names)
+void PatternPanel::setChannels(const std::vector<std::string>& stdNames,
+                               const std::vector<std::string>& drumNames)
 {
-    channelNames_ = names;
-    outChoice.clear();
-    for (const auto& n : names) outChoice.add(n.c_str());
+    stdChannelNames_  = stdNames;
+    drumChannelNames_ = drumNames;
     refreshOutChoice();
 }
 
@@ -228,19 +233,35 @@ void PatternPanel::refreshOutChoice()
     if (!timeline) { outChoice.value(0); return; }
     const auto& tl = timeline->get();
     int sel = tl.selectedTrackIndex;
-    outChoice.value(0);
-    if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+    if (sel < 0 || sel >= (int)tl.tracks.size()) { outChoice.value(0); return; }
     int patId = tl.tracks[sel].patternId;
+
+    PatternType type = PatternType::STANDARD;
+    std::string currentChannel;
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
-        for (int i = 0; i < (int)channelNames_.size(); i++) {
-            if (channelNames_[i] == p.outputChannelName) {
-                outChoice.value(i);
-                break;
-            }
-        }
+        type           = p.type;
+        currentChannel = p.outputChannelName;
         break;
     }
+
+    const auto& names = (type == PatternType::DRUM) ? drumChannelNames_ : stdChannelNames_;
+
+    outChoice.clear();
+    for (const auto& n : names) outChoice.add(n.c_str());
+
+    for (int i = 0; i < (int)names.size(); i++) {
+        if (names[i] == currentChannel) {
+            outChoice.value(i);
+            outChoice.redraw();
+            return;
+        }
+    }
+
+    // Current channel not in the type-filtered list — assign first available.
+    outChoice.value(0);
+    if (!names.empty())
+        timeline->setPatternOutputChannel(patId, names[0]);
     outChoice.redraw();
 }
 

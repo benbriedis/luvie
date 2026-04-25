@@ -33,9 +33,10 @@ static constexpr int typeLabelW  = 62;
 
 static constexpr int drumRowH    = 32;
 static constexpr int drumBtnH    = 22;
-static constexpr int drumImportW = 150;
-static constexpr int drumExportW = 150;
-static constexpr int drumClearW  = 70;
+static constexpr int drumImportW = 115;
+static constexpr int drumGmW     = 105;
+static constexpr int drumExportW = 115;
+static constexpr int drumClearW  = 65;
 static constexpr int drumBtnGap  = 8;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
@@ -147,7 +148,8 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
     end();
 
     connections_.push_back({nextPortId_++, "midi_out_1"});
-    channels_.push_back({nextChanId_++, "A", "midi_out_1", 1});
+    channels_.push_back({nextChanId_++, "A", "midi_out_1",  1, {}, false});
+    channels_.push_back({nextChanId_++, "B", "midi_out_1", 10, {}, true});
     rebuildRows();
     hide();
 }
@@ -322,6 +324,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
         if (row.midiChanChoice){ remove(row.midiChanChoice);Fl::delete_widget(row.midiChanChoice); }
         if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
         if (row.importBtn)     { remove(row.importBtn);     Fl::delete_widget(row.importBtn); }
+        if (row.gmBtn)         { remove(row.gmBtn);         Fl::delete_widget(row.gmBtn); }
         if (row.exportBtn)     { remove(row.exportBtn);     Fl::delete_widget(row.exportBtn); }
         if (row.clearBtn)      { remove(row.clearBtn);      Fl::delete_widget(row.clearBtn); }
     }
@@ -392,17 +395,22 @@ void ConnectionsOverlay::rebuildChannelRows() {
         del->setBorderWidth(0);
         del->callback(chanDeleteCb, this);
 
-        if (channels_.size() <= 1 || (isChannelInUse && isChannelInUse(channels_[i].name)))
-            del->deactivate();
+        {
+            int typeCount = 0;
+            for (const auto& ch : channels_) if (ch.isDrum == drum) ++typeCount;
+            bool inUse = isChannelInUse && isChannelInUse(channels_[i].name);
+            if (typeCount <= 1 || inUse) del->deactivate();
+        }
 
         // Drum mappings sub-row — only for drum channels
         ModernButton* imp = nullptr;
+        ModernButton* gm  = nullptr;
         ModernButton* exp = nullptr;
         ModernButton* clr = nullptr;
         if (drum) {
             const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2;
 
-            imp = new ModernButton(pad, drumBtnY, drumImportW, drumBtnH, "Import drum mappings");
+            imp = new ModernButton(pad, drumBtnY, drumImportW, drumBtnH, "Import drum map");
             imp->labelsize(11);
             imp->labelcolor(textCol);
             imp->color(addBtnBg);
@@ -410,8 +418,17 @@ void ConnectionsOverlay::rebuildChannelRows() {
             imp->setBorderColor(borderCol);
             imp->callback(importDrumMapCb, this);
 
-            const int expX = pad + drumImportW + drumBtnGap;
-            exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum mappings");
+            const int gmX = pad + drumImportW + drumBtnGap;
+            gm = new ModernButton(gmX, drumBtnY, drumGmW, drumBtnH, "Load GM map");
+            gm->labelsize(11);
+            gm->labelcolor(textCol);
+            gm->color(addBtnBg);
+            gm->setBorderWidth(1);
+            gm->setBorderColor(borderCol);
+            gm->callback(loadGmMapCb, this);
+
+            const int expX = gmX + drumGmW + drumBtnGap;
+            exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum map");
             exp->labelsize(11);
             exp->labelcolor(textCol);
             exp->color(addBtnBg);
@@ -429,7 +446,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
             clr->callback(clearDrumMapCb, this);
         }
 
-        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, exp, clr, channels_[i].name});
+        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, exp, clr, channels_[i].name});
         y += rowH + (drum ? drumRowH : 0);
     }
     end();
@@ -521,11 +538,14 @@ void ConnectionsOverlay::chanNameCb(Fl_Widget* w, void* d) {
 }
 
 void ConnectionsOverlay::refreshChannelButtons() {
+    int drumCount = 0, stdCount = 0;
+    for (const auto& ch : channels_) ch.isDrum ? ++drumCount : ++stdCount;
     for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
         if (!chanRows_[i].deleteBtn) continue;
         bool inUse = isChannelInUse && isChannelInUse(channels_[i].name);
-        if (channels_.size() <= 1 || inUse) chanRows_[i].deleteBtn->deactivate();
-        else                                chanRows_[i].deleteBtn->activate();
+        int typeCount = channels_[i].isDrum ? drumCount : stdCount;
+        if (typeCount <= 1 || inUse) chanRows_[i].deleteBtn->deactivate();
+        else                         chanRows_[i].deleteBtn->activate();
     }
     redraw();
 }
@@ -535,6 +555,10 @@ void ConnectionsOverlay::chanDeleteCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->chanRows_.size(); i++) {
         if (w != self->chanRows_[i].deleteBtn) continue;
         if (self->isChannelInUse && self->isChannelInUse(self->channels_[i].name)) return;
+        bool isDrum = self->channels_[i].isDrum;
+        int typeCount = 0;
+        for (const auto& ch : self->channels_) if (ch.isDrum == isDrum) ++typeCount;
+        if (typeCount <= 1) return;
         self->channels_.erase(self->channels_.begin() + i);
         self->rebuildChannelRows();
         self->rebuildPortChoices();
@@ -578,6 +602,16 @@ void ConnectionsOverlay::importDrumMapCb(Fl_Widget* w, void* d) {
         const char* path = fc.filename();
         if (!path || !path[0]) return;
         self->channels_[i].drumMap = parseMidnam(path);
+        if (self->onChannelsChanged) self->onChannelsChanged();
+        return;
+    }
+}
+
+void ConnectionsOverlay::loadGmMapCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].gmBtn) continue;
+        self->channels_[i].drumMap = gmPercussionMap();
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }

@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     window.end();
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
-    songTimeline.defaultOutputChannel = "midi_out_1:1";
+    songTimeline.defaultOutputChannel = "A";
     {
         int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
         songTimeline.addTrack("Pattern 1", patId);
@@ -98,19 +98,26 @@ int main(int argc, char **argv) {
     auto pushChannelRoutings = [&]() {
         if (!connOverlay) return;
         const auto& chans = connOverlay->getChannels();
-        if (!chans.empty())
-            songTimeline.defaultOutputChannel = chans[0].name;
+        // Update timeline defaults to first channel of each type.
+        songTimeline.defaultOutputChannel     = "";
+        songTimeline.defaultDrumOutputChannel = "";
+        for (const auto& ci : chans) {
+            if (!ci.isDrum && songTimeline.defaultOutputChannel.empty())
+                songTimeline.defaultOutputChannel = ci.name;
+            if (ci.isDrum && songTimeline.defaultDrumOutputChannel.empty())
+                songTimeline.defaultDrumOutputChannel = ci.name;
+        }
         if (useJack) {
             std::vector<JackTransport::ChannelRouting> routings;
-            for (const auto& ci : connOverlay->getChannels())
+            for (const auto& ci : chans)
                 routings.push_back({ci.name, ci.portName, ci.midiChannel});
             jackTransport.setChannels(routings);
         }
         if (app.patternPanel) {
-            std::vector<std::string> names;
-            for (const auto& ci : connOverlay->getChannels())
-                names.push_back(ci.name);
-            app.patternPanel->setChannels(names);
+            std::vector<std::string> stdNames, drumNames;
+            for (const auto& ci : chans)
+                (ci.isDrum ? drumNames : stdNames).push_back(ci.name);
+            app.patternPanel->setChannels(stdNames, drumNames);
         }
     };
 

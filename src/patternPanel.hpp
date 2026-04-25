@@ -18,7 +18,8 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     int                 editingTrackId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
-    std::vector<std::string> channelNames_;
+    std::vector<std::string> stdChannelNames_;
+    std::vector<std::string> drumChannelNames_;
 
     Fl_Box         patternName;
     Fl_Box         baseLabel;
@@ -63,8 +64,9 @@ public:
     // Set chord/root/sharp without triggering onParamsChanged.
     void setParams(int root, int chord, bool sharp);
 
-    // Update the available channel list shown in the Out dropdown.
-    void setChannels(const std::vector<std::string>& names);
+    // Update the available channel lists shown in the Out dropdown.
+    void setChannels(const std::vector<std::string>& stdNames,
+                     const std::vector<std::string>& drumNames);
 
     void setTimeline(ObservableTimeline* tl);
     void setDrumMode(bool drum);

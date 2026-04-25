@@ -46,6 +46,7 @@ class ConnectionsOverlay : public BasePopup {
         Fl_Choice*    midiChanChoice = nullptr;
         ModernButton* deleteBtn      = nullptr;
         ModernButton* importBtn      = nullptr;
+        ModernButton* gmBtn          = nullptr;
         ModernButton* exportBtn      = nullptr;
         ModernButton* clearBtn       = nullptr;
         std::string   committedName;
@@ -81,6 +82,7 @@ class ConnectionsOverlay : public BasePopup {
     static void portChoiceCb    (Fl_Widget*, void*);
     static void midiChanChoiceCb(Fl_Widget*, void*);
     static void importDrumMapCb (Fl_Widget*, void*);
+    static void loadGmMapCb     (Fl_Widget*, void*);
     static void exportDrumMapCb (Fl_Widget*, void*);
     static void clearDrumMapCb  (Fl_Widget*, void*);
 

@@ -302,7 +302,8 @@ int ObservableTimeline::createDrumPattern(float lengthBeats)
 	p.id = id;
 	p.lengthBeats = lengthBeats;
 	p.type = PatternType::DRUM;
-	p.outputChannelName = defaultOutputChannel;
+	p.outputChannelName = defaultDrumOutputChannel.empty()
+	    ? defaultOutputChannel : defaultDrumOutputChannel;
 	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
 	data.patterns.push_back(std::move(p));
 	notify();
