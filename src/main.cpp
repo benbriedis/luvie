@@ -125,9 +125,12 @@ int main(int argc, char **argv) {
     auto pushDrumMaps = [&]() {
         if (!connOverlay || !app.drumEd) return;
         std::map<std::string, std::map<int, std::string>> allMaps;
-        for (const auto& ci : connOverlay->getChannels())
-            allMaps[ci.name] = ci.drumMap;
-        app.drumEd->setAllDrumMaps(allMaps);
+        std::map<std::string, bool> allFallbacks;
+        for (const auto& ci : connOverlay->getChannels()) {
+            allMaps[ci.name]      = ci.drumMap;
+            allFallbacks[ci.name] = ci.fallbackNoteNames;
+        }
+        app.drumEd->setAllDrumMaps(allMaps, allFallbacks);
     };
 
     if (connOverlay) {
@@ -166,6 +169,12 @@ int main(int argc, char **argv) {
         pushDrumMaps();
     }
 
+    if (app.drumEd) {
+        app.drumEd->onDrumLabelChanged = [&](const std::string& chanName, int midiNote, const std::string& label) {
+            if (connOverlay) connOverlay->updateChannelDrumMap(chanName, midiNote, label);
+        };
+    }
+
     // Helper: unregister all current ports, then register ports from the overlay.
     auto applyLoadedConnections = [&](const AppState& state) {
         if (!connOverlay) return;
@@ -184,7 +193,7 @@ int main(int argc, char **argv) {
         // Load channels and push routings.
         std::vector<ConnectionsOverlay::ChannelInfo> chans;
         for (const auto& c : state.jackChannels)
-            chans.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap, c.isDrum});
+            chans.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap, c.isDrum, c.fallbackNoteNames});
         connOverlay->setChannels(chans);
         pushChannelRoutings();
         pushDrumMaps();
@@ -198,7 +207,7 @@ int main(int argc, char **argv) {
             state.jackConnections.push_back({name});
         state.jackChannels.clear();
         for (const auto& ci : connOverlay->getChannels())
-            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap, ci.isDrum});
+            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap, ci.isDrum, ci.fallbackNoteNames});
     };
 
     // --- NSM session management -------------------------------------------

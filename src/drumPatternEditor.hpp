@@ -7,7 +7,9 @@
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
 #include "gridScrollPane.hpp"
+#include "inlineInput.hpp"
 #include <FL/Fl_Widget.H>
+#include <functional>
 #include <map>
 #include <string>
 
@@ -15,36 +17,48 @@
 class DrumNoteLabels : public Fl_Widget {
     int numRows;
     int rowHeight;
-    int rowOffset = 0;
-    std::map<int, std::string> drumMap_;
+    int rowOffset         = 0;
+    bool fallbackNoteNames = false;
+    std::map<int, std::string> drumMap;
 
     void draw() override;
+    int  handle(int event) override;
 
 public:
     DrumNoteLabels(int x, int y, int w, int numRows, int rowHeight);
     void setRowOffset(int offset) { rowOffset = offset; redraw(); }
     void setNumRows(int n)        { numRows   = n;       redraw(); }
-    void setDrumMap(const std::map<int, std::string>& m) { drumMap_ = m; redraw(); }
+    void setDrumMap(const std::map<int, std::string>& m) { drumMap = m; redraw(); }
+    void setFallbackNoteNames(bool b) { fallbackNoteNames = b; redraw(); }
+
+    std::function<void(int midiNote, int rowY, int rowH)> onRowDoubleClicked;
 };
 
 // ---------------------------------------------------------------------------
 
 class DrumPatternEditor : public Editor, public ITimelineObserver {
-    static constexpr int labelsW    = 36;
+    static constexpr int labelsW    = 90;
     static constexpr int scrollbarW = 14;
 
     GridScrollPane*     scrollbar         = nullptr;
     DrumNoteLabels      drumLabels;
     DrumGrid            drumGrid;
+    InlineInput         drumLabelInput;
     ObservableTimeline* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
+    int                 editingMidiNote   = -1;
 
-    std::map<std::string, std::map<int, std::string>> allDrumMaps_;
+    std::map<std::string, std::map<int, std::string>> allDrumMaps;
+    std::map<std::string, bool>                       allFallbackModes;
 
+    std::string currentChannelName() const;
     void setRowOffset(int offset);
     void setColOffset(int offset);
     void applyCurrentDrumMap();
+    void startDrumLabelEdit(int midiNote, int rowY, int rowH);
+    void commitDrumLabelEdit();
+    void cancelDrumLabelEdit();
     int  handle(int event) override;
 
 public:
@@ -52,8 +66,11 @@ public:
                       int rowHeight, int colWidth, float snap, Popup& popup);
     ~DrumPatternEditor();
 
+    std::function<void(const std::string& chanName, int midiNote, const std::string& label)> onDrumLabelChanged;
+
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
-    void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps);
+    void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
+                        const std::map<std::string, bool>& fallbacks);
     void onTimelineChanged() override;
     void resize(int x, int y, int w, int h) override;
 };

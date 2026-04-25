@@ -281,6 +281,11 @@ Implement undo/redo. Only enable Save & Save As if a change has been made (and n
 
 Connections X is not all the way to the right. (Putting on a left an alternative)
 
+FOR MANUAL: double clicking on note label in drum pattern allows the instrument name to be enterred or modified.
+            A drum can be saved later too.
+
+FOR MANUAL: in the pattern editor double click on the pattern name to edit.
+
 .........................
 
     
@@ -332,3 +337,5 @@ FROM GOOGLE:
 In Pattern Editor clicking awy from the numerator of bar fields doesn't lose the focus and update the data.
   Also clicking #Bars and dragging the mouse left or right changes the number of bars. Dont think I want.
 
+The load drum map buttons need a better visual indication the buttons are pressed.
+Should be able to tab into them.

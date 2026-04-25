@@ -1,4 +1,6 @@
 #include "drumPatternEditor.hpp"
+#include "inlineEditDispatch.hpp"
+#include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
 
@@ -21,17 +23,43 @@ void DrumNoteLabels::draw()
     fl_color(borderCol);
     fl_rectf(x() + w() - 1, y(), 1, h());
 
+    static constexpr const char* noteNames[] = {
+        "C","C#","D","D#","E","F","F#","G","G#","A","A#","B"
+    };
     fl_font(FL_HELVETICA, 10);
     for (int r = 0; r < numRows; r++) {
         int midiNote = rowOffset + numRows - 1 - r;
         if (midiNote < 0 || midiNote > 127) continue;
         int ry = y() + r * rowHeight;
         fl_color(FL_WHITE);
-        auto it = drumMap_.find(midiNote);
-        std::string label = (it != drumMap_.end()) ? it->second : std::to_string(midiNote);
-        fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
-                FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+        std::string label;
+        auto it = drumMap.find(midiNote);
+        if (it != drumMap.end()) {
+            label = it->second;
+        } else if (fallbackNoteNames) {
+            label = std::string(noteNames[midiNote % 12]) + std::to_string(midiNote / 12 - 1);
+        } else {
+            label = std::to_string(midiNote);
+        }
+        fl_draw(label.c_str(), x() + 4, ry, w() - 8, rowHeight,
+                FL_ALIGN_LEFT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
     }
+}
+
+int DrumNoteLabels::handle(int event)
+{
+    if (event == FL_PUSH) {
+        if (Fl::event_clicks() >= 1 && onRowDoubleClicked) {
+            int r = (Fl::event_y() - y()) / rowHeight;
+            if (r >= 0 && r < numRows) {
+                int midiNote = rowOffset + numRows - 1 - r;
+                if (midiNote >= 0 && midiNote <= 127)
+                    onRowDoubleClicked(midiNote, y() + r * rowHeight, rowHeight);
+            }
+        }
+        return 1;
+    }
+    return Fl_Widget::handle(event);
 }
 
 // ---------------------------------------------------------------------------
@@ -42,7 +70,8 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
                                      int rowHeight, int colWidth, float snap, Popup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       drumLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
-      drumGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
+      drumGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
+      drumLabelInput(x + scrollbarW, y + rulerH, labelsW, rowHeight)
 {
     rulerOffsetX = scrollbarW + labelsW;
 
@@ -73,10 +102,26 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     drumGrid.size(visibleGridW, gridH);
     drumGrid.setPlayhead(&playhead);
 
+    drumLabels.onRowDoubleClicked = [this](int midiNote, int rowY, int rh) {
+        startDrumLabelEdit(midiNote, rowY, rh);
+    };
+
+    drumLabelInput.hide();
+    drumLabelInput.box(FL_FLAT_BOX);
+    drumLabelInput.color(0x2D374800);
+    drumLabelInput.textcolor(FL_WHITE);
+    drumLabelInput.cursor_color(FL_WHITE);
+    drumLabelInput.when(FL_WHEN_ENTER_KEY);
+    drumLabelInput.callback([](Fl_Widget*, void* d) {
+        static_cast<DrumPatternEditor*>(d)->commitDrumLabelEdit();
+    }, this);
+    drumLabelInput.onUnfocus([this]() { commitDrumLabelEdit(); });
+
     add(*scrollbar);
     add(*hScrollbar);
     add(drumLabels);
     add(drumGrid);
+    add(drumLabelInput);
 
     playhead.setOwner(this);
     seekingEnabled = false;
@@ -107,28 +152,98 @@ void DrumPatternEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl
     playhead.setPatternTrack(trackIndex);
 }
 
-void DrumPatternEditor::setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps)
+void DrumPatternEditor::setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
+                                       const std::map<std::string, bool>& fallbacks)
 {
-    allDrumMaps_ = maps;
+    allDrumMaps      = maps;
+    allFallbackModes = fallbacks;
     applyCurrentDrumMap();
+}
+
+std::string DrumPatternEditor::currentChannelName() const
+{
+    if (!timeline) return {};
+    int sel = timeline->get().selectedTrackIndex;
+    const auto& tracks = timeline->get().tracks;
+    if (sel < 0 || sel >= (int)tracks.size()) return {};
+    int patId = tracks[sel].patternId;
+    for (const auto& p : timeline->get().patterns)
+        if (p.id == patId) return p.outputChannelName;
+    return {};
+}
+
+void DrumPatternEditor::startDrumLabelEdit(int midiNote, int rowY, int rowH)
+{
+    if (editingMidiNote >= 0) commitDrumLabelEdit();
+
+    std::string chanName = currentChannelName();
+    if (chanName.empty()) return;
+
+    std::string current;
+    auto mit = allDrumMaps.find(chanName);
+    if (mit != allDrumMaps.end()) {
+        auto nit = mit->second.find(midiNote);
+        if (nit != mit->second.end()) current = nit->second;
+    }
+
+    editingMidiNote = midiNote;
+    drumLabelInput.resize(drumLabels.x(), rowY, drumLabels.w(), rowH);
+    drumLabelInput.value(current.c_str());
+    drumLabelInput.show();
+    drumLabelInput.take_focus();
+    drumLabelInput.insert_position(drumLabelInput.size(), 0);
+    InlineEditDispatch::install(this, [this]() { commitDrumLabelEdit(); });
+}
+
+void DrumPatternEditor::commitDrumLabelEdit()
+{
+    if (editingMidiNote < 0) return;
+    int note = editingMidiNote;
+    editingMidiNote = -1;
+    InlineEditDispatch::uninstall();
+    std::string newLabel = drumLabelInput.value();
+    drumLabelInput.hide();
+
+    std::string chanName = currentChannelName();
+    if (!chanName.empty()) {
+        if (newLabel.empty())
+            allDrumMaps[chanName].erase(note);
+        else
+            allDrumMaps[chanName][note] = newLabel;
+        applyCurrentDrumMap();
+        if (onDrumLabelChanged) onDrumLabelChanged(chanName, note, newLabel);
+    }
+    redraw();
+}
+
+void DrumPatternEditor::cancelDrumLabelEdit()
+{
+    if (editingMidiNote < 0) return;
+    editingMidiNote = -1;
+    InlineEditDispatch::uninstall();
+    drumLabelInput.hide();
+    redraw();
 }
 
 void DrumPatternEditor::applyCurrentDrumMap()
 {
-    if (!timeline) { drumLabels.setDrumMap({}); return; }
+    if (!timeline) { drumLabels.setDrumMap({}); drumLabels.setFallbackNoteNames(false); return; }
     int sel = timeline->get().selectedTrackIndex;
     const auto& tracks = timeline->get().tracks;
-    if (sel < 0 || sel >= (int)tracks.size()) { drumLabels.setDrumMap({}); return; }
+    if (sel < 0 || sel >= (int)tracks.size()) { drumLabels.setDrumMap({}); drumLabels.setFallbackNoteNames(false); return; }
     int patId = tracks[sel].patternId;
     for (const auto& p : timeline->get().patterns) {
         if (p.id == patId) {
-            auto it = allDrumMaps_.find(p.outputChannelName);
-            drumLabels.setDrumMap(it != allDrumMaps_.end()
-                ? it->second : std::map<int, std::string>{});
+            auto mit = allDrumMaps.find(p.outputChannelName);
+            drumLabels.setDrumMap(mit != allDrumMaps.end()
+                ? mit->second : std::map<int, std::string>{});
+            auto fit = allFallbackModes.find(p.outputChannelName);
+            drumLabels.setFallbackNoteNames(fit != allFallbackModes.end() && fit->second);
             return;
         }
     }
     drumLabels.setDrumMap({});
+    drumLabels.setFallbackNoteNames(false);
 }
 
 void DrumPatternEditor::onTimelineChanged()
@@ -181,6 +296,7 @@ void DrumPatternEditor::setColOffset(int offset)
 
 void DrumPatternEditor::resize(int x, int /*y*/, int w, int h)
 {
+    if (editingMidiNote >= 0) cancelDrumLabelEdit();
     Fl_Widget::resize(x, y(), w, h);
 
     int gy           = y();
@@ -222,6 +338,10 @@ void DrumPatternEditor::resize(int x, int /*y*/, int w, int h)
 
 int DrumPatternEditor::handle(int event)
 {
+    if (event == FL_KEYDOWN && Fl::event_key() == FL_Escape && editingMidiNote >= 0) {
+        cancelDrumLabelEdit();
+        return 1;
+    }
     if (event == FL_MOUSEWHEEL) {
         if (Fl::event_dx() != 0)
             setColOffset(colOffset + Fl::event_dx());

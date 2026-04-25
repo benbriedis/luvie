@@ -11,9 +11,10 @@ struct JackConnection {
 struct JackChannel {
     std::string name;
     std::string portName;
-    int         midiChannel = 1;
+    int         midiChannel       = 1;
     std::map<int, std::string> drumMap;
-    bool        isDrum = false;
+    bool        isDrum            = false;
+    bool        fallbackNoteNames = false;
 };
 
 // App-level state that gets persisted to / loaded from disk.

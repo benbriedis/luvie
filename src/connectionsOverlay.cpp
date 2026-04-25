@@ -31,13 +31,15 @@ static constexpr int chanGap     = 6;
 static constexpr int chanMidiW   = 70;
 static constexpr int typeLabelW  = 62;
 
-static constexpr int drumRowH    = 32;
-static constexpr int drumBtnH    = 22;
-static constexpr int drumImportW = 115;
-static constexpr int drumGmW     = 105;
-static constexpr int drumExportW = 115;
-static constexpr int drumClearW  = 65;
-static constexpr int drumBtnGap  = 8;
+static constexpr int drumRowH          = 32;
+static constexpr int drumBtnH          = 22;
+static constexpr int drumImportW       = 115;
+static constexpr int drumGmW           = 105;
+static constexpr int drumExportW       = 115;
+static constexpr int drumClearW        = 65;
+static constexpr int drumFallbackLabelW = 58;
+static constexpr int drumFallbackChoiceW = 90;
+static constexpr int drumBtnGap        = 8;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -204,15 +206,28 @@ std::vector<std::string> ConnectionsOverlay::getConnections() const {
 void ConnectionsOverlay::setChannels(const std::vector<ChannelInfo>& chans) {
     channels_.clear();
     for (const auto& ci : chans)
-        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap, ci.isDrum});
+        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap, ci.isDrum, ci.fallbackNoteNames});
     rebuildChannelRows();
 }
 
 std::vector<ConnectionsOverlay::ChannelInfo> ConnectionsOverlay::getChannels() const {
     std::vector<ChannelInfo> result;
     for (const auto& ch : channels_)
-        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel, ch.drumMap, ch.isDrum});
+        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel, ch.drumMap, ch.isDrum, ch.fallbackNoteNames});
     return result;
+}
+
+void ConnectionsOverlay::updateChannelDrumMap(const std::string& chanName, int midiNote, const std::string& label)
+{
+    for (auto& ch : channels_) {
+        if (ch.name == chanName) {
+            if (label.empty())
+                ch.drumMap.erase(midiNote);
+            else
+                ch.drumMap[midiNote] = label;
+            return;
+        }
+    }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -323,10 +338,12 @@ void ConnectionsOverlay::rebuildChannelRows() {
         if (row.portChoice)    { remove(row.portChoice);    Fl::delete_widget(row.portChoice); }
         if (row.midiChanChoice){ remove(row.midiChanChoice);Fl::delete_widget(row.midiChanChoice); }
         if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
-        if (row.importBtn)     { remove(row.importBtn);     Fl::delete_widget(row.importBtn); }
-        if (row.gmBtn)         { remove(row.gmBtn);         Fl::delete_widget(row.gmBtn); }
-        if (row.exportBtn)     { remove(row.exportBtn);     Fl::delete_widget(row.exportBtn); }
-        if (row.clearBtn)      { remove(row.clearBtn);      Fl::delete_widget(row.clearBtn); }
+        if (row.importBtn)      { remove(row.importBtn);      Fl::delete_widget(row.importBtn); }
+        if (row.gmBtn)          { remove(row.gmBtn);          Fl::delete_widget(row.gmBtn); }
+        if (row.exportBtn)      { remove(row.exportBtn);      Fl::delete_widget(row.exportBtn); }
+        if (row.clearBtn)       { remove(row.clearBtn);       Fl::delete_widget(row.clearBtn); }
+        if (row.fallbackLabel)  { remove(row.fallbackLabel);  Fl::delete_widget(row.fallbackLabel); }
+        if (row.fallbackChoice) { remove(row.fallbackChoice); Fl::delete_widget(row.fallbackChoice); }
     }
     chanRows_.clear();
 
@@ -403,10 +420,12 @@ void ConnectionsOverlay::rebuildChannelRows() {
         }
 
         // Drum mappings sub-row — only for drum channels
-        ModernButton* imp = nullptr;
-        ModernButton* gm  = nullptr;
-        ModernButton* exp = nullptr;
-        ModernButton* clr = nullptr;
+        ModernButton* imp  = nullptr;
+        ModernButton* gm   = nullptr;
+        ModernButton* exp  = nullptr;
+        ModernButton* clr  = nullptr;
+        Fl_Box*       fbLbl = nullptr;
+        Fl_Choice*    fbCh  = nullptr;
         if (drum) {
             const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2;
 
@@ -444,9 +463,30 @@ void ConnectionsOverlay::rebuildChannelRows() {
             clr->setBorderWidth(1);
             clr->setBorderColor(borderCol);
             clr->callback(clearDrumMapCb, this);
+
+            const int fbLabelX  = clrX + drumClearW + drumBtnGap;
+            const int fbChoiceX = fbLabelX + drumFallbackLabelW;
+            fbLbl = new Fl_Box(fbLabelX, drumBtnY, drumFallbackLabelW, drumBtnH, "Fallback");
+            fbLbl->box(FL_NO_BOX);
+            fbLbl->labelcolor(subTextCol);
+            fbLbl->labelsize(11);
+            fbLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+            auto* fbMc = new ModernChoice(fbChoiceX, drumBtnY, drumFallbackChoiceW, drumBtnH);
+            fbMc->color(inputBgCol);
+            fbMc->labelcolor(textCol);
+            fbMc->textsize(11);
+            fbMc->setBorderColor(borderCol);
+            fbMc->setArrowColor(subTextCol);
+            fbMc->setHoverColor(0xF3F4F600);
+            fbMc->add("Notes");
+            fbMc->add("Numbers");
+            fbMc->value(channels_[i].fallbackNoteNames ? 0 : 1);
+            fbMc->callback(fallbackChoiceCb, this);
+            fbCh = fbMc;
         }
 
-        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, exp, clr, channels_[i].name});
+        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, exp, clr, fbLbl, fbCh, channels_[i].name});
         y += rowH + (drum ? drumRowH : 0);
     }
     end();
@@ -641,6 +681,17 @@ void ConnectionsOverlay::clearDrumMapCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->chanRows_.size(); i++) {
         if (w != self->chanRows_[i].clearBtn) continue;
         self->channels_[i].drumMap.clear();
+        if (self->onChannelsChanged) self->onChannelsChanged();
+        return;
+    }
+}
+
+void ConnectionsOverlay::fallbackChoiceCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].fallbackChoice) continue;
+        // index 0 = "Notes" (show note names), index 1 = "Numbers" (show MIDI numbers)
+        self->channels_[i].fallbackNoteNames = (static_cast<Fl_Choice*>(w)->value() == 0);
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }

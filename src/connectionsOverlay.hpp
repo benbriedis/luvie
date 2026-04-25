@@ -37,7 +37,8 @@ class ConnectionsOverlay : public BasePopup {
         std::string portName;
         int midiChannel = 1;
         std::map<int, std::string> drumMap;
-        bool isDrum = false;
+        bool isDrum            = false;
+        bool fallbackNoteNames = false;
     };
     struct ChannelRow {
         Fl_Box*       typeLabel      = nullptr;
@@ -49,6 +50,8 @@ class ConnectionsOverlay : public BasePopup {
         ModernButton* gmBtn          = nullptr;
         ModernButton* exportBtn      = nullptr;
         ModernButton* clearBtn       = nullptr;
+        Fl_Box*       fallbackLabel  = nullptr;
+        Fl_Choice*    fallbackChoice = nullptr;
         std::string   committedName;
     };
 
@@ -81,10 +84,11 @@ class ConnectionsOverlay : public BasePopup {
     static void chanDeleteCb    (Fl_Widget*, void*);
     static void portChoiceCb    (Fl_Widget*, void*);
     static void midiChanChoiceCb(Fl_Widget*, void*);
-    static void importDrumMapCb (Fl_Widget*, void*);
-    static void loadGmMapCb     (Fl_Widget*, void*);
-    static void exportDrumMapCb (Fl_Widget*, void*);
-    static void clearDrumMapCb  (Fl_Widget*, void*);
+    static void importDrumMapCb   (Fl_Widget*, void*);
+    static void loadGmMapCb       (Fl_Widget*, void*);
+    static void exportDrumMapCb   (Fl_Widget*, void*);
+    static void clearDrumMapCb    (Fl_Widget*, void*);
+    static void fallbackChoiceCb  (Fl_Widget*, void*);
 
     void draw() override;
     int  handle(int event) override;
@@ -104,10 +108,12 @@ public:
         std::string portName;
         int         midiChannel;
         std::map<int, std::string> drumMap;
-        bool        isDrum = false;
+        bool        isDrum            = false;
+        bool        fallbackNoteNames = false;
     };
     void setChannels(const std::vector<ChannelInfo>& chans);
     std::vector<ChannelInfo> getChannels() const;
+    void updateChannelDrumMap(const std::string& chanName, int midiNote, const std::string& label);
 
     std::function<void(const std::string& name)>                                onPortAdded;
     std::function<void(const std::string& name)>                                onPortRemoved;
