@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE MIDINameDocument PUBLIC "-//MIDI Manufacturers Association//DTD MIDINameDocument 1.0//EN" "http://midi.org">
+<MIDINameDocument>
+    <MasterDeviceNames>
+        <Manufacturer>Custom</Manufacturer>
+        <Model>DrumKit</Model>
+        <CustomDeviceName>My Drums</CustomDeviceName>
+        <PatchBank name="Drum Kits">
+            <Patch name="Standard Kit" number="0"/>
+        </PatchBank>
+        <NoteNames>
+            <Note Number="36" Name="Kick"/>
+            <Note Number="38" Name="Snare"/>
+            <Note Number="42" Name="Closed Hi-Hat"/>
+        </NoteNames>
+    </MasterDeviceNames>
+</MIDINameDocument>

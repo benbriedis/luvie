@@ -171,8 +171,13 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
     for (const auto& c : state.jackConnections)
         jconns.push_back({{"portName", c.portName}});
     json jchans = json::array();
-    for (const auto& c : state.jackChannels)
-        jchans.push_back({{"name", c.name}, {"portName", c.portName}, {"midiChannel", c.midiChannel}});
+    for (const auto& c : state.jackChannels) {
+        json jmap;
+        for (const auto& [note, name] : c.drumMap)
+            jmap[std::to_string(note)] = name;
+        jchans.push_back({{"name", c.name}, {"portName", c.portName},
+                          {"midiChannel", c.midiChannel}, {"drumMap", jmap}});
+    }
     json j = {
         {"version",         1},
         {"rootPitch",       state.rootPitch},
@@ -204,11 +209,15 @@ bool loadAppState(const std::string& filePath, AppState& state) {
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackConnections", json::array()))
         state.jackConnections.push_back({jc.value("portName", "")});
-    for (const auto& jc : j.value("jackChannels", json::array()))
-        state.jackChannels.push_back({
-            jc.value("name", ""),
-            jc.value("portName", ""),
-            jc.value("midiChannel", 1)
-        });
+    for (const auto& jc : j.value("jackChannels", json::array())) {
+        JackChannel ch;
+        ch.name        = jc.value("name", "");
+        ch.portName    = jc.value("portName", "");
+        ch.midiChannel = jc.value("midiChannel", 1);
+        if (jc.contains("drumMap"))
+            for (auto& [k, v] : jc["drumMap"].items())
+                ch.drumMap[std::stoi(k)] = v.get<std::string>();
+        state.jackChannels.push_back(std::move(ch));
+    }
     return true;
 }

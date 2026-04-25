@@ -1,5 +1,6 @@
 #pragma once
 #include "timeline.hpp"
+#include <map>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@ struct JackChannel {
     std::string name;
     std::string portName;
     int         midiChannel = 1;
+    std::map<int, std::string> drumMap;
 };
 
 // App-level state that gets persisted to / loaded from disk.

@@ -1,6 +1,7 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <filesystem>
+#include <map>
 #include <string>
 #include "appWindow.hpp"
 #include "simpleTransport.hpp"
@@ -11,6 +12,7 @@
 #include "noteLabels.hpp"
 #include "luvieApp.hpp"
 #include "connectionsOverlay.hpp"
+#include "drumPatternEditor.hpp"
 #include "itimelineobserver.hpp"
 #include "nsm.hpp"
 #include "timelineIO.hpp"
@@ -112,6 +114,15 @@ int main(int argc, char **argv) {
         }
     };
 
+    // Helper: push drum maps from channels to drum editor.
+    auto pushDrumMaps = [&]() {
+        if (!connOverlay || !app.drumEd) return;
+        std::map<std::string, std::map<int, std::string>> allMaps;
+        for (const auto& ci : connOverlay->getChannels())
+            allMaps[ci.name] = ci.drumMap;
+        app.drumEd->setAllDrumMaps(allMaps);
+    };
+
     if (connOverlay) {
         connOverlay->onPortAdded = [&](const std::string& name) {
             if (useJack) jackTransport.addMidiPort(name);
@@ -132,6 +143,7 @@ int main(int argc, char **argv) {
         };
         connOverlay->onChannelsChanged = [&]() {
             pushChannelRoutings();
+            pushDrumMaps();
             connOverlay->refreshChannelButtons();
         };
 
@@ -144,6 +156,7 @@ int main(int argc, char **argv) {
                 jackTransport.addMidiPort(name);
         }
         pushChannelRoutings();
+        pushDrumMaps();
     }
 
     // Helper: unregister all current ports, then register ports from the overlay.
@@ -164,9 +177,10 @@ int main(int argc, char **argv) {
         // Load channels and push routings.
         std::vector<ConnectionsOverlay::ChannelInfo> chans;
         for (const auto& c : state.jackChannels)
-            chans.push_back({0, c.name, c.portName, c.midiChannel});
+            chans.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap});
         connOverlay->setChannels(chans);
         pushChannelRoutings();
+        pushDrumMaps();
     };
 
     // Helper: fill jackConnections and jackChannels in an AppState from the overlay.
@@ -177,7 +191,7 @@ int main(int argc, char **argv) {
             state.jackConnections.push_back({name});
         state.jackChannels.clear();
         for (const auto& ci : connOverlay->getChannels())
-            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel});
+            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap});
     };
 
     // --- NSM session management -------------------------------------------

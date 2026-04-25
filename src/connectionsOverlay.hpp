@@ -1,6 +1,7 @@
 #pragma once
 #include "basePopup.hpp"
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -33,12 +34,16 @@ class ConnectionsOverlay : public BasePopup {
         std::string name;
         std::string portName;
         int midiChannel = 1;
+        std::map<int, std::string> drumMap;
     };
     struct ChannelRow {
-        Fl_Input*     nameInput     = nullptr;
-        Fl_Choice*    portChoice    = nullptr;
+        Fl_Input*     nameInput      = nullptr;
+        Fl_Choice*    portChoice     = nullptr;
         Fl_Choice*    midiChanChoice = nullptr;
-        ModernButton* deleteBtn     = nullptr;
+        ModernButton* deleteBtn      = nullptr;
+        ModernButton* importBtn      = nullptr;
+        ModernButton* exportBtn      = nullptr;
+        ModernButton* clearBtn       = nullptr;
         std::string   committedName;
     };
 
@@ -71,6 +76,9 @@ class ConnectionsOverlay : public BasePopup {
     static void chanDeleteCb    (Fl_Widget*, void*);
     static void portChoiceCb    (Fl_Widget*, void*);
     static void midiChanChoiceCb(Fl_Widget*, void*);
+    static void importDrumMapCb (Fl_Widget*, void*);
+    static void exportDrumMapCb (Fl_Widget*, void*);
+    static void clearDrumMapCb  (Fl_Widget*, void*);
 
     void draw() override;
     int  handle(int event) override;
@@ -89,6 +97,7 @@ public:
         std::string name;
         std::string portName;
         int         midiChannel;
+        std::map<int, std::string> drumMap;
     };
     void setChannels(const std::vector<ChannelInfo>& chans);
     std::vector<ChannelInfo> getChannels() const;

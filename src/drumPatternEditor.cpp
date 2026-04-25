@@ -27,7 +27,8 @@ void DrumNoteLabels::draw()
         if (midiNote < 0 || midiNote > 127) continue;
         int ry = y() + r * rowHeight;
         fl_color(FL_WHITE);
-        std::string label = std::to_string(midiNote);
+        auto it = drumMap_.find(midiNote);
+        std::string label = (it != drumMap_.end()) ? it->second : std::to_string(midiNote);
         fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
                 FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
     }
@@ -106,6 +107,30 @@ void DrumPatternEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl
     playhead.setPatternTrack(trackIndex);
 }
 
+void DrumPatternEditor::setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps)
+{
+    allDrumMaps_ = maps;
+    applyCurrentDrumMap();
+}
+
+void DrumPatternEditor::applyCurrentDrumMap()
+{
+    if (!timeline) { drumLabels.setDrumMap({}); return; }
+    int sel = timeline->get().selectedTrackIndex;
+    const auto& tracks = timeline->get().tracks;
+    if (sel < 0 || sel >= (int)tracks.size()) { drumLabels.setDrumMap({}); return; }
+    int patId = tracks[sel].patternId;
+    for (const auto& p : timeline->get().patterns) {
+        if (p.id == patId) {
+            auto it = allDrumMaps_.find(p.outputChannelName);
+            drumLabels.setDrumMap(it != allDrumMaps_.end()
+                ? it->second : std::map<int, std::string>{});
+            return;
+        }
+    }
+    drumLabels.setDrumMap({});
+}
+
 void DrumPatternEditor::onTimelineChanged()
 {
     if (!timeline) return;
@@ -124,6 +149,7 @@ void DrumPatternEditor::onTimelineChanged()
             }
         }
     }
+    applyCurrentDrumMap();
 }
 
 void DrumPatternEditor::setRowOffset(int offset)

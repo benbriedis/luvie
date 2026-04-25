@@ -1,8 +1,10 @@
 #include "connectionsOverlay.hpp"
+#include "midnamParser.hpp"
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Input.H>
+#include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl.H>
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -26,6 +28,13 @@ static constexpr int chanSecH  = 44;
 static constexpr int chanColH2 = 22;
 static constexpr int chanGap   = 6;
 static constexpr int chanMidiW = 70;
+
+static constexpr int drumRowH    = 32;
+static constexpr int drumBtnH    = 22;
+static constexpr int drumImportW = 150;
+static constexpr int drumExportW = 150;
+static constexpr int drumClearW  = 70;
+static constexpr int drumBtnGap  = 8;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -176,14 +185,14 @@ std::vector<std::string> ConnectionsOverlay::getConnections() const {
 void ConnectionsOverlay::setChannels(const std::vector<ChannelInfo>& chans) {
     channels_.clear();
     for (const auto& ci : chans)
-        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel});
+        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap});
     rebuildChannelRows();
 }
 
 std::vector<ConnectionsOverlay::ChannelInfo> ConnectionsOverlay::getChannels() const {
     std::vector<ChannelInfo> result;
     for (const auto& ch : channels_)
-        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel});
+        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel, ch.drumMap});
     return result;
 }
 
@@ -290,10 +299,13 @@ void ConnectionsOverlay::rebuildRows() {
 
 void ConnectionsOverlay::rebuildChannelRows() {
     for (auto& row : chanRows_) {
-        if (row.nameInput)    { remove(row.nameInput);    Fl::delete_widget(row.nameInput); }
-        if (row.portChoice)   { remove(row.portChoice);   Fl::delete_widget(row.portChoice); }
-        if (row.midiChanChoice){ remove(row.midiChanChoice); Fl::delete_widget(row.midiChanChoice); }
-        if (row.deleteBtn)    { remove(row.deleteBtn);    Fl::delete_widget(row.deleteBtn); }
+        if (row.nameInput)     { remove(row.nameInput);     Fl::delete_widget(row.nameInput); }
+        if (row.portChoice)    { remove(row.portChoice);    Fl::delete_widget(row.portChoice); }
+        if (row.midiChanChoice){ remove(row.midiChanChoice);Fl::delete_widget(row.midiChanChoice); }
+        if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
+        if (row.importBtn)     { remove(row.importBtn);     Fl::delete_widget(row.importBtn); }
+        if (row.exportBtn)     { remove(row.exportBtn);     Fl::delete_widget(row.exportBtn); }
+        if (row.clearBtn)      { remove(row.clearBtn);      Fl::delete_widget(row.clearBtn); }
     }
     chanRows_.clear();
 
@@ -356,8 +368,37 @@ void ConnectionsOverlay::rebuildChannelRows() {
         if (channels_.size() <= 1 || (isChannelInUse && isChannelInUse(channels_[i].name)))
             del->deactivate();
 
-        chanRows_.push_back({nameInp, portCh, midiCh, del, channels_[i].name});
-        y += rowH;
+        // Drum mappings sub-row
+        const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2;
+
+        auto* imp = new ModernButton(pad, drumBtnY, drumImportW, drumBtnH, "Import drum mappings");
+        imp->labelsize(11);
+        imp->labelcolor(textCol);
+        imp->color(addBtnBg);
+        imp->setBorderWidth(1);
+        imp->setBorderColor(borderCol);
+        imp->callback(importDrumMapCb, this);
+
+        const int expX = pad + drumImportW + drumBtnGap;
+        auto* exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum mappings");
+        exp->labelsize(11);
+        exp->labelcolor(textCol);
+        exp->color(addBtnBg);
+        exp->setBorderWidth(1);
+        exp->setBorderColor(borderCol);
+        exp->callback(exportDrumMapCb, this);
+
+        const int clrX = expX + drumExportW + drumBtnGap;
+        auto* clr = new ModernButton(clrX, drumBtnY, drumClearW, drumBtnH, "Clear");
+        clr->labelsize(11);
+        clr->labelcolor(textCol);
+        clr->color(addBtnBg);
+        clr->setBorderWidth(1);
+        clr->setBorderColor(borderCol);
+        clr->callback(clearDrumMapCb, this);
+
+        chanRows_.push_back({nameInp, portCh, midiCh, del, imp, exp, clr, channels_[i].name});
+        y += rowH + drumRowH;
     }
     end();
 
@@ -487,6 +528,52 @@ void ConnectionsOverlay::midiChanChoiceCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->chanRows_.size(); i++) {
         if (w != self->chanRows_[i].midiChanChoice) continue;
         self->channels_[i].midiChannel = static_cast<Fl_Choice*>(w)->value() + 1;
+        if (self->onChannelsChanged) self->onChannelsChanged();
+        return;
+    }
+}
+
+void ConnectionsOverlay::importDrumMapCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].importBtn) continue;
+        Fl_Native_File_Chooser fc;
+        fc.title("Import Drum Mappings");
+        fc.type(Fl_Native_File_Chooser::BROWSE_FILE);
+        fc.filter("MIDNAM Files\t*.midnam\nAll Files\t*");
+        if (fc.show() != 0) return;
+        const char* path = fc.filename();
+        if (!path || !path[0]) return;
+        self->channels_[i].drumMap = parseMidnam(path);
+        if (self->onChannelsChanged) self->onChannelsChanged();
+        return;
+    }
+}
+
+void ConnectionsOverlay::exportDrumMapCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].exportBtn) continue;
+        Fl_Native_File_Chooser fc;
+        fc.title("Export Drum Mappings");
+        fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
+        fc.filter("MIDNAM Files\t*.midnam\nAll Files\t*");
+        fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
+        if (fc.show() != 0) return;
+        std::string path = fc.filename();
+        if (path.empty()) return;
+        if (path.size() < 7 || path.substr(path.size() - 7) != ".midnam")
+            path += ".midnam";
+        exportMidnam(path, self->channels_[i].drumMap, self->channels_[i].name);
+        return;
+    }
+}
+
+void ConnectionsOverlay::clearDrumMapCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].clearBtn) continue;
+        self->channels_[i].drumMap.clear();
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }
