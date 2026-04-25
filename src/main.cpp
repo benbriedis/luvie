@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
         // Load channels and push routings.
         std::vector<ConnectionsOverlay::ChannelInfo> chans;
         for (const auto& c : state.jackChannels)
-            chans.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap});
+            chans.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap, c.isDrum});
         connOverlay->setChannels(chans);
         pushChannelRoutings();
         pushDrumMaps();
@@ -191,7 +191,7 @@ int main(int argc, char **argv) {
             state.jackConnections.push_back({name});
         state.jackChannels.clear();
         for (const auto& ci : connOverlay->getChannels())
-            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap});
+            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap, ci.isDrum});
     };
 
     // --- NSM session management -------------------------------------------

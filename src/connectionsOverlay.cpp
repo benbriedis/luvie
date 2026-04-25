@@ -3,6 +3,7 @@
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
 #include <FL/fl_draw.H>
+#include <FL/Fl_Box.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl.H>
@@ -24,10 +25,11 @@ static constexpr int addBtnPad= 10;
 static constexpr int pad      = 16;
 static constexpr int delBtnSz = 26;
 
-static constexpr int chanSecH  = 44;
-static constexpr int chanColH2 = 22;
-static constexpr int chanGap   = 6;
-static constexpr int chanMidiW = 70;
+static constexpr int chanSecH    = 44;
+static constexpr int chanColH2   = 22;
+static constexpr int chanGap     = 6;
+static constexpr int chanMidiW   = 70;
+static constexpr int typeLabelW  = 62;
 
 static constexpr int drumRowH    = 32;
 static constexpr int drumBtnH    = 22;
@@ -120,9 +122,24 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         auto* self = static_cast<ConnectionsOverlay*>(d);
         const std::string portName = self->connections_.empty()
             ? "" : self->connections_[0].portName;
-        const int midiCh = 1;
         const std::string name = self->nextLetterChanName();
-        self->channels_.push_back({self->nextChanId_++, name, portName, midiCh});
+        self->channels_.push_back({self->nextChanId_++, name, portName, 1, {}, false});
+        self->rebuildChannelRows();
+        if (self->onChannelsChanged) self->onChannelsChanged();
+    }, this);
+
+    addDrumChanBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Drum Channel");
+    addDrumChanBtn->labelsize(12);
+    addDrumChanBtn->labelcolor(textCol);
+    addDrumChanBtn->color(addBtnBg);
+    addDrumChanBtn->setBorderWidth(1);
+    addDrumChanBtn->setBorderColor(borderCol);
+    addDrumChanBtn->callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<ConnectionsOverlay*>(d);
+        const std::string portName = self->connections_.empty()
+            ? "" : self->connections_[0].portName;
+        const std::string name = self->nextLetterChanName();
+        self->channels_.push_back({self->nextChanId_++, name, portName, 1, {}, true});
         self->rebuildChannelRows();
         if (self->onChannelsChanged) self->onChannelsChanged();
     }, this);
@@ -185,14 +202,14 @@ std::vector<std::string> ConnectionsOverlay::getConnections() const {
 void ConnectionsOverlay::setChannels(const std::vector<ChannelInfo>& chans) {
     channels_.clear();
     for (const auto& ci : chans)
-        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap});
+        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap, ci.isDrum});
     rebuildChannelRows();
 }
 
 std::vector<ConnectionsOverlay::ChannelInfo> ConnectionsOverlay::getChannels() const {
     std::vector<ChannelInfo> result;
     for (const auto& ch : channels_)
-        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel, ch.drumMap});
+        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel, ch.drumMap, ch.isDrum});
     return result;
 }
 
@@ -299,6 +316,7 @@ void ConnectionsOverlay::rebuildRows() {
 
 void ConnectionsOverlay::rebuildChannelRows() {
     for (auto& row : chanRows_) {
+        if (row.typeLabel)     { remove(row.typeLabel);     Fl::delete_widget(row.typeLabel); }
         if (row.nameInput)     { remove(row.nameInput);     Fl::delete_widget(row.nameInput); }
         if (row.portChoice)    { remove(row.portChoice);    Fl::delete_widget(row.portChoice); }
         if (row.midiChanChoice){ remove(row.midiChanChoice);Fl::delete_widget(row.midiChanChoice); }
@@ -309,8 +327,8 @@ void ConnectionsOverlay::rebuildChannelRows() {
     }
     chanRows_.clear();
 
-    const int usableW = w() - 2*pad - delBtnSz - 8 - 2*chanGap;
-    const int remaining = usableW - chanMidiW;
+    const int usableW  = w() - 2*pad - delBtnSz - 8 - 2*chanGap;
+    const int remaining = usableW - chanMidiW - typeLabelW - chanGap;
     chanNameW_ = remaining * 45 / 100;
     chanPortW_ = remaining - chanNameW_;
 
@@ -318,16 +336,25 @@ void ConnectionsOverlay::rebuildChannelRows() {
 
     begin();
     for (int i = 0; i < (int)channels_.size(); i++) {
-        const int iy = y + (rowH - inputH) / 2;
+        const int iy    = y + (rowH - inputH) / 2;
+        const bool drum = channels_[i].isDrum;
 
-        auto* nameInp = new NameInput(pad, iy, chanNameW_, inputH);
+        // Type label
+        auto* typeLbl = new Fl_Box(pad, iy, typeLabelW, inputH,
+            drum ? "Drum" : "Standard");
+        typeLbl->box(FL_NO_BOX);
+        typeLbl->labelcolor(subTextCol);
+        typeLbl->labelsize(10);
+
+        const int nameX = pad + typeLabelW + chanGap;
+        auto* nameInp = new NameInput(nameX, iy, chanNameW_, inputH);
         nameInp->color(inputBgCol);
         nameInp->textcolor(textCol);
         nameInp->textsize(12);
         nameInp->value(channels_[i].name.c_str());
         nameInp->callback(chanNameCb, this);
 
-        const int portX = pad + chanNameW_ + chanGap;
+        const int portX = nameX + chanNameW_ + chanGap;
         auto* portCh = new ModernChoice(portX, iy, chanPortW_, inputH);
         portCh->color(inputBgCol);
         portCh->labelcolor(textCol);
@@ -368,41 +395,47 @@ void ConnectionsOverlay::rebuildChannelRows() {
         if (channels_.size() <= 1 || (isChannelInUse && isChannelInUse(channels_[i].name)))
             del->deactivate();
 
-        // Drum mappings sub-row
-        const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2;
+        // Drum mappings sub-row — only for drum channels
+        ModernButton* imp = nullptr;
+        ModernButton* exp = nullptr;
+        ModernButton* clr = nullptr;
+        if (drum) {
+            const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2;
 
-        auto* imp = new ModernButton(pad, drumBtnY, drumImportW, drumBtnH, "Import drum mappings");
-        imp->labelsize(11);
-        imp->labelcolor(textCol);
-        imp->color(addBtnBg);
-        imp->setBorderWidth(1);
-        imp->setBorderColor(borderCol);
-        imp->callback(importDrumMapCb, this);
+            imp = new ModernButton(pad, drumBtnY, drumImportW, drumBtnH, "Import drum mappings");
+            imp->labelsize(11);
+            imp->labelcolor(textCol);
+            imp->color(addBtnBg);
+            imp->setBorderWidth(1);
+            imp->setBorderColor(borderCol);
+            imp->callback(importDrumMapCb, this);
 
-        const int expX = pad + drumImportW + drumBtnGap;
-        auto* exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum mappings");
-        exp->labelsize(11);
-        exp->labelcolor(textCol);
-        exp->color(addBtnBg);
-        exp->setBorderWidth(1);
-        exp->setBorderColor(borderCol);
-        exp->callback(exportDrumMapCb, this);
+            const int expX = pad + drumImportW + drumBtnGap;
+            exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum mappings");
+            exp->labelsize(11);
+            exp->labelcolor(textCol);
+            exp->color(addBtnBg);
+            exp->setBorderWidth(1);
+            exp->setBorderColor(borderCol);
+            exp->callback(exportDrumMapCb, this);
 
-        const int clrX = expX + drumExportW + drumBtnGap;
-        auto* clr = new ModernButton(clrX, drumBtnY, drumClearW, drumBtnH, "Clear");
-        clr->labelsize(11);
-        clr->labelcolor(textCol);
-        clr->color(addBtnBg);
-        clr->setBorderWidth(1);
-        clr->setBorderColor(borderCol);
-        clr->callback(clearDrumMapCb, this);
+            const int clrX = expX + drumExportW + drumBtnGap;
+            clr = new ModernButton(clrX, drumBtnY, drumClearW, drumBtnH, "Clear");
+            clr->labelsize(11);
+            clr->labelcolor(textCol);
+            clr->color(addBtnBg);
+            clr->setBorderWidth(1);
+            clr->setBorderColor(borderCol);
+            clr->callback(clearDrumMapCb, this);
+        }
 
-        chanRows_.push_back({nameInp, portCh, midiCh, del, imp, exp, clr, channels_[i].name});
-        y += rowH + drumRowH;
+        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, exp, clr, channels_[i].name});
+        y += rowH + (drum ? drumRowH : 0);
     }
     end();
 
     addChanBtn->position(w() - pad - addBtnW, y + addBtnPad);
+    addDrumChanBtn->position(w() - pad - 2*addBtnW - chanGap, y + addBtnPad);
     redraw();
 }
 
@@ -678,11 +711,13 @@ void ConnectionsOverlay::draw() {
                     w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
             const int chanColY = chanRowsTopY_ - chanColH2;
-            const int portX    = pad + chanNameW_ + chanGap;
+            const int nameX    = pad + typeLabelW + chanGap;
+            const int portX    = nameX + chanNameW_ + chanGap;
             const int midiX    = portX + chanPortW_ + chanGap;
             fl_font(FL_HELVETICA, 10);
             fl_color(subTextCol);
-            fl_draw("NAME",            pad,   chanColY, chanNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("TYPE",            pad,   chanColY, typeLabelW, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("NAME",            nameX, chanColY, chanNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
             fl_draw("MIDI OUTPUT PORT", portX, chanColY, chanPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
             fl_draw("MIDI CH",          midiX, chanColY, chanMidiW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 

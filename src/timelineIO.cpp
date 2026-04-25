@@ -176,7 +176,8 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
         for (const auto& [note, name] : c.drumMap)
             jmap[std::to_string(note)] = name;
         jchans.push_back({{"name", c.name}, {"portName", c.portName},
-                          {"midiChannel", c.midiChannel}, {"drumMap", jmap}});
+                          {"midiChannel", c.midiChannel}, {"drumMap", jmap},
+                          {"isDrum", c.isDrum}});
     }
     json j = {
         {"version",         1},
@@ -217,6 +218,7 @@ bool loadAppState(const std::string& filePath, AppState& state) {
         if (jc.contains("drumMap"))
             for (auto& [k, v] : jc["drumMap"].items())
                 ch.drumMap[std::stoi(k)] = v.get<std::string>();
+        ch.isDrum = jc.value("isDrum", false);
         state.jackChannels.push_back(std::move(ch));
     }
     return true;

@@ -13,6 +13,7 @@ struct JackChannel {
     std::string portName;
     int         midiChannel = 1;
     std::map<int, std::string> drumMap;
+    bool        isDrum = false;
 };
 
 // App-level state that gets persisted to / loaded from disk.

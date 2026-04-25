@@ -6,13 +6,15 @@
 #include <vector>
 
 class ModernButton;
+class Fl_Box;
 class Fl_Input;
 class Fl_Choice;
 
 class ConnectionsOverlay : public BasePopup {
-    ModernButton* closeBtn   = nullptr;
-    ModernButton* addBtn     = nullptr;
-    ModernButton* addChanBtn = nullptr;
+    ModernButton* closeBtn        = nullptr;
+    ModernButton* addBtn          = nullptr;
+    ModernButton* addChanBtn      = nullptr;
+    ModernButton* addDrumChanBtn  = nullptr;
 
     int nextPortId_ = 1;
     int nextChanId_ = 1;
@@ -35,8 +37,10 @@ class ConnectionsOverlay : public BasePopup {
         std::string portName;
         int midiChannel = 1;
         std::map<int, std::string> drumMap;
+        bool isDrum = false;
     };
     struct ChannelRow {
+        Fl_Box*       typeLabel      = nullptr;
         Fl_Input*     nameInput      = nullptr;
         Fl_Choice*    portChoice     = nullptr;
         Fl_Choice*    midiChanChoice = nullptr;
@@ -98,6 +102,7 @@ public:
         std::string portName;
         int         midiChannel;
         std::map<int, std::string> drumMap;
+        bool        isDrum = false;
     };
     void setChannels(const std::vector<ChannelInfo>& chans);
     std::vector<ChannelInfo> getChannels() const;
