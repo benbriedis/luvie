@@ -10,7 +10,7 @@ class Fl_Box;
 class Fl_Input;
 class Fl_Choice;
 
-class ConnectionsOverlay : public BasePopup {
+class OutputsOverlay : public BasePopup {
     ModernButton* closeBtn        = nullptr;
     ModernButton* addBtn          = nullptr;
     ModernButton* addInstrBtn     = nullptr;
@@ -20,7 +20,7 @@ class ConnectionsOverlay : public BasePopup {
     int nextInstrId_ = 1;
 
     // ── Port data ──────────────────────────────────────────────────────────────
-    struct Connection {
+    struct Output {
         int id;
         std::string portName;
     };
@@ -64,7 +64,7 @@ class ConnectionsOverlay : public BasePopup {
         std::string   committedName;
     };
 
-    std::vector<Connection>  connections_;
+    std::vector<Output>  outputs_;
     std::vector<RowWidgets>  rows_;
     std::vector<Instrument>    instruments_;
     std::vector<InstrumentRow> instrRows_;
@@ -108,12 +108,12 @@ class ConnectionsOverlay : public BasePopup {
     int  handle(int event) override;
 
 public:
-    ConnectionsOverlay(int x, int y, int w, int h);
+    OutputsOverlay(int x, int y, int w, int h);
     void hide() override;
 
     // Port API (unchanged)
-    void setConnections(const std::vector<std::string>& portNames);
-    std::vector<std::string> getConnections() const;
+    void setOutputs(const std::vector<std::string>& portNames);
+    std::vector<std::string> getOutputs() const;
 
     // Instrument API
     struct InstrumentInfo {

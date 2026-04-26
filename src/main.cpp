@@ -11,7 +11,7 @@
 #include "transport.hpp"
 #include "noteLabels.hpp"
 #include "luvieApp.hpp"
-#include "connectionsOverlay.hpp"
+#include "outputsOverlay.hpp"
 #include "drumPatternEditor.hpp"
 #include "itimelineobserver.hpp"
 #include "nsm.hpp"
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     }
 
     // --- JACK port management ---------------------------------------------
-    ConnectionsOverlay* connOverlay = app.connectionsOverlay;
+    OutputsOverlay* connOverlay = app.outputsOverlay;
 
     // Helper: push current instrument list to jackTransport and patternPanel.
     auto pushInstrumentRoutings = [&]() {
@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
 
         // Register the default port and push initial instrument routings.
         if (useJack) {
-            for (const auto& name : connOverlay->getConnections())
+            for (const auto& name : connOverlay->getOutputs())
                 jackTransport.addMidiPort(name);
         }
         pushInstrumentRoutings();
@@ -191,22 +191,22 @@ int main(int argc, char **argv) {
     }
 
     // Helper: unregister all current ports, then register ports from the overlay.
-    auto applyLoadedConnections = [&](const AppState& state) {
+    auto applyLoadedOutputs = [&](const AppState& state) {
         if (!connOverlay) return;
         // Unregister existing ports
         if (useJack)
-            for (const auto& name : connOverlay->getConnections())
+            for (const auto& name : connOverlay->getOutputs())
                 jackTransport.removeMidiPort(name);
         // Load new port list
         std::vector<std::string> names;
-        for (const auto& c : state.jackConnections) names.push_back(c.portName);
-        connOverlay->setConnections(names);
+        for (const auto& c : state.jackOutputs) names.push_back(c.portName);
+        connOverlay->setOutputs(names);
         // Register loaded ports
         if (useJack)
-            for (const auto& name : connOverlay->getConnections())
+            for (const auto& name : connOverlay->getOutputs())
                 jackTransport.addMidiPort(name);
         // Load instruments and push routings.
-        std::vector<ConnectionsOverlay::InstrumentInfo> instrs;
+        std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
             instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
@@ -217,12 +217,12 @@ int main(int argc, char **argv) {
         sendAllProgramChanges();
     };
 
-    // Helper: fill jackConnections and jackInstruments in an AppState from the overlay.
-    auto collectConnections = [&](AppState& state) {
+    // Helper: fill jackOutputs and jackInstruments in an AppState from the overlay.
+    auto collectOutputs = [&](AppState& state) {
         if (!connOverlay) return;
-        state.jackConnections.clear();
-        for (const auto& name : connOverlay->getConnections())
-            state.jackConnections.push_back({name});
+        state.jackOutputs.clear();
+        for (const auto& name : connOverlay->getOutputs())
+            state.jackOutputs.push_back({name});
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
             state.jackInstruments.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
             songTimeline.loadTimeline(state.timeline);
             if (app.patternPanel)
                 app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
-            applyLoadedConnections(state);
+            applyLoadedOutputs(state);
         }
         return true;
     };
@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
             state.chordType = app.patternPanel->chordType();
             state.sharp     = app.patternPanel->isSharp();
         }
-        collectConnections(state);
+        collectOutputs(state);
         return saveAppState(state, nsmSessionPath + ".json");
     };
 
@@ -281,7 +281,7 @@ int main(int argc, char **argv) {
                 songTimeline.loadTimeline(state.timeline);
                 if (app.patternPanel)
                     app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
-                applyLoadedConnections(state);
+                applyLoadedOutputs(state);
             }
         }
 
@@ -310,7 +310,7 @@ int main(int argc, char **argv) {
                 state.chordType = app.patternPanel->chordType();
                 state.sharp     = app.patternPanel->isSharp();
             }
-            collectConnections(state);
+            collectOutputs(state);
             saveAppState(state, path);
         };
 

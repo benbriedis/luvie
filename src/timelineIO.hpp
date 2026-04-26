@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-struct JackConnection {
+struct JackOutput {
     std::string portName; // name of our registered JACK output port
 };
 
@@ -27,7 +27,7 @@ struct AppState {
     int  rootPitch = 0;
     int  chordType = 0;
     bool sharp     = true;
-    std::vector<JackConnection> jackConnections;
+    std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;
 };
 

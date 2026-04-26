@@ -168,7 +168,7 @@ static Timeline timelineFromJson(const json& j) {
 
 bool saveAppState(const AppState& state, const std::string& filePath) {
     json jconns = json::array();
-    for (const auto& c : state.jackConnections)
+    for (const auto& c : state.jackOutputs)
         jconns.push_back({{"portName", c.portName}});
     json jinstrs = json::array();
     for (const auto& c : state.jackInstruments) {
@@ -188,7 +188,7 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
         {"chordType",        state.chordType},
         {"sharp",            state.sharp},
         {"timeline",         timelineToJson(state.timeline)},
-        {"jackConnections",  jconns},
+        {"jackOutputs",  jconns},
         {"jackInstruments",  jinstrs},
     };
     std::ofstream f(filePath);
@@ -211,8 +211,8 @@ bool loadAppState(const std::string& filePath, AppState& state) {
     state.sharp     = j.value("sharp",     true);
     if (j.contains("timeline"))
         state.timeline = timelineFromJson(j.at("timeline"));
-    for (const auto& jc : j.value("jackConnections", json::array()))
-        state.jackConnections.push_back({jc.value("portName", "")});
+    for (const auto& jc : j.value("jackOutputs", json::array()))
+        state.jackOutputs.push_back({jc.value("portName", "")});
     auto instrArray = j.contains("jackInstruments") ? j.value("jackInstruments", json::array())
                                                       : j.value("jackChannels",    json::array());
     for (const auto& jc : instrArray) {

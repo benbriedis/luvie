@@ -18,7 +18,7 @@
 #include "drumPatternEditor.hpp"
 #include "pianorollEditor.hpp"
 #include "loopEditor.hpp"
-#include "connectionsOverlay.hpp"
+#include "outputsOverlay.hpp"
 
 std::string LuvieApp::lastFileDir;
 
@@ -122,7 +122,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     menuBar->add("File/Save As", 0,                nullptr, nullptr, FL_MENU_DIVIDER);
     menuBar->add("File/Import",  0,                nullptr, nullptr);
     menuBar->add("File/Export",  0,                nullptr, nullptr, 0);
-    menuBar->add("View/Connections", 0, nullptr, nullptr, FL_MENU_TOGGLE);
+    menuBar->add("View/Outputs", 0, nullptr, nullptr, FL_MENU_TOGGLE);
     window->add(menuBar);
 
     // ---- Popups (created before any group so they stay unparented until explicit add) ----
@@ -281,8 +281,8 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         item->callback(importCb, this);
     if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Export")))
         item->callback(exportCb, this);
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Connections")))
-        item->callback(connectionsCb, this);
+    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
+        item->callback(outputsCb, this);
 
     // ---- Popups — added last (FLTK dispatches in reverse order) ----
     // Small popups first so they take priority in the click-away check.
@@ -297,13 +297,13 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     {
         const int oy = menuBarH + 20;
         const int om = 20;
-        connectionsOverlay = new ConnectionsOverlay(om, oy, winW - 2*om, window->h() - oy - om);
-        connectionsOverlay->onClose = [this]() {
-            if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Connections")))
+        outputsOverlay = new OutputsOverlay(om, oy, winW - 2*om, window->h() - oy - om);
+        outputsOverlay->onClose = [this]() {
+            if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
                 item->clear();
         };
-        window->add(connectionsOverlay);
-        window->registerPopup(connectionsOverlay);
+        window->add(outputsOverlay);
+        window->registerPopup(outputsOverlay);
     }
 
     // ---- Resizable chain + minimum size ----
@@ -335,15 +335,15 @@ void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
     menuBar->redraw();
 }
 
-void LuvieApp::connectionsCb(Fl_Widget* w, void* data) {
+void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
     auto* app  = static_cast<LuvieApp*>(data);
     auto* item = static_cast<Fl_Menu_Item*>(
-        const_cast<Fl_Menu_Item*>(app->menuBar->find_item("View/Connections")));
-    if (!item || !app->connectionsOverlay) return;
+        const_cast<Fl_Menu_Item*>(app->menuBar->find_item("View/Outputs")));
+    if (!item || !app->outputsOverlay) return;
     if (item->value())
-        app->connectionsOverlay->show();
+        app->outputsOverlay->show();
     else
-        app->connectionsOverlay->hide();
+        app->outputsOverlay->hide();
 }
 
 LuvieApp::~LuvieApp() {
