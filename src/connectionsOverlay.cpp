@@ -191,7 +191,7 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         auto* self = static_cast<ConnectionsOverlay*>(d);
         const std::string portName = self->connections_.empty()
             ? "" : self->connections_[0].portName;
-        const std::string name = self->nextLetterChanName();
+        const std::string name = self->nextNumberedChanName(false);
         self->channels_.push_back({self->nextChanId_++, name, portName, 1, {}, false});
         self->rebuildChannelRows();
         if (self->onChannelsChanged) self->onChannelsChanged();
@@ -207,7 +207,7 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         auto* self = static_cast<ConnectionsOverlay*>(d);
         const std::string portName = self->connections_.empty()
             ? "" : self->connections_[0].portName;
-        const std::string name = self->nextLetterChanName();
+        const std::string name = self->nextNumberedChanName(true);
         self->channels_.push_back({self->nextChanId_++, name, portName, 1, {}, true});
         self->rebuildChannelRows();
         if (self->onChannelsChanged) self->onChannelsChanged();
@@ -216,8 +216,8 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
     end();
 
     connections_.push_back({nextPortId_++, "midi_out_1"});
-    channels_.push_back({nextChanId_++, "A", "midi_out_1",  1, {}, false});
-    channels_.push_back({nextChanId_++, "B", "midi_out_1", 10, {}, true});
+    channels_.push_back({nextChanId_++, "Instrument 1", "midi_out_1",  1, {}, false});
+    channels_.push_back({nextChanId_++, "Drums 1",      "midi_out_1", 10, {}, true});
     rebuildRows();
     hide();
 }
@@ -332,18 +332,16 @@ std::string ConnectionsOverlay::uniqueChanName(const std::string& base, int excl
     }
 }
 
-std::string ConnectionsOverlay::nextLetterChanName() const {
+std::string ConnectionsOverlay::nextNumberedChanName(bool isDrum) const {
+    const std::string prefix = isDrum ? "Drums " : "Instrument ";
     auto inUse = [&](const std::string& name) {
         for (const auto& ch : channels_)
             if (ch.name == name) return true;
         return false;
     };
-    for (int round = 1; ; round++) {
-        std::string suffix = round == 1 ? "" : std::to_string(round);
-        for (char c = 'A'; c <= 'Z'; c++) {
-            std::string name = std::string(1, c) + suffix;
-            if (!inUse(name)) return name;
-        }
+    for (int n = 1; ; n++) {
+        std::string name = prefix + std::to_string(n);
+        if (!inUse(name)) return name;
     }
 }
 

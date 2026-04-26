@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     window.end();
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
-    songTimeline.defaultOutputChannel = "A";
+    songTimeline.defaultOutputChannel = "Instrument 1";
     {
         int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
         songTimeline.addTrack("Pattern 1", patId);
