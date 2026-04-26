@@ -39,6 +39,10 @@ class ConnectionsOverlay : public BasePopup {
         std::map<int, std::string> drumMap;
         bool isDrum            = false;
         bool fallbackNoteNames = false;
+        int  programNumber     = -1;
+        int  bankMsb           = -1;
+        int  bankLsb           = -1;
+        int  gm1Instrument     = -1;
     };
     struct ChannelRow {
         Fl_Box*       typeLabel      = nullptr;
@@ -46,13 +50,17 @@ class ConnectionsOverlay : public BasePopup {
         Fl_Choice*    portChoice     = nullptr;
         Fl_Choice*    midiChanChoice = nullptr;
         ModernButton* deleteBtn      = nullptr;
-        ModernButton* importBtn      = nullptr;
-        ModernButton* gmBtn          = nullptr;
-        ModernButton* gsBtn          = nullptr;
-        ModernButton* exportBtn      = nullptr;
-        ModernButton* clearBtn       = nullptr;
-        Fl_Box*       fallbackLabel  = nullptr;
-        Fl_Choice*    fallbackChoice = nullptr;
+        ModernButton* importBtn       = nullptr;
+        ModernButton* gmBtn           = nullptr;
+        ModernButton* gsBtn           = nullptr;
+        ModernButton* exportBtn       = nullptr;
+        ModernButton* clearBtn        = nullptr;
+        Fl_Box*       fallbackLabel   = nullptr;
+        Fl_Choice*    fallbackChoice  = nullptr;
+        Fl_Input*     programInput    = nullptr;
+        Fl_Choice*    programDropdown = nullptr;
+        Fl_Input*     bankMsbInput    = nullptr;
+        Fl_Input*     bankLsbInput    = nullptr;
         std::string   committedName;
     };
 
@@ -91,6 +99,10 @@ class ConnectionsOverlay : public BasePopup {
     static void exportDrumMapCb   (Fl_Widget*, void*);
     static void clearDrumMapCb    (Fl_Widget*, void*);
     static void fallbackChoiceCb  (Fl_Widget*, void*);
+    static void programInputCb    (Fl_Widget*, void*);
+    static void programDropdownCb (Fl_Widget*, void*);
+    static void bankMsbInputCb    (Fl_Widget*, void*);
+    static void bankLsbInputCb    (Fl_Widget*, void*);
 
     void draw() override;
     int  handle(int event) override;
@@ -112,6 +124,10 @@ public:
         std::map<int, std::string> drumMap;
         bool        isDrum            = false;
         bool        fallbackNoteNames = false;
+        int         programNumber     = -1;
+        int         bankMsb           = -1;
+        int         bankLsb           = -1;
+        int         gm1Instrument     = -1;
     };
     void setChannels(const std::vector<ChannelInfo>& chans);
     std::vector<ChannelInfo> getChannels() const;
@@ -124,6 +140,8 @@ public:
     // Fired whenever the channels list or any channel's fields change.
     std::function<void()> onChannelsChanged;
     std::function<void(const std::string& oldName, const std::string& newName)> onChannelRenamed;
+    // Fired when program number or bank fields change for a channel.
+    std::function<void(const std::string& chanName)> onProgramChanged;
 
     // Optional: return true if the named channel is currently used by a pattern.
     std::function<bool(const std::string& name)> isChannelInUse;

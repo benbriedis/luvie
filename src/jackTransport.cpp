@@ -74,6 +74,23 @@ void JackTransport::setChannels(const std::vector<ChannelRouting>& routings)
     rebuildSnapshot();
 }
 
+void JackTransport::sendProgramChange(const std::string& portName, int midiCh0,
+                                      int bankMsb, int bankLsb, int program)
+{
+    if (!client || !midiEnabled) return;
+    uint8_t ch = static_cast<uint8_t>(midiCh0 & 0x0F);
+    std::vector<PendingMsg> msgs;
+    if (bankMsb >= 0)
+        msgs.push_back({portName, {static_cast<uint8_t>(0xB0 | ch), 0,  static_cast<uint8_t>(bankMsb)}, 3});
+    if (bankLsb >= 0)
+        msgs.push_back({portName, {static_cast<uint8_t>(0xB0 | ch), 32, static_cast<uint8_t>(bankLsb)}, 3});
+    if (program >= 0)
+        msgs.push_back({portName, {static_cast<uint8_t>(0xC0 | ch), static_cast<uint8_t>(program), 0}, 2});
+    if (msgs.empty()) return;
+    std::lock_guard<std::mutex> lk(pendingMutex_);
+    for (auto& m : msgs) pendingMsgs_.push_back(std::move(m));
+}
+
 void JackTransport::setActivePatterns(ActivePatternSet* a)
 {
     if (aps) aps->removeObserver(this);
@@ -310,6 +327,15 @@ int JackTransport::process(jack_nframes_t nframes)
             namedBufs.push_back({name, b});
         }
         portsMutex.unlock();
+    }
+
+    if (!namedBufs.empty() && pendingMutex_.try_lock()) {
+        for (const auto& pm : pendingMsgs_) {
+            void* b = findBuf(namedBufs, pm.portName);
+            if (b) jack_midi_event_write(b, 0, pm.data, pm.len);
+        }
+        pendingMsgs_.clear();
+        pendingMutex_.unlock();
     }
 
     bool jumped = !firstCall && wasPlaying && (pos.frame != lastFrame + nframes);

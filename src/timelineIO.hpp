@@ -15,6 +15,10 @@ struct JackChannel {
     std::map<int, std::string> drumMap;
     bool        isDrum            = false;
     bool        fallbackNoteNames = false;
+    int         programNumber     = -1;  // -1 = not set; 0-127 = MIDI program
+    int         bankMsb           = -1;  // -1 = not set; 0-127 = CC#0 value
+    int         bankLsb           = -1;  // -1 = not set; 0-127 = CC#32 value
+    int         gm1Instrument     = -1;  // last GM1 instrument selected from the dropdown
 };
 
 // App-level state that gets persisted to / loaded from disk.

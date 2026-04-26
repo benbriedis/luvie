@@ -41,9 +41,14 @@ public:
     struct ChannelRouting {
         std::string channelName;
         std::string portName;
-        int         midiChannel;  // 1-based
+        int         midiChannel;   // 1-based
+        int         programNumber = -1;  // -1 = not set; 0-127 = MIDI program
+        int         bankMsb       = -1;  // -1 = not set; 0-127 = CC#0 value
+        int         bankLsb       = -1;  // -1 = not set; 0-127 = CC#32 value
     };
     void setChannels(const std::vector<ChannelRouting>& routings);
+    void sendProgramChange(const std::string& portName, int midiCh0,
+                           int bankMsb, int bankLsb, int program);
 
     // MIDI port management — call from UI thread.
     bool addMidiPort(const std::string& name);
@@ -75,6 +80,10 @@ private:
 
     std::mutex                           portsMutex;
     std::map<std::string, jack_port_t*>  midiPorts_;
+
+    struct PendingMsg { std::string portName; uint8_t data[3]; int len; };
+    std::mutex              pendingMutex_;
+    std::vector<PendingMsg> pendingMsgs_;
 
     // ── Atomics ───────────────────────────────────────────────────────────────
     std::atomic<jack_nframes_t> posFrames{0};
