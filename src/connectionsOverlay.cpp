@@ -35,6 +35,7 @@ static constexpr int drumRowH          = 32;
 static constexpr int drumBtnH          = 22;
 static constexpr int drumImportW       = 115;
 static constexpr int drumGmW           = 105;
+static constexpr int drumGsW           = 100;
 static constexpr int drumExportW       = 115;
 static constexpr int drumClearW        = 65;
 static constexpr int drumFallbackLabelW = 58;
@@ -340,6 +341,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
         if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
         if (row.importBtn)      { remove(row.importBtn);      Fl::delete_widget(row.importBtn); }
         if (row.gmBtn)          { remove(row.gmBtn);          Fl::delete_widget(row.gmBtn); }
+        if (row.gsBtn)          { remove(row.gsBtn);          Fl::delete_widget(row.gsBtn); }
         if (row.exportBtn)      { remove(row.exportBtn);      Fl::delete_widget(row.exportBtn); }
         if (row.clearBtn)       { remove(row.clearBtn);       Fl::delete_widget(row.clearBtn); }
         if (row.fallbackLabel)  { remove(row.fallbackLabel);  Fl::delete_widget(row.fallbackLabel); }
@@ -422,6 +424,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
         // Drum mappings sub-row — only for drum channels
         ModernButton* imp  = nullptr;
         ModernButton* gm   = nullptr;
+        ModernButton* gs   = nullptr;
         ModernButton* exp  = nullptr;
         ModernButton* clr  = nullptr;
         Fl_Box*       fbLbl = nullptr;
@@ -446,7 +449,16 @@ void ConnectionsOverlay::rebuildChannelRows() {
             gm->setBorderColor(borderCol);
             gm->callback(loadGmMapCb, this);
 
-            const int expX = gmX + drumGmW + drumBtnGap;
+            const int gsX = gmX + drumGmW + drumBtnGap;
+            gs = new ModernButton(gsX, drumBtnY, drumGsW, drumBtnH, "Load GS map");
+            gs->labelsize(11);
+            gs->labelcolor(textCol);
+            gs->color(addBtnBg);
+            gs->setBorderWidth(1);
+            gs->setBorderColor(borderCol);
+            gs->callback(loadGsMapCb, this);
+
+            const int expX = gsX + drumGsW + drumBtnGap;
             exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum map");
             exp->labelsize(11);
             exp->labelcolor(textCol);
@@ -486,7 +498,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
             fbCh = fbMc;
         }
 
-        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, exp, clr, fbLbl, fbCh, channels_[i].name});
+        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh, channels_[i].name});
         y += rowH + (drum ? drumRowH : 0);
     }
     end();
@@ -652,6 +664,16 @@ void ConnectionsOverlay::loadGmMapCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->chanRows_.size(); i++) {
         if (w != self->chanRows_[i].gmBtn) continue;
         self->channels_[i].drumMap = gmPercussionMap();
+        if (self->onChannelsChanged) self->onChannelsChanged();
+        return;
+    }
+}
+
+void ConnectionsOverlay::loadGsMapCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<ConnectionsOverlay*>(d);
+    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
+        if (w != self->chanRows_[i].gsBtn) continue;
+        self->channels_[i].drumMap = gsPercussionMap();
         if (self->onChannelsChanged) self->onChannelsChanged();
         return;
     }

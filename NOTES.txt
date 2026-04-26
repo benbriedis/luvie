@@ -308,3 +308,44 @@ In Pattern Editor clicking awy from the numerator of bar fields doesn't lose the
 The load drum map buttons need a better visual indication the buttons are pressed.
 	Should be able to tab into them too.
 
+Support for sending progam number messages?
+   What does Seq24 do? Try attaching to my Casio... probably need something.
+   cf including GM instrument names. May need/want edittable mappings for instrument names.
+
+Also wrt MIDI GM1.0:  https://en.wikipedia.org/wiki/General_MIDI
+	Channel messages 	Support for controller number 1, 7, 10, 11, 64, 100, 101, 121 and 123; 
+	                    support for channel pressure and pitch bend controllers. 
+	Other messages		Respond to the data entry controller and the RPNs for fine and coarse tuning and pitch bend range, 
+						as well as all General MIDI Level 1 System Messages.
+
+CC messages: Sent on a channel I think. GM1.0 values are:
+	0 - pitch bend
+	1 - modulation wheel
+	7 - channel volume
+	etc
+
+Registered parameters (RPN support) - a few standard parameters 
+SysEx messages - 2 standard GMs
+
+
+Drum mappings - cf adding Roland GS extensions (or even replacing the GM map... GS is a superset I think.)
+
+
+PITCH BENDS, etc...
+- Best done with rubber bands?
+- cf apply in pattern editors and/or song editor?
+
+
+PLAN:
+1. Add a program number to each channel (with default).
+   Ideally add a dropdown or something to allow instrument to be selected by name instead.
+      Still need to be able to enter by number though.
+	  Dropdown only going to work for 128 or so. 
+	  Need to be able to enter number > 128... in which case an extended message is sent.
+   There are the MIDI GM1.0 names + extensions.
+   NB MIDI2.0 has a mechanism for instrument discovery...
+
+2. Add an 'expression' section at the bottom of BOTH the patterns and song editors
+   that allow for rubber bands on a range of parameters.
+
+

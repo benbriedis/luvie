@@ -48,6 +48,7 @@ class ConnectionsOverlay : public BasePopup {
         ModernButton* deleteBtn      = nullptr;
         ModernButton* importBtn      = nullptr;
         ModernButton* gmBtn          = nullptr;
+        ModernButton* gsBtn          = nullptr;
         ModernButton* exportBtn      = nullptr;
         ModernButton* clearBtn       = nullptr;
         Fl_Box*       fallbackLabel  = nullptr;
@@ -86,6 +87,7 @@ class ConnectionsOverlay : public BasePopup {
     static void midiChanChoiceCb(Fl_Widget*, void*);
     static void importDrumMapCb   (Fl_Widget*, void*);
     static void loadGmMapCb       (Fl_Widget*, void*);
+    static void loadGsMapCb       (Fl_Widget*, void*);
     static void exportDrumMapCb   (Fl_Widget*, void*);
     static void clearDrumMapCb    (Fl_Widget*, void*);
     static void fallbackChoiceCb  (Fl_Widget*, void*);

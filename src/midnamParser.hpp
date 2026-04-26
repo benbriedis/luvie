@@ -42,6 +42,25 @@ inline std::map<int, std::string> gmPercussionMap() {
     };
 }
 
+inline std::map<int, std::string> gsPercussionMap() {
+    auto m = gmPercussionMap();
+    m[27] = "High Q";
+    m[28] = "Slap";
+    m[29] = "Scratch Push";
+    m[30] = "Scratch Pull";
+    m[31] = "Sticks";
+    m[32] = "Square Click";
+    m[33] = "Metronome Click";
+    m[34] = "Metronome Bell";
+    m[82] = "Shaker";
+    m[83] = "Jingle Bell";
+    m[84] = "Bell Tree";
+    m[85] = "Castanets";
+    m[86] = "Mute Surdo";
+    m[87] = "Open Surdo";
+    return m;
+}
+
 inline bool exportMidnam(const std::string& path,
                          const std::map<int, std::string>& map,
                          const std::string& channelName) {
