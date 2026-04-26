@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     window.end();
 
     ObservableTimeline songTimeline(120.0f, 4, 4);
-    songTimeline.defaultOutputChannel = "Instrument 1";
+    songTimeline.defaultOutputInstrument = "Instrument 1";
     {
         int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
         songTimeline.addTrack("Pattern 1", patId);
@@ -94,50 +94,50 @@ int main(int argc, char **argv) {
     // --- JACK port management ---------------------------------------------
     ConnectionsOverlay* connOverlay = app.connectionsOverlay;
 
-    // Helper: push current channel list to jackTransport and patternPanel.
-    auto pushChannelRoutings = [&]() {
+    // Helper: push current instrument list to jackTransport and patternPanel.
+    auto pushInstrumentRoutings = [&]() {
         if (!connOverlay) return;
-        const auto& chans = connOverlay->getChannels();
-        // Update timeline defaults to first channel of each type.
-        songTimeline.defaultOutputChannel     = "";
-        songTimeline.defaultDrumOutputChannel = "";
-        for (const auto& ci : chans) {
-            if (!ci.isDrum && songTimeline.defaultOutputChannel.empty())
-                songTimeline.defaultOutputChannel = ci.name;
-            if (ci.isDrum && songTimeline.defaultDrumOutputChannel.empty())
-                songTimeline.defaultDrumOutputChannel = ci.name;
+        const auto& instrs = connOverlay->getInstruments();
+        // Update timeline defaults to first instrument of each type.
+        songTimeline.defaultOutputInstrument     = "";
+        songTimeline.defaultDrumOutputInstrument = "";
+        for (const auto& ci : instrs) {
+            if (!ci.isDrum && songTimeline.defaultOutputInstrument.empty())
+                songTimeline.defaultOutputInstrument = ci.name;
+            if (ci.isDrum && songTimeline.defaultDrumOutputInstrument.empty())
+                songTimeline.defaultDrumOutputInstrument = ci.name;
         }
         if (useJack) {
-            std::vector<JackTransport::ChannelRouting> routings;
-            for (const auto& ci : chans)
+            std::vector<JackTransport::InstrumentRouting> routings;
+            for (const auto& ci : instrs)
                 routings.push_back({ci.name, ci.portName, ci.midiChannel,
                                     ci.programNumber, ci.bankMsb, ci.bankLsb});
-            jackTransport.setChannels(routings);
+            jackTransport.setInstruments(routings);
         }
         if (app.patternPanel) {
             std::vector<std::string> stdNames, drumNames;
-            for (const auto& ci : chans)
+            for (const auto& ci : instrs)
                 (ci.isDrum ? drumNames : stdNames).push_back(ci.name);
-            app.patternPanel->setChannels(stdNames, drumNames);
+            app.patternPanel->setInstruments(stdNames, drumNames);
         }
     };
 
-    // Helper: send program change (+ bank select) for all channels that have one set.
+    // Helper: send program change (+ bank select) for all instruments that have one set.
     auto sendAllProgramChanges = [&]() {
         if (!useJack || !connOverlay) return;
-        for (const auto& ci : connOverlay->getChannels()) {
+        for (const auto& ci : connOverlay->getInstruments()) {
             if (ci.programNumber < 0 && ci.bankMsb < 0 && ci.bankLsb < 0) continue;
             jackTransport.sendProgramChange(ci.portName, ci.midiChannel - 1,
                                             ci.bankMsb, ci.bankLsb, ci.programNumber);
         }
     };
 
-    // Helper: push drum maps from channels to drum editor.
+    // Helper: push drum maps from instruments to drum editor.
     auto pushDrumMaps = [&]() {
         if (!connOverlay || !app.drumEd) return;
         std::map<std::string, std::map<int, std::string>> allMaps;
         std::map<std::string, bool> allFallbacks;
-        for (const auto& ci : connOverlay->getChannels()) {
+        for (const auto& ci : connOverlay->getInstruments()) {
             allMaps[ci.name]      = ci.drumMap;
             allFallbacks[ci.name] = ci.fallbackNoteNames;
         }
@@ -154,39 +154,39 @@ int main(int argc, char **argv) {
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             if (useJack) jackTransport.renameMidiPort(oldName, newName);
         };
-        connOverlay->onChannelRenamed = [&](const std::string& oldName, const std::string& newName) {
-            songTimeline.renamePatternOutputChannel(oldName, newName);
+        connOverlay->onInstrumentRenamed = [&](const std::string& oldName, const std::string& newName) {
+            songTimeline.renamePatternOutputInstrument(oldName, newName);
         };
-        connOverlay->isChannelInUse = [&](const std::string& name) {
+        connOverlay->isInstrumentInUse = [&](const std::string& name) {
             for (const auto& p : songTimeline.get().patterns)
-                if (p.outputChannelName == name) return true;
+                if (p.outputInstrumentName == name) return true;
             return false;
         };
-        connOverlay->onChannelsChanged = [&]() {
-            pushChannelRoutings();
+        connOverlay->onInstrumentsChanged = [&]() {
+            pushInstrumentRoutings();
             pushDrumMaps();
-            connOverlay->refreshChannelButtons();
+            connOverlay->refreshInstrumentButtons();
         };
         connOverlay->onProgramChanged = [&](const std::string&) {
-            pushChannelRoutings();
+            pushInstrumentRoutings();
             sendAllProgramChanges();
         };
 
-        timelineWatcher.onChange = [&]() { connOverlay->refreshChannelButtons(); };
+        timelineWatcher.onChange = [&]() { connOverlay->refreshInstrumentButtons(); };
         songTimeline.addObserver(&timelineWatcher);
 
-        // Register the default port and push initial channel routings.
+        // Register the default port and push initial instrument routings.
         if (useJack) {
             for (const auto& name : connOverlay->getConnections())
                 jackTransport.addMidiPort(name);
         }
-        pushChannelRoutings();
+        pushInstrumentRoutings();
         pushDrumMaps();
     }
 
     if (app.drumEd) {
-        app.drumEd->onDrumLabelChanged = [&](const std::string& chanName, int midiNote, const std::string& label) {
-            if (connOverlay) connOverlay->updateChannelDrumMap(chanName, midiNote, label);
+        app.drumEd->onDrumLabelChanged = [&](const std::string& instrName, int midiNote, const std::string& label) {
+            if (connOverlay) connOverlay->updateInstrumentDrumMap(instrName, midiNote, label);
         };
     }
 
@@ -205,30 +205,30 @@ int main(int argc, char **argv) {
         if (useJack)
             for (const auto& name : connOverlay->getConnections())
                 jackTransport.addMidiPort(name);
-        // Load channels and push routings.
-        std::vector<ConnectionsOverlay::ChannelInfo> chans;
-        for (const auto& c : state.jackChannels)
-            chans.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
-                             c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
-                             c.gm1Instrument});
-        connOverlay->setChannels(chans);
-        pushChannelRoutings();
+        // Load instruments and push routings.
+        std::vector<ConnectionsOverlay::InstrumentInfo> instrs;
+        for (const auto& c : state.jackInstruments)
+            instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
+                              c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
+                              c.gm1Instrument});
+        connOverlay->setInstruments(instrs);
+        pushInstrumentRoutings();
         pushDrumMaps();
         sendAllProgramChanges();
     };
 
-    // Helper: fill jackConnections and jackChannels in an AppState from the overlay.
+    // Helper: fill jackConnections and jackInstruments in an AppState from the overlay.
     auto collectConnections = [&](AppState& state) {
         if (!connOverlay) return;
         state.jackConnections.clear();
         for (const auto& name : connOverlay->getConnections())
             state.jackConnections.push_back({name});
-        state.jackChannels.clear();
-        for (const auto& ci : connOverlay->getChannels())
-            state.jackChannels.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
-                                          ci.isDrum, ci.fallbackNoteNames,
-                                          ci.programNumber, ci.bankMsb, ci.bankLsb,
-                                          ci.gm1Instrument});
+        state.jackInstruments.clear();
+        for (const auto& ci : connOverlay->getInstruments())
+            state.jackInstruments.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+                                             ci.isDrum, ci.fallbackNoteNames,
+                                             ci.programNumber, ci.bankMsb, ci.bankLsb,
+                                             ci.gm1Instrument});
     };
 
     // --- NSM session management -------------------------------------------

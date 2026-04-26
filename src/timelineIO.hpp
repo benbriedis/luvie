@@ -8,7 +8,7 @@ struct JackConnection {
     std::string portName; // name of our registered JACK output port
 };
 
-struct JackChannel {
+struct JackInstrument {
     std::string name;
     std::string portName;
     int         midiChannel       = 1;
@@ -28,7 +28,7 @@ struct AppState {
     int  chordType = 0;
     bool sharp     = true;
     std::vector<JackConnection> jackConnections;
-    std::vector<JackChannel>    jackChannels;
+    std::vector<JackInstrument> jackInstruments;
 };
 
 // Save/load the full AppState to/from a JSON file.

@@ -181,43 +181,43 @@ ConnectionsOverlay::ConnectionsOverlay(int x, int y, int w, int h)
         if (self->onPortAdded) self->onPortAdded(name);
     }, this);
 
-    addChanBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Channel");
-    addChanBtn->labelsize(12);
-    addChanBtn->labelcolor(textCol);
-    addChanBtn->color(addBtnBg);
-    addChanBtn->setBorderWidth(1);
-    addChanBtn->setBorderColor(borderCol);
-    addChanBtn->callback([](Fl_Widget*, void* d) {
+    addInstrBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Instrument");
+    addInstrBtn->labelsize(12);
+    addInstrBtn->labelcolor(textCol);
+    addInstrBtn->color(addBtnBg);
+    addInstrBtn->setBorderWidth(1);
+    addInstrBtn->setBorderColor(borderCol);
+    addInstrBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<ConnectionsOverlay*>(d);
         const std::string portName = self->connections_.empty()
             ? "" : self->connections_[0].portName;
-        const std::string name = self->nextNumberedChanName(false);
-        self->channels_.push_back({self->nextChanId_++, name, portName, 1, {}, false});
-        self->rebuildChannelRows();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        const std::string name = self->nextNumberedInstrName(false);
+        self->instruments_.push_back({self->nextInstrId_++, name, portName, 1, {}, false});
+        self->rebuildInstrumentRows();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
 
-    addDrumChanBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Drum Channel");
-    addDrumChanBtn->labelsize(12);
-    addDrumChanBtn->labelcolor(textCol);
-    addDrumChanBtn->color(addBtnBg);
-    addDrumChanBtn->setBorderWidth(1);
-    addDrumChanBtn->setBorderColor(borderCol);
-    addDrumChanBtn->callback([](Fl_Widget*, void* d) {
+    addDrumInstrBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Drumkit");
+    addDrumInstrBtn->labelsize(12);
+    addDrumInstrBtn->labelcolor(textCol);
+    addDrumInstrBtn->color(addBtnBg);
+    addDrumInstrBtn->setBorderWidth(1);
+    addDrumInstrBtn->setBorderColor(borderCol);
+    addDrumInstrBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<ConnectionsOverlay*>(d);
         const std::string portName = self->connections_.empty()
             ? "" : self->connections_[0].portName;
-        const std::string name = self->nextNumberedChanName(true);
-        self->channels_.push_back({self->nextChanId_++, name, portName, 1, {}, true});
-        self->rebuildChannelRows();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        const std::string name = self->nextNumberedInstrName(true);
+        self->instruments_.push_back({self->nextInstrId_++, name, portName, 1, {}, true});
+        self->rebuildInstrumentRows();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
 
     end();
 
     connections_.push_back({nextPortId_++, "midi_out_1"});
-    channels_.push_back({nextChanId_++, "Instrument 1", "midi_out_1",  1, {}, false});
-    channels_.push_back({nextChanId_++, "Drums 1",      "midi_out_1", 10, {}, true});
+    instruments_.push_back({nextInstrId_++, "Instrument 1", "midi_out_1",  1, {}, false});
+    instruments_.push_back({nextInstrId_++, "Drums 1",      "midi_out_1", 10, {}, true});
     rebuildRows();
     hide();
 }
@@ -231,24 +231,24 @@ void ConnectionsOverlay::hide() {
         const std::string newName = connections_[i].portName;
         const std::string oldName = rows_[i].committedName;
         if (newName == oldName) continue;
-        for (auto& ch : channels_)
-            if (ch.portName == oldName) ch.portName = newName;
+        for (auto& instr : instruments_)
+            if (instr.portName == oldName) instr.portName = newName;
         if (onPortRenamed) onPortRenamed(oldName, newName);
     }
-    // Channel name safety net
-    bool chanChanged = false;
-    for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
-        if (!chanRows_[i].nameInput) continue;
-        std::string newName = chanRows_[i].nameInput->value();
-        const std::string oldChanName = chanRows_[i].committedName;
-        if (!newName.empty() && newName != oldChanName) {
-            newName = uniqueChanName(newName, i);
-            channels_[i].name = newName;
-            if (onChannelRenamed) onChannelRenamed(oldChanName, newName);
-            chanChanged = true;
+    // Instrument name safety net
+    bool instrChanged = false;
+    for (int i = 0; i < (int)instrRows_.size() && i < (int)instruments_.size(); i++) {
+        if (!instrRows_[i].nameInput) continue;
+        std::string newName = instrRows_[i].nameInput->value();
+        const std::string oldInstrName = instrRows_[i].committedName;
+        if (!newName.empty() && newName != oldInstrName) {
+            newName = uniqueInstrName(newName, i);
+            instruments_[i].name = newName;
+            if (onInstrumentRenamed) onInstrumentRenamed(oldInstrName, newName);
+            instrChanged = true;
         }
     }
-    if (chanChanged && onChannelsChanged) onChannelsChanged();
+    if (instrChanged && onInstrumentsChanged) onInstrumentsChanged();
     if (onClose) onClose();
     BasePopup::hide();
 }
@@ -269,32 +269,32 @@ std::vector<std::string> ConnectionsOverlay::getConnections() const {
     return result;
 }
 
-void ConnectionsOverlay::setChannels(const std::vector<ChannelInfo>& chans) {
-    channels_.clear();
-    for (const auto& ci : chans)
-        channels_.push_back({nextChanId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
-                             ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
-                             ci.gm1Instrument});
-    rebuildChannelRows();
+void ConnectionsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
+    instruments_.clear();
+    for (const auto& ci : instrs)
+        instruments_.push_back({nextInstrId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+                                ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
+                                ci.gm1Instrument});
+    rebuildInstrumentRows();
 }
 
-std::vector<ConnectionsOverlay::ChannelInfo> ConnectionsOverlay::getChannels() const {
-    std::vector<ChannelInfo> result;
-    for (const auto& ch : channels_)
-        result.push_back({ch.id, ch.name, ch.portName, ch.midiChannel, ch.drumMap,
-                          ch.isDrum, ch.fallbackNoteNames, ch.programNumber, ch.bankMsb, ch.bankLsb,
-                          ch.gm1Instrument});
+std::vector<ConnectionsOverlay::InstrumentInfo> ConnectionsOverlay::getInstruments() const {
+    std::vector<InstrumentInfo> result;
+    for (const auto& instr : instruments_)
+        result.push_back({instr.id, instr.name, instr.portName, instr.midiChannel, instr.drumMap,
+                          instr.isDrum, instr.fallbackNoteNames, instr.programNumber, instr.bankMsb, instr.bankLsb,
+                          instr.gm1Instrument});
     return result;
 }
 
-void ConnectionsOverlay::updateChannelDrumMap(const std::string& chanName, int midiNote, const std::string& label)
+void ConnectionsOverlay::updateInstrumentDrumMap(const std::string& instrName, int midiNote, const std::string& label)
 {
-    for (auto& ch : channels_) {
-        if (ch.name == chanName) {
+    for (auto& instr : instruments_) {
+        if (instr.name == instrName) {
             if (label.empty())
-                ch.drumMap.erase(midiNote);
+                instr.drumMap.erase(midiNote);
             else
-                ch.drumMap[midiNote] = label;
+                instr.drumMap[midiNote] = label;
             return;
         }
     }
@@ -317,11 +317,11 @@ std::string ConnectionsOverlay::uniquePortName(const std::string& base, int excl
     }
 }
 
-std::string ConnectionsOverlay::uniqueChanName(const std::string& base, int excludeIdx) const {
+std::string ConnectionsOverlay::uniqueInstrName(const std::string& base, int excludeIdx) const {
     auto isUnique = [&](const std::string& name) {
-        for (int i = 0; i < (int)channels_.size(); i++) {
+        for (int i = 0; i < (int)instruments_.size(); i++) {
             if (i == excludeIdx) continue;
-            if (channels_[i].name == name) return false;
+            if (instruments_[i].name == name) return false;
         }
         return true;
     };
@@ -332,11 +332,11 @@ std::string ConnectionsOverlay::uniqueChanName(const std::string& base, int excl
     }
 }
 
-std::string ConnectionsOverlay::nextNumberedChanName(bool isDrum) const {
+std::string ConnectionsOverlay::nextNumberedInstrName(bool isDrum) const {
     const std::string prefix = isDrum ? "Drums " : "Instrument ";
     auto inUse = [&](const std::string& name) {
-        for (const auto& ch : channels_)
-            if (ch.name == name) return true;
+        for (const auto& instr : instruments_)
+            if (instr.name == name) return true;
         return false;
     };
     for (int n = 1; ; n++) {
@@ -381,8 +381,8 @@ void ConnectionsOverlay::rebuildRows() {
         del->callback(deleteCb, this);
 
         const std::string& pname = connections_[i].portName;
-        bool referenced = std::any_of(channels_.begin(), channels_.end(),
-            [&](const Channel& ch){ return ch.portName == pname; });
+        bool referenced = std::any_of(instruments_.begin(), instruments_.end(),
+            [&](const Instrument& instr){ return instr.portName == pname; });
         if (referenced) del->deactivate();
 
         rows_.push_back({inp, del, connections_[i].portName});
@@ -393,14 +393,14 @@ void ConnectionsOverlay::rebuildRows() {
     addBtn->position(w() - pad - addBtnW, y + addBtnPad);
     y += addBtnPad + addBtnH + addBtnPad;
 
-    chanSectionTopY_ = y;
-    chanRowsTopY_    = y + chanSecH + chanColH2;
+    instrSectionTopY_ = y;
+    instrRowsTopY_    = y + chanSecH + chanColH2;
 
-    rebuildChannelRows();
+    rebuildInstrumentRows();
 }
 
-void ConnectionsOverlay::rebuildChannelRows() {
-    for (auto& row : chanRows_) {
+void ConnectionsOverlay::rebuildInstrumentRows() {
+    for (auto& row : instrRows_) {
         if (row.typeLabel)     { remove(row.typeLabel);     Fl::delete_widget(row.typeLabel); }
         if (row.nameInput)     { remove(row.nameInput);     Fl::delete_widget(row.nameInput); }
         if (row.portChoice)    { remove(row.portChoice);    Fl::delete_widget(row.portChoice); }
@@ -418,19 +418,19 @@ void ConnectionsOverlay::rebuildChannelRows() {
         if (row.bankMsbInput)    { remove(row.bankMsbInput);    Fl::delete_widget(row.bankMsbInput); }
         if (row.bankLsbInput)    { remove(row.bankLsbInput);    Fl::delete_widget(row.bankLsbInput); }
     }
-    chanRows_.clear();
+    instrRows_.clear();
 
     const int usableW  = w() - 2*pad - delBtnSz - 8 - 2*chanGap;
     const int remaining = usableW - chanMidiW - typeLabelW - chanGap;
-    chanNameW_ = remaining * 45 / 100;
-    chanPortW_ = remaining - chanNameW_;
+    instrNameW_ = remaining * 45 / 100;
+    instrPortW_ = remaining - instrNameW_;
 
-    int y = chanRowsTopY_;
+    int y = instrRowsTopY_;
 
     begin();
-    for (int i = 0; i < (int)channels_.size(); i++) {
+    for (int i = 0; i < (int)instruments_.size(); i++) {
         const int iy    = y + (rowH - inputH) / 2;
-        const bool drum = channels_[i].isDrum;
+        const bool drum = instruments_[i].isDrum;
 
         // Type label
         auto* typeLbl = new Fl_Box(pad, iy, typeLabelW, inputH,
@@ -440,15 +440,15 @@ void ConnectionsOverlay::rebuildChannelRows() {
         typeLbl->labelsize(10);
 
         const int nameX = pad + typeLabelW + chanGap;
-        auto* nameInp = new NameInput(nameX, iy, chanNameW_, inputH);
+        auto* nameInp = new NameInput(nameX, iy, instrNameW_, inputH);
         nameInp->color(inputBgCol);
         nameInp->textcolor(textCol);
         nameInp->textsize(12);
-        nameInp->value(channels_[i].name.c_str());
-        nameInp->callback(chanNameCb, this);
+        nameInp->value(instruments_[i].name.c_str());
+        nameInp->callback(instrNameCb, this);
 
-        const int portX = nameX + chanNameW_ + chanGap;
-        auto* portCh = new ModernChoice(portX, iy, chanPortW_, inputH);
+        const int portX = nameX + instrNameW_ + chanGap;
+        auto* portCh = new ModernChoice(portX, iy, instrPortW_, inputH);
         portCh->color(inputBgCol);
         portCh->labelcolor(textCol);
         portCh->textsize(12);
@@ -458,12 +458,12 @@ void ConnectionsOverlay::rebuildChannelRows() {
         int selPort = 0;
         for (int j = 0; j < (int)connections_.size(); j++) {
             portCh->add(connections_[j].portName.c_str());
-            if (connections_[j].portName == channels_[i].portName) selPort = j;
+            if (connections_[j].portName == instruments_[i].portName) selPort = j;
         }
         portCh->value(selPort);
         portCh->callback(portChoiceCb, this);
 
-        const int midiX = portX + chanPortW_ + chanGap;
+        const int midiX = portX + instrPortW_ + chanGap;
         auto* midiCh = new ModernChoice(midiX, iy, chanMidiW, inputH);
         midiCh->color(inputBgCol);
         midiCh->labelcolor(textCol);
@@ -473,7 +473,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
         midiCh->setHoverColor(0xF3F4F600);
         for (int ch = 1; ch <= 16; ch++)
             midiCh->add(std::to_string(ch).c_str());
-        midiCh->value(channels_[i].midiChannel - 1);
+        midiCh->value(instruments_[i].midiChannel - 1);
         midiCh->callback(midiChanChoiceCb, this);
 
         auto* del = new ModernButton(
@@ -483,12 +483,12 @@ void ConnectionsOverlay::rebuildChannelRows() {
         del->labelcolor(delRedCol);
         del->color(bgCol);
         del->setBorderWidth(0);
-        del->callback(chanDeleteCb, this);
+        del->callback(instrDeleteCb, this);
 
         {
             int typeCount = 0;
-            for (const auto& ch : channels_) if (ch.isDrum == drum) ++typeCount;
-            bool inUse = isChannelInUse && isChannelInUse(channels_[i].name);
+            for (const auto& instr : instruments_) if (instr.isDrum == drum) ++typeCount;
+            bool inUse = isInstrumentInUse && isInstrumentInUse(instruments_[i].name);
             if (typeCount <= 1 || inUse) del->deactivate();
         }
 
@@ -565,7 +565,7 @@ void ConnectionsOverlay::rebuildChannelRows() {
             fbMc->setHoverColor(0xF3F4F600);
             fbMc->add("Notes");
             fbMc->add("Numbers");
-            fbMc->value(channels_[i].fallbackNoteNames ? 0 : 1);
+            fbMc->value(instruments_[i].fallbackNoteNames ? 0 : 1);
             fbMc->callback(fallbackChoiceCb, this);
             fbCh = fbMc;
         }
@@ -594,8 +594,8 @@ void ConnectionsOverlay::rebuildChannelRows() {
         msbInp->textcolor(textCol);
         msbInp->textsize(11);
         msbInp->callback(bankMsbInputCb, this);
-        if (channels_[i].bankMsb >= 0)
-            msbInp->value(std::to_string(channels_[i].bankMsb).c_str());
+        if (instruments_[i].bankMsb >= 0)
+            msbInp->value(std::to_string(instruments_[i].bankMsb).c_str());
         bx += 38 + 12;
 
         auto* lsbLbl = new Fl_Box(bx, bankWidY, 28, progBtnH, "LSB");
@@ -610,8 +610,8 @@ void ConnectionsOverlay::rebuildChannelRows() {
         lsbInp->textcolor(textCol);
         lsbInp->textsize(11);
         lsbInp->callback(bankLsbInputCb, this);
-        if (channels_[i].bankLsb >= 0)
-            lsbInp->value(std::to_string(channels_[i].bankLsb).c_str());
+        if (instruments_[i].bankLsb >= 0)
+            lsbInp->value(std::to_string(instruments_[i].bankLsb).c_str());
 
         // Program / instrument sub-row — all channels
         const int progSubY = bankSubY + progRowH;
@@ -630,8 +630,8 @@ void ConnectionsOverlay::rebuildChannelRows() {
         progInp->textcolor(textCol);
         progInp->textsize(11);
         progInp->callback(programInputCb, this);
-        if (channels_[i].programNumber >= 0)
-            progInp->value(std::to_string(channels_[i].programNumber + 1).c_str());
+        if (instruments_[i].programNumber >= 0)
+            progInp->value(std::to_string(instruments_[i].programNumber + 1).c_str());
         px += 40 + 12;
 
         auto* gm1Lbl = new Fl_Box(px, progWidY, 125, progBtnH, "Set to GM1 instrument");
@@ -653,41 +653,41 @@ void ConnectionsOverlay::rebuildChannelRows() {
             std::string item = std::to_string(n + 1) + " \xe2\x80\x93 " + kGm1Names[n];
             progDrop->add(item.c_str());
         }
-        progDrop->value(channels_[i].gm1Instrument >= 0 ? channels_[i].gm1Instrument + 1 : 0);
+        progDrop->value(instruments_[i].gm1Instrument >= 0 ? instruments_[i].gm1Instrument + 1 : 0);
         progDrop->callback(programDropdownCb, this);
 
-        chanRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh,
-                             progInp, progDrop, msbInp, lsbInp, channels_[i].name});
+        instrRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh,
+                              progInp, progDrop, msbInp, lsbInp, instruments_[i].name});
         y += rowH + (drum ? drumRowH : 0) + 2 * progRowH;
     }
     end();
 
-    addChanBtn->position(w() - pad - addBtnW, y + addBtnPad);
-    addDrumChanBtn->position(w() - pad - 2*addBtnW - chanGap, y + addBtnPad);
+    addInstrBtn->position(w() - pad - addBtnW, y + addBtnPad);
+    addDrumInstrBtn->position(w() - pad - 2*addBtnW - chanGap, y + addBtnPad);
     redraw();
 }
 
 void ConnectionsOverlay::rebuildPortChoices() {
-    for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
-        auto* ch = chanRows_[i].portChoice;
+    for (int i = 0; i < (int)instrRows_.size() && i < (int)instruments_.size(); i++) {
+        auto* ch = instrRows_[i].portChoice;
         if (!ch) continue;
         ch->clear();
         int selIdx = 0;
         for (int j = 0; j < (int)connections_.size(); j++) {
             ch->add(connections_[j].portName.c_str());
-            if (connections_[j].portName == channels_[i].portName) selIdx = j;
+            if (connections_[j].portName == instruments_[i].portName) selIdx = j;
         }
         if (!connections_.empty()) {
             ch->value(selIdx);
-            channels_[i].portName = connections_[selIdx].portName;
+            instruments_[i].portName = connections_[selIdx].portName;
         }
     }
     // Update delete button state for each port.
     for (int i = 0; i < (int)rows_.size() && i < (int)connections_.size(); i++) {
         if (!rows_[i].deleteBtn) continue;
         const std::string& pname = connections_[i].portName;
-        bool referenced = std::any_of(channels_.begin(), channels_.end(),
-            [&](const Channel& ch){ return ch.portName == pname; });
+        bool referenced = std::any_of(instruments_.begin(), instruments_.end(),
+            [&](const Instrument& instr){ return instr.portName == pname; });
         if (referenced) rows_[i].deleteBtn->deactivate();
         else            rows_[i].deleteBtn->activate();
     }
@@ -707,8 +707,8 @@ void ConnectionsOverlay::inputCb(Fl_Widget* w, void* d) {
         static_cast<Fl_Input*>(w)->value(newName.c_str());
         self->rows_[i].committedName   = newName;
         self->connections_[i].portName = newName;
-        for (auto& ch : self->channels_)
-            if (ch.portName == oldName) ch.portName = newName;
+        for (auto& instr : self->instruments_)
+            if (instr.portName == oldName) instr.portName = newName;
         if (self->onPortRenamed) self->onPortRenamed(oldName, newName);
         self->rebuildPortChoices();
         return;
@@ -727,84 +727,84 @@ void ConnectionsOverlay::deleteCb(Fl_Widget* w, void* d) {
     }
 }
 
-void ConnectionsOverlay::chanNameCb(Fl_Widget* w, void* d) {
+void ConnectionsOverlay::instrNameCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].nameInput) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].nameInput) continue;
         std::string newName = static_cast<Fl_Input*>(w)->value();
-        const std::string oldName = self->chanRows_[i].committedName;
+        const std::string oldName = self->instrRows_[i].committedName;
         if (newName.empty()) {
             static_cast<Fl_Input*>(w)->value(oldName.c_str());
             return;
         }
         if (newName == oldName) return;
-        newName = self->uniqueChanName(newName, i);
+        newName = self->uniqueInstrName(newName, i);
         static_cast<Fl_Input*>(w)->value(newName.c_str());
-        self->chanRows_[i].committedName = newName;
-        self->channels_[i].name = newName;
-        if (self->onChannelRenamed) self->onChannelRenamed(oldName, newName);
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        self->instrRows_[i].committedName = newName;
+        self->instruments_[i].name = newName;
+        if (self->onInstrumentRenamed) self->onInstrumentRenamed(oldName, newName);
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
-void ConnectionsOverlay::refreshChannelButtons() {
+void ConnectionsOverlay::refreshInstrumentButtons() {
     int drumCount = 0, stdCount = 0;
-    for (const auto& ch : channels_) ch.isDrum ? ++drumCount : ++stdCount;
-    for (int i = 0; i < (int)chanRows_.size() && i < (int)channels_.size(); i++) {
-        if (!chanRows_[i].deleteBtn) continue;
-        bool inUse = isChannelInUse && isChannelInUse(channels_[i].name);
-        int typeCount = channels_[i].isDrum ? drumCount : stdCount;
-        if (typeCount <= 1 || inUse) chanRows_[i].deleteBtn->deactivate();
-        else                         chanRows_[i].deleteBtn->activate();
+    for (const auto& instr : instruments_) instr.isDrum ? ++drumCount : ++stdCount;
+    for (int i = 0; i < (int)instrRows_.size() && i < (int)instruments_.size(); i++) {
+        if (!instrRows_[i].deleteBtn) continue;
+        bool inUse = isInstrumentInUse && isInstrumentInUse(instruments_[i].name);
+        int typeCount = instruments_[i].isDrum ? drumCount : stdCount;
+        if (typeCount <= 1 || inUse) instrRows_[i].deleteBtn->deactivate();
+        else                         instrRows_[i].deleteBtn->activate();
     }
     redraw();
 }
 
-void ConnectionsOverlay::chanDeleteCb(Fl_Widget* w, void* d) {
+void ConnectionsOverlay::instrDeleteCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].deleteBtn) continue;
-        if (self->isChannelInUse && self->isChannelInUse(self->channels_[i].name)) return;
-        bool isDrum = self->channels_[i].isDrum;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].deleteBtn) continue;
+        if (self->isInstrumentInUse && self->isInstrumentInUse(self->instruments_[i].name)) return;
+        bool isDrum = self->instruments_[i].isDrum;
         int typeCount = 0;
-        for (const auto& ch : self->channels_) if (ch.isDrum == isDrum) ++typeCount;
+        for (const auto& instr : self->instruments_) if (instr.isDrum == isDrum) ++typeCount;
         if (typeCount <= 1) return;
-        self->channels_.erase(self->channels_.begin() + i);
-        self->rebuildChannelRows();
+        self->instruments_.erase(self->instruments_.begin() + i);
+        self->rebuildInstrumentRows();
         self->rebuildPortChoices();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::portChoiceCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].portChoice) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].portChoice) continue;
         int idx = static_cast<Fl_Choice*>(w)->value();
         if (idx >= 0 && idx < (int)self->connections_.size())
-            self->channels_[i].portName = self->connections_[idx].portName;
+            self->instruments_[i].portName = self->connections_[idx].portName;
         self->rebuildPortChoices();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::midiChanChoiceCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].midiChanChoice) continue;
-        self->channels_[i].midiChannel = static_cast<Fl_Choice*>(w)->value() + 1;
-        if (self->onChannelsChanged) self->onChannelsChanged();
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].midiChanChoice) continue;
+        self->instruments_[i].midiChannel = static_cast<Fl_Choice*>(w)->value() + 1;
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::importDrumMapCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].importBtn) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].importBtn) continue;
         Fl_Native_File_Chooser fc;
         fc.title("Import Drum Mappings");
         fc.type(Fl_Native_File_Chooser::BROWSE_FILE);
@@ -812,36 +812,36 @@ void ConnectionsOverlay::importDrumMapCb(Fl_Widget* w, void* d) {
         if (fc.show() != 0) return;
         const char* path = fc.filename();
         if (!path || !path[0]) return;
-        self->channels_[i].drumMap = parseMidnam(path);
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        self->instruments_[i].drumMap = parseMidnam(path);
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::loadGmMapCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].gmBtn) continue;
-        self->channels_[i].drumMap = gmPercussionMap();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].gmBtn) continue;
+        self->instruments_[i].drumMap = gmPercussionMap();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::loadGsMapCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].gsBtn) continue;
-        self->channels_[i].drumMap = gsPercussionMap();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].gsBtn) continue;
+        self->instruments_[i].drumMap = gsPercussionMap();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::exportDrumMapCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].exportBtn) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].exportBtn) continue;
         Fl_Native_File_Chooser fc;
         fc.title("Export Drum Mappings");
         fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
@@ -852,28 +852,28 @@ void ConnectionsOverlay::exportDrumMapCb(Fl_Widget* w, void* d) {
         if (path.empty()) return;
         if (path.size() < 7 || path.substr(path.size() - 7) != ".midnam")
             path += ".midnam";
-        exportMidnam(path, self->channels_[i].drumMap, self->channels_[i].name);
+        exportMidnam(path, self->instruments_[i].drumMap, self->instruments_[i].name);
         return;
     }
 }
 
 void ConnectionsOverlay::clearDrumMapCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].clearBtn) continue;
-        self->channels_[i].drumMap.clear();
-        if (self->onChannelsChanged) self->onChannelsChanged();
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].clearBtn) continue;
+        self->instruments_[i].drumMap.clear();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
 
 void ConnectionsOverlay::fallbackChoiceCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].fallbackChoice) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].fallbackChoice) continue;
         // index 0 = "Notes" (show note names), index 1 = "Numbers" (show MIDI numbers)
-        self->channels_[i].fallbackNoteNames = (static_cast<Fl_Choice*>(w)->value() == 0);
-        if (self->onChannelsChanged) self->onChannelsChanged();
+        self->instruments_[i].fallbackNoteNames = (static_cast<Fl_Choice*>(w)->value() == 0);
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
 }
@@ -882,54 +882,54 @@ void ConnectionsOverlay::fallbackChoiceCb(Fl_Widget* w, void* d) {
 
 void ConnectionsOverlay::programInputCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].programInput) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].programInput) continue;
         int v = parseOptionalInt(static_cast<Fl_Input*>(w)->value(), 1, 128);
-        self->channels_[i].programNumber = (v >= 0) ? v - 1 : -1;
-        self->channels_[i].gm1Instrument = -1;
-        if (self->chanRows_[i].programDropdown)
-            self->chanRows_[i].programDropdown->value(0);
-        if (self->onProgramChanged) self->onProgramChanged(self->channels_[i].name);
+        self->instruments_[i].programNumber = (v >= 0) ? v - 1 : -1;
+        self->instruments_[i].gm1Instrument = -1;
+        if (self->instrRows_[i].programDropdown)
+            self->instrRows_[i].programDropdown->value(0);
+        if (self->onProgramChanged) self->onProgramChanged(self->instruments_[i].name);
         return;
     }
 }
 
 void ConnectionsOverlay::programDropdownCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].programDropdown) continue;
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].programDropdown) continue;
         int idx = static_cast<Fl_Choice*>(w)->value();
         if (idx <= 0) {
-            self->channels_[i].programNumber = -1;
-            self->channels_[i].gm1Instrument = -1;
-            if (self->chanRows_[i].programInput) self->chanRows_[i].programInput->value("");
+            self->instruments_[i].programNumber = -1;
+            self->instruments_[i].gm1Instrument = -1;
+            if (self->instrRows_[i].programInput) self->instrRows_[i].programInput->value("");
         } else {
-            self->channels_[i].programNumber = idx - 1;
-            self->channels_[i].gm1Instrument = idx - 1;
-            if (self->chanRows_[i].programInput)
-                self->chanRows_[i].programInput->value(std::to_string(idx).c_str());
+            self->instruments_[i].programNumber = idx - 1;
+            self->instruments_[i].gm1Instrument = idx - 1;
+            if (self->instrRows_[i].programInput)
+                self->instrRows_[i].programInput->value(std::to_string(idx).c_str());
         }
-        if (self->onProgramChanged) self->onProgramChanged(self->channels_[i].name);
+        if (self->onProgramChanged) self->onProgramChanged(self->instruments_[i].name);
         return;
     }
 }
 
 void ConnectionsOverlay::bankMsbInputCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].bankMsbInput) continue;
-        self->channels_[i].bankMsb = parseOptionalInt(static_cast<Fl_Input*>(w)->value(), 0, 127);
-        if (self->onProgramChanged) self->onProgramChanged(self->channels_[i].name);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].bankMsbInput) continue;
+        self->instruments_[i].bankMsb = parseOptionalInt(static_cast<Fl_Input*>(w)->value(), 0, 127);
+        if (self->onProgramChanged) self->onProgramChanged(self->instruments_[i].name);
         return;
     }
 }
 
 void ConnectionsOverlay::bankLsbInputCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<ConnectionsOverlay*>(d);
-    for (int i = 0; i < (int)self->chanRows_.size(); i++) {
-        if (w != self->chanRows_[i].bankLsbInput) continue;
-        self->channels_[i].bankLsb = parseOptionalInt(static_cast<Fl_Input*>(w)->value(), 0, 127);
-        if (self->onProgramChanged) self->onProgramChanged(self->channels_[i].name);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].bankLsbInput) continue;
+        self->instruments_[i].bankLsb = parseOptionalInt(static_cast<Fl_Input*>(w)->value(), 0, 127);
+        if (self->onProgramChanged) self->onProgramChanged(self->instruments_[i].name);
         return;
     }
 }
@@ -943,13 +943,13 @@ std::vector<Fl_Widget*> ConnectionsOverlay::getFocusOrder() const {
         if (row.deleteBtn && row.deleteBtn->active()) order.push_back(row.deleteBtn);
     }
     order.push_back(addBtn);
-    for (const auto& row : chanRows_) {
+    for (const auto& row : instrRows_) {
         if (row.nameInput && row.nameInput->active())       order.push_back(row.nameInput);
         if (row.portChoice && row.portChoice->active())     order.push_back(row.portChoice);
         if (row.midiChanChoice && row.midiChanChoice->active()) order.push_back(row.midiChanChoice);
         if (row.deleteBtn && row.deleteBtn->active())       order.push_back(row.deleteBtn);
     }
-    order.push_back(addChanBtn);
+    order.push_back(addInstrBtn);
     order.push_back(closeBtn);
     return order;
 }
@@ -1020,32 +1020,32 @@ void ConnectionsOverlay::draw() {
         fl_line(pad, rowsTopY, w() - pad, rowsTopY);
         fl_line_style(0);
 
-        // ── Channel section ──────────────────────────────────────────────────
-        if (chanSectionTopY_ > 0) {
+        // ── Instrument section ───────────────────────────────────────────────
+        if (instrSectionTopY_ > 0) {
             fl_color(dividerCol);
             fl_line_style(FL_SOLID, 1);
-            fl_line(0, chanSectionTopY_, w(), chanSectionTopY_);
+            fl_line(0, instrSectionTopY_, w(), instrSectionTopY_);
             fl_line_style(0);
 
             fl_font(FL_HELVETICA_BOLD, 13);
             fl_color(textCol);
-            fl_draw("Channels", titlePad, chanSectionTopY_ + 12,
+            fl_draw("Instruments", titlePad, instrSectionTopY_ + 12,
                     w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
-            const int chanColY = chanRowsTopY_ - chanColH2;
+            const int chanColY = instrRowsTopY_ - chanColH2;
             const int nameX    = pad + typeLabelW + chanGap;
-            const int portX    = nameX + chanNameW_ + chanGap;
-            const int midiX    = portX + chanPortW_ + chanGap;
+            const int portX    = nameX + instrNameW_ + chanGap;
+            const int midiX    = portX + instrPortW_ + chanGap;
             fl_font(FL_HELVETICA, 10);
             fl_color(subTextCol);
-            fl_draw("TYPE",            pad,   chanColY, typeLabelW, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("NAME",            nameX, chanColY, chanNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("MIDI OUTPUT PORT", portX, chanColY, chanPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("MIDI CH",          midiX, chanColY, chanMidiW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("TYPE",             pad,   chanColY, typeLabelW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("NAME",             nameX, chanColY, instrNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("MIDI OUTPUT PORT", portX, chanColY, instrPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("MIDI CH",          midiX, chanColY, chanMidiW,   chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
             fl_color(dividerCol);
             fl_line_style(FL_SOLID, 1);
-            fl_line(pad, chanRowsTopY_, w() - pad, chanRowsTopY_);
+            fl_line(pad, instrRowsTopY_, w() - pad, instrRowsTopY_);
             fl_line_style(0);
         }
     }

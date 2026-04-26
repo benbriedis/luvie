@@ -191,10 +191,10 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }
         const auto& names = (type == PatternType::DRUM)
-            ? self->drumChannelNames_ : self->stdChannelNames_;
+            ? self->drumInstrumentNames_ : self->stdInstrumentNames_;
         int idx = self->outChoice.value();
         std::string name = (idx >= 0 && idx < (int)names.size()) ? names[idx] : "";
-        self->timeline->setPatternOutputChannel(patId, name);
+        self->timeline->setPatternOutputInstrument(patId, name);
     }, this);
 
     input.hide();
@@ -220,11 +220,11 @@ void PatternPanel::setParams(int root, int chord, bool sharp)
 	redraw();
 }
 
-void PatternPanel::setChannels(const std::vector<std::string>& stdNames,
-                               const std::vector<std::string>& drumNames)
+void PatternPanel::setInstruments(const std::vector<std::string>& stdNames,
+                                  const std::vector<std::string>& drumNames)
 {
-    stdChannelNames_  = stdNames;
-    drumChannelNames_ = drumNames;
+    stdInstrumentNames_  = stdNames;
+    drumInstrumentNames_ = drumNames;
     refreshOutChoice();
 }
 
@@ -237,31 +237,31 @@ void PatternPanel::refreshOutChoice()
     int patId = tl.tracks[sel].patternId;
 
     PatternType type = PatternType::STANDARD;
-    std::string currentChannel;
+    std::string currentInstrument;
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
-        type           = p.type;
-        currentChannel = p.outputChannelName;
+        type              = p.type;
+        currentInstrument = p.outputInstrumentName;
         break;
     }
 
-    const auto& names = (type == PatternType::DRUM) ? drumChannelNames_ : stdChannelNames_;
+    const auto& names = (type == PatternType::DRUM) ? drumInstrumentNames_ : stdInstrumentNames_;
 
     outChoice.clear();
     for (const auto& n : names) outChoice.add(n.c_str());
 
     for (int i = 0; i < (int)names.size(); i++) {
-        if (names[i] == currentChannel) {
+        if (names[i] == currentInstrument) {
             outChoice.value(i);
             outChoice.redraw();
             return;
         }
     }
 
-    // Current channel not in the type-filtered list — assign first available.
+    // Current instrument not in the type-filtered list — assign first available.
     outChoice.value(0);
     if (!names.empty())
-        timeline->setPatternOutputChannel(patId, names[0]);
+        timeline->setPatternOutputInstrument(patId, names[0]);
     outChoice.redraw();
 }
 

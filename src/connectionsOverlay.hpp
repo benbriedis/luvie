@@ -13,11 +13,11 @@ class Fl_Choice;
 class ConnectionsOverlay : public BasePopup {
     ModernButton* closeBtn        = nullptr;
     ModernButton* addBtn          = nullptr;
-    ModernButton* addChanBtn      = nullptr;
-    ModernButton* addDrumChanBtn  = nullptr;
+    ModernButton* addInstrBtn     = nullptr;
+    ModernButton* addDrumInstrBtn = nullptr;
 
     int nextPortId_ = 1;
-    int nextChanId_ = 1;
+    int nextInstrId_ = 1;
 
     // ── Port data ──────────────────────────────────────────────────────────────
     struct Connection {
@@ -30,8 +30,8 @@ class ConnectionsOverlay : public BasePopup {
         std::string   committedName;
     };
 
-    // ── Channel data ───────────────────────────────────────────────────────────
-    struct Channel {
+    // ── Instrument data ────────────────────────────────────────────────────────
+    struct Instrument {
         int id;
         std::string name;
         std::string portName;
@@ -44,7 +44,7 @@ class ConnectionsOverlay : public BasePopup {
         int  bankLsb           = -1;
         int  gm1Instrument     = -1;
     };
-    struct ChannelRow {
+    struct InstrumentRow {
         Fl_Box*       typeLabel      = nullptr;
         Fl_Input*     nameInput      = nullptr;
         Fl_Choice*    portChoice     = nullptr;
@@ -66,17 +66,17 @@ class ConnectionsOverlay : public BasePopup {
 
     std::vector<Connection>  connections_;
     std::vector<RowWidgets>  rows_;
-    std::vector<Channel>     channels_;
-    std::vector<ChannelRow>  chanRows_;
+    std::vector<Instrument>    instruments_;
+    std::vector<InstrumentRow> instrRows_;
 
-    // Layout state (recomputed by rebuildRows / rebuildChannelRows)
-    int chanSectionTopY_ = 0;
-    int chanRowsTopY_    = 0;
-    int chanNameW_       = 0;
-    int chanPortW_       = 0;
+    // Layout state (recomputed by rebuildRows / rebuildInstrumentRows)
+    int instrSectionTopY_ = 0;
+    int instrRowsTopY_    = 0;
+    int instrNameW_       = 0;
+    int instrPortW_       = 0;
 
     void rebuildRows();
-    void rebuildChannelRows();
+    void rebuildInstrumentRows();
     void rebuildPortChoices();
     void syncFromInputs();
 
@@ -84,13 +84,13 @@ class ConnectionsOverlay : public BasePopup {
     void advanceFocusBy(int dir);
 
     std::string uniquePortName(const std::string& base, int excludeIdx = -1) const;
-    std::string uniqueChanName(const std::string& base, int excludeIdx = -1) const;
-    std::string nextNumberedChanName(bool isDrum) const;
+    std::string uniqueInstrName(const std::string& base, int excludeIdx = -1) const;
+    std::string nextNumberedInstrName(bool isDrum) const;
 
     static void inputCb         (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
-    static void chanNameCb      (Fl_Widget*, void*);
-    static void chanDeleteCb    (Fl_Widget*, void*);
+    static void instrNameCb     (Fl_Widget*, void*);
+    static void instrDeleteCb   (Fl_Widget*, void*);
     static void portChoiceCb    (Fl_Widget*, void*);
     static void midiChanChoiceCb(Fl_Widget*, void*);
     static void importDrumMapCb   (Fl_Widget*, void*);
@@ -115,8 +115,8 @@ public:
     void setConnections(const std::vector<std::string>& portNames);
     std::vector<std::string> getConnections() const;
 
-    // Channel API
-    struct ChannelInfo {
+    // Instrument API
+    struct InstrumentInfo {
         int         id;
         std::string name;
         std::string portName;
@@ -129,22 +129,22 @@ public:
         int         bankLsb           = -1;
         int         gm1Instrument     = -1;
     };
-    void setChannels(const std::vector<ChannelInfo>& chans);
-    std::vector<ChannelInfo> getChannels() const;
-    void updateChannelDrumMap(const std::string& chanName, int midiNote, const std::string& label);
+    void setInstruments(const std::vector<InstrumentInfo>& instrs);
+    std::vector<InstrumentInfo> getInstruments() const;
+    void updateInstrumentDrumMap(const std::string& instrName, int midiNote, const std::string& label);
 
     std::function<void(const std::string& name)>                                onPortAdded;
     std::function<void(const std::string& name)>                                onPortRemoved;
     std::function<void(const std::string& oldName, const std::string& newName)> onPortRenamed;
 
-    // Fired whenever the channels list or any channel's fields change.
-    std::function<void()> onChannelsChanged;
-    std::function<void(const std::string& oldName, const std::string& newName)> onChannelRenamed;
-    // Fired when program number or bank fields change for a channel.
-    std::function<void(const std::string& chanName)> onProgramChanged;
+    // Fired whenever the instruments list or any instrument's fields change.
+    std::function<void()> onInstrumentsChanged;
+    std::function<void(const std::string& oldName, const std::string& newName)> onInstrumentRenamed;
+    // Fired when program number or bank fields change for an instrument.
+    std::function<void(const std::string& instrName)> onProgramChanged;
 
-    // Optional: return true if the named channel is currently used by a pattern.
-    std::function<bool(const std::string& name)> isChannelInUse;
-    void refreshChannelButtons();
+    // Optional: return true if the named instrument is currently used by a pattern.
+    std::function<bool(const std::string& name)> isInstrumentInUse;
+    void refreshInstrumentButtons();
     std::function<void()> onClose;
 };

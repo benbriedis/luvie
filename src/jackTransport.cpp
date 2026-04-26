@@ -66,11 +66,11 @@ void JackTransport::setNoteParams(int root, int chord)
     rebuildSnapshot();
 }
 
-void JackTransport::setChannels(const std::vector<ChannelRouting>& routings)
+void JackTransport::setInstruments(const std::vector<InstrumentRouting>& routings)
 {
-    channelMap_.clear();
+    instrumentMap_.clear();
     for (const auto& r : routings)
-        channelMap_[r.channelName] = r;
+        instrumentMap_[r.instrumentName] = r;
     rebuildSnapshot();
 }
 
@@ -155,9 +155,9 @@ void JackTransport::rebuildSnapshot()
     auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx) {
         is.portName    = "";
         is.midiChannel = trackIdx % 16;
-        if (!pat->outputChannelName.empty()) {
-            auto it = channelMap_.find(pat->outputChannelName);
-            if (it != channelMap_.end()) {
+        if (!pat->outputInstrumentName.empty()) {
+            auto it = instrumentMap_.find(pat->outputInstrumentName);
+            if (it != instrumentMap_.end()) {
                 is.portName    = it->second.portName;
                 is.midiChannel = it->second.midiChannel - 1;
             }

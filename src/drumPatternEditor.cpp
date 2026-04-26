@@ -160,7 +160,7 @@ void DrumPatternEditor::setAllDrumMaps(const std::map<std::string, std::map<int,
     applyCurrentDrumMap();
 }
 
-std::string DrumPatternEditor::currentChannelName() const
+std::string DrumPatternEditor::currentInstrumentName() const
 {
     if (!timeline) return {};
     int sel = timeline->get().selectedTrackIndex;
@@ -168,7 +168,7 @@ std::string DrumPatternEditor::currentChannelName() const
     if (sel < 0 || sel >= (int)tracks.size()) return {};
     int patId = tracks[sel].patternId;
     for (const auto& p : timeline->get().patterns)
-        if (p.id == patId) return p.outputChannelName;
+        if (p.id == patId) return p.outputInstrumentName;
     return {};
 }
 
@@ -176,11 +176,11 @@ void DrumPatternEditor::startDrumLabelEdit(int midiNote, int rowY, int rowH)
 {
     if (editingMidiNote >= 0) commitDrumLabelEdit();
 
-    std::string chanName = currentChannelName();
-    if (chanName.empty()) return;
+    std::string instrName = currentInstrumentName();
+    if (instrName.empty()) return;
 
     std::string current;
-    auto mit = allDrumMaps.find(chanName);
+    auto mit = allDrumMaps.find(instrName);
     if (mit != allDrumMaps.end()) {
         auto nit = mit->second.find(midiNote);
         if (nit != mit->second.end()) current = nit->second;
@@ -204,14 +204,14 @@ void DrumPatternEditor::commitDrumLabelEdit()
     std::string newLabel = drumLabelInput.value();
     drumLabelInput.hide();
 
-    std::string chanName = currentChannelName();
-    if (!chanName.empty()) {
+    std::string instrName = currentInstrumentName();
+    if (!instrName.empty()) {
         if (newLabel.empty())
-            allDrumMaps[chanName].erase(note);
+            allDrumMaps[instrName].erase(note);
         else
-            allDrumMaps[chanName][note] = newLabel;
+            allDrumMaps[instrName][note] = newLabel;
         applyCurrentDrumMap();
-        if (onDrumLabelChanged) onDrumLabelChanged(chanName, note, newLabel);
+        if (onDrumLabelChanged) onDrumLabelChanged(instrName, note, newLabel);
     }
     redraw();
 }
@@ -234,10 +234,10 @@ void DrumPatternEditor::applyCurrentDrumMap()
     int patId = tracks[sel].patternId;
     for (const auto& p : timeline->get().patterns) {
         if (p.id == patId) {
-            auto mit = allDrumMaps.find(p.outputChannelName);
+            auto mit = allDrumMaps.find(p.outputInstrumentName);
             drumLabels.setDrumMap(mit != allDrumMaps.end()
                 ? mit->second : std::map<int, std::string>{});
-            auto fit = allFallbackModes.find(p.outputChannelName);
+            auto fit = allFallbackModes.find(p.outputInstrumentName);
             drumLabels.setFallbackNoteNames(fit != allFallbackModes.end() && fit->second);
             return;
         }

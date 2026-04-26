@@ -288,7 +288,7 @@ int ObservableTimeline::createPattern(float lengthBeats)
 	Pattern p;
 	p.id = id;
 	p.lengthBeats = lengthBeats;
-	p.outputChannelName = defaultOutputChannel;
+	p.outputInstrumentName = defaultOutputInstrument;
 	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
 	data.patterns.push_back(p);
 	notify();
@@ -302,8 +302,8 @@ int ObservableTimeline::createDrumPattern(float lengthBeats)
 	p.id = id;
 	p.lengthBeats = lengthBeats;
 	p.type = PatternType::DRUM;
-	p.outputChannelName = defaultDrumOutputChannel.empty()
-	    ? defaultOutputChannel : defaultDrumOutputChannel;
+	p.outputInstrumentName = defaultDrumOutputInstrument.empty()
+	    ? defaultOutputInstrument : defaultDrumOutputInstrument;
 	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
 	data.patterns.push_back(std::move(p));
 	notify();
@@ -317,7 +317,7 @@ int ObservableTimeline::createPianorollPattern(float lengthBeats)
 	p.id = id;
 	p.lengthBeats = lengthBeats;
 	p.type = PatternType::PIANOROLL;
-	p.outputChannelName = defaultOutputChannel;
+	p.outputInstrumentName = defaultOutputInstrument;
 	timeSigAt(0, p.timeSigTop, p.timeSigBottom);
 	data.patterns.push_back(std::move(p));
 	notify();
@@ -605,23 +605,23 @@ void ObservableTimeline::resizeNoteLeft(int noteId, float newStart, float newLen
 	}
 }
 
-void ObservableTimeline::setPatternOutputChannel(int patId, const std::string& channelName)
+void ObservableTimeline::setPatternOutputInstrument(int patId, const std::string& instrumentName)
 {
 	for (auto& p : data.patterns) {
 		if (p.id == patId) {
-			p.outputChannelName = channelName;
+			p.outputInstrumentName = instrumentName;
 			notify();
 			return;
 		}
 	}
 }
 
-void ObservableTimeline::renamePatternOutputChannel(const std::string& oldName, const std::string& newName)
+void ObservableTimeline::renamePatternOutputInstrument(const std::string& oldName, const std::string& newName)
 {
 	bool changed = false;
 	for (auto& p : data.patterns) {
-		if (p.outputChannelName == oldName) {
-			p.outputChannelName = newName;
+		if (p.outputInstrumentName == oldName) {
+			p.outputInstrumentName = newName;
 			changed = true;
 		}
 	}

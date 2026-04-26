@@ -52,7 +52,7 @@ class DrumPatternEditor : public Editor, public ITimelineObserver {
     std::map<std::string, std::map<int, std::string>> allDrumMaps;
     std::map<std::string, bool>                       allFallbackModes;
 
-    std::string currentChannelName() const;
+    std::string currentInstrumentName() const;
     void setRowOffset(int offset);
     void setColOffset(int offset);
     void applyCurrentDrumMap();

@@ -36,17 +36,17 @@ public:
     void setActivePatterns(ActivePatternSet* aps);
     void setNoteParams(int rootPitch, int chordType);
 
-    // Channel routing: maps channel name → (portName, 1-based MIDI channel).
-    // Call from UI thread whenever the channels list changes.
-    struct ChannelRouting {
-        std::string channelName;
+    // Instrument routing: maps instrument name → (portName, 1-based MIDI channel).
+    // Call from UI thread whenever the instruments list changes.
+    struct InstrumentRouting {
+        std::string instrumentName;
         std::string portName;
         int         midiChannel;   // 1-based
         int         programNumber = -1;  // -1 = not set; 0-127 = MIDI program
         int         bankMsb       = -1;  // -1 = not set; 0-127 = CC#0 value
         int         bankLsb       = -1;  // -1 = not set; 0-127 = CC#32 value
     };
-    void setChannels(const std::vector<ChannelRouting>& routings);
+    void setInstruments(const std::vector<InstrumentRouting>& routings);
     void sendProgramChange(const std::string& portName, int midiCh0,
                            int bankMsb, int bankLsb, int program);
 
@@ -96,7 +96,7 @@ private:
     int                              rootPitch    = 0;
     int                              chordType    = 0;
     bool                             loopMode     = false;
-    std::map<std::string, ChannelRouting> channelMap_; // channelName → routing
+    std::map<std::string, InstrumentRouting> instrumentMap_; // instrumentName → routing
 
     // ── Timeline snapshot for RT use ─────────────────────────────────────────
     struct TimeSegment {

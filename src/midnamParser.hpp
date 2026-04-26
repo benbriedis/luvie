@@ -63,7 +63,7 @@ inline std::map<int, std::string> gsPercussionMap() {
 
 inline bool exportMidnam(const std::string& path,
                          const std::map<int, std::string>& map,
-                         const std::string& channelName) {
+                         const std::string& instrumentName) {
     std::ofstream f(path);
     if (!f) return false;
     f << R"(<?xml version="1.0" encoding="UTF-8"?>)" "\n";
@@ -71,7 +71,7 @@ inline bool exportMidnam(const std::string& path,
     f << "<MIDINameDocument>\n";
     f << "    <MasterDeviceNames>\n";
     f << "        <Manufacturer>Custom</Manufacturer>\n";
-    f << "        <Model>" << channelName << "</Model>\n";
+    f << "        <Model>" << instrumentName << "</Model>\n";
     f << "        <NoteNames>\n";
     for (const auto& [note, name] : map)
         f << "            <Note Number=\"" << note << "\" Name=\"" << name << "\"/>\n";

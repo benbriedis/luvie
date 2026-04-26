@@ -67,19 +67,19 @@ public:
 	void resizeNoteLeft(int noteId, float newStart, float newLength);
 	std::vector<Note> buildPatternNotes(int patternId) const;
 
-	// Default channel names assigned to newly created patterns.
-	std::string defaultOutputChannel;
-	std::string defaultDrumOutputChannel;
+	// Default instrument names assigned to newly created patterns.
+	std::string defaultOutputInstrument;
+	std::string defaultDrumOutputInstrument;
 
-	// Set the output channel assignment for a pattern (empty = unassigned).
-	void setPatternOutputChannel(int patId, const std::string& channelName);
+	// Set the output instrument assignment for a pattern (empty = unassigned).
+	void setPatternOutputInstrument(int patId, const std::string& instrumentName);
 
 	// Set the per-pattern time signature (also adjusts lengthBeats to keep bar count constant).
 	void setPatternTimeSig(int patId, int top, int bottom);
 
 	// Set the pattern definition length in beats.
 	void setPatternLength(int patId, float lengthBeats);
-	void renamePatternOutputChannel(const std::string& oldName, const std::string& newName);
+	void renamePatternOutputInstrument(const std::string& oldName, const std::string& newName);
 
 	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)
 	void placePattern(int trackIndex, int patternId, float startBar, float length);

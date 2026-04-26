@@ -63,7 +63,7 @@ static json patternToJson(const Pattern& p) {
         {"type",              (int)p.type},
         {"notes",             jnotes},
         {"drumNotes",         jdrum},
-        {"outputChannelName", p.outputChannelName},
+        {"outputInstrumentName", p.outputInstrumentName},
         {"timeSigTop",        p.timeSigTop},
         {"timeSigBottom",     p.timeSigBottom},
     };
@@ -74,7 +74,7 @@ static Pattern patternFromJson(const json& j) {
     p.id                = j.at("id");
     p.lengthBeats       = j.at("lengthBeats");
     p.type              = (PatternType)j.value("type", 0);
-    p.outputChannelName = j.value("outputChannelName", "");
+    p.outputInstrumentName = j.value("outputInstrumentName", j.value("outputChannelName", ""));
     p.timeSigTop        = j.value("timeSigTop",    4);
     p.timeSigBottom     = j.value("timeSigBottom", 4);
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));
@@ -170,26 +170,26 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
     json jconns = json::array();
     for (const auto& c : state.jackConnections)
         jconns.push_back({{"portName", c.portName}});
-    json jchans = json::array();
-    for (const auto& c : state.jackChannels) {
+    json jinstrs = json::array();
+    for (const auto& c : state.jackInstruments) {
         json jmap;
         for (const auto& [note, name] : c.drumMap)
             jmap[std::to_string(note)] = name;
-        jchans.push_back({{"name", c.name}, {"portName", c.portName},
-                          {"midiChannel", c.midiChannel}, {"drumMap", jmap},
-                          {"isDrum", c.isDrum}, {"fallbackNoteNames", c.fallbackNoteNames},
-                          {"programNumber", c.programNumber},
-                          {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
-                          {"gm1Instrument", c.gm1Instrument}});
+        jinstrs.push_back({{"name", c.name}, {"portName", c.portName},
+                           {"midiChannel", c.midiChannel}, {"drumMap", jmap},
+                           {"isDrum", c.isDrum}, {"fallbackNoteNames", c.fallbackNoteNames},
+                           {"programNumber", c.programNumber},
+                           {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
+                           {"gm1Instrument", c.gm1Instrument}});
     }
     json j = {
-        {"version",         1},
-        {"rootPitch",       state.rootPitch},
-        {"chordType",       state.chordType},
-        {"sharp",           state.sharp},
-        {"timeline",        timelineToJson(state.timeline)},
-        {"jackConnections", jconns},
-        {"jackChannels",    jchans},
+        {"version",          1},
+        {"rootPitch",        state.rootPitch},
+        {"chordType",        state.chordType},
+        {"sharp",            state.sharp},
+        {"timeline",         timelineToJson(state.timeline)},
+        {"jackConnections",  jconns},
+        {"jackInstruments",  jinstrs},
     };
     std::ofstream f(filePath);
     if (!f) return false;
@@ -213,8 +213,10 @@ bool loadAppState(const std::string& filePath, AppState& state) {
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackConnections", json::array()))
         state.jackConnections.push_back({jc.value("portName", "")});
-    for (const auto& jc : j.value("jackChannels", json::array())) {
-        JackChannel ch;
+    auto instrArray = j.contains("jackInstruments") ? j.value("jackInstruments", json::array())
+                                                      : j.value("jackChannels",    json::array());
+    for (const auto& jc : instrArray) {
+        JackInstrument ch;
         ch.name        = jc.value("name", "");
         ch.portName    = jc.value("portName", "");
         ch.midiChannel = jc.value("midiChannel", 1);
@@ -227,7 +229,7 @@ bool loadAppState(const std::string& filePath, AppState& state) {
         ch.bankMsb           = jc.value("bankMsb",           -1);
         ch.bankLsb           = jc.value("bankLsb",           -1);
         ch.gm1Instrument     = jc.value("gm1Instrument",     -1);
-        state.jackChannels.push_back(std::move(ch));
+        state.jackInstruments.push_back(std::move(ch));
     }
     return true;
 }
