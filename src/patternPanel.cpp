@@ -22,11 +22,11 @@ static constexpr int slashW        = 12;
 static constexpr int timeSigDenW   = 50;
 static constexpr int barsLabelW    = 36;
 static constexpr int barsInputW    = 40;
-static constexpr int outLabelW    = 28;
 static constexpr int outChoiceW   = 155;
 
 static int nameX(int x)          { return x + pad; }
-static int baseLabelX(int x)     { return nameX(x) + nameW + pad; }
+static int outChoiceX(int x)     { return nameX(x) + nameW + pad; }
+static int baseLabelX(int x)     { return outChoiceX(x) + outChoiceW + groupGap; }
 static int sharpFlatBtnX(int x)  { return baseLabelX(x) + labelW + sg; }
 static int rootChoiceX(int x)    { return sharpFlatBtnX(x) + toggleBtnW + sg; }
 static int chordLabelX(int x)    { return rootChoiceX(x) + rootChoiceW + groupGap; }
@@ -37,13 +37,12 @@ static int timeSigSlashX(int x)  { return timeSigNumX(x) + timeSigNumW; }
 static int timeSigDenX(int x)    { return timeSigSlashX(x) + slashW; }
 static int barsLabelX(int x)     { return timeSigDenX(x) + timeSigDenW + groupGap; }
 static int barsInputX(int x)     { return barsLabelX(x) + barsLabelW; }
-static int outLabelX(int x)      { return barsInputX(x) + barsInputW + groupGap; }
-static int outChoiceX(int x)     { return outLabelX(x) + outLabelW; }
 static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
       patternName (nameX(x),          ctrlY(y,h), nameW,         ctrlH),
+      outChoice   (outChoiceX(x),     ctrlY(y,h), outChoiceW,    ctrlH),
       baseLabel   (baseLabelX(x),     ctrlY(y,h), labelW,        ctrlH, "Base"),
       sharpFlatBtn(sharpFlatBtnX(x),  ctrlY(y,h), toggleBtnW,    ctrlH, "#"),
       rootChoice  (rootChoiceX(x),    ctrlY(y,h), rootChoiceW,   ctrlH),
@@ -55,8 +54,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       timeSigDen  (timeSigDenX(x),    ctrlY(y,h), timeSigDenW,   ctrlH),
       barsLabel   (barsLabelX(x),    ctrlY(y,h), barsLabelW,    ctrlH, "Bars"),
       barsInput   (barsInputX(x),    ctrlY(y,h), barsInputW,    ctrlH),
-      outLabel    (outLabelX(x),      ctrlY(y,h), outLabelW,     ctrlH, "Out"),
-      outChoice   (outChoiceX(x),     ctrlY(y,h), outChoiceW,    ctrlH),
       input       (nameX(x),          ctrlY(y,h), nameW,         ctrlH)
 {
     box(FL_NO_BOX);
@@ -173,10 +170,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
             break;
         }
     }, this);
-
-    outLabel.box(FL_NO_BOX);
-    outLabel.labelcolor(panelText);
-    outLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
     outChoice.value(0);
     outChoice.callback([](Fl_Widget*, void* d) {

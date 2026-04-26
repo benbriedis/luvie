@@ -349,3 +349,10 @@ PLAN:
    that allow for rubber bands on a range of parameters.
 
 
+When adding standard patterns, pianorolls and drum patterns maintain separate counters for the default names.
+
+Connections X doesnt sit at the RHS
+
+Instruments needs a vertical scroll
+
+Pressing ESC crashes the program

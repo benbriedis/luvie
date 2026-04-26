@@ -33,7 +33,6 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     ModernChoice   timeSigDen;
     Fl_Box         barsLabel;
     Fl_Value_Input barsInput;
-    Fl_Box         outLabel;
     ModernChoice   outChoice;
     InlineInput    input;
 
