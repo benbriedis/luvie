@@ -21,7 +21,8 @@ struct ParamLaneLocal {
 struct ParamIdle {};
 struct ParamPendingCreate { int laneIdx; float beat; int value; };
 struct ParamDragState     { int laneIdx, ptIdx; float origBeat; int origValue; bool moved = false; };
-using ParamState = std::variant<ParamIdle, ParamPendingCreate, ParamDragState>;
+struct ParamVirtualDrag   { int laneIdx, predPtIdx, origValue; bool moved = false; };
+using ParamState = std::variant<ParamIdle, ParamPendingCreate, ParamDragState, ParamVirtualDrag>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ class SongGrid : public Grid, public ITimelineObserver {
     void rebuildParamLanes();
     void drawParamRow(int laneIdx, int rowY, int gridRight);
     int  findParamPointAtCursor(int laneIdx) const;
+    int  findPrecedingDotIdx(int laneIdx) const;
+    bool canPlaceDot(int laneIdx, float beat, int excludeId = -1) const;
     int  handleParamEvent(int event);
 
 protected:
