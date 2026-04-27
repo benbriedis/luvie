@@ -39,7 +39,7 @@ class ParamLaneContextPopup : public BasePopup {
     void doAdd() {
         hide();
         if (!timeline) return;
-        int n     = (int)timeline->get().tracks.size() + 1;
+        int n     = timeline->nextTrackNumberForType(PatternType::STANDARD);
         int patId = timeline->createPattern(numPatternBeats);
         timeline->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
@@ -48,7 +48,7 @@ class ParamLaneContextPopup : public BasePopup {
     void doAddDrum() {
         hide();
         if (!timeline) return;
-        int n     = (int)timeline->get().tracks.size() + 1;
+        int n     = timeline->nextTrackNumberForType(PatternType::DRUM);
         int patId = timeline->createDrumPattern(numPatternBeats);
         timeline->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
@@ -57,7 +57,7 @@ class ParamLaneContextPopup : public BasePopup {
     void doAddPianoroll() {
         hide();
         if (!timeline) return;
-        int n     = (int)timeline->get().tracks.size() + 1;
+        int n     = timeline->nextTrackNumberForType(PatternType::PIANOROLL);
         int patId = timeline->createPianorollPattern(numPatternBeats);
         timeline->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();

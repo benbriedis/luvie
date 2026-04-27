@@ -113,7 +113,7 @@ void TrackContextPopup::doAdd()
 {
     hide();
     if (!timeline) return;
-    int n     = (int)timeline->get().tracks.size() + 1;
+    int n     = timeline->nextTrackNumberForType(PatternType::STANDARD);
     int patId = timeline->createPattern(numPatternBeats);
     timeline->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
@@ -123,7 +123,7 @@ void TrackContextPopup::doAddDrum()
 {
     hide();
     if (!timeline) return;
-    int n     = (int)timeline->get().tracks.size() + 1;
+    int n     = timeline->nextTrackNumberForType(PatternType::DRUM);
     int patId = timeline->createDrumPattern(numPatternBeats);
     timeline->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
@@ -133,7 +133,7 @@ void TrackContextPopup::doAddPianoroll()
 {
     hide();
     if (!timeline) return;
-    int n     = (int)timeline->get().tracks.size() + 1;
+    int n     = timeline->nextTrackNumberForType(PatternType::PIANOROLL);
     int patId = timeline->createPianorollPattern(numPatternBeats);
     timeline->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
@@ -144,13 +144,21 @@ void TrackContextPopup::doCopy()
     hide();
     if (!timeline) return;
     int srcPatId = -1;
-    for (const auto& t : timeline->get().tracks)
-        if (t.id == targetTrackId) { srcPatId = t.patternId; break; }
+    PatternType srcType = PatternType::STANDARD;
+    for (const auto& t : timeline->get().tracks) {
+        if (t.id != targetTrackId) continue;
+        srcPatId = t.patternId;
+        for (const auto& p : timeline->get().patterns)
+            if (p.id == srcPatId) { srcType = p.type; break; }
+        break;
+    }
     if (srcPatId < 0) return;
     int newPatId = timeline->copyPattern(srcPatId);
     if (newPatId < 0) return;
-    int n = (int)timeline->get().tracks.size() + 1;
-    timeline->addTrack("Pattern " + std::to_string(n), newPatId, rowOrderIdxForTrackId(targetTrackId) + 1);
+    int n = timeline->nextTrackNumberForType(srcType);
+    static constexpr const char* prefixes[] = { "Pattern", "Drum", "Pianoroll" };
+    const char* prefix = prefixes[static_cast<int>(srcType)];
+    timeline->addTrack(std::string(prefix) + " " + std::to_string(n), newPatId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 

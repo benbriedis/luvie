@@ -298,6 +298,17 @@ int ObservableTimeline::copyPattern(int srcPatId)
 	return copy.id;
 }
 
+int ObservableTimeline::nextTrackNumberForType(PatternType type) const
+{
+	int count = 0;
+	for (const auto& t : data.tracks) {
+		for (const auto& p : data.patterns) {
+			if (p.id == t.patternId && p.type == type) { ++count; break; }
+		}
+	}
+	return count + 1;
+}
+
 void ObservableTimeline::removeTrackAndPattern(int trackId)
 {
 	auto it = std::find_if(data.tracks.begin(), data.tracks.end(),

@@ -105,6 +105,9 @@ public:
 	// Does NOT notify — caller must add a track (which notifies) or call notify manually.
 	int copyPattern(int srcPatId);
 
+	// Returns count-of-existing-tracks-of-that-type + 1 for use in default names.
+	int nextTrackNumberForType(PatternType type) const;
+
 	// Remove a track and its pattern definition (if the pattern is not shared).
 	void removeTrackAndPattern(int trackId);
 

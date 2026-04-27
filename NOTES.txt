@@ -316,9 +316,5 @@ Hook up to MIDI output - output MIDI commands every time a halfway boundary is r
 cf "Track" ==> "Lane" generally
 
 In the parameter submenu place clicks next to options that already exist
-
-
-'Add pattern' / 'Add parameter' / ... - add pattern immediately after the row that was clicked. (in progress)
-+ allow click and drag
-+ Number Drums and patterns separately
-
+   
+Clicking and dragging to reorder the tracks in the song editor doesnt look great.
