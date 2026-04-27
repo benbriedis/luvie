@@ -304,8 +304,6 @@ When adding standard patterns, pianorolls and drum patterns maintain separate co
 
 Connections X doesnt sit at the RHS
 
-Instruments needs a vertical scroll
-
 Pressing ESC crashes the program
 
 TO TEST Program number: a) connect to Casio b) maybe connect to some software synth?
@@ -317,7 +315,4 @@ When I start up in standalone mode (with -v) and close the application (using th
    that allow for rubber bands on a range of parameters.
 
 
-Lift 'luvie.ttl' out of plugins/ and remove plugins/
-Combine Makefile and src/Makefile
-Remove/move  junk/
-
+TEST Luvie as plugin, NSM and standalone again

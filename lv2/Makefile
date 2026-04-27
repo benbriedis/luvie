@@ -1,13 +1,13 @@
 CC      = gcc
 CXX     = g++-13
 
-FLTK_CONFIG  = ../../deps/installation/bin/fltk-config
+FLTK_CONFIG  = ../deps/installation/bin/fltk-config
 FLTK_CXXFLAGS := $(shell $(FLTK_CONFIG) --cxxflags)
 FLTK_LDFLAGS  := $(shell $(FLTK_CONFIG) --ldflags) $(shell $(FLTK_CONFIG) --libs)
 
-LV2_INC  = -I../../deps/sources/lv2/include
-SRC_INC  = -I../../src
-SRC_LIB  = ../../src/build/libluvie.a
+LV2_INC  = -I../deps/sources/lv2/include
+SRC_INC  = -I../src
+SRC_LIB  = ../src/build/libluvie.a
 
 JACK_CFLAGS := $(shell pkg-config --cflags jack 2>/dev/null)
 JACK_LIBS   := $(shell pkg-config --libs   jack 2>/dev/null)
