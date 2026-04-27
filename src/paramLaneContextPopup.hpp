@@ -65,17 +65,7 @@ class ParamLaneContextPopup : public BasePopup {
 
     void doShowParamSubmenu() {
         if (!paramSubmenu) return;
-        int btnY = y() + 1 + 3 * btnH;
-        int subX = x() + popW;
-        int subY = btnY;
-        if (auto* win = window()) {
-            int maxX = win->x() + win->w() - ParameterSubmenu::popW;
-            int maxY = win->y() + win->h() - ParameterSubmenu::popH;
-            if (subX > maxX) subX = x() - ParameterSubmenu::popW;
-            if (subY > maxY) subY = maxY;
-        }
-        paramSubmenu->position(subX, subY);
-        paramSubmenu->show();
+        paramSubmenu->showFor(this, y() + 1 + 3*btnH, timeline);
     }
 
     void doRemove() {

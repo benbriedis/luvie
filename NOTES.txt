@@ -309,12 +309,11 @@ WHEN IMPLEMENTING parameter playing:
   - 2 dots at the same position: only play the 2nd one (ie the 2nd one along the length of the rubberband)
   - ensure parameter values are sent before note starts changes. (Ideally send note ends, then parameter changes, then note starts)
 
-Add parameters rubberbands to pattern editors too
-
 Hook up to MIDI output - output MIDI commands every time a halfway boundary is reached
 
 cf "Track" ==> "Lane" generally
 
-In the parameter submenu place clicks next to options that already exist
-   
 Clicking and dragging to reorder the tracks in the song editor doesnt look great.
+
+Add parameters rubberbands to pattern editors too?
+   If a parameter is set in both places? Just play all the parameters as they come along?

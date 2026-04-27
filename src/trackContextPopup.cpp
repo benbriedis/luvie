@@ -173,17 +173,5 @@ void TrackContextPopup::doDelete()
 void TrackContextPopup::doShowParamSubmenu()
 {
     if (!paramSubmenu) return;
-    // Position the submenu to the right of (and aligned with) the Add parameter button.
-    int btnY   = y() + 1 + 6*btnH;
-    int subX   = x() + popW;
-    int subY   = btnY;
-    // Clamp so the submenu stays within the parent window.
-    if (auto* win = window()) {
-        int maxX = win->x() + win->w() - ParameterSubmenu::popW;
-        int maxY = win->y() + win->h() - ParameterSubmenu::popH;
-        if (subX > maxX) subX = x() - ParameterSubmenu::popW;
-        if (subY > maxY) subY = maxY;
-    }
-    paramSubmenu->position(subX, subY);
-    paramSubmenu->show();
+    paramSubmenu->showFor(this, y() + 1 + 6*btnH, timeline);
 }
