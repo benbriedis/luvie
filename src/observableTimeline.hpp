@@ -87,6 +87,7 @@ public:
 	// Param lane management
 	bool hasParamLane(const std::string& type) const;
 	int  addParamLane(const std::string& type);   // creates lane with anchor at beat 0, value 63
+	void removeParamLane(int laneId);
 	int  addParamPoint(int laneId, float beat, int value);
 	void removeParamPoint(int pointId);
 	void moveParamPoint(int pointId, float beat, int value);

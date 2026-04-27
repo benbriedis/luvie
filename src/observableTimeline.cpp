@@ -668,6 +668,15 @@ int ObservableTimeline::addParamLane(const std::string& type)
 	return laneId;
 }
 
+void ObservableTimeline::removeParamLane(int laneId)
+{
+	data.paramLanes.erase(
+		std::remove_if(data.paramLanes.begin(), data.paramLanes.end(),
+			[laneId](const ParamLane& l) { return l.id == laneId; }),
+		data.paramLanes.end());
+	notify();
+}
+
 int ObservableTimeline::addParamPoint(int laneId, float beat, int value)
 {
 	for (auto& lane : data.paramLanes) {

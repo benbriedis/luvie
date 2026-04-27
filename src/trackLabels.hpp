@@ -6,10 +6,12 @@
 #include <FL/Fl_Group.H>
 
 class TrackContextPopup;
+class ParamLaneContextPopup;
 
 class TrackLabels : public Fl_Group, public ITimelineObserver {
-    ObservableTimeline*  timeline          = nullptr;
-    TrackContextPopup*   contextPopup      = nullptr;
+    ObservableTimeline*     timeline          = nullptr;
+    TrackContextPopup*      contextPopup      = nullptr;
+    ParamLaneContextPopup*  paramLanePopup    = nullptr;
     int                  numVisibleRows;
     int                  rowHeight;
     int                  rowOffset         = 0;
@@ -30,6 +32,7 @@ public:
 
     void setTimeline(ObservableTimeline* tl);
     void setContextPopup(TrackContextPopup* p) { contextPopup = p; }
+    void setParamLaneContextPopup(ParamLaneContextPopup* p) { paramLanePopup = p; }
     void setRowOffset(int offset);
     void setNumVisibleRows(int n) { numVisibleRows = n; }
     void onTimelineChanged() override { redraw(); }

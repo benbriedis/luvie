@@ -1,5 +1,6 @@
 #include "songEditor.hpp"
 #include "trackContextPopup.hpp"
+#include "paramLaneContextPopup.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -96,6 +97,11 @@ void SongEditor::setTransport(ITransport* t, ObservableTimeline* tl)
 void SongEditor::setContextPopup(TrackContextPopup* p)
 {
     trackLabels.setContextPopup(p);
+}
+
+void SongEditor::setParamLaneContextPopup(ParamLaneContextPopup* p)
+{
+    trackLabels.setParamLaneContextPopup(p);
 }
 
 void SongEditor::setTrackView(int trackIndex, bool beatResolution)

@@ -15,6 +15,7 @@
 #include "markerRuler.hpp"
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
+#include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
 #include "pianorollEditor.hpp"
 #include "loopEditor.hpp"
@@ -132,8 +133,9 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     auto* sp      = new SongPopup{};
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
-    auto* ctxPop  = new TrackContextPopup;
-    auto* pdPop   = new ParamDotPopup{};
+    auto* ctxPop    = new TrackContextPopup;
+    auto* plcPop    = new ParamLaneContextPopup;
+    auto* pdPop     = new ParamDotPopup{};
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -218,6 +220,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         tempoRuler->setClipLeft(clipLeft);
     };
     og2->setContextPopup(ctxPop);
+    og2->setParamLaneContextPopup(plcPop);
     og2->onEndReached = [this]() { bottomPane->notifyEndReached(); };
     og2->onSeek = [this]() {
         bottomPane->notifySeek();
@@ -300,6 +303,8 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
+    window->add(plcPop); window->registerPopup(plcPop);
+    window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);
     window->add(pdPop);  window->registerPopup(pdPop);
 
     // Connections overlay last — large sub-window, click-away via registerPopup.

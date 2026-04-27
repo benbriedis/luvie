@@ -12,6 +12,7 @@
 #include <vector>
 
 class TrackContextPopup;
+class ParamLaneContextPopup;
 
 class SongEditor : public Editor, public ITimelineObserver {
     static constexpr int labelW    = 80;
@@ -46,6 +47,7 @@ public:
 
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setContextPopup(TrackContextPopup* p);
+    void setParamLaneContextPopup(ParamLaneContextPopup* p);
     void setTrackView(int trackIndex, bool beatResolution);
 
     void onTimelineChanged() override;

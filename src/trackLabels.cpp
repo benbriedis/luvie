@@ -1,5 +1,6 @@
 #include "trackLabels.hpp"
 #include "trackContextPopup.hpp"
+#include "paramLaneContextPopup.hpp"
 #include "inlineEditDispatch.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
@@ -170,9 +171,19 @@ int TrackLabels::handle(int event)
         int numTracks = (int)timeline->get().tracks.size();
 
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
-            if (contextPopup && row >= 0 && row < numTracks)
-                contextPopup->open(row, timeline,
-                                   Fl::event_x_root(), Fl::event_y_root());
+            if (row >= 0 && row < numTracks) {
+                if (contextPopup)
+                    contextPopup->open(row, timeline,
+                                       Fl::event_x_root(), Fl::event_y_root());
+            } else {
+                int laneIdx = row - numTracks;
+                int numParams = (int)timeline->get().paramLanes.size();
+                if (paramLanePopup && laneIdx >= 0 && laneIdx < numParams) {
+                    int laneId = timeline->get().paramLanes[laneIdx].id;
+                    paramLanePopup->open(laneId, timeline,
+                                        Fl::event_x_root(), Fl::event_y_root());
+                }
+            }
             return 1;
         }
 

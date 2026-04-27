@@ -340,3 +340,7 @@ ETC...
 
 'Add pattern' / 'Add parameter' / ... - add pattern immediately after the row that was clicked.
 
+
+WHEN IMPLEMENTING parameter playing:
+  - 2 dots at the same position: only play the 2nd one (ie the 2nd one along the length of the rubberband)
+  - ensure parameter values are sent before note starts changes. (Ideally send note ends, then parameter changes, then note starts)
