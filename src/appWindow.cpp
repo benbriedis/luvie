@@ -189,15 +189,25 @@ int AppWindow::handle(int event)
             return 1;
         }
 
-        Fl_Window* active = nullptr;
+        bool anyVisible = false;
         for (auto* p : popups)
-            if (p->visible()) { active = p; break; }
-        if (active) {
+            if (p->visible()) { anyVisible = true; break; }
+        if (anyVisible) {
             int ex = Fl::event_x(), ey = Fl::event_y();
-            bool inPopup = ex >= active->x() && ex < active->x() + active->w()
-                        && ey >= active->y() && ey < active->y() + active->h();
-            if (!inPopup) {
-                if (event == FL_PUSH) { active->hide(); closingClick = true; }
+            bool inAny = false;
+            for (auto* p : popups) {
+                if (!p->visible()) continue;
+                if (ex >= p->x() && ex < p->x() + p->w()
+                 && ey >= p->y() && ey < p->y() + p->h()) {
+                    inAny = true;
+                    break;
+                }
+            }
+            if (!inAny) {
+                if (event == FL_PUSH) {
+                    for (auto* p : popups) p->hide();
+                    closingClick = true;
+                }
                 return 1;
             }
         }

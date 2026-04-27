@@ -292,6 +292,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->add(tPop);   window->registerPopup(tPop);
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
+    window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
 
     // Connections overlay last — large sub-window, click-away via registerPopup.
     {

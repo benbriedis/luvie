@@ -29,6 +29,7 @@ TrackContextPopup::TrackContextPopup()
     addPianorollBtn = makeItem(1 + 3*btnH,  popW, "Add Pianoroll Pattern");
     copyBtn         = makeItem(1 + 4*btnH,  popW, "Copy Pattern");
     deleteBtn       = makeItem(1 + 5*btnH,  popW, "Delete Pattern");
+    addParamBtn     = makeItem(1 + 6*btnH,  popW, "Add parameter \xe2\x96\xb6");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doOpenPattern();
@@ -48,6 +49,26 @@ TrackContextPopup::TrackContextPopup()
     deleteBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doDelete();
     }, this);
+    addParamBtn->callback([](Fl_Widget*, void* d) {
+        static_cast<TrackContextPopup*>(d)->doShowParamSubmenu();
+    }, this);
+
+    // Hovering any non-submenu button hides the parameter submenu.
+    auto hideSubmenuFn = [this]() {
+        if (paramSubmenu) paramSubmenu->hide();
+    };
+    openPatternBtn->onEnter  = hideSubmenuFn;
+    addBtn->onEnter          = hideSubmenuFn;
+    addDrumBtn->onEnter      = hideSubmenuFn;
+    addPianorollBtn->onEnter = hideSubmenuFn;
+    copyBtn->onEnter         = hideSubmenuFn;
+    deleteBtn->onEnter       = hideSubmenuFn;
+
+    paramSubmenu = new ParameterSubmenu();
+    paramSubmenu->onSelect = [this](const char* type) {
+        hide();
+        if (onAddParameter) onAddParameter(type);
+    };
 
     end();
     hide();
@@ -128,4 +149,22 @@ void TrackContextPopup::doDelete()
     int trackId = tracks[targetRow].id;
     timeline->removeTrackAndPattern(trackId);
     if (auto* win = window()) win->redraw();
+}
+
+void TrackContextPopup::doShowParamSubmenu()
+{
+    if (!paramSubmenu) return;
+    // Position the submenu to the right of (and aligned with) the Add parameter button.
+    int btnY   = y() + 1 + 6*btnH;
+    int subX   = x() + popW;
+    int subY   = btnY;
+    // Clamp so the submenu stays within the parent window.
+    if (auto* win = window()) {
+        int maxX = win->x() + win->w() - ParameterSubmenu::popW;
+        int maxY = win->y() + win->h() - ParameterSubmenu::popH;
+        if (subX > maxX) subX = x() - ParameterSubmenu::popW;
+        if (subY > maxY) subY = maxY;
+    }
+    paramSubmenu->position(subX, subY);
+    paramSubmenu->show();
 }

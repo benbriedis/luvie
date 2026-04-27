@@ -314,3 +314,24 @@ When I start up in standalone mode (with -v) and close the application (using th
 TEST Luvie as plugin, NSM and standalone again
 
 Click and drag patterns in SongEditor
+
+cf these weird parameters:
+    0,0 Pitch bend range
+    1,0 Channel Fine tuning
+    2,0 Channel Coarse tuning
+portamento, sostenuto, soft pedal (cc#65-67), sustain.
+CC 	Default function
+70 	Sound Variation
+71 	Timbre/Harmonic Intensity (filter resonance)
+72 	Release Time
+73 	Attack Time
+74 	Brightness (cutoff frequency)
+	
+CC 	Default function
+75 	Decay Time
+76 	Vibrato Rate
+77 	Vibrato Depth
+78 	Vibrato Delay
+79 	Metronome Rate 
+ETC...
+

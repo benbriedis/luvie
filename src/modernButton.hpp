@@ -3,12 +3,18 @@
 
 #include <FL/Fl_Button.H>
 #include <FL/fl_draw.H>
+#include <functional>
 
 class ModernButton : public Fl_Button {
     bool      hovered     = false;
     int       borderWidth = 2;
     Fl_Color  borderCol   = 0xCBD5E100;  // matches transport buttons by default
     Fl_Color  hoverCol    = 0;           // 0 = auto-derive (lighter of bg)
+
+public:
+    std::function<void()> onEnter;
+
+private:
 
     void draw() override {
         Fl_Color bg = color();
@@ -38,7 +44,7 @@ class ModernButton : public Fl_Button {
     }
 
     int handle(int event) override {
-        if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
+        if (event == FL_ENTER) { hovered = true;  redraw(); if (onEnter) onEnter(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
         if (event == FL_HIDE)  { hovered = false; return 0; }
         if (event == FL_KEYBOARD) {
