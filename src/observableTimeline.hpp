@@ -33,10 +33,11 @@ public:
 	void   secondsToBarBeat(double secs, int& bar, int& beat) const;
 
 	// Track management
-	int  addTrack(std::string label = "", int patternId = 0);
+	int  addTrack(std::string label = "", int patternId = 0, int atIndex = -1);
 	void removeTrack(int trackId);
 	void renameTrack(int trackId, std::string newLabel);
 	void selectTrack(int index);
+	int  trackIndexForId(int trackId) const;
 
 	// Pattern definition management
 	int createPattern(float lengthBeats);
@@ -86,7 +87,7 @@ public:
 
 	// Param lane management
 	bool hasParamLane(const std::string& type) const;
-	int  addParamLane(const std::string& type);   // creates lane with anchor at beat 0, value 63
+	int  addParamLane(const std::string& type, int atIndex = -1);
 	void removeParamLane(int laneId);
 	int  addParamPoint(int laneId, float beat, int value);
 	void removeParamPoint(int pointId);

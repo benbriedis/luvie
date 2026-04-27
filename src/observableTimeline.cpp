@@ -28,6 +28,10 @@ void ObservableTimeline::notify()
 void ObservableTimeline::loadTimeline(const Timeline& tl)
 {
 	data = tl;
+	if (data.rowOrder.empty()) {
+		for (const auto& t : data.tracks)     data.rowOrder.push_back({true,  t.id});
+		for (const auto& l : data.paramLanes) data.rowOrder.push_back({false, l.id});
+	}
 	nextId = 1;
 	for (const auto& p : data.patterns) {
 		if (p.id >= nextId) nextId = p.id + 1;
@@ -212,12 +216,24 @@ void ObservableTimeline::secondsToBarBeat(double secs, int& bar, int& beat) cons
 // ---------------------------------------------------------------------------
 // Track management
 
-int ObservableTimeline::addTrack(std::string label, int patternId)
+int ObservableTimeline::addTrack(std::string label, int patternId, int atIndex)
 {
 	int id = nextId++;
 	data.tracks.push_back({id, std::move(label), patternId, {}});
+	RowRef ref{true, id};
+	if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
+		data.rowOrder.insert(data.rowOrder.begin() + atIndex, ref);
+	else
+		data.rowOrder.push_back(ref);
 	notify();
 	return id;
+}
+
+int ObservableTimeline::trackIndexForId(int trackId) const
+{
+	for (int i = 0; i < (int)data.tracks.size(); i++)
+		if (data.tracks[i].id == trackId) return i;
+	return -1;
 }
 
 void ObservableTimeline::renameTrack(int trackId, std::string newLabel)
@@ -238,6 +254,10 @@ void ObservableTimeline::removeTrack(int trackId)
 		std::remove_if(data.tracks.begin(), data.tracks.end(),
 			[trackId](const Track& t) { return t.id == trackId; }),
 		data.tracks.end());
+	data.rowOrder.erase(
+		std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+			[trackId](const RowRef& r) { return r.isTrack && r.id == trackId; }),
+		data.rowOrder.end());
 	notify();
 }
 
@@ -272,6 +292,10 @@ void ObservableTimeline::removeTrackAndPattern(int trackId)
 
 	int patId = it->patternId;
 	data.tracks.erase(it);
+	data.rowOrder.erase(
+		std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+			[trackId](const RowRef& r) { return r.isTrack && r.id == trackId; }),
+		data.rowOrder.end());
 
 	bool stillUsed = std::any_of(data.tracks.begin(), data.tracks.end(),
 		[patId](const Track& t) { return t.patternId == patId; });
@@ -643,9 +667,16 @@ void ObservableTimeline::placePattern(int trackIndex, int patternId, float start
 std::vector<Note> ObservableTimeline::buildNotes() const
 {
 	std::vector<Note> notes;
-	for (int row = 0; row < (int)data.tracks.size(); row++)
-		for (const auto& p : data.tracks[row].patterns)
-			notes.push_back({p.id, row, p.startBar, p.length});
+	for (int row = 0; row < (int)data.rowOrder.size(); row++) {
+		const auto& ref = data.rowOrder[row];
+		if (!ref.isTrack) continue;
+		for (const auto& t : data.tracks)
+			if (t.id == ref.id) {
+				for (const auto& p : t.patterns)
+					notes.push_back({p.id, row, p.startBar, p.length});
+				break;
+			}
+	}
 	return notes;
 }
 
@@ -656,7 +687,7 @@ bool ObservableTimeline::hasParamLane(const std::string& type) const
 	return false;
 }
 
-int ObservableTimeline::addParamLane(const std::string& type)
+int ObservableTimeline::addParamLane(const std::string& type, int atIndex)
 {
 	int laneId = nextId++;
 	ParamLane lane;
@@ -664,6 +695,11 @@ int ObservableTimeline::addParamLane(const std::string& type)
 	lane.type = type;
 	lane.points.push_back({nextId++, 0.0f, 63, true});
 	data.paramLanes.push_back(std::move(lane));
+	RowRef ref{false, laneId};
+	if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
+		data.rowOrder.insert(data.rowOrder.begin() + atIndex, ref);
+	else
+		data.rowOrder.push_back(ref);
 	notify();
 	return laneId;
 }
@@ -674,6 +710,10 @@ void ObservableTimeline::removeParamLane(int laneId)
 		std::remove_if(data.paramLanes.begin(), data.paramLanes.end(),
 			[laneId](const ParamLane& l) { return l.id == laneId; }),
 		data.paramLanes.end());
+	data.rowOrder.erase(
+		std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+			[laneId](const RowRef& r) { return !r.isTrack && r.id == laneId; }),
+		data.rowOrder.end());
 	notify();
 }
 

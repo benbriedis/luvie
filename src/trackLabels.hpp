@@ -16,10 +16,10 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     int                  rowHeight;
     int                  rowOffset         = 0;
     InlineInput          input;
-    int                  editingTrackIndex = -1;
+    int                  editingAbsRow = -1;
     std::string          originalLabel;
 
-    void startEdit(int trackIndex);
+    void startEdit(int absRow);
     void cancelEdit();
     void checkDuplicate();
 

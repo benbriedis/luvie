@@ -28,12 +28,20 @@ class ParamLaneContextPopup : public BasePopup {
         return btn;
     }
 
+    int rowOrderIdxForLane() const {
+        if (!timeline) return -1;
+        const auto& ro = timeline->get().rowOrder;
+        for (int i = 0; i < (int)ro.size(); i++)
+            if (!ro[i].isTrack && ro[i].id == laneId) return i;
+        return -1;
+    }
+
     void doAdd() {
         hide();
         if (!timeline) return;
         int n     = (int)timeline->get().tracks.size() + 1;
         int patId = timeline->createPattern(numPatternBeats);
-        timeline->addTrack("Pattern " + std::to_string(n), patId);
+        timeline->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
     }
 
@@ -42,7 +50,7 @@ class ParamLaneContextPopup : public BasePopup {
         if (!timeline) return;
         int n     = (int)timeline->get().tracks.size() + 1;
         int patId = timeline->createDrumPattern(numPatternBeats);
-        timeline->addTrack("Drum " + std::to_string(n), patId);
+        timeline->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
     }
 
@@ -51,7 +59,7 @@ class ParamLaneContextPopup : public BasePopup {
         if (!timeline) return;
         int n     = (int)timeline->get().tracks.size() + 1;
         int patId = timeline->createPianorollPattern(numPatternBeats);
-        timeline->addTrack("Pianoroll " + std::to_string(n), patId);
+        timeline->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
     }
 
@@ -119,8 +127,13 @@ public:
         paramSubmenu = new ParameterSubmenu();
         paramSubmenu->onSelect = [this](const char* type) {
             hide();
-            if (timeline && !timeline->hasParamLane(type))
-                timeline->addParamLane(type);
+            if (!timeline || timeline->hasParamLane(type)) return;
+            int atIndex = -1;
+            const auto& lanes = timeline->get().paramLanes;
+            for (int i = 0; i < (int)lanes.size(); i++) {
+                if (lanes[i].id == laneId) { atIndex = i + 1; break; }
+            }
+            timeline->addParamLane(type, atIndex);
         };
 
         end();

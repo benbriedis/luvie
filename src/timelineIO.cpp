@@ -166,12 +166,16 @@ static json timelineToJson(const Timeline& tl) {
     json jparams = json::array();
     for (const auto& lane : tl.paramLanes) jparams.push_back(paramLaneToJson(lane));
 
+    json jrows = json::array();
+    for (const auto& r : tl.rowOrder) jrows.push_back({{"isTrack", r.isTrack}, {"id", r.id}});
+
     return {
         {"bpms",               jbpms},
         {"timeSigs",           jsigs},
         {"patterns",           jpats},
         {"tracks",             jtracks},
         {"paramLanes",         jparams},
+        {"rowOrder",           jrows},
         {"selectedTrackIndex", tl.selectedTrackIndex},
     };
 }
@@ -188,6 +192,8 @@ static Timeline timelineFromJson(const json& j) {
         tl.tracks.push_back(trackFromJson(jt));
     for (const auto& jp : j.value("paramLanes", json::array()))
         tl.paramLanes.push_back(paramLaneFromJson(jp));
+    for (const auto& jr : j.value("rowOrder", json::array()))
+        tl.rowOrder.push_back({jr.at("isTrack").get<bool>(), jr.at("id").get<int>()});
     tl.selectedTrackIndex = j.value("selectedTrackIndex", -1);
     return tl;
 }

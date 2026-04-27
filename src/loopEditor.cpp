@@ -377,8 +377,10 @@ int LoopEditor::handle(int event)
             if (onToggleChanged) onToggleChanged();
             return 1;
         }
-        if (Fl::event_button() == FL_RIGHT_MOUSE && contextPopup) {
-            contextPopup->open(idx, timeline,
+        if (Fl::event_button() == FL_RIGHT_MOUSE && contextPopup && timeline) {
+            int trackId = (idx >= 0 && idx < (int)timeline->get().tracks.size())
+                          ? timeline->get().tracks[idx].id : -1;
+            contextPopup->open(trackId, timeline,
                                Fl::event_x_root(), Fl::event_y_root());
             return 1;
         }

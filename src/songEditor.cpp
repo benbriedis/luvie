@@ -118,9 +118,7 @@ void SongEditor::onTimelineChanged()
 void SongEditor::updateScrollBounds()
 {
     if (!timeline || !scrollbar) return;
-    int numTracks = (int)timeline->get().tracks.size();
-    int numParams = (int)timeline->get().paramLanes.size();
-    int total    = numTracks + numParams;
+    int total = (int)timeline->get().rowOrder.size();
     int visRows  = std::min(total, numVisibleRows);
     int rh       = songGrid.rowHeight;
     int gridH    = std::max(visRows * rh, 1);
@@ -182,9 +180,7 @@ void SongEditor::updateScrollBounds()
 void SongEditor::setRowOffset(int offset)
 {
     if (!timeline || !scrollbar) return;
-    int numTracks = (int)timeline->get().tracks.size();
-    int numParams = (int)timeline->get().paramLanes.size();
-    int total  = numTracks + numParams;
+    int total = (int)timeline->get().rowOrder.size();
     int maxOff = std::max(0, total - numVisibleRows);
     rowOffset  = std::clamp(offset, 0, maxOff);
     if (total > numVisibleRows) {

@@ -63,10 +63,9 @@ void SongGrid::draw()
 
     // Param lane dots and rubber bands
     if (!localParamLanes.empty()) {
-        int numTracks = (int)timeline->get().tracks.size();
         int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
         for (int li = 0; li < (int)localParamLanes.size(); li++) {
-            int vr = li + numTracks - rowOffset;
+            int vr = visualRowForLaneId(localParamLanes[li].id);
             if (vr < 0 || vr >= numRows) continue;
             drawParamRow(li, y() + vr * rowHeight, gridRight);
         }
@@ -101,11 +100,34 @@ void SongGrid::rebuildParamLanes()
     }
 }
 
+int SongGrid::visualRowForLaneId(int laneId) const
+{
+    if (!timeline) return -1;
+    const auto& ro = timeline->get().rowOrder;
+    for (int i = 0; i < (int)ro.size(); i++)
+        if (!ro[i].isTrack && ro[i].id == laneId)
+            return i - rowOffset;
+    return -1;
+}
+
+int SongGrid::laneIdxForAbsRow(int absRow) const
+{
+    if (!timeline) return -1;
+    const auto& ro = timeline->get().rowOrder;
+    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].isTrack) return -1;
+    int id = ro[absRow].id;
+    for (int i = 0; i < (int)localParamLanes.size(); i++)
+        if (localParamLanes[i].id == id) return i;
+    return -1;
+}
+
 Fl_Color SongGrid::rowBgColor(int visualRow) const
 {
     if (localParamLanes.empty() || !timeline) return bgColor;
-    int numTracks = (int)timeline->get().tracks.size();
-    if (visualRow + rowOffset >= numTracks) return kParamRowBg;
+    int absRow = visualRow + rowOffset;
+    const auto& ro = timeline->get().rowOrder;
+    if (absRow >= 0 && absRow < (int)ro.size() && !ro[absRow].isTrack)
+        return kParamRowBg;
     return bgColor;
 }
 
@@ -171,8 +193,7 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
 int SongGrid::findParamPointAtCursor(int laneIdx) const
 {
     if (laneIdx < 0 || laneIdx >= (int)localParamLanes.size() || !timeline) return -1;
-    int numTracks = (int)timeline->get().tracks.size();
-    int vr = laneIdx + numTracks - rowOffset;
+    int vr = visualRowForLaneId(localParamLanes[laneIdx].id);
     if (vr < 0 || vr >= numRows) return -1;
 
     const int dotR      = std::max(2, rowHeight / 9);
@@ -227,11 +248,10 @@ int SongGrid::handleParamEvent(int event)
     const int dotR       = std::max(2, rowHeight / 9);
     const int totalRange = rowHeight - 1 - 2 * dotR;
     const int hitR       = dotR + 4;
-    int numTracks = timeline ? (int)timeline->get().tracks.size() : 0;
 
-    int ey  = Fl::event_y() - y();
-    int vr  = ey / rowHeight;
-    int laneIdx = vr + rowOffset - numTracks;
+    int ey      = Fl::event_y() - y();
+    int vr      = ey / rowHeight;
+    int laneIdx = laneIdxForAbsRow(vr + rowOffset);
 
     // Helper: check if any real dot overlaps the virtual dot position (left edge)
     auto isVirtualOverlapped = [&](int li) {
@@ -244,8 +264,8 @@ int SongGrid::handleParamEvent(int event)
 
     // Helper: absolute y of virtual dot for a given lane
     auto virtualDotY = [&](int li, int predIdx) {
-        int laneVR = li + numTracks - rowOffset;
-        int rowY   = y() + laneVR * rowHeight;
+        int laneVR = visualRowForLaneId(localParamLanes[li].id);
+        int rowY   = y() + (laneVR >= 0 ? laneVR : 0) * rowHeight;
         int value  = localParamLanes[li].points[predIdx].value;
         return rowY + dotR + (totalRange > 0 ? (int)((127 - value) * totalRange / 127.0f) : 0);
     };
@@ -313,7 +333,7 @@ int SongGrid::handleParamEvent(int event)
 
     case FL_DRAG: {
         if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
-            int laneVR  = d->laneIdx + numTracks - rowOffset;
+            int laneVR  = visualRowForLaneId(localParamLanes[d->laneIdx].id);
             int eyInRow = ey - laneVR * rowHeight;
             int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
             int newVal  = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
@@ -344,7 +364,7 @@ int SongGrid::handleParamEvent(int event)
                 newBeat = std::clamp(newBeat, lo, hi);
             }
 
-            int laneVR   = d->laneIdx + numTracks - rowOffset;
+            int laneVR   = visualRowForLaneId(localParamLanes[d->laneIdx].id);
             int eyInRow  = ey - laneVR * rowHeight;
             int mapped   = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
             int newValue = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
@@ -496,11 +516,18 @@ std::function<void()> SongGrid::makeDeleteCallback(int noteIdx)
 void SongGrid::openContextMenu(int idx)
 {
     if (!songPopup) { Grid::openContextMenu(idx); return; }
-    int trackIndex = (int)notes[idx].pitch + rowOffset;
+    int absRow   = (int)notes[idx].pitch + rowOffset;
+    int trackIdx = -1;
+    if (timeline) {
+        const auto& ro = timeline->get().rowOrder;
+        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
+            trackIdx = timeline->trackIndexForId(ro[absRow].id);
+    }
     songPopup->open(&notes, idx, this,
         makeDeleteCallback(idx),
-        onOpenPattern ? std::function<void()>([this, trackIndex]() { onOpenPattern(trackIndex); })
-                      : nullptr);
+        (onOpenPattern && trackIdx >= 0)
+            ? std::function<void()>([this, trackIdx]() { onOpenPattern(trackIdx); })
+            : nullptr);
 }
 
 void SongGrid::onBeginDrag(int noteIdx)
@@ -524,8 +551,13 @@ void SongGrid::resizing(StateDragResize& s)
 void SongGrid::onCommitMove(const StateDragMove& s)
 {
     if (!timeline) return;
-    int id = notes[s.noteIdx].id;
-    timeline->movePattern(id, (int)notes[s.noteIdx].pitch + rowOffset, notes[s.noteIdx].beat);
+    int id     = notes[s.noteIdx].id;
+    int absRow = (int)notes[s.noteIdx].pitch + rowOffset;
+    const auto& ro = timeline->get().rowOrder;
+    int trackIdx = -1;
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
+        trackIdx = timeline->trackIndexForId(ro[absRow].id);
+    timeline->movePattern(id, trackIdx, notes[s.noteIdx].beat);
 }
 
 void SongGrid::onCommitResize(const StateDragResize& s)
@@ -546,12 +578,11 @@ int SongGrid::handle(int event)
     if (!std::holds_alternative<ParamIdle>(paramState))
         return handleParamEvent(event);
 
-    // Route to param handler when cursor is in the param row area
+    // Route to param handler when cursor is over a param lane row
     if (!localParamLanes.empty() && timeline) {
-        int ey = Fl::event_y() - y();
-        int numTracks = (int)timeline->get().tracks.size();
-        int visTrackRows = std::max(0, std::min(numTracks - rowOffset, numRows));
-        if (ey >= visTrackRows * rowHeight)
+        int ey  = Fl::event_y() - y();
+        int vr  = ey / rowHeight;
+        if (laneIdxForAbsRow(vr + rowOffset) >= 0)
             return handleParamEvent(event);
     }
 
@@ -560,8 +591,13 @@ int SongGrid::handle(int event)
 
 void SongGrid::onNoteDoubleClick(int noteIdx)
 {
-    if (onPatternDoubleClick)
-        onPatternDoubleClick((int)notes[noteIdx].pitch + rowOffset);
+    if (!onPatternDoubleClick || !timeline) return;
+    int absRow = (int)notes[noteIdx].pitch + rowOffset;
+    const auto& ro = timeline->get().rowOrder;
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
+        int trackIdx = timeline->trackIndexForId(ro[absRow].id);
+        if (trackIdx >= 0) onPatternDoubleClick(trackIdx);
+    }
 }
 
 void SongGrid::toggleNote()
@@ -583,10 +619,13 @@ void SongGrid::toggleNote()
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) { return (int)n.pitch == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
-    const auto& tracks = timeline->get().tracks;
-    if (clear && absRow >= 0 && absRow < (int)tracks.size()) {
-        int patId = tracks[absRow].patternId;
-        if (patId > 0)
-            timeline->placePattern(absRow, patId, col, 1.0f);
+    const auto& ro = timeline->get().rowOrder;
+    if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
+        int trackIdx = timeline->trackIndexForId(ro[absRow].id);
+        if (trackIdx >= 0) {
+            int patId = timeline->get().tracks[trackIdx].patternId;
+            if (patId > 0)
+                timeline->placePattern(trackIdx, patId, col, 1.0f);
+        }
     }
 }

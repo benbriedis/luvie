@@ -67,17 +67,27 @@ TrackContextPopup::TrackContextPopup()
     paramSubmenu = new ParameterSubmenu();
     paramSubmenu->onSelect = [this](const char* type) {
         hide();
-        if (onAddParameter) onAddParameter(type);
+        if (!timeline || timeline->hasParamLane(type)) return;
+        timeline->addParamLane(type, rowOrderIdxForTrackId(targetTrackId) + 1);
     };
 
     end();
     hide();
 }
 
-void TrackContextPopup::open(int row, ObservableTimeline* tl, int wx, int wy)
+int TrackContextPopup::rowOrderIdxForTrackId(int trackId) const
 {
-    timeline  = tl;
-    targetRow = row;
+    if (!timeline) return -1;
+    const auto& ro = timeline->get().rowOrder;
+    for (int i = 0; i < (int)ro.size(); i++)
+        if (ro[i].isTrack && ro[i].id == trackId) return i;
+    return -1;
+}
+
+void TrackContextPopup::open(int trackId, ObservableTimeline* tl, int wx, int wy)
+{
+    timeline      = tl;
+    targetTrackId = trackId;
 
     bool canDelete = tl && (int)tl->get().tracks.size() > 1;
     canDelete ? deleteBtn->activate() : deleteBtn->deactivate();
@@ -93,7 +103,10 @@ void TrackContextPopup::open(int row, ObservableTimeline* tl, int wx, int wy)
 void TrackContextPopup::doOpenPattern()
 {
     hide();
-    if (onOpenPattern) onOpenPattern(targetRow);
+    if (onOpenPattern && timeline) {
+        int trackIdx = timeline->trackIndexForId(targetTrackId);
+        if (trackIdx >= 0) onOpenPattern(trackIdx);
+    }
 }
 
 void TrackContextPopup::doAdd()
@@ -102,7 +115,7 @@ void TrackContextPopup::doAdd()
     if (!timeline) return;
     int n     = (int)timeline->get().tracks.size() + 1;
     int patId = timeline->createPattern(numPatternBeats);
-    timeline->addTrack("Pattern " + std::to_string(n), patId);
+    timeline->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -112,7 +125,7 @@ void TrackContextPopup::doAddDrum()
     if (!timeline) return;
     int n     = (int)timeline->get().tracks.size() + 1;
     int patId = timeline->createDrumPattern(numPatternBeats);
-    timeline->addTrack("Drum " + std::to_string(n), patId);
+    timeline->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -122,7 +135,7 @@ void TrackContextPopup::doAddPianoroll()
     if (!timeline) return;
     int n     = (int)timeline->get().tracks.size() + 1;
     int patId = timeline->createPianorollPattern(numPatternBeats);
-    timeline->addTrack("Pianoroll " + std::to_string(n), patId);
+    timeline->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -130,13 +143,14 @@ void TrackContextPopup::doCopy()
 {
     hide();
     if (!timeline) return;
-    const auto& tracks = timeline->get().tracks;
-    if (targetRow < 0 || targetRow >= (int)tracks.size()) return;
-    int srcPatId = tracks[targetRow].patternId;
+    int srcPatId = -1;
+    for (const auto& t : timeline->get().tracks)
+        if (t.id == targetTrackId) { srcPatId = t.patternId; break; }
+    if (srcPatId < 0) return;
     int newPatId = timeline->copyPattern(srcPatId);
     if (newPatId < 0) return;
-    int n = (int)tracks.size() + 1;
-    timeline->addTrack("Pattern " + std::to_string(n), newPatId);
+    int n = (int)timeline->get().tracks.size() + 1;
+    timeline->addTrack("Pattern " + std::to_string(n), newPatId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -144,10 +158,7 @@ void TrackContextPopup::doDelete()
 {
     hide();
     if (!timeline) return;
-    const auto& tracks = timeline->get().tracks;
-    if (targetRow < 0 || targetRow >= (int)tracks.size()) return;
-    int trackId = tracks[targetRow].id;
-    timeline->removeTrackAndPattern(trackId);
+    timeline->removeTrackAndPattern(targetTrackId);
     if (auto* win = window()) win->redraw();
 }
 

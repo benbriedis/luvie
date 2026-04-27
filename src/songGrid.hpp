@@ -48,6 +48,8 @@ class SongGrid : public Grid, public ITimelineObserver {
     int  findPrecedingDotIdx(int laneIdx) const;
     bool canPlaceDot(int laneIdx, float beat, int excludeId = -1) const;
     int  handleParamEvent(int event);
+    int  visualRowForLaneId(int laneId) const;   // visual (relative) row, or -1
+    int  laneIdxForAbsRow(int absRow) const;     // index into localParamLanes, or -1
 
 protected:
     void draw() override;

@@ -73,12 +73,19 @@ struct ParamLane {
 	std::vector<ParamPoint>  points;  // sorted by beat
 };
 
+// One entry per visible row; determines display order of tracks and param lanes.
+struct RowRef {
+	bool isTrack;  // true = Track, false = ParamLane
+	int  id;
+};
+
 struct Timeline {
 	std::vector<BpmMarker>     bpms;
 	std::vector<TimeSigMarker> timeSigs;
 	std::vector<Pattern>       patterns;  // pattern definitions
 	std::vector<Track>         tracks;
 	std::vector<ParamLane>     paramLanes;
+	std::vector<RowRef>        rowOrder;  // interleaved display order
 	int                        selectedTrackIndex = -1;
 };
 

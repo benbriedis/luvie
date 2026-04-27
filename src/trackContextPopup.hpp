@@ -23,11 +23,12 @@ private:
     ModernButton*       copyBtn;
     ModernButton*       deleteBtn;
     ModernButton*       addParamBtn;
-    ObservableTimeline* timeline  = nullptr;
-    int                 targetRow = -1;
+    ObservableTimeline* timeline      = nullptr;
+    int                 targetTrackId = -1;
 
     static constexpr int numPatternBeats = 8;
 
+    int  rowOrderIdxForTrackId(int trackId) const;
     void doOpenPattern();
     void doAdd();
     void doAddDrum();
@@ -42,9 +43,8 @@ public:
     TrackContextPopup();
 
     std::function<void(int trackIndex)>  onOpenPattern;
-    std::function<void(const char*)>     onAddParameter;
 
-    void open(int row, ObservableTimeline* tl, int wx, int wy);
+    void open(int trackId, ObservableTimeline* tl, int wx, int wy);
 };
 
 #endif
