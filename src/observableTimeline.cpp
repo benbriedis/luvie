@@ -236,6 +236,20 @@ int ObservableTimeline::trackIndexForId(int trackId) const
 	return -1;
 }
 
+void ObservableTimeline::moveRow(int from, int toGap)
+{
+	auto& ro = data.rowOrder;
+	int n = (int)ro.size();
+	if (from < 0 || from >= n) return;
+	if (toGap < 0 || toGap > n) return;
+	if (toGap == from || toGap == from + 1) return;  // already in place
+	RowRef ref = ro[from];
+	ro.erase(ro.begin() + from);
+	int insertAt = (toGap > from) ? toGap - 1 : toGap;
+	ro.insert(ro.begin() + insertAt, ref);
+	notify();
+}
+
 void ObservableTimeline::renameTrack(int trackId, std::string newLabel)
 {
 	for (auto& t : data.tracks)

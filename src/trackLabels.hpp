@@ -19,6 +19,13 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     int                  editingAbsRow = -1;
     std::string          originalLabel;
 
+    int  dragStartRow = -1;
+    int  dragStartY   = 0;
+    bool dragging     = false;
+    int  dragRow      = -1;
+    int  dropRow      = -1;
+    static constexpr int dragThreshold = 4;
+
     void startEdit(int absRow);
     void cancelEdit();
     void checkDuplicate();

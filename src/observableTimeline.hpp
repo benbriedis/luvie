@@ -38,6 +38,7 @@ public:
 	void renameTrack(int trackId, std::string newLabel);
 	void selectTrack(int index);
 	int  trackIndexForId(int trackId) const;
+	void moveRow(int fromRowIdx, int toGapIdx);  // reorder rowOrder in-place
 
 	// Pattern definition management
 	int createPattern(float lengthBeats);

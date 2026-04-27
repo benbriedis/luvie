@@ -133,13 +133,16 @@ void TrackLabels::draw()
 
         if (i >= 0 && i < (int)ro.size()) {
             const auto& ref = ro[i];
+            bool isDragSrc = (dragging && i == dragRow);
             if (ref.isTrack) {
                 bool isSel = (ref.id == selectedId);
-                fl_color(isSel ? colSelected : colNormal);
+                Fl_Color bg = isSel ? colSelected : colNormal;
+                if (isDragSrc) bg = fl_color_average(bg, FL_WHITE, 0.75f);
+                fl_color(bg);
                 fl_rectf(x(), ry, w(), rowHeight);
                 fl_color(colBorder);
                 fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
-                fl_color(colText);
+                fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                 for (const auto& t : tl.tracks)
                     if (t.id == ref.id) {
                         fl_draw(t.label.c_str(), x() + 4, ry, w() - 8, rowHeight,
@@ -147,11 +150,12 @@ void TrackLabels::draw()
                         break;
                     }
             } else {
-                fl_color(colParam);
+                Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
+                fl_color(bg);
                 fl_rectf(x(), ry, w(), rowHeight);
                 fl_color(colBorder);
                 fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
-                fl_color(colText);
+                fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                 for (const auto& lane : tl.paramLanes)
                     if (lane.id == ref.id) {
                         fl_draw(lane.type.c_str(), x() + 4, ry, w() - 8, rowHeight,
@@ -166,6 +170,17 @@ void TrackLabels::draw()
             fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
         }
     }
+
+    // Drop indicator line
+    if (dragging && dropRow >= 0) {
+        int lineVR = dropRow - rowOffset;
+        int lineY  = std::clamp(y() + lineVR * rowHeight, y(), y() + numVisibleRows * rowHeight);
+        fl_color(0x00BFFFFF);  // cyan
+        fl_line_style(FL_SOLID, 2);
+        fl_line(x(), lineY, x() + w() - 1, lineY);
+        fl_line_style(0);
+    }
+
     draw_children();
 }
 
@@ -204,14 +219,56 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
-            if (row >= 0 && row < (int)ro.size() && ro[row].isTrack) {
-                if (Fl::event_clicks() == 1) {
-                    startEdit(row);
-                } else {
-                    int trackIdx = timeline->trackIndexForId(ro[row].id);
+            if (Fl::event_clicks() == 1) {
+                // Double-click: start edit immediately, no drag
+                startEdit(row);
+                dragStartRow = -1;
+                return 1;
+            }
+
+            // Single click: record potential drag start; commit on release
+            dragStartRow = row;
+            dragStartY   = Fl::event_y();
+            dragging     = false;
+            dragRow      = -1;
+            dropRow      = -1;
+            return 1;
+        }
+    }
+
+    if (event == FL_DRAG) {
+        if (dragStartRow < 0) return 0;
+        if (!dragging && std::abs(Fl::event_y() - dragStartY) > dragThreshold) {
+            dragging = true;
+            dragRow  = dragStartRow;
+        }
+        if (dragging && timeline) {
+            const auto& ro = timeline->get().rowOrder;
+            int mouseRelY = Fl::event_y() - y();
+            int gap = (mouseRelY + rowHeight / 2) / rowHeight + rowOffset;
+            dropRow = std::clamp(gap, 0, (int)ro.size());
+            redraw();
+        }
+        return 1;
+    }
+
+    if (event == FL_RELEASE) {
+        if (Fl::event_button() == FL_LEFT_MOUSE) {
+            if (dragging) {
+                if (timeline && dragRow >= 0 && dropRow >= 0)
+                    timeline->moveRow(dragRow, dropRow);
+                dragging = false;
+                dragRow  = -1;
+                dropRow  = -1;
+            } else if (dragStartRow >= 0 && timeline) {
+                // Pure single click: select track
+                const auto& ro = timeline->get().rowOrder;
+                if (dragStartRow < (int)ro.size() && ro[dragStartRow].isTrack) {
+                    int trackIdx = timeline->trackIndexForId(ro[dragStartRow].id);
                     if (trackIdx >= 0) timeline->selectTrack(trackIdx);
                 }
             }
+            dragStartRow = -1;
             return 1;
         }
     }
