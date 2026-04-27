@@ -4,6 +4,7 @@
 #include "grid.hpp"
 #include "observableTimeline.hpp"
 #include "songPopup.hpp"
+#include "paramDotPopup.hpp"
 #include <variant>
 
 // ── Local param lane data (for rendering / drag preview) ─────────────────────
@@ -29,6 +30,7 @@ using ParamState = std::variant<ParamIdle, ParamPendingCreate, ParamDragState, P
 class SongGrid : public Grid, public ITimelineObserver {
     ObservableTimeline* timeline          = nullptr;
     SongPopup*          songPopup         = nullptr;
+    ParamDotPopup*      paramDotPopup     = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;
     float               tickBarPos        = 0.0f;
@@ -66,7 +68,8 @@ public:
     std::function<void(int trackIndex)> onPatternDoubleClick;
     std::function<void(int trackIndex)> onOpenPattern;
 
-    void setSongPopup(SongPopup* p) { songPopup = p; }
+    void setSongPopup(SongPopup* p)         { songPopup = p; }
+    void setParamDotPopup(ParamDotPopup* p) { paramDotPopup = p; }
 
     int handle(int event) override;
 

@@ -132,7 +132,7 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
         }
         if (draw) {
             int vdotY = dotYFor(lane.points[predIdx].value);
-            fl_color(0x88888800);
+            fl_color(0xFF999900);
             fl_pie(x() - dotR, vdotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
         }
     }
@@ -260,9 +260,23 @@ int SongGrid::handleParamEvent(int event)
         int ptIdx = findParamPointAtCursor(laneIdx);
 
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
-            if (ptIdx >= 0 && !localParamLanes[laneIdx].points[ptIdx].anchor && timeline)
-                timeline->removeParamPoint(localParamLanes[laneIdx].points[ptIdx].id);
-            paramState = ParamIdle{};
+            if (ptIdx >= 0 && paramDotPopup) {
+                auto& pt   = localParamLanes[laneIdx].points[ptIdx];
+                int   ptId = pt.id;
+                float beat = pt.beat;
+                int   val  = pt.value;
+                bool  anc  = pt.anchor;
+                paramState = ParamIdle{};
+                paramDotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc,
+                    [this, ptId, beat](int newVal) {
+                        if (timeline) timeline->moveParamPoint(ptId, beat, newVal);
+                    },
+                    [this, ptId, anc]() {
+                        if (timeline && !anc) timeline->removeParamPoint(ptId);
+                    });
+            } else {
+                paramState = ParamIdle{};
+            }
             return 1;
         }
         if (ptIdx >= 0) {
@@ -359,18 +373,17 @@ int SongGrid::handleParamEvent(int event)
             else
                 { rebuildParamLanes(); redraw(); }
         } else if (auto* d = std::get_if<ParamDragState>(&paramState)) {
-            auto& pt   = localParamLanes[d->laneIdx].points[d->ptIdx];
-            int  ptId  = pt.id;
-            float beat = pt.beat;
-            int  value = pt.value;
-            bool moved = d->moved;
-            bool anchor = pt.anchor;
+            auto& pt      = localParamLanes[d->laneIdx].points[d->ptIdx];
+            int   ptId    = pt.id;
+            float beat    = pt.beat;
+            int   value   = pt.value;
+            bool  moved   = d->moved;
+            bool  anchor  = pt.anchor;
+            float origBeat = d->origBeat;
             paramState = ParamIdle{};
             if (moved && timeline) {
-                float validBeat = canPlaceDot(d->laneIdx, beat, ptId) ? beat : d->origBeat;
+                float validBeat = canPlaceDot(d->laneIdx, beat, ptId) ? beat : origBeat;
                 timeline->moveParamPoint(ptId, validBeat, value);
-            } else if (!moved && !anchor && timeline) {
-                timeline->removeParamPoint(ptId);
             } else {
                 rebuildParamLanes(); redraw();
             }

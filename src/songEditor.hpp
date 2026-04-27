@@ -41,7 +41,8 @@ public:
     std::function<void(int trackIndex)>            onOpenPattern;
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
 
-    void setSongPopup(SongPopup* p) { songGrid.setSongPopup(p); }
+    void setSongPopup(SongPopup* p)         { songGrid.setSongPopup(p); }
+    void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }
 
     void setTransport(ITransport* t, ObservableTimeline* tl);
     void setContextPopup(TrackContextPopup* p);

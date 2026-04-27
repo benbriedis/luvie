@@ -239,6 +239,8 @@ Implement undo/redo (possible on an editor-by-editor basis? or current edit only
 
 .........................
 
+- cf Is pitch randomisation possible for drums?
+
 - Outputs overlay: click outside the port field doesnt register unless clicking into another field
   Should probably lose focus at this point.
 - Outputs overlay - focused items don't fully defocus.

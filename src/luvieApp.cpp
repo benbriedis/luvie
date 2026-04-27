@@ -19,6 +19,7 @@
 #include "pianorollEditor.hpp"
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
+#include "paramDotPopup.hpp"
 
 std::string LuvieApp::lastFileDir;
 
@@ -132,6 +133,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop  = new TrackContextPopup;
+    auto* pdPop   = new ParamDotPopup{};
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -229,6 +231,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     og2->onPatternDoubleClick = openPatternTab;
     og2->onOpenPattern        = openPatternTab;
     og2->setSongPopup(sp);
+    og2->setParamDotPopup(pdPop);
     ctxPop->onOpenPattern     = openPatternTab;
     ctxPop->onAddParameter    = [timeline](const char* paramType) {
         if (!timeline->hasParamLane(paramType))
@@ -297,6 +300,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
+    window->add(pdPop);  window->registerPopup(pdPop);
 
     // Connections overlay last — large sub-window, click-away via registerPopup.
     {
