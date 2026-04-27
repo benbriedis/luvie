@@ -112,7 +112,7 @@ Fl_Color SongGrid::rowBgColor(int visualRow) const
 void SongGrid::drawParamRow(int laneIdx, int rowY, int /*gridRight*/)
 {
     const auto& lane = localParamLanes[laneIdx];
-    const int dotR = std::max(2, rowHeight / 3);
+    const int dotR = std::max(2, rowHeight / 9);
     const int totalRange = rowHeight - 1 - 2 * dotR;
     if (totalRange <= 0) return;
 
