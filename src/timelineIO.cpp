@@ -126,6 +126,28 @@ static Track trackFromJson(const json& j) {
     return t;
 }
 
+// ── ParamLane ─────────────────────────────────────────────────────────────────
+
+static json paramPointToJson(const ParamPoint& p) {
+    return {{"id", p.id}, {"beat", p.beat}, {"value", p.value}, {"anchor", p.anchor}};
+}
+static ParamPoint paramPointFromJson(const json& j) {
+    return {j.at("id"), j.at("beat"), j.value("value", 63), j.value("anchor", false)};
+}
+static json paramLaneToJson(const ParamLane& lane) {
+    json jpts = json::array();
+    for (const auto& p : lane.points) jpts.push_back(paramPointToJson(p));
+    return {{"id", lane.id}, {"type", lane.type}, {"points", jpts}};
+}
+static ParamLane paramLaneFromJson(const json& j) {
+    ParamLane lane;
+    lane.id   = j.at("id");
+    lane.type = j.at("type").get<std::string>();
+    for (const auto& jp : j.value("points", json::array()))
+        lane.points.push_back(paramPointFromJson(jp));
+    return lane;
+}
+
 // ── Timeline ──────────────────────────────────────────────────────────────────
 
 static json timelineToJson(const Timeline& tl) {
@@ -141,11 +163,15 @@ static json timelineToJson(const Timeline& tl) {
     json jtracks = json::array();
     for (const auto& t : tl.tracks) jtracks.push_back(trackToJson(t));
 
+    json jparams = json::array();
+    for (const auto& lane : tl.paramLanes) jparams.push_back(paramLaneToJson(lane));
+
     return {
         {"bpms",               jbpms},
         {"timeSigs",           jsigs},
         {"patterns",           jpats},
         {"tracks",             jtracks},
+        {"paramLanes",         jparams},
         {"selectedTrackIndex", tl.selectedTrackIndex},
     };
 }
@@ -160,6 +186,8 @@ static Timeline timelineFromJson(const json& j) {
         tl.patterns.push_back(patternFromJson(jp));
     for (const auto& jt : j.value("tracks", json::array()))
         tl.tracks.push_back(trackFromJson(jt));
+    for (const auto& jp : j.value("paramLanes", json::array()))
+        tl.paramLanes.push_back(paramLaneFromJson(jp));
     tl.selectedTrackIndex = j.value("selectedTrackIndex", -1);
     return tl;
 }

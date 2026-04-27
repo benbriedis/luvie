@@ -335,3 +335,6 @@ CC 	Default function
 79 	Metronome Rate 
 ETC...
 
+
+'Add pattern' / 'Add parameter' / ... - add pattern immediately after the row that was clicked.
+

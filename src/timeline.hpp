@@ -60,11 +60,25 @@ struct Track {
 	std::vector<PatternInstance> patterns;
 };
 
+struct ParamPoint {
+	int   id;
+	float beat;
+	int   value   = 63;    // 0-127
+	bool  anchor  = false; // can't be deleted or moved horizontally
+};
+
+struct ParamLane {
+	int                      id;
+	std::string              type;    // "Pitch", "Modulation", etc.
+	std::vector<ParamPoint>  points;  // sorted by beat
+};
+
 struct Timeline {
 	std::vector<BpmMarker>     bpms;
 	std::vector<TimeSigMarker> timeSigs;
 	std::vector<Pattern>       patterns;  // pattern definitions
 	std::vector<Track>         tracks;
+	std::vector<ParamLane>     paramLanes;
 	int                        selectedTrackIndex = -1;
 };
 

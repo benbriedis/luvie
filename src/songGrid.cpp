@@ -1,9 +1,15 @@
 #include "songGrid.hpp"
+#include "editor.hpp"
 #include "playhead.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
+
+static constexpr Fl_Color kParamRowBg  = 0xF0F4FF00;
+static constexpr Fl_Color kParamLine   = 0x8888CC00;
+static constexpr Fl_Color kParamDotFill = 0x5555EE00;
+static constexpr Fl_Color kParamDotRim  = 0x1111EE00;
 
 SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
@@ -18,9 +24,9 @@ void SongGrid::draw()
     const int tickH = 4;
     for (const auto& note : notes) {
         if (note.pitch < 0 || note.pitch >= numRows) continue;
-        int y0  = y() + note.pitch * rowHeight;
+        int y0  = y() + (int)(note.pitch * rowHeight);
         int top = 4, bottom = 4;
-        if (timeline) timeline->timeSigAt((int)note.beat, top, bottom);
+        timeline->timeSigAt((int)note.beat, top, bottom);
 
         float startOffset = 0.0f;
         // While left-resizing, show dragStartOffset so the tick stays fixed visually
@@ -54,6 +60,18 @@ void SongGrid::draw()
             tickBar += intervalBars;
         }
     }
+
+    // Param lane dots and rubber bands
+    if (!localParamLanes.empty()) {
+        int numTracks = (int)timeline->get().tracks.size();
+        int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+        for (int li = 0; li < (int)localParamLanes.size(); li++) {
+            int vr = li + numTracks - rowOffset;
+            if (vr < 0 || vr >= numRows) continue;
+            drawParamRow(li, y() + vr * rowHeight, gridRight);
+        }
+    }
+
     fl_pop_clip();
 }
 
@@ -66,7 +84,207 @@ void SongGrid::setTimeline(ObservableTimeline* tl)
 {
     swapObserver(timeline, tl, this);
     rebuildNotes();
+    rebuildParamLanes();
     redraw();
+}
+
+void SongGrid::rebuildParamLanes()
+{
+    localParamLanes.clear();
+    if (!timeline) return;
+    for (const auto& lane : timeline->get().paramLanes) {
+        ParamLaneLocal local;
+        local.id = lane.id;
+        for (const auto& pt : lane.points)
+            local.points.push_back({pt.id, pt.beat, pt.value, pt.anchor});
+        localParamLanes.push_back(std::move(local));
+    }
+}
+
+Fl_Color SongGrid::rowBgColor(int visualRow) const
+{
+    if (localParamLanes.empty() || !timeline) return bgColor;
+    int numTracks = (int)timeline->get().tracks.size();
+    if (visualRow + rowOffset >= numTracks) return kParamRowBg;
+    return bgColor;
+}
+
+void SongGrid::drawParamRow(int laneIdx, int rowY, int /*gridRight*/)
+{
+    const auto& lane = localParamLanes[laneIdx];
+    const int dotR = std::max(2, rowHeight / 3);
+    const int totalRange = rowHeight - 1 - 2 * dotR;
+    if (totalRange <= 0) return;
+
+    auto dotYFor = [&](int value) {
+        return rowY + dotR + (int)((127 - value) * totalRange / 127.0f);
+    };
+
+    // Rubber band lines between consecutive dots
+    fl_color(kParamLine);
+    for (int i = 0; i + 1 < (int)lane.points.size(); i++) {
+        const auto& a = lane.points[i];
+        const auto& b = lane.points[i + 1];
+        fl_line(x() + (int)((a.beat - colOffset) * colWidth), dotYFor(a.value),
+                x() + (int)((b.beat - colOffset) * colWidth), dotYFor(b.value));
+    }
+
+    // Dots
+    for (const auto& pt : lane.points) {
+        int dotX = x() + (int)((pt.beat - colOffset) * colWidth);
+        if (dotX + dotR < x() || dotX - dotR > x() + w()) continue;
+        int dotY = dotYFor(pt.value);
+        fl_color(kParamDotFill);
+        fl_pie(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
+        fl_color(kParamDotRim);
+        fl_arc(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
+    }
+}
+
+int SongGrid::findParamPointAtCursor(int laneIdx) const
+{
+    if (laneIdx < 0 || laneIdx >= (int)localParamLanes.size() || !timeline) return -1;
+    int numTracks = (int)timeline->get().tracks.size();
+    int vr = laneIdx + numTracks - rowOffset;
+    if (vr < 0 || vr >= numRows) return -1;
+
+    const int dotR      = std::max(2, rowHeight / 3);
+    const int totalRange = rowHeight - 1 - 2 * dotR;
+    const int hitR      = dotR + 4;
+
+    int rowY = y() + vr * rowHeight;
+    int ex   = Fl::event_x();
+    int ey   = Fl::event_y();
+
+    int   bestIdx  = -1;
+    float bestDist = (float)(hitR + 1);
+
+    for (int i = 0; i < (int)localParamLanes[laneIdx].points.size(); i++) {
+        const auto& pt = localParamLanes[laneIdx].points[i];
+        int dotX = x() + (int)((pt.beat - colOffset) * colWidth);
+        int dotY = rowY + dotR + (totalRange > 0 ? (int)((127 - pt.value) * totalRange / 127.0f) : 0);
+        float dx = (float)(ex - dotX);
+        float dy = (float)(ey - dotY);
+        float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist < (float)hitR && dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+    return bestIdx;
+}
+
+int SongGrid::handleParamEvent(int event)
+{
+    const int dotR       = std::max(2, rowHeight / 3);
+    const int totalRange = rowHeight - 1 - 2 * dotR;
+    int numTracks = timeline ? (int)timeline->get().tracks.size() : 0;
+
+    int ey  = Fl::event_y() - y();
+    int vr  = ey / rowHeight;
+    int laneIdx = vr + rowOffset - numTracks;
+
+    switch (event) {
+    case FL_PUSH: {
+        int ex        = Fl::event_x() - x();
+        int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+        if (ex >= gridRight) { paramState = ParamIdle{}; return 1; }
+        if (laneIdx < 0 || laneIdx >= (int)localParamLanes.size()) return 1;
+
+        int ptIdx = findParamPointAtCursor(laneIdx);
+
+        if (Fl::event_button() == FL_RIGHT_MOUSE) {
+            if (ptIdx >= 0 && !localParamLanes[laneIdx].points[ptIdx].anchor && timeline)
+                timeline->removeParamPoint(localParamLanes[laneIdx].points[ptIdx].id);
+            paramState = ParamIdle{};
+            return 1;
+        }
+        if (ptIdx >= 0) {
+            auto& pt = localParamLanes[laneIdx].points[ptIdx];
+            paramState = ParamDragState{laneIdx, ptIdx, pt.beat, pt.value};
+            if (window()) window()->cursor(FL_CURSOR_HAND);
+        } else {
+            float beat = (float)ex / colWidth + colOffset;
+            if (snap > 0.0f) beat = std::round(beat / snap) * snap;
+            beat = std::max(0.0f, beat);
+            int eyInRow = ey - vr * rowHeight;
+            int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
+            int value   = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
+            paramState  = ParamPendingCreate{laneIdx, beat, std::clamp(value, 0, 127)};
+        }
+        return 1;
+    }
+
+    case FL_DRAG: {
+        if (auto* d = std::get_if<ParamDragState>(&paramState)) {
+            int ex        = Fl::event_x() - x();
+            bool isAnchor = localParamLanes[d->laneIdx].points[d->ptIdx].anchor;
+
+            float newBeat = (float)ex / colWidth + colOffset;
+            if (snap > 0.0f) newBeat = std::round(newBeat / snap) * snap;
+            newBeat = std::max(0.0f, std::min((float)numCols, newBeat));
+            if (isAnchor) newBeat = 0.0f;
+
+            int laneVR   = d->laneIdx + numTracks - rowOffset;
+            int eyInRow  = ey - laneVR * rowHeight;
+            int mapped   = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
+            int newValue = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
+            newValue     = std::clamp(newValue, 0, 127);
+
+            auto& pt = localParamLanes[d->laneIdx].points[d->ptIdx];
+            if (newBeat != pt.beat || newValue != pt.value) d->moved = true;
+            pt.beat  = newBeat;
+            pt.value = newValue;
+            redraw();
+        }
+        return 1;
+    }
+
+    case FL_RELEASE: {
+        if (auto* d = std::get_if<ParamDragState>(&paramState)) {
+            auto& pt   = localParamLanes[d->laneIdx].points[d->ptIdx];
+            int  ptId  = pt.id;
+            float beat = pt.beat;
+            int  value = pt.value;
+            bool moved = d->moved;
+            bool anchor = pt.anchor;
+            paramState = ParamIdle{};
+            if (moved && timeline) {
+                timeline->moveParamPoint(ptId, beat, value);
+            } else if (!moved && !anchor && timeline) {
+                timeline->removeParamPoint(ptId);
+            } else {
+                rebuildParamLanes(); redraw();
+            }
+        } else if (auto* d = std::get_if<ParamPendingCreate>(&paramState)) {
+            int li = d->laneIdx; float beat = d->beat; int value = d->value;
+            paramState = ParamIdle{};
+            if (timeline && li >= 0 && li < (int)localParamLanes.size())
+                timeline->addParamPoint(localParamLanes[li].id, beat, value);
+        } else {
+            paramState = ParamIdle{};
+        }
+        if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+        return 1;
+    }
+
+    case FL_ENTER:
+        return 1;
+
+    case FL_MOVE:
+        if (laneIdx >= 0 && laneIdx < (int)localParamLanes.size()) {
+            int ptIdx = findParamPointAtCursor(laneIdx);
+            if (window()) window()->cursor(ptIdx >= 0 ? FL_CURSOR_HAND : FL_CURSOR_DEFAULT);
+        } else {
+            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+        }
+        return 0;
+
+    case FL_LEAVE:
+        paramState = ParamIdle{};
+        if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+        return 0;
+
+    default:
+        return 0;
+    }
 }
 
 void SongGrid::rebuildNotes()
@@ -117,6 +335,8 @@ void SongGrid::onTimelineChanged()
 {
     if (!isActiveDrag())
         rebuildNotes();
+    if (!std::holds_alternative<ParamDragState>(paramState))
+        rebuildParamLanes();
     redraw();
 }
 
@@ -175,6 +395,20 @@ void SongGrid::onCommitResize(const StateDragResize& s)
 int SongGrid::handle(int event)
 {
     if (songPopup && songPopup->visible()) return 0;
+
+    // Active param interaction takes priority over everything
+    if (!std::holds_alternative<ParamIdle>(paramState))
+        return handleParamEvent(event);
+
+    // Route to param handler when cursor is in the param row area
+    if (!localParamLanes.empty() && timeline) {
+        int ey = Fl::event_y() - y();
+        int numTracks = (int)timeline->get().tracks.size();
+        int visTrackRows = std::max(0, std::min(numTracks - rowOffset, numRows));
+        if (ey >= visTrackRows * rowHeight)
+            return handleParamEvent(event);
+    }
+
     return Grid::handle(event);
 }
 

@@ -8,6 +8,7 @@
 static constexpr Fl_Color colNormal   = 0x1F293700;
 static constexpr Fl_Color colSelected = 0x3B82F600;
 static constexpr Fl_Color colEmpty    = 0x17202A00;
+static constexpr Fl_Color colParam    = 0x1A2B3A00;  // param lane label bg
 static constexpr Fl_Color colText     = FL_WHITE;
 static constexpr Fl_Color colBorder   = 0x37415100;
 
@@ -112,6 +113,7 @@ void TrackLabels::cancelEdit()
 void TrackLabels::draw()
 {
     int totalTracks = timeline ? (int)timeline->get().tracks.size() : 0;
+    int totalParams = timeline ? (int)timeline->get().paramLanes.size() : 0;
     int sel         = timeline ? timeline->get().selectedTrackIndex : -1;
 
     fl_font(FL_HELVETICA, 11);
@@ -129,11 +131,24 @@ void TrackLabels::draw()
                     x() + 4, ry, w() - 8, rowHeight,
                     FL_ALIGN_LEFT | FL_ALIGN_CLIP);
         } else {
-            // Empty row below last track
-            fl_color(colEmpty);
-            fl_rectf(x(), ry, w(), rowHeight);
-            fl_color(colBorder);
-            fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+            int laneIdx = i - totalTracks;
+            if (laneIdx >= 0 && laneIdx < totalParams) {
+                // Param lane label
+                fl_color(colParam);
+                fl_rectf(x(), ry, w(), rowHeight);
+                fl_color(colBorder);
+                fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+                fl_color(colText);
+                fl_draw(timeline->get().paramLanes[laneIdx].type.c_str(),
+                        x() + 4, ry, w() - 8, rowHeight,
+                        FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+            } else {
+                // Empty row below all tracks and param lanes
+                fl_color(colEmpty);
+                fl_rectf(x(), ry, w(), rowHeight);
+                fl_color(colBorder);
+                fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+            }
         }
     }
     draw_children();

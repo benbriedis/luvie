@@ -4,6 +4,26 @@
 #include "grid.hpp"
 #include "observableTimeline.hpp"
 #include "songPopup.hpp"
+#include <variant>
+
+// ── Local param lane data (for rendering / drag preview) ─────────────────────
+struct ParamPtLocal {
+    int   id;
+    float beat;
+    int   value;
+    bool  anchor;
+};
+struct ParamLaneLocal {
+    int                    id;
+    std::vector<ParamPtLocal> points;  // sorted by beat
+};
+
+struct ParamIdle {};
+struct ParamPendingCreate { int laneIdx; float beat; int value; };
+struct ParamDragState     { int laneIdx, ptIdx; float origBeat; int origValue; bool moved = false; };
+using ParamState = std::variant<ParamIdle, ParamPendingCreate, ParamDragState>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class SongGrid : public Grid, public ITimelineObserver {
     ObservableTimeline* timeline          = nullptr;
@@ -15,10 +35,18 @@ class SongGrid : public Grid, public ITimelineObserver {
     int                 dragBeatsPerBar   = 4;
     int                 rowOffset         = 0;
 
+    std::vector<ParamLaneLocal> localParamLanes;
+    ParamState                  paramState;
+
     void rebuildNotes();
+    void rebuildParamLanes();
+    void drawParamRow(int laneIdx, int rowY, int gridRight);
+    int  findParamPointAtCursor(int laneIdx) const;
+    int  handleParamEvent(int event);
 
 protected:
     void draw() override;
+    Fl_Color rowBgColor(int visualRow) const override;
     void resizing(StateDragResize& s) override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     void openContextMenu(int idx) override;

@@ -84,6 +84,13 @@ public:
 	// Place a PatternInstance referencing an existing Pattern (no new Pattern created)
 	void placePattern(int trackIndex, int patternId, float startBar, float length);
 
+	// Param lane management
+	bool hasParamLane(const std::string& type) const;
+	int  addParamLane(const std::string& type);   // creates lane with anchor at beat 0, value 63
+	int  addParamPoint(int laneId, float beat, int value);
+	void removeParamPoint(int pointId);
+	void moveParamPoint(int pointId, float beat, int value);
+
 	// Build a flat Note list for grid consumption (row = track index)
 	std::vector<Note> buildNotes() const;
 

@@ -41,6 +41,11 @@ void ObservableTimeline::loadTimeline(const Timeline& tl)
 		for (const auto& inst : t.patterns)
 			if (inst.id >= nextId) nextId = inst.id + 1;
 	}
+	for (const auto& lane : data.paramLanes) {
+		if (lane.id >= nextId) nextId = lane.id + 1;
+		for (const auto& pt : lane.points)
+			if (pt.id >= nextId) nextId = pt.id + 1;
+	}
 	notify();
 }
 
@@ -642,5 +647,67 @@ std::vector<Note> ObservableTimeline::buildNotes() const
 		for (const auto& p : data.tracks[row].patterns)
 			notes.push_back({p.id, row, p.startBar, p.length});
 	return notes;
+}
+
+bool ObservableTimeline::hasParamLane(const std::string& type) const
+{
+	for (const auto& lane : data.paramLanes)
+		if (lane.type == type) return true;
+	return false;
+}
+
+int ObservableTimeline::addParamLane(const std::string& type)
+{
+	int laneId = nextId++;
+	ParamLane lane;
+	lane.id   = laneId;
+	lane.type = type;
+	lane.points.push_back({nextId++, 0.0f, 63, true});
+	data.paramLanes.push_back(std::move(lane));
+	notify();
+	return laneId;
+}
+
+int ObservableTimeline::addParamPoint(int laneId, float beat, int value)
+{
+	for (auto& lane : data.paramLanes) {
+		if (lane.id != laneId) continue;
+		int ptId = nextId++;
+		auto it = std::lower_bound(lane.points.begin(), lane.points.end(),
+			beat, [](const ParamPoint& p, float b) { return p.beat < b; });
+		lane.points.insert(it, {ptId, beat, std::clamp(value, 0, 127), false});
+		notify();
+		return ptId;
+	}
+	return -1;
+}
+
+void ObservableTimeline::removeParamPoint(int pointId)
+{
+	for (auto& lane : data.paramLanes) {
+		auto it = std::find_if(lane.points.begin(), lane.points.end(),
+			[pointId](const ParamPoint& p) { return p.id == pointId; });
+		if (it != lane.points.end() && !it->anchor) {
+			lane.points.erase(it);
+			notify();
+			return;
+		}
+	}
+}
+
+void ObservableTimeline::moveParamPoint(int pointId, float beat, int value)
+{
+	for (auto& lane : data.paramLanes) {
+		for (auto& pt : lane.points) {
+			if (pt.id != pointId) continue;
+			if (!pt.anchor)
+				pt.beat  = std::max(0.0f, beat);
+			pt.value = std::clamp(value, 0, 127);
+			std::stable_sort(lane.points.begin(), lane.points.end(),
+				[](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
+			notify();
+			return;
+		}
+	}
 }
 

@@ -230,6 +230,10 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     og2->onOpenPattern        = openPatternTab;
     og2->setSongPopup(sp);
     ctxPop->onOpenPattern     = openPatternTab;
+    ctxPop->onAddParameter    = [timeline](const char* paramType) {
+        if (!timeline->hasParamLane(paramType))
+            timeline->addParamLane(paramType);
+    };
     if (verbose) {
         og2->setVerbose(true);
         if (getPitchName)
