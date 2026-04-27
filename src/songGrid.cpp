@@ -109,7 +109,7 @@ Fl_Color SongGrid::rowBgColor(int visualRow) const
     return bgColor;
 }
 
-void SongGrid::drawParamRow(int laneIdx, int rowY, int /*gridRight*/)
+void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
 {
     const auto& lane = localParamLanes[laneIdx];
     const int dotR = std::max(2, rowHeight / 9);
@@ -120,13 +120,23 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int /*gridRight*/)
         return rowY + dotR + (int)((127 - value) * totalRange / 127.0f);
     };
 
-    // Rubber band lines between consecutive dots
     fl_color(kParamLine);
+
+    // Rubber band lines between consecutive dots
     for (int i = 0; i + 1 < (int)lane.points.size(); i++) {
         const auto& a = lane.points[i];
         const auto& b = lane.points[i + 1];
         fl_line(x() + (int)((a.beat - colOffset) * colWidth), dotYFor(a.value),
                 x() + (int)((b.beat - colOffset) * colWidth), dotYFor(b.value));
+    }
+
+    // Extend horizontally from the last dot to the right edge
+    if (!lane.points.empty()) {
+        const auto& last = lane.points.back();
+        int lastX = x() + (int)((last.beat - colOffset) * colWidth);
+        int lastY = dotYFor(last.value);
+        if (lastX < x() + gridRight)
+            fl_line(lastX, lastY, x() + gridRight, lastY);
     }
 
     // Dots
