@@ -2,11 +2,13 @@
 #include "midnamParser.hpp"
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
+#include "gridScrollPane.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl.H>
+#include <algorithm>
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ static constexpr int drumClearW        = 65;
 static constexpr int drumFallbackLabelW = 58;
 static constexpr int drumFallbackChoiceW = 90;
 static constexpr int drumBtnGap        = 8;
+static constexpr int scrollbarW        = 14;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -213,6 +216,15 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
 
+    vScrollbar_ = new GridScrollPane(Fl_Widget::w() - scrollbarW, headerH, scrollbarW, Fl_Widget::h() - headerH);
+    vScrollbar_->linesize(20);
+    vScrollbar_->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<OutputsOverlay*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->applyScrollY((int)sb->value());
+    }, this);
+    add(*vScrollbar_);
+
     end();
 
     outputs_.push_back({nextPortId_++, "midi_out_1"});
@@ -251,6 +263,13 @@ void OutputsOverlay::hide() {
     if (instrChanged && onInstrumentsChanged) onInstrumentsChanged();
     if (onClose) onClose();
     BasePopup::hide();
+}
+
+void OutputsOverlay::resize(int x, int y, int w, int h) {
+    Fl_Window::resize(x, y, w, h);
+    closeBtn->position(w - closePad - closeSz, (headerH - closeSz) / 2);
+    if (vScrollbar_) vScrollbar_->resize(w - scrollbarW, headerH, scrollbarW, h - headerH);
+    rebuildRows();
 }
 
 void OutputsOverlay::setOutputs(const std::vector<std::string>& portNames) {
@@ -357,12 +376,12 @@ void OutputsOverlay::rebuildRows() {
     }
     rows_.clear();
 
-    const int inputW = w() - 2*pad - delBtnSz - 8;
+    const int inputW = w() - scrollbarW - 2*pad - delBtnSz - 8;
     int y = rowsTopY;
 
     begin();
     for (int i = 0; i < (int)outputs_.size(); i++) {
-        const int iy = y + (rowH - inputH) / 2;
+        const int iy = y + (rowH - inputH) / 2 - scrollY_;
 
         auto* inp = new NameInput(pad, iy, inputW, inputH);
         inp->color(inputBgCol);
@@ -372,7 +391,7 @@ void OutputsOverlay::rebuildRows() {
         inp->callback(inputCb, this);
 
         auto* del = new ModernButton(
-            w() - pad - delBtnSz, y + (rowH - delBtnSz) / 2,
+            w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2 - scrollY_,
             delBtnSz, delBtnSz, "\xc3\x97");
         del->labelsize(14);
         del->labelcolor(delRedCol);
@@ -390,7 +409,7 @@ void OutputsOverlay::rebuildRows() {
     }
     end();
 
-    addBtn->position(w() - pad - addBtnW, y + addBtnPad);
+    addBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad - scrollY_);
     y += addBtnPad + addBtnH + addBtnPad;
 
     instrSectionTopY_ = y;
@@ -417,10 +436,15 @@ void OutputsOverlay::rebuildInstrumentRows() {
         if (row.programDropdown) { remove(row.programDropdown); Fl::delete_widget(row.programDropdown); }
         if (row.bankMsbInput)    { remove(row.bankMsbInput);    Fl::delete_widget(row.bankMsbInput); }
         if (row.bankLsbInput)    { remove(row.bankLsbInput);    Fl::delete_widget(row.bankLsbInput); }
+        if (row.bankLabel)       { remove(row.bankLabel);       Fl::delete_widget(row.bankLabel); }
+        if (row.msbLabel)        { remove(row.msbLabel);        Fl::delete_widget(row.msbLabel); }
+        if (row.lsbLabel)        { remove(row.lsbLabel);        Fl::delete_widget(row.lsbLabel); }
+        if (row.progLabel)       { remove(row.progLabel);       Fl::delete_widget(row.progLabel); }
+        if (row.gm1Label)        { remove(row.gm1Label);        Fl::delete_widget(row.gm1Label); }
     }
     instrRows_.clear();
 
-    const int usableW  = w() - 2*pad - delBtnSz - 8 - 2*chanGap;
+    const int usableW  = w() - scrollbarW - 2*pad - delBtnSz - 8 - 2*chanGap;
     const int remaining = usableW - chanMidiW - typeLabelW - chanGap;
     instrNameW_ = remaining * 45 / 100;
     instrPortW_ = remaining - instrNameW_;
@@ -429,7 +453,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
     begin();
     for (int i = 0; i < (int)instruments_.size(); i++) {
-        const int iy    = y + (rowH - inputH) / 2;
+        const int iy    = y + (rowH - inputH) / 2 - scrollY_;
         const bool drum = instruments_[i].isDrum;
 
         // Type label
@@ -477,7 +501,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         midiCh->callback(midiChanChoiceCb, this);
 
         auto* del = new ModernButton(
-            w() - pad - delBtnSz, y + (rowH - delBtnSz) / 2,
+            w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2 - scrollY_,
             delBtnSz, delBtnSz, "\xc3\x97");
         del->labelsize(14);
         del->labelcolor(delRedCol);
@@ -501,7 +525,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         Fl_Box*       fbLbl = nullptr;
         Fl_Choice*    fbCh  = nullptr;
         if (drum) {
-            const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2;
+            const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2 - scrollY_;
 
             const int drumStartX = pad + typeLabelW + chanGap;
             imp = new ModernButton(drumStartX, drumBtnY, drumImportW, drumBtnH, "Import drum map");
@@ -572,7 +596,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         // Bank sub-row — above program row, all channels
         const int bankSubY = y + rowH + (drum ? drumRowH : 0);
-        const int bankWidY = bankSubY + (progRowH - progBtnH) / 2;
+        const int bankWidY = bankSubY + (progRowH - progBtnH) / 2 - scrollY_;
 
         int bx = pad + chanGap;
         auto* bankLbl = new Fl_Box(bx, bankWidY, 90, progBtnH, "Bank:");
@@ -615,7 +639,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         // Program / instrument sub-row — all channels
         const int progSubY = bankSubY + progRowH;
-        const int progWidY = progSubY + (progRowH - progBtnH) / 2;
+        const int progWidY = progSubY + (progRowH - progBtnH) / 2 - scrollY_;
 
         int px = pad + typeLabelW + chanGap;
         auto* progLbl = new Fl_Box(px, progWidY, 90, progBtnH, "Program number");
@@ -657,13 +681,58 @@ void OutputsOverlay::rebuildInstrumentRows() {
         progDrop->callback(programDropdownCb, this);
 
         instrRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh,
-                              progInp, progDrop, msbInp, lsbInp, instruments_[i].name});
+                              progInp, progDrop, msbInp, lsbInp,
+                              bankLbl, msbLbl, lsbLbl, progLbl, gm1Lbl,
+                              instruments_[i].name});
         y += rowH + (drum ? drumRowH : 0) + 2 * progRowH;
     }
     end();
 
-    addInstrBtn->position(w() - pad - addBtnW, y + addBtnPad);
-    addDrumInstrBtn->position(w() - pad - 2*addBtnW - chanGap, y + addBtnPad);
+    addInstrBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad - scrollY_);
+    addDrumInstrBtn->position(w() - scrollbarW - pad - 2*addBtnW - chanGap, y + addBtnPad - scrollY_);
+
+    totalContentH_ = (y + addBtnPad + addBtnH + addBtnPad) - headerH;
+    updateScrollbar();
+    redraw();
+}
+
+void OutputsOverlay::updateScrollbar() {
+    if (!vScrollbar_) return;
+    const int available = h() - headerH;
+    const int maxScroll = std::max(0, totalContentH_ - available);
+    if (maxScroll <= 0) {
+        scrollY_ = 0;
+        vScrollbar_->hide();
+    } else {
+        scrollY_ = std::clamp(scrollY_, 0, maxScroll);
+        vScrollbar_->value(scrollY_, available, 0, totalContentH_);
+        vScrollbar_->show();
+    }
+}
+
+void OutputsOverlay::applyScrollY(int newY) {
+    if (newY == scrollY_) return;
+    const int delta = scrollY_ - newY;
+    scrollY_ = newY;
+
+    auto mv = [&](Fl_Widget* wp) { if (wp) wp->position(wp->x(), wp->y() + delta); };
+
+    for (auto& row : rows_) { mv(row.input); mv(row.deleteBtn); }
+    mv(addBtn);
+
+    for (auto& row : instrRows_) {
+        mv(row.typeLabel);      mv(row.nameInput);      mv(row.portChoice);
+        mv(row.midiChanChoice); mv(row.deleteBtn);      mv(row.importBtn);
+        mv(row.gmBtn);          mv(row.gsBtn);           mv(row.exportBtn);
+        mv(row.clearBtn);       mv(row.fallbackLabel);  mv(row.fallbackChoice);
+        mv(row.programInput);   mv(row.programDropdown);
+        mv(row.bankMsbInput);   mv(row.bankLsbInput);
+        mv(row.bankLabel);      mv(row.msbLabel);        mv(row.lsbLabel);
+        mv(row.progLabel);      mv(row.gm1Label);
+    }
+    mv(addInstrBtn); mv(addDrumInstrBtn);
+
+    if (vScrollbar_) vScrollbar_->value(scrollY_, h() - headerH, 0, totalContentH_);
     redraw();
 }
 
@@ -968,6 +1037,13 @@ void OutputsOverlay::advanceFocusBy(int dir) {
 }
 
 int OutputsOverlay::handle(int event) {
+    if (event == FL_MOUSEWHEEL && vScrollbar_ && vScrollbar_->visible()) {
+        const int available = h() - headerH;
+        const int maxScroll = std::max(0, totalContentH_ - available);
+        const int newY = std::clamp(scrollY_ + Fl::event_dy() * 20, 0, maxScroll);
+        applyScrollY(newY);
+        return 1;
+    }
     if (event == FL_KEYBOARD) {
         int k = Fl::event_key();
         if (k == FL_Tab) {
@@ -985,7 +1061,12 @@ int OutputsOverlay::handle(int event) {
 // ── Drawing ───────────────────────────────────────────────────────────────────
 
 void OutputsOverlay::draw() {
-    if (damage() & ~FL_DAMAGE_CHILD) {
+    const bool full = damage() & ~FL_DAMAGE_CHILD;
+    const int  sy   = scrollY_;
+    const int  sbW  = (vScrollbar_ && vScrollbar_->visible()) ? scrollbarW : 0;
+
+    if (full) {
+        // Fixed header background + border
         fl_color(bgCol);
         fl_rectf(0, 0, w(), h());
 
@@ -1004,32 +1085,35 @@ void OutputsOverlay::draw() {
         fl_draw("Outputs", titlePad, 0, w() - 2*titlePad, headerH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
+        // Scrollable static content — clipped to content area
+        fl_push_clip(0, headerH, w() - sbW, h() - headerH);
+
         fl_font(FL_HELVETICA_BOLD, 13);
         fl_color(textCol);
-        fl_draw("MIDI Output Ports", titlePad, headerH + 12,
+        fl_draw("MIDI Output Ports", titlePad, headerH + 12 - sy,
                 w() - 2*titlePad, sectionH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
         const int colY = headerH + sectionH;
         fl_font(FL_HELVETICA, 10);
         fl_color(subTextCol);
-        fl_draw("PORT NAME", pad, colY,
+        fl_draw("PORT NAME", pad, colY - sy,
                 w() - 2*pad, colH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
         fl_color(dividerCol);
         fl_line_style(FL_SOLID, 1);
-        fl_line(pad, rowsTopY, w() - pad, rowsTopY);
+        fl_line(pad, rowsTopY - sy, w() - sbW - pad, rowsTopY - sy);
         fl_line_style(0);
 
         // ── Instrument section ───────────────────────────────────────────────
         if (instrSectionTopY_ > 0) {
             fl_color(dividerCol);
             fl_line_style(FL_SOLID, 1);
-            fl_line(0, instrSectionTopY_, w(), instrSectionTopY_);
+            fl_line(0, instrSectionTopY_ - sy, w() - sbW, instrSectionTopY_ - sy);
             fl_line_style(0);
 
             fl_font(FL_HELVETICA_BOLD, 13);
             fl_color(textCol);
-            fl_draw("Instruments", titlePad, instrSectionTopY_ + 12,
+            fl_draw("Instruments", titlePad, instrSectionTopY_ + 12 - sy,
                     w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
             const int chanColY = instrRowsTopY_ - chanColH2;
@@ -1038,16 +1122,37 @@ void OutputsOverlay::draw() {
             const int midiX    = portX + instrPortW_ + chanGap;
             fl_font(FL_HELVETICA, 10);
             fl_color(subTextCol);
-            fl_draw("TYPE",             pad,   chanColY, typeLabelW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("NAME",             nameX, chanColY, instrNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("MIDI OUTPUT PORT", portX, chanColY, instrPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("MIDI CH",          midiX, chanColY, chanMidiW,   chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("TYPE",             pad,   chanColY - sy, typeLabelW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("NAME",             nameX, chanColY - sy, instrNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("MIDI OUTPUT PORT", portX, chanColY - sy, instrPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+            fl_draw("MIDI CH",          midiX, chanColY - sy, chanMidiW,   chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
             fl_color(dividerCol);
             fl_line_style(FL_SOLID, 1);
-            fl_line(pad, instrRowsTopY_, w() - pad, instrRowsTopY_);
+            fl_line(pad, instrRowsTopY_ - sy, w() - sbW - pad, instrRowsTopY_ - sy);
             fl_line_style(0);
         }
+
+        fl_pop_clip();
     }
-    draw_children();
+
+    // Draw fixed header child (close button) without content-area clip
+    if (full) draw_child(*closeBtn);
+    else      update_child(*closeBtn);
+
+    // Draw content children clipped to content area
+    fl_push_clip(0, headerH, w() - sbW, h() - headerH);
+    for (int i = 0; i < children(); i++) {
+        Fl_Widget* c = child(i);
+        if (c == closeBtn || c == vScrollbar_) continue;
+        if (full) draw_child(*c);
+        else      update_child(*c);
+    }
+    fl_pop_clip();
+
+    // Draw scrollbar without content-area clip restriction
+    if (vScrollbar_ && vScrollbar_->visible()) {
+        if (full) draw_child(*vScrollbar_);
+        else      update_child(*vScrollbar_);
+    }
 }

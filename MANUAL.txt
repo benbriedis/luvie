@@ -1,0 +1,14 @@
+
+SOME THINGS TO MENTION
+----------------------
+
+Have New Session Manager support
+
+Have a standalone version that can take a project file as an argument - eg:  luvie myproject.json
+  MAYBE add a "luvie -h" option in. For some reason getting the Fltk options again...
+
+Double clicking on note label in drum pattern allows the instrument name to be enterred or modified.
+            A drum can be saved later too.
+
+In the pattern editor double click on the pattern name to edit.
+
