@@ -13,14 +13,14 @@
 #include <vector>
 #include <algorithm>
 
-#include "../../src/appWindow.hpp"
-#include "../../src/transport.hpp"
-#include "../../src/simpleTransport.hpp"
-#include "../../src/jackTransport.hpp"
-#include "../../src/observableTimeline.hpp"
-#include "../../src/patternPanel.hpp"
-#include "../../src/chords.hpp"
-#include "../../src/luvieApp.hpp"
+#include "../src/appWindow.hpp"
+#include "../src/transport.hpp"
+#include "../src/simpleTransport.hpp"
+#include "../src/jackTransport.hpp"
+#include "../src/observableTimeline.hpp"
+#include "../src/patternPanel.hpp"
+#include "../src/chords.hpp"
+#include "../src/luvieApp.hpp"
 #include "timeline_serial.h"
 #include <nlohmann/json.hpp>
 

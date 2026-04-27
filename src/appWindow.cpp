@@ -174,6 +174,9 @@ int AppWindow::handle(int event)
         }
     }
 
+    if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape)
+        return 1;
+
     switch (event) {
     case FL_PUSH:
     case FL_DRAG:

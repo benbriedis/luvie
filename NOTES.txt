@@ -302,10 +302,6 @@ NB MIDI2.0 has a mechanism for instrument discovery...
 
 When adding standard patterns, pianorolls and drum patterns maintain separate counters for the default names.
 
-Connections X doesnt sit at the RHS
-
-Pressing ESC crashes the program
-
 TO TEST Program number: a) connect to Casio b) maybe connect to some software synth?
 
 When I start up in standalone mode (with -v) and close the application (using the window X) I don't get my audio back.
@@ -316,3 +312,5 @@ When I start up in standalone mode (with -v) and close the application (using th
 
 
 TEST Luvie as plugin, NSM and standalone again
+
+Click and drag patterns in SongEditor
