@@ -73,8 +73,10 @@ void Playhead::tick()
 					checkLoopVerboseNotes(lastPosition, curPos);
 			} else {
 				if (aps && obsTl) aps->sync(*obsTl, curPos);
-				if (verbose && obsTl && curPos >= lastPosition)
+				if (verbose && obsTl && curPos >= lastPosition) {
 					checkVerboseNotes(lastPosition, curPos);
+					checkVerboseSongParams(lastPosition, curPos);
+				}
 				if (curPos >= (float)numCols) {
 					transport->pause();
 					if (onEndReached) onEndReached();
@@ -102,7 +104,8 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 		std::string    label;
 		for (const auto& p : tl.patterns)
 			if (p.id == patId) { pat = &p; break; }
-		if (!pat || pat->notes.empty() || pat->lengthBeats <= 0.0f) continue;
+		if (!pat || pat->lengthBeats <= 0.0f) continue;
+		if (pat->notes.empty() && pat->paramLanes.empty()) continue;
 		for (const auto& track : tl.tracks)
 			if (track.patternId == patId) { label = track.label; break; }
 
@@ -126,6 +129,37 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				                             : std::to_string(note.pitch);
 				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
+			}
+		}
+
+		for (const auto& lane : pat->paramLanes) {
+			auto checkFire = [&](float evtBeat, int value) {
+				float cycles    = std::floor((prevBeats - evtBeat) / len);
+				float firstFire = evtBeat + cycles * len;
+				if (firstFire < prevBeats) firstFire += len;
+				if (firstFire >= curBeats) return;
+				float songBar = anchorBar + firstFire / beatsPerBar;
+				int   bar     = (int)songBar + 1;
+				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+				printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
+				       bar, beat, label.c_str(), lane.type.c_str(), value);
+			};
+			for (int i = 0; i < (int)lane.points.size(); i++) {
+				checkFire(lane.points[i].beat, lane.points[i].value);
+				if (i + 1 < (int)lane.points.size()) {
+					float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
+					int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
+					if (b1 > b0 && v1 != v0) {
+						float db = b1 - b0;
+						int   dv = v1 - v0;
+						if (dv > 0)
+							for (int N = v0; N < v1; N++)
+								checkFire(b0 + (N + 0.5f - v0) / dv * db, N + 1);
+						else
+							for (int N = v1; N < v0; N++)
+								checkFire(b0 + (N + 0.5f - v0) / dv * db, N);
+					}
+				}
 			}
 		}
 	}
@@ -257,6 +291,68 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				std::string name = pitchName ? pitchName(note.pitch) : std::to_string(note.pitch);
 				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
+			}
+		}
+
+		for (const auto& lane : pat->paramLanes) {
+			auto checkFire = [&](float evtBeat, int value) {
+				float cycles    = std::floor((prevBeats - evtBeat) / len);
+				float firstFire = evtBeat + cycles * len;
+				if (firstFire < prevBeats) firstFire += len;
+				if (firstFire >= curBeats) return;
+				float songBar = anchorBar + firstFire / beatsPerBar;
+				int   bar     = (int)songBar + 1;
+				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+				printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
+				       bar, beat, label.c_str(), lane.type.c_str(), value);
+			};
+			for (int i = 0; i < (int)lane.points.size(); i++) {
+				checkFire(lane.points[i].beat, lane.points[i].value);
+				if (i + 1 < (int)lane.points.size()) {
+					float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
+					int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
+					if (b1 > b0 && v1 != v0) {
+						float db = b1 - b0;
+						int   dv = v1 - v0;
+						if (dv > 0)
+							for (int N = v0; N < v1; N++)
+								checkFire(b0 + (N + 0.5f - v0) / dv * db, N + 1);
+						else
+							for (int N = v1; N < v0; N++)
+								checkFire(b0 + (N + 0.5f - v0) / dv * db, N);
+					}
+				}
+			}
+		}
+	}
+}
+
+void Playhead::checkVerboseSongParams(float prevPos, float curPos)
+{
+	if (!obsTl) return;
+	const Timeline& tl = obsTl->get();
+	for (const auto& lane : tl.paramLanes) {
+		for (int i = 0; i < (int)lane.points.size(); i++) {
+			auto report = [&](float barPos, int value) {
+				if (barPos < prevPos || barPos >= curPos) return;
+				int bar = (int)barPos + 1;
+				printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
+				       bar, lane.type.c_str(), value);
+			};
+			report(lane.points[i].beat, lane.points[i].value);
+			if (i + 1 < (int)lane.points.size()) {
+				float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
+				int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
+				if (b1 > b0 && v1 != v0) {
+					float db = b1 - b0;
+					int   dv = v1 - v0;
+					if (dv > 0)
+						for (int N = v0; N < v1; N++)
+							report(b0 + (N + 0.5f - v0) / dv * db, N + 1);
+					else
+						for (int N = v1; N < v0; N++)
+							report(b0 + (N + 0.5f - v0) / dv * db, N);
+				}
 			}
 		}
 	}

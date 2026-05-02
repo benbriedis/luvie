@@ -180,6 +180,40 @@ void JackTransport::rebuildSnapshot()
         }
     };
 
+    // Maps param lane type name → MIDI CC number; -1 means pitch bend.
+    auto ccForType = [](const std::string& type) -> int {
+        if (type == "Modulation")  return 1;
+        if (type == "Volume")      return 7;
+        if (type == "Pan")         return 10;
+        if (type == "Expression")  return 11;
+        return -1; // "Pitch" and unknowns → pitch bend
+    };
+
+    // Pre-compute all firing events (point values + half-integer crossings) for a lane.
+    auto buildParamEvents = [](const ParamLane& lane) -> std::vector<ParamEventSnap> {
+        std::vector<ParamEventSnap> evts;
+        for (int i = 0; i < (int)lane.points.size(); i++) {
+            evts.push_back({lane.points[i].beat, lane.points[i].value});
+            if (i + 1 < (int)lane.points.size()) {
+                float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
+                int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
+                if (b1 > b0 && v1 != v0) {
+                    float db = b1 - b0;
+                    int   dv = v1 - v0;
+                    if (dv > 0)
+                        for (int N = v0; N < v1; N++)
+                            evts.push_back({b0 + (N + 0.5f - v0) / dv * db, N + 1});
+                    else
+                        for (int N = v1; N < v0; N++)
+                            evts.push_back({b0 + (N + 0.5f - v0) / dv * db, N});
+                }
+            }
+        }
+        std::sort(evts.begin(), evts.end(),
+                  [](const ParamEventSnap& a, const ParamEventSnap& b) { return a.beat < b.beat; });
+        return evts;
+    };
+
     if (loopMode) {
         if (!aps) return;
         const auto& actives = aps->patterns();
@@ -203,6 +237,24 @@ void JackTransport::rebuildSnapshot()
                     buildNotes(is, pat, trackIdx);
                     if (!is.notes.empty())
                         ts.instances.push_back(std::move(is));
+
+                    // Param lanes for this active pattern.
+                    for (const auto& lane : pat->paramLanes) {
+                        auto evts = buildParamEvents(lane);
+                        if (evts.empty()) continue;
+                        ParamInstSnap pis;
+                        pis.startBar     = anchorBar;
+                        pis.length       = 1.0e9f;
+                        pis.startOffset  = 0.0f;
+                        pis.beatsPerBar  = (float)top;
+                        pis.patternBeats = pat->lengthBeats;
+                        pis.portName     = is.portName;
+                        pis.midiChannel  = is.midiChannel;
+                        pis.priority     = trackIdx + 1;
+                        pis.ccNumber     = ccForType(lane.type);
+                        pis.events       = std::move(evts);
+                        newSnap.paramInsts.push_back(std::move(pis));
+                    }
                 }
             }
             newSnap.tracks.push_back(std::move(ts));
@@ -226,9 +278,56 @@ void JackTransport::rebuildSnapshot()
                 is.beatsPerBar = (float)top;
                 buildNotes(is, pat, trackIdx);
                 ts.instances.push_back(std::move(is));
+
+                // Param lanes for this pattern instance.
+                if (is.portName.empty()) continue;
+                for (const auto& lane : pat->paramLanes) {
+                    auto evts = buildParamEvents(lane);
+                    if (evts.empty()) continue;
+                    ParamInstSnap pis;
+                    pis.startBar     = inst.startBar;
+                    pis.length       = inst.length;
+                    pis.startOffset  = inst.startOffset;
+                    pis.beatsPerBar  = (float)top;
+                    pis.patternBeats = pat->lengthBeats;
+                    pis.portName     = is.portName;
+                    pis.midiChannel  = is.midiChannel;
+                    pis.priority     = trackIdx + 1;
+                    pis.ccNumber     = ccForType(lane.type);
+                    pis.events       = std::move(evts);
+                    newSnap.paramInsts.push_back(std::move(pis));
+                }
             }
             newSnap.tracks.push_back(std::move(ts));
             ++trackIdx;
+        }
+
+        // Song-level param lanes: broadcast to all active (port, channel) pairs,
+        // priority 0 (lowest). Beat field stores bar position (1 unit = 1 bar).
+        std::set<std::pair<std::string,int>> allPorts;
+        for (const auto& ts : newSnap.tracks)
+            for (const auto& inst : ts.instances)
+                if (!inst.portName.empty())
+                    allPorts.insert({inst.portName, inst.midiChannel});
+
+        for (const auto& lane : tl.paramLanes) {
+            auto evts = buildParamEvents(lane);
+            if (evts.empty()) continue;
+            int cc = ccForType(lane.type);
+            for (const auto& [port, ch] : allPorts) {
+                ParamInstSnap pis;
+                pis.startBar     = 0.0f;
+                pis.length       = 1.0e9f;
+                pis.startOffset  = 0.0f;
+                pis.beatsPerBar  = 1.0f;  // 1 beat = 1 bar at song level
+                pis.patternBeats = 0.0f;  // sentinel: song-level, no loop
+                pis.portName     = port;
+                pis.midiChannel  = ch;
+                pis.priority     = 0;
+                pis.ccNumber     = cc;
+                pis.events       = evts;
+                newSnap.paramInsts.push_back(std::move(pis));
+            }
         }
     }
 
@@ -381,7 +480,8 @@ int JackTransport::process(jack_nframes_t nframes)
                                  (firstCall || jumped) ? pos.frame : lastFrame) / sampleRate);
             float curBars  = snapSecondsToBar(static_cast<double>(blockEnd) / sampleRate);
 
-            fireNoteEvents(namedBufs, nframes, pos.frame, prevBars, curBars);
+            fireNoteEvents (namedBufs, nframes, pos.frame, prevBars, curBars);
+            fireParamEvents(namedBufs, nframes, pos.frame, prevBars, curBars);
             snapMutex.unlock();
         }
     }
@@ -459,6 +559,119 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
                 }
             }
         }
+    }
+}
+
+// ── Param event generation (RT thread, called with snapMutex held) ───────────
+
+void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
+                                     jack_nframes_t nframes,
+                                     jack_nframes_t blockStart,
+                                     float prevBars, float curBars)
+{
+    struct PendingParam {
+        jack_nframes_t frame;
+        const std::string* portName;
+        int   midiChannel;
+        int   ccNumber;
+        int   value;
+        int   priority;
+    };
+    std::vector<PendingParam> pending;
+
+    for (const ParamInstSnap& inst : snap.paramInsts) {
+        if (inst.events.empty()) continue;
+
+        if (inst.patternBeats == 0.0f) {
+            // Song-level: event.beat is a bar position; no looping.
+            void* buf = findBuf(namedBufs, inst.portName);
+            if (!buf) continue;
+            for (const ParamEventSnap& evt : inst.events) {
+                if (evt.beat < prevBars || evt.beat >= curBars) continue;
+                double secs = snapBarToSeconds(evt.beat);
+                auto   fr   = static_cast<jack_nframes_t>(secs * sampleRate);
+                jack_nframes_t off = (fr >= blockStart) ? (fr - blockStart) : 0;
+                off = std::min(off, nframes - 1);
+                pending.push_back({off, &inst.portName, inst.midiChannel,
+                                   inst.ccNumber, evt.value, inst.priority});
+            }
+        } else {
+            // Pattern-level: event.beat is a within-pattern beat; wraps with patternBeats.
+            if (inst.startBar + inst.length <= prevBars) continue;
+            if (inst.startBar >= curBars)                continue;
+
+            void* buf = findBuf(namedBufs, inst.portName);
+            if (!buf) continue;
+
+            float windowStart = std::max(prevBars, inst.startBar);
+            float windowEnd   = std::min(curBars,  inst.startBar + inst.length);
+            float beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
+            float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
+
+            for (const ParamEventSnap& evt : inst.events) {
+                float len       = inst.patternBeats;
+                float cycles    = std::floor((beatStart - evt.beat) / len);
+                float firstFire = evt.beat + cycles * len;
+                if (firstFire < beatStart) firstFire += len;
+
+                while (firstFire < beatEnd) {
+                    float  onBar  = inst.startBar + (firstFire - inst.startOffset) / inst.beatsPerBar;
+                    double onSecs = snapBarToSeconds(onBar);
+                    auto   fr     = static_cast<jack_nframes_t>(onSecs * sampleRate);
+                    jack_nframes_t off = (fr >= blockStart) ? (fr - blockStart) : 0;
+                    off = std::min(off, nframes - 1);
+                    pending.push_back({off, &inst.portName, inst.midiChannel,
+                                       inst.ccNumber, evt.value, inst.priority});
+                    firstFire += len;
+                }
+            }
+        }
+    }
+
+    if (pending.empty()) return;
+
+    // Sort by (portName, channel, cc, frame) then priority descending so the
+    // highest-priority entry for each combination comes first.
+    std::sort(pending.begin(), pending.end(), [](const PendingParam& a, const PendingParam& b) {
+        if (a.portName    != b.portName)    return *a.portName    < *b.portName;
+        if (a.midiChannel != b.midiChannel) return a.midiChannel  < b.midiChannel;
+        if (a.ccNumber    != b.ccNumber)    return a.ccNumber      < b.ccNumber;
+        if (a.frame       != b.frame)       return a.frame         < b.frame;
+        return a.priority > b.priority;   // higher priority first within same slot
+    });
+
+    for (int i = 0; i < (int)pending.size(); ) {
+        const PendingParam& p = pending[i];
+        // Advance past lower-priority duplicates for the same (port,ch,cc,frame).
+        int j = i + 1;
+        while (j < (int)pending.size()       &&
+               *pending[j].portName == *p.portName &&
+               pending[j].midiChannel == p.midiChannel &&
+               pending[j].ccNumber    == p.ccNumber    &&
+               pending[j].frame       == p.frame)
+            ++j;
+
+        void* buf = findBuf(namedBufs, *p.portName);
+        if (buf) {
+            if (p.ccNumber < 0) {
+                // Pitch bend: map 0-127 → 0-16383 (14-bit).
+                int     val14 = (p.value * 16383) / 127;
+                uint8_t msg[3] = {
+                    static_cast<uint8_t>(0xE0 | (p.midiChannel & 0x0F)),
+                    static_cast<uint8_t>(val14 & 0x7F),
+                    static_cast<uint8_t>((val14 >> 7) & 0x7F)
+                };
+                jack_midi_event_write(buf, p.frame, msg, 3);
+            } else {
+                uint8_t msg[3] = {
+                    static_cast<uint8_t>(0xB0 | (p.midiChannel & 0x0F)),
+                    static_cast<uint8_t>(p.ccNumber & 0x7F),
+                    static_cast<uint8_t>(p.value    & 0x7F)
+                };
+                jack_midi_event_write(buf, p.frame, msg, 3);
+            }
+        }
+        i = j;
     }
 }
 

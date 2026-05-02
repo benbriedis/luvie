@@ -27,6 +27,7 @@ class Playhead : public ITimelineObserver {
 	bool isInPattern(float bars) const;
 	void checkVerboseNotes(float prevPos, float curPos);
 	void checkLoopVerboseNotes(float prevPos, float curPos);
+	void checkVerboseSongParams(float prevPos, float curPos);
 
 	int       barsToPixel(float bars) const;
 	float     pixelToBars(int px)     const;

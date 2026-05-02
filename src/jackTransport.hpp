@@ -124,9 +124,26 @@ private:
     struct TrackSnap {
         std::vector<InstanceSnap> instances;
     };
+    struct ParamEventSnap {
+        float beat;   // within-pattern beat (pattern-level) or bar position (song-level)
+        int   value;  // 0-127
+    };
+    struct ParamInstSnap {
+        float startBar;
+        float length;        // bars
+        float startOffset;   // beats offset into pattern at instance start; 0 for song-level
+        float beatsPerBar;   // 1.0f for song-level (beat == bar)
+        float patternBeats;  // 0.0f = song-level (no loop); >0 = pattern length in beats
+        std::string portName;
+        int   midiChannel;   // 0-based
+        int   priority;      // 0 = song-level; trackIdx+1 for pattern lanes
+        int   ccNumber;      // 1,7,10,11; -1 = pitch bend
+        std::vector<ParamEventSnap> events;  // sorted by beat
+    };
     struct Snapshot {
-        std::vector<TimeSegment> segs;
-        std::vector<TrackSnap>   tracks;
+        std::vector<TimeSegment>   segs;
+        std::vector<TrackSnap>     tracks;
+        std::vector<ParamInstSnap> paramInsts;
     };
     mutable std::mutex snapMutex;
     Snapshot           snap;
@@ -152,9 +169,12 @@ private:
     int process(jack_nframes_t nframes);
 
     using NamedBuf = std::pair<std::string, void*>;
-    void fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
-                        jack_nframes_t nframes,
-                        jack_nframes_t blockStart, float prevBars, float curBars);
+    void fireNoteEvents (const std::vector<NamedBuf>& namedBufs,
+                         jack_nframes_t nframes,
+                         jack_nframes_t blockStart, float prevBars, float curBars);
+    void fireParamEvents(const std::vector<NamedBuf>& namedBufs,
+                         jack_nframes_t nframes,
+                         jack_nframes_t blockStart, float prevBars, float curBars);
 };
 
 #endif
