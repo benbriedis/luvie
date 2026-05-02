@@ -3,7 +3,9 @@
 
 #include "editor.hpp"
 #include "noteLabelsContextPopup.hpp"
+#include "patternParamGrid.hpp"
 #include "pianorollGrid.hpp"
+#include "paramDotPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
@@ -31,18 +33,23 @@ public:
 // ---------------------------------------------------------------------------
 
 class PianorollEditor : public Editor, public ITimelineObserver {
-    static constexpr int labelsW    = 42;
+    static constexpr int labelsW    = 70;
     static constexpr int scrollbarW = 14;
 
     GridScrollPane*     scrollbar         = nullptr;
+    GridScrollPane*     paramScrollbar    = nullptr;
     PianorollLabels     labels;
     PianorollGrid       grid;
+    PatternParamLabels  paramLabels;
+    PatternParamGrid    paramGrid;
     ObservableTimeline* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
+    int                 paramLaneOffset   = 0;
 
     void setRowOffset(int offset);
     void setColOffset(int offset);
+    void updateParamScrollbar();
     int  handle(int event) override;
 
 public:
@@ -52,6 +59,7 @@ public:
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
+    void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     void onTimelineChanged() override;
     void resize(int x, int y, int w, int h) override;
 };

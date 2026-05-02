@@ -72,14 +72,18 @@ int DrumNoteLabels::handle(int event)
 
 DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                                      int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
+    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + kParamAreaH + hScrollH, numCols, colWidth),
       drumLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       drumGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
-      drumLabelInput(x + scrollbarW, y + rulerH, labelsW, rowHeight)
+      drumLabelInput(x + scrollbarW, y + rulerH, labelsW, rowHeight),
+      paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, labelsW),
+      paramGrid(x + scrollbarW + labelsW, y + rulerH + numRows * rowHeight,
+                visibleW - scrollbarW - labelsW, colWidth, snap)
 {
     rulerOffsetX = scrollbarW + labelsW;
 
     const int gridH       = numRows * rowHeight;
+    const int paramY      = y + rulerH + gridH;
     const int visibleGridW = visibleW - scrollbarW - labelsW;
 
     scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
@@ -91,7 +95,18 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
         self->setRowOffset(maxOff - (int)sb->value());
     }, this);
 
-    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, y + rulerH + gridH,
+    paramScrollbar = new GridScrollPane(x, paramY, scrollbarW, kParamAreaH);
+    paramScrollbar->linesize(1);
+    paramScrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<DrumPatternEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->paramLaneOffset = (int)sb->value();
+        self->paramGrid.setLaneOffset(self->paramLaneOffset);
+        self->paramLabels.setLaneOffset(self->paramLaneOffset);
+    }, this);
+    paramScrollbar->hide();
+
+    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY + kParamAreaH,
                                     visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
     hScrollbar->linesize(1);
     hScrollbar->callback([](Fl_Widget* w, void* d) {
@@ -121,11 +136,16 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     }, this);
     drumLabelInput.onUnfocus([this]() { commitDrumLabelEdit(); });
 
+    paramGrid.setNumCols(numCols);
+
     add(*scrollbar);
+    add(*paramScrollbar);
     add(*hScrollbar);
     add(drumLabels);
     add(drumGrid);
     add(drumLabelInput);
+    add(paramLabels);
+    add(paramGrid);
 
     playhead.setOwner(this);
     seekingEnabled = false;
@@ -269,19 +289,26 @@ void DrumPatternEditor::onTimelineChanged()
 {
     if (!timeline) return;
     int sel = timeline->get().selectedTrackIndex;
-    if (sel == lastSelectedTrack) return;
+    bool trackChanged = (sel != lastSelectedTrack);
     lastSelectedTrack = sel;
+
     const auto& tracks = timeline->get().tracks;
     if (sel >= 0 && sel < (int)tracks.size()) {
-        playhead.setPatternTrack(sel);
         int patId = tracks[sel].patternId;
-        // Only load if it's a drum pattern
-        for (const auto& p : timeline->get().patterns) {
-            if (p.id == patId && p.type == PatternType::DRUM) {
-                drumGrid.setTimeline(timeline, patId);
-                break;
+        if (trackChanged) {
+            playhead.setPatternTrack(sel);
+            for (const auto& p : timeline->get().patterns) {
+                if (p.id == patId && p.type == PatternType::DRUM) {
+                    drumGrid.setTimeline(timeline, patId);
+                    break;
+                }
             }
+            paramGrid.setTimeline(timeline, patId);
+        } else {
+            paramGrid.update(timeline, patId);
         }
+        paramLabels.setTimeline(timeline, patId);
+        updateParamScrollbar();
     }
     applyCurrentDrumMap();
 }
@@ -303,6 +330,7 @@ void DrumPatternEditor::setColOffset(int offset)
     colOffset = std::clamp(offset, 0, std::max(0, drumGrid.numCols - visibleCols));
     hScrollPixel = colOffset * drumGrid.colWidth;
     drumGrid.setColOffset(colOffset);
+    paramGrid.setColOffset(colOffset);
     hScrollbar->value(colOffset, visibleCols, 0, drumGrid.numCols);
 
     int totalGridW = drumGrid.numCols * drumGrid.colWidth;
@@ -313,42 +341,63 @@ void DrumPatternEditor::setColOffset(int offset)
     redraw();
 }
 
+void DrumPatternEditor::updateParamScrollbar()
+{
+    if (!paramScrollbar) return;
+    int total = paramGrid.numLanes();
+    if (total <= kMaxVisParams) {
+        paramScrollbar->hide();
+        paramLaneOffset = 0;
+    } else {
+        int maxOff = total - kMaxVisParams;
+        paramLaneOffset = std::clamp(paramLaneOffset, 0, maxOff);
+        paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
+        paramScrollbar->show();
+    }
+    paramGrid.setLaneOffset(paramLaneOffset);
+    paramLabels.setLaneOffset(paramLaneOffset);
+}
+
 void DrumPatternEditor::resize(int x, int /*y*/, int w, int h)
 {
     if (editingMidiNote >= 0) cancelDrumLabelEdit();
     Fl_Widget::resize(x, y(), w, h);
 
     int gy           = y();
-    int newNumRows   = std::max(1, (h - rulerH - hScrollH) / drumGrid.rowHeight);
+    int newNumRows   = std::max(1, (h - rulerH - kParamAreaH - hScrollH) / drumGrid.rowHeight);
     int visibleGridW = std::max(1, w - scrollbarW - labelsW);
     int gridH        = newNumRows * drumGrid.rowHeight;
+    int paramY       = gy + rulerH + gridH;
 
     scrollbar->resize(x, gy + rulerH, scrollbarW, gridH);
+    if (paramScrollbar) paramScrollbar->resize(x, paramY, scrollbarW, kParamAreaH);
 
     drumLabels.setNumRows(newNumRows);
     drumLabels.resize(x + scrollbarW, gy + rulerH, labelsW, gridH);
+    paramLabels.resize(x + scrollbarW, paramY, labelsW, kParamAreaH);
 
     drumGrid.setNumRows(newNumRows);
     drumGrid.resize(x + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
+    paramGrid.resize(x + scrollbarW + labelsW, paramY, visibleGridW, kParamAreaH);
 
-    hScrollbar->resize(x + scrollbarW + labelsW, gy + rulerH + gridH, visibleGridW, hScrollH);
+    hScrollbar->resize(x + scrollbarW + labelsW, paramY + kParamAreaH, visibleGridW, hScrollH);
 
-    // Recompute vertical scroll
     setRowOffset(drumGrid.getRowOffset());
 
-    // Recompute horizontal scroll
     int totalGridW = drumGrid.numCols * drumGrid.colWidth;
     if (totalGridW > visibleGridW) {
         int visibleCols = visibleGridW / drumGrid.colWidth;
         colOffset    = std::clamp(colOffset, 0, std::max(0, drumGrid.numCols - visibleCols));
         hScrollPixel = colOffset * drumGrid.colWidth;
         drumGrid.setColOffset(colOffset);
+        paramGrid.setColOffset(colOffset);
         hScrollbar->value(colOffset, visibleCols, 0, drumGrid.numCols);
         hScrollbar->show();
     } else {
         colOffset    = 0;
         hScrollPixel = 0;
         drumGrid.setColOffset(0);
+        paramGrid.setColOffset(0);
         hScrollbar->hide();
     }
 

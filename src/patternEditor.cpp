@@ -8,13 +8,17 @@
 
 PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
+    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + kParamAreaH + hScrollH, numCols, colWidth),
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
-      patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
+      patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
+      paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, labelsW),
+      paramGrid(x + scrollbarW + labelsW, y + rulerH + numRows * rowHeight,
+                visibleW - scrollbarW - labelsW, colWidth, snap)
 {
     rulerOffsetX = scrollbarW + labelsW;
 
-    const int gridH      = numRows * rowHeight;
+    const int gridH       = numRows * rowHeight;
+    const int paramY      = y + rulerH + gridH;
     const int visibleGridW = visibleW - scrollbarW - labelsW;
 
     scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
@@ -27,7 +31,18 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
         self->setRowOffset(maxOff - (int)sb->value());
     }, this);
 
-    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, y + rulerH + gridH,
+    paramScrollbar = new GridScrollPane(x, paramY, scrollbarW, kParamAreaH);
+    paramScrollbar->linesize(1);
+    paramScrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<PatternEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->paramLaneOffset = (int)sb->value();
+        self->paramGrid.setLaneOffset(self->paramLaneOffset);
+        self->paramLabels.setLaneOffset(self->paramLaneOffset);
+    }, this);
+    paramScrollbar->hide();
+
+    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY + kParamAreaH,
                                     visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
     hScrollbar->linesize(1);
     hScrollbar->callback([](Fl_Widget* w, void* d) {
@@ -42,10 +57,15 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
     patternGrid.size(visibleGridW, gridH);
     patternGrid.setPlayhead(&playhead);
 
+    paramGrid.setNumCols(numCols);
+
     add(*scrollbar);
+    add(*paramScrollbar);
     add(*hScrollbar);
     add(noteLabels);
     add(patternGrid);
+    add(paramLabels);
+    add(paramGrid);
 
     playhead.setOwner(this);
     seekingEnabled = false;
@@ -59,7 +79,6 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
             setRowOffset(noteLabels.getRowOffset());
     };
 
-    // initialise horizontal scroll state
     int totalGridW = numCols * colWidth;
     if (totalGridW > visibleGridW) {
         hScrollbar->value(0, visibleGridW / colWidth, 0, numCols);
@@ -155,6 +174,7 @@ void PatternEditor::setColOffset(int offset)
     colOffset = std::clamp(offset, 0, std::max(0, patternGrid.numCols - visibleCols));
     hScrollPixel = colOffset * patternGrid.colWidth;
     patternGrid.setColOffset(colOffset);
+    paramGrid.setColOffset(colOffset);
     hScrollbar->value(colOffset, visibleCols, 0, patternGrid.numCols);
 
     int totalGridW = patternGrid.numCols * patternGrid.colWidth;
@@ -165,41 +185,62 @@ void PatternEditor::setColOffset(int offset)
     redraw();
 }
 
+void PatternEditor::updateParamScrollbar()
+{
+    if (!paramScrollbar) return;
+    int total = paramGrid.numLanes();
+    if (total <= kMaxVisParams) {
+        paramScrollbar->hide();
+        paramLaneOffset = 0;
+    } else {
+        int maxOff = total - kMaxVisParams;
+        paramLaneOffset = std::clamp(paramLaneOffset, 0, maxOff);
+        paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
+        paramScrollbar->show();
+    }
+    paramGrid.setLaneOffset(paramLaneOffset);
+    paramLabels.setLaneOffset(paramLaneOffset);
+}
+
 void PatternEditor::resize(int x, int /*y*/, int w, int h)
 {
     Fl_Widget::resize(x, y(), w, h);
 
     int gy           = y();
-    int newNumRows   = std::max(1, (h - rulerH - hScrollH) / patternGrid.rowHeight);
+    int newNumRows   = std::max(1, (h - rulerH - kParamAreaH - hScrollH) / patternGrid.rowHeight);
     int visibleGridW = std::max(1, w - scrollbarW - labelsW);
     int gridH        = newNumRows * patternGrid.rowHeight;
+    int paramY       = gy + rulerH + gridH;
 
     scrollbar->resize(x, gy + rulerH, scrollbarW, gridH);
+    if (paramScrollbar) paramScrollbar->resize(x, paramY, scrollbarW, kParamAreaH);
 
     noteLabels.setNumRows(newNumRows);
     noteLabels.resize(x + scrollbarW, gy + rulerH, labelsW, gridH);
+    paramLabels.resize(x + scrollbarW, paramY, labelsW, kParamAreaH);
 
     patternGrid.setNumRows(newNumRows);
     patternGrid.resize(x + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
+    paramGrid.resize(x + scrollbarW + labelsW, paramY, visibleGridW, kParamAreaH);
 
-    hScrollbar->resize(x + scrollbarW + labelsW, gy + rulerH + gridH, visibleGridW, hScrollH);
+    hScrollbar->resize(x + scrollbarW + labelsW, paramY + kParamAreaH, visibleGridW, hScrollH);
 
-    // Recompute vertical scroll range with updated numRows
     setRowOffset(noteLabels.getRowOffset());
 
-    // Recompute horizontal scroll
     int totalGridW = patternGrid.numCols * patternGrid.colWidth;
     if (totalGridW > visibleGridW) {
         int visibleCols = visibleGridW / patternGrid.colWidth;
         colOffset    = std::clamp(colOffset, 0, std::max(0, patternGrid.numCols - visibleCols));
         hScrollPixel = colOffset * patternGrid.colWidth;
         patternGrid.setColOffset(colOffset);
+        paramGrid.setColOffset(colOffset);
         hScrollbar->value(colOffset, visibleCols, 0, patternGrid.numCols);
         hScrollbar->show();
     } else {
         colOffset    = 0;
         hScrollPixel = 0;
         patternGrid.setColOffset(0);
+        paramGrid.setColOffset(0);
         hScrollbar->hide();
     }
 
@@ -272,7 +313,12 @@ void PatternEditor::onTimelineChanged()
         patternGrid.setTimeline(timeline, patId);
         setRowOffset(computeDefaultOffset(patId));
         lastLengthBeats = -1.0f;
+        paramGrid.setTimeline(timeline, patId);
+    } else {
+        paramGrid.update(timeline, patId);
     }
+    paramLabels.setTimeline(timeline, patId);
+    updateParamScrollbar();
 
     float lb = 0.0f;
     for (const auto& p : tl.patterns)
@@ -281,6 +327,7 @@ void PatternEditor::onTimelineChanged()
     if (lb != lastLengthBeats && lb > 0.0f) {
         lastLengthBeats      = lb;
         patternGrid.numCols  = (int)lb;
+        paramGrid.setNumCols((int)lb);
         playhead.setNumCols((int)lb);
         setColOffset(colOffset);
         redraw();

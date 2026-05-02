@@ -3,7 +3,9 @@
 
 #include "editor.hpp"
 #include "drumGrid.hpp"
+#include "patternParamGrid.hpp"
 #include "noteLabelsContextPopup.hpp"
+#include "paramDotPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
@@ -43,13 +45,17 @@ class DrumPatternEditor : public Editor, public ITimelineObserver {
     static constexpr int scrollbarW = 14;
 
     GridScrollPane*     scrollbar         = nullptr;
+    GridScrollPane*     paramScrollbar    = nullptr;
     DrumNoteLabels      drumLabels;
     DrumGrid            drumGrid;
     InlineInput         drumLabelInput;
+    PatternParamLabels  paramLabels;
+    PatternParamGrid    paramGrid;
     ObservableTimeline* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
     int                 editingMidiNote   = -1;
+    int                 paramLaneOffset   = 0;
 
     std::map<std::string, std::map<int, std::string>> allDrumMaps;
     std::map<std::string, bool>                       allFallbackModes;
@@ -61,6 +67,7 @@ class DrumPatternEditor : public Editor, public ITimelineObserver {
     void startDrumLabelEdit(int midiNote, int rowY, int rowH);
     void commitDrumLabelEdit();
     void cancelDrumLabelEdit();
+    void updateParamScrollbar();
     int  handle(int event) override;
 
 public:
@@ -72,6 +79,7 @@ public:
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
+    void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
                         const std::map<std::string, bool>& fallbacks);
     void onTimelineChanged() override;

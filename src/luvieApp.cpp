@@ -22,6 +22,7 @@
 #include "outputsOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
+#include "patternParamGrid.hpp"
 
 std::string LuvieApp::lastFileDir;
 
@@ -272,6 +273,9 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     patternEd->setNoteLabelsContextPopup(nlCtxPop);
     drumEd->setNoteLabelsContextPopup(nlCtxPop);
     pianorollEd->setNoteLabelsContextPopup(nlCtxPop);
+    patternEd->setParamDotPopup(pdPop);
+    drumEd->setParamDotPopup(pdPop);
+    pianorollEd->setParamDotPopup(pdPop);
 
     // ---- Note label / params sync ----
     auto syncNoteLabels = [this]() {
@@ -325,8 +329,8 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
 
     // ---- Resizable chain + minimum size ----
     window->resizable(tabs);
-    const int minW = 14 + 36 + 5*40;
-    const int minH = menuBarH + tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
+    const int minW = 14 + 70 + 5*40;
+    const int minH = menuBarH + tabBarH + Editor::rulerH + 5*rowHeight + kParamAreaH + Editor::hScrollH + panelH + bottomH;
     window->size_range(minW, minH);
 
     // ---- Timeline observers ----

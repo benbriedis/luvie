@@ -758,15 +758,21 @@ int ObservableTimeline::addParamPoint(int laneId, float beat, int value)
 
 void ObservableTimeline::removeParamPoint(int pointId)
 {
-	for (auto& lane : data.paramLanes) {
-		auto it = std::find_if(lane.points.begin(), lane.points.end(),
-			[pointId](const ParamPoint& p) { return p.id == pointId; });
-		if (it != lane.points.end() && !it->anchor) {
-			lane.points.erase(it);
-			notify();
-			return;
+	auto tryRemove = [&](std::vector<ParamLane>& lanes) {
+		for (auto& lane : lanes) {
+			auto it = std::find_if(lane.points.begin(), lane.points.end(),
+				[pointId](const ParamPoint& p) { return p.id == pointId; });
+			if (it != lane.points.end() && !it->anchor) {
+				lane.points.erase(it);
+				notify();
+				return true;
+			}
 		}
-	}
+		return false;
+	};
+	if (tryRemove(data.paramLanes)) return;
+	for (auto& pat : data.patterns)
+		if (tryRemove(pat.paramLanes)) return;
 }
 
 bool ObservableTimeline::hasPatternParamLane(int patId, const std::string& type) const
@@ -798,17 +804,41 @@ int ObservableTimeline::addPatternParamLane(int patId, const std::string& type)
 
 void ObservableTimeline::moveParamPoint(int pointId, float beat, int value)
 {
-	for (auto& lane : data.paramLanes) {
-		for (auto& pt : lane.points) {
-			if (pt.id != pointId) continue;
-			if (!pt.anchor)
-				pt.beat  = std::max(0.0f, beat);
-			pt.value = std::clamp(value, 0, 127);
-			std::stable_sort(lane.points.begin(), lane.points.end(),
-				[](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
-			notify();
-			return;
+	auto tryMove = [&](std::vector<ParamLane>& lanes) {
+		for (auto& lane : lanes) {
+			for (auto& pt : lane.points) {
+				if (pt.id != pointId) continue;
+				if (!pt.anchor)
+					pt.beat  = std::max(0.0f, beat);
+				pt.value = std::clamp(value, 0, 127);
+				std::stable_sort(lane.points.begin(), lane.points.end(),
+					[](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
+				notify();
+				return true;
+			}
 		}
+		return false;
+	};
+	if (tryMove(data.paramLanes)) return;
+	for (auto& pat : data.patterns)
+		if (tryMove(pat.paramLanes)) return;
+}
+
+int ObservableTimeline::addPatternParamPoint(int patId, int laneId, float beat, int value)
+{
+	for (auto& p : data.patterns) {
+		if (p.id != patId) continue;
+		for (auto& lane : p.paramLanes) {
+			if (lane.id != laneId) continue;
+			int ptId = nextId++;
+			auto it = std::lower_bound(lane.points.begin(), lane.points.end(),
+				beat, [](const ParamPoint& p, float b) { return p.beat < b; });
+			lane.points.insert(it, {ptId, beat, std::clamp(value, 0, 127), false});
+			notify();
+			return ptId;
+		}
+		break;
 	}
+	return -1;
 }
 
