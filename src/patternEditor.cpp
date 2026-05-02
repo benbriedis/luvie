@@ -8,7 +8,7 @@
 
 PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + kParamAreaH + hScrollH, numCols, colWidth),
+    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
       paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, labelsW),
@@ -17,8 +17,8 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
 {
     rulerOffsetX = scrollbarW + labelsW;
 
-    const int gridH       = numRows * rowHeight;
-    const int paramY      = y + rulerH + gridH;
+    const int gridH        = numRows * rowHeight;
+    const int paramY       = y + rulerH + gridH;
     const int visibleGridW = visibleW - scrollbarW - labelsW;
 
     scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
@@ -42,7 +42,7 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
     }, this);
     paramScrollbar->hide();
 
-    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY + kParamAreaH,
+    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY,
                                     visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
     hScrollbar->linesize(1);
     hScrollbar->callback([](Fl_Widget* w, void* d) {
@@ -57,6 +57,8 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
     patternGrid.size(visibleGridW, gridH);
     patternGrid.setPlayhead(&playhead);
 
+    paramLabels.hide();
+    paramGrid.hide();
     paramGrid.setNumCols(numCols);
 
     add(*scrollbar);
@@ -187,64 +189,65 @@ void PatternEditor::setColOffset(int offset)
 
 void PatternEditor::updateParamScrollbar()
 {
-    if (!paramScrollbar) return;
     int total = paramGrid.numLanes();
-    if (total <= kMaxVisParams) {
-        paramScrollbar->hide();
-        paramLaneOffset = 0;
-    } else {
+    if (total > kMaxVisParams) {
         int maxOff = total - kMaxVisParams;
         paramLaneOffset = std::clamp(paramLaneOffset, 0, maxOff);
-        paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
-        paramScrollbar->show();
+        if (paramScrollbar)
+            paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
+    } else {
+        paramLaneOffset = 0;
     }
     paramGrid.setLaneOffset(paramLaneOffset);
     paramLabels.setLaneOffset(paramLaneOffset);
+    relayout();
+}
+
+void PatternEditor::relayout()
+{
+    const int bx = x(), gy = y(), bw = w(), bh = h();
+    const int lanes      = paramGrid.numLanes();
+    const int visRows    = std::min(lanes, kMaxVisParams);
+    const int paramAreaH = visRows * kParamRowH;
+
+    const int newNumRows   = std::max(1, (bh - rulerH - paramAreaH - hScrollH) / patternGrid.rowHeight);
+    const int visibleGridW = std::max(1, bw - scrollbarW - labelsW);
+    const int gridH        = newNumRows * patternGrid.rowHeight;
+    const int paramY       = gy + rulerH + gridH;
+
+    scrollbar->resize(bx, gy + rulerH, scrollbarW, gridH);
+    noteLabels.setNumRows(newNumRows);
+    noteLabels.resize(bx + scrollbarW, gy + rulerH, labelsW, gridH);
+    patternGrid.setNumRows(newNumRows);
+    patternGrid.resize(bx + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
+
+    if (paramAreaH > 0) {
+        paramLabels.resize(bx + scrollbarW, paramY, labelsW, paramAreaH);
+        paramGrid.resize(bx + scrollbarW + labelsW, paramY, visibleGridW, paramAreaH);
+        paramLabels.show();
+        paramGrid.show();
+        if (lanes > kMaxVisParams) {
+            paramScrollbar->resize(bx, paramY, scrollbarW, paramAreaH);
+            paramScrollbar->show();
+        } else {
+            paramScrollbar->hide();
+        }
+    } else {
+        paramLabels.hide();
+        paramGrid.hide();
+        paramScrollbar->hide();
+    }
+
+    hScrollbar->resize(bx + scrollbarW + labelsW, paramY + paramAreaH, visibleGridW, hScrollH);
+
+    setRowOffset(noteLabels.getRowOffset());
+    setColOffset(colOffset);
 }
 
 void PatternEditor::resize(int x, int /*y*/, int w, int h)
 {
     Fl_Widget::resize(x, y(), w, h);
-
-    int gy           = y();
-    int newNumRows   = std::max(1, (h - rulerH - kParamAreaH - hScrollH) / patternGrid.rowHeight);
-    int visibleGridW = std::max(1, w - scrollbarW - labelsW);
-    int gridH        = newNumRows * patternGrid.rowHeight;
-    int paramY       = gy + rulerH + gridH;
-
-    scrollbar->resize(x, gy + rulerH, scrollbarW, gridH);
-    if (paramScrollbar) paramScrollbar->resize(x, paramY, scrollbarW, kParamAreaH);
-
-    noteLabels.setNumRows(newNumRows);
-    noteLabels.resize(x + scrollbarW, gy + rulerH, labelsW, gridH);
-    paramLabels.resize(x + scrollbarW, paramY, labelsW, kParamAreaH);
-
-    patternGrid.setNumRows(newNumRows);
-    patternGrid.resize(x + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
-    paramGrid.resize(x + scrollbarW + labelsW, paramY, visibleGridW, kParamAreaH);
-
-    hScrollbar->resize(x + scrollbarW + labelsW, paramY + kParamAreaH, visibleGridW, hScrollH);
-
-    setRowOffset(noteLabels.getRowOffset());
-
-    int totalGridW = patternGrid.numCols * patternGrid.colWidth;
-    if (totalGridW > visibleGridW) {
-        int visibleCols = visibleGridW / patternGrid.colWidth;
-        colOffset    = std::clamp(colOffset, 0, std::max(0, patternGrid.numCols - visibleCols));
-        hScrollPixel = colOffset * patternGrid.colWidth;
-        patternGrid.setColOffset(colOffset);
-        paramGrid.setColOffset(colOffset);
-        hScrollbar->value(colOffset, visibleCols, 0, patternGrid.numCols);
-        hScrollbar->show();
-    } else {
-        colOffset    = 0;
-        hScrollPixel = 0;
-        patternGrid.setColOffset(0);
-        paramGrid.setColOffset(0);
-        hScrollbar->hide();
-    }
-
-    redraw();
+    relayout();
 }
 
 int PatternEditor::handle(int event)

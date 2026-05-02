@@ -330,7 +330,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     // ---- Resizable chain + minimum size ----
     window->resizable(tabs);
     const int minW = 14 + 70 + 5*40;
-    const int minH = menuBarH + tabBarH + Editor::rulerH + 5*rowHeight + kParamAreaH + Editor::hScrollH + panelH + bottomH;
+    const int minH = menuBarH + tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
     window->size_range(minW, minH);
 
     // ---- Timeline observers ----

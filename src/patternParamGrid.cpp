@@ -31,7 +31,8 @@ void PatternParamLabels::draw()
     }
 
     fl_font(FL_HELVETICA, 10);
-    for (int r = 0; r < kMaxVisParams; r++) {
+    const int visRows = h() / kParamRowH;
+    for (int r = 0; r < visRows; r++) {
         int rowY = y() + r * kParamRowH;
         fl_color(0x1C2D3E00);
         fl_rectf(x(), rowY, w() - 1, kParamRowH);
@@ -95,15 +96,16 @@ void PatternParamGrid::draw()
     fl_push_clip(x(), y(), w() + 1, h() + 1);
 
     int gridRight = std::min(w(), (numCols_ - colOffset_) * colWidth_);
+    const int visRows = h() / kParamRowH;
 
     // Row backgrounds
-    for (int r = 0; r < kMaxVisParams; r++) {
+    for (int r = 0; r < visRows; r++) {
         fl_color(kParamRowBg);
         fl_rectf(x(), y() + r * kParamRowH, gridRight, kParamRowH);
     }
 
     // Horizontal separators
-    for (int r = 0; r <= kMaxVisParams; r++) {
+    for (int r = 0; r <= visRows; r++) {
         fl_color(kRowSep);
         fl_line(x(), y() + r * kParamRowH, x() + gridRight, y() + r * kParamRowH);
     }
@@ -119,11 +121,11 @@ void PatternParamGrid::draw()
         int x0 = x() + (i - colOffset_) * colWidth_;
         bool isBar = timeSigTop > 0 && i % timeSigTop == 0;
         fl_color(isBar ? (Fl_Color)0x00660000 : (Fl_Color)0x00EE0000);
-        fl_line(x0, y(), x0, y() + kMaxVisParams * kParamRowH);
+        fl_line(x0, y(), x0, y() + h());
     }
 
     // Param rubberbands
-    for (int r = 0; r < kMaxVisParams; r++) {
+    for (int r = 0; r < visRows; r++) {
         int li = r + laneOffset;
         if (li >= (int)localLanes.size()) break;
         drawParamRow(li, y() + r * kParamRowH, gridRight);
@@ -241,7 +243,8 @@ int PatternParamGrid::handle(int event)
     const int hitR       = dotR + 4;
 
     int ey = Fl::event_y() - y();
-    int vr = std::clamp(ey / kParamRowH, 0, kMaxVisParams - 1);
+    const int visRows = std::max(1, h() / kParamRowH);
+    int vr = std::clamp(ey / kParamRowH, 0, visRows - 1);
     int laneIdx = vr + laneOffset;
     bool overLane = laneIdx < (int)localLanes.size();
 

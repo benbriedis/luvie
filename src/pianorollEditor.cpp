@@ -62,7 +62,7 @@ int PianorollLabels::handle(int event)
 
 PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                                  int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + kParamAreaH + hScrollH, numCols, colWidth),
+    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       labels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       grid(numRows, numCols, rowHeight, colWidth, snap, popup),
       paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, labelsW),
@@ -95,7 +95,7 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
     }, this);
     paramScrollbar->hide();
 
-    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY + kParamAreaH,
+    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY,
                                     visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
     hScrollbar->linesize(1);
     hScrollbar->callback([](Fl_Widget* w, void* d) {
@@ -110,6 +110,8 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
     grid.size(visibleGridW, gridH);
     grid.setPlayhead(&playhead);
 
+    paramLabels.hide();
+    paramGrid.hide();
     paramGrid.setNumCols(numCols);
 
     add(*scrollbar);
@@ -219,64 +221,65 @@ void PianorollEditor::setColOffset(int offset)
 
 void PianorollEditor::updateParamScrollbar()
 {
-    if (!paramScrollbar) return;
     int total = paramGrid.numLanes();
-    if (total <= kMaxVisParams) {
-        paramScrollbar->hide();
-        paramLaneOffset = 0;
-    } else {
+    if (total > kMaxVisParams) {
         int maxOff = total - kMaxVisParams;
         paramLaneOffset = std::clamp(paramLaneOffset, 0, maxOff);
-        paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
-        paramScrollbar->show();
+        if (paramScrollbar)
+            paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
+    } else {
+        paramLaneOffset = 0;
     }
     paramGrid.setLaneOffset(paramLaneOffset);
     paramLabels.setLaneOffset(paramLaneOffset);
+    relayout();
+}
+
+void PianorollEditor::relayout()
+{
+    const int bx = x(), gy = y(), bw = w(), bh = h();
+    const int lanes      = paramGrid.numLanes();
+    const int visRows    = std::min(lanes, kMaxVisParams);
+    const int paramAreaH = visRows * kParamRowH;
+
+    const int newNumRows   = std::max(1, (bh - rulerH - paramAreaH - hScrollH) / grid.rowHeight);
+    const int visibleGridW = std::max(1, bw - scrollbarW - labelsW);
+    const int gridH        = newNumRows * grid.rowHeight;
+    const int paramY       = gy + rulerH + gridH;
+
+    scrollbar->resize(bx, gy + rulerH, scrollbarW, gridH);
+    labels.setNumRows(newNumRows);
+    labels.resize(bx + scrollbarW, gy + rulerH, labelsW, gridH);
+    grid.setNumRows(newNumRows);
+    grid.resize(bx + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
+
+    if (paramAreaH > 0) {
+        paramLabels.resize(bx + scrollbarW, paramY, labelsW, paramAreaH);
+        paramGrid.resize(bx + scrollbarW + labelsW, paramY, visibleGridW, paramAreaH);
+        paramLabels.show();
+        paramGrid.show();
+        if (lanes > kMaxVisParams) {
+            paramScrollbar->resize(bx, paramY, scrollbarW, paramAreaH);
+            paramScrollbar->show();
+        } else {
+            paramScrollbar->hide();
+        }
+    } else {
+        paramLabels.hide();
+        paramGrid.hide();
+        paramScrollbar->hide();
+    }
+
+    hScrollbar->resize(bx + scrollbarW + labelsW, paramY + paramAreaH, visibleGridW, hScrollH);
+
+    setRowOffset(grid.getRowOffset());
+    setColOffset(colOffset);
 }
 
 void PianorollEditor::resize(int x, int /*y*/, int w, int h)
 {
     Fl_Widget::resize(x, y(), w, h);
-
-    int gy           = y();
-    int newNumRows   = std::max(1, (h - rulerH - kParamAreaH - hScrollH) / grid.rowHeight);
-    int visibleGridW = std::max(1, w - scrollbarW - labelsW);
-    int gridH        = newNumRows * grid.rowHeight;
-    int paramY       = gy + rulerH + gridH;
-
-    scrollbar->resize(x, gy + rulerH, scrollbarW, gridH);
-    if (paramScrollbar) paramScrollbar->resize(x, paramY, scrollbarW, kParamAreaH);
-
-    labels.setNumRows(newNumRows);
-    labels.resize(x + scrollbarW, gy + rulerH, labelsW, gridH);
-    paramLabels.resize(x + scrollbarW, paramY, labelsW, kParamAreaH);
-
-    grid.setNumRows(newNumRows);
-    grid.resize(x + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
-    paramGrid.resize(x + scrollbarW + labelsW, paramY, visibleGridW, kParamAreaH);
-
-    hScrollbar->resize(x + scrollbarW + labelsW, paramY + kParamAreaH, visibleGridW, hScrollH);
-
-    setRowOffset(grid.getRowOffset());
-
-    int totalGridW = grid.numCols * grid.colWidth;
-    if (totalGridW > visibleGridW) {
-        int visibleCols = visibleGridW / grid.colWidth;
-        colOffset    = std::clamp(colOffset, 0, std::max(0, grid.numCols - visibleCols));
-        hScrollPixel = colOffset * grid.colWidth;
-        grid.setColOffset(colOffset);
-        paramGrid.setColOffset(colOffset);
-        hScrollbar->value(colOffset, visibleCols, 0, grid.numCols);
-        hScrollbar->show();
-    } else {
-        colOffset    = 0;
-        hScrollPixel = 0;
-        grid.setColOffset(0);
-        paramGrid.setColOffset(0);
-        hScrollbar->hide();
-    }
-
-    redraw();
+    relayout();
 }
 
 int PianorollEditor::handle(int event)

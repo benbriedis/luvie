@@ -67,6 +67,7 @@ class DrumPatternEditor : public Editor, public ITimelineObserver {
     void startDrumLabelEdit(int midiNote, int rowY, int rowH);
     void commitDrumLabelEdit();
     void cancelDrumLabelEdit();
+    void relayout();
     void updateParamScrollbar();
     int  handle(int event) override;
 

@@ -49,6 +49,7 @@ class PianorollEditor : public Editor, public ITimelineObserver {
 
     void setRowOffset(int offset);
     void setColOffset(int offset);
+    void relayout();
     void updateParamScrollbar();
     int  handle(int event) override;
 

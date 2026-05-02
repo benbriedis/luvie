@@ -317,3 +317,31 @@ Clicking and dragging to reorder the tracks in the song editor doesnt look great
 
 Add parameters rubberbands to pattern editors too?
    If a parameter is set in both places? Just play all the parameters as they come along?
+
+c having a "context is available' cursor
+....
+
+Split observerableTimeline:   -- more related to song editor
+       ==> observableSong
+   patterns and parameters should have their own observer
+   
+   
+TODO check parameters are saved and restored OK - both for the song editor and patterns
+
+cf a pane resize drag between the parameter and notes grids
+
+Separate modern GUI elements into modern/  (separate out an app-specific code, creating GUI subclasses where desirable)
+
+   
+
+Reconsider the leading and trailing rubberbands and initial dot for both song and pattern editors.
+ALSO are parameter changes actually being output yet?
+
+1. KEEP initial constrained dot  [STORE REASON FOR THIS SOMEWHERE + other design decisions]
+
+
+
+
+Design decisions
+----------------
+Initial dots (for looping, repositioning playhead, explict good)
