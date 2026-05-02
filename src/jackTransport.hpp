@@ -126,7 +126,7 @@ private:
     };
     struct ParamEventSnap {
         float beat;   // within-pattern beat (pattern-level) or bar position (song-level)
-        int   value;  // 0-127
+        int   value;  // 0-127 for CC, 0-16383 for pitch bend
     };
     struct ParamInstSnap {
         float startBar;

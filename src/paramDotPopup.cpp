@@ -23,7 +23,7 @@ ParamDotPopup::ParamDotPopup()
     lbl->box(FL_NO_BOX);
 
     input = new Fl_Value_Input(pad + 30, row1Y, popupW - pad - 30 - pad, row1H);
-    input->range(0, 127);
+    input->range(0, 16383);
     input->step(1);
     input->box(FL_FLAT_BOX);
     input->color(popupInputBg);
@@ -75,11 +75,12 @@ int ParamDotPopup::handle(int event)
     return BasePopup::handle(event);
 }
 
-void ParamDotPopup::open(int wx, int wy, int value, bool isAnchor,
+void ParamDotPopup::open(int wx, int wy, int value, bool isAnchor, int maxVal,
                          std::function<void(int)> onOk,
                          std::function<void()>    onDelete)
 {
     committed  = false;
+    input->range(0, maxVal);
     input->value(value);
     isAnchor ? deleteBtn->deactivate() : deleteBtn->activate();
     onOkCb     = std::move(onOk);

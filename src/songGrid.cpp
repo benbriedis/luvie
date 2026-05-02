@@ -93,7 +93,8 @@ void SongGrid::rebuildParamLanes()
     if (!timeline) return;
     for (const auto& lane : timeline->get().paramLanes) {
         ParamLaneLocal local;
-        local.id = lane.id;
+        local.id   = lane.id;
+        local.type = lane.type;
         for (const auto& pt : lane.points)
             local.points.push_back({pt.id, pt.beat, pt.value, pt.anchor});
         localParamLanes.push_back(std::move(local));
@@ -137,9 +138,10 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
     const int dotR = std::max(2, rowHeight / 9);
     const int totalRange = rowHeight - 1 - 2 * dotR;
     if (totalRange <= 0) return;
+    const int maxVal = laneMaxValue(lane.type);
 
     auto dotYFor = [&](int value) {
-        return rowY + dotR + (int)((127 - value) * totalRange / 127.0f);
+        return rowY + dotR + (int)((maxVal - value) * totalRange / (float)maxVal);
     };
 
     // Virtual dot: hollow dotted circle at left edge, value from last off-screen dot
@@ -210,7 +212,8 @@ int SongGrid::findParamPointAtCursor(int laneIdx) const
     for (int i = 0; i < (int)localParamLanes[laneIdx].points.size(); i++) {
         const auto& pt = localParamLanes[laneIdx].points[i];
         int dotX = x() + (int)((pt.beat - colOffset) * colWidth);
-        int dotY = rowY + dotR + (totalRange > 0 ? (int)((127 - pt.value) * totalRange / 127.0f) : 0);
+        const int mv = laneMaxValue(localParamLanes[laneIdx].type);
+        int dotY = rowY + dotR + (totalRange > 0 ? (int)((mv - pt.value) * totalRange / (float)mv) : 0);
         float dx = (float)(ex - dotX);
         float dy = (float)(ey - dotY);
         float dist = std::sqrt(dx * dx + dy * dy);
@@ -267,7 +270,8 @@ int SongGrid::handleParamEvent(int event)
         int laneVR = visualRowForLaneId(localParamLanes[li].id);
         int rowY   = y() + (laneVR >= 0 ? laneVR : 0) * rowHeight;
         int value  = localParamLanes[li].points[predIdx].value;
-        return rowY + dotR + (totalRange > 0 ? (int)((127 - value) * totalRange / 127.0f) : 0);
+        int mv     = laneMaxValue(localParamLanes[li].type);
+        return rowY + dotR + (totalRange > 0 ? (int)((mv - value) * totalRange / (float)mv) : 0);
     };
 
     switch (event) {
@@ -286,8 +290,9 @@ int SongGrid::handleParamEvent(int event)
                 float beat = pt.beat;
                 int   val  = pt.value;
                 bool  anc  = pt.anchor;
+                int maxVal = laneMaxValue(localParamLanes[laneIdx].type);
                 paramState = ParamIdle{};
-                paramDotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc,
+                paramDotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
                         if (timeline) timeline->moveParamPoint(ptId, beat, newVal);
                     },
@@ -319,13 +324,15 @@ int SongGrid::handleParamEvent(int event)
                 }
             }
             if (!hitVirtual) {
-                float beat = (float)ex / colWidth + colOffset;
+                int maxVal  = laneIdx >= 0 && laneIdx < (int)localParamLanes.size()
+                              ? laneMaxValue(localParamLanes[laneIdx].type) : 127;
+                float beat  = (float)ex / colWidth + colOffset;
                 if (snap > 0.0f) beat = std::round(beat / snap) * snap;
                 beat = std::max(0.0f, beat);
                 int eyInRow = ey - vr * rowHeight;
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
-                int value   = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
-                paramState  = ParamPendingCreate{laneIdx, beat, std::clamp(value, 0, 127)};
+                int value   = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
+                paramState  = ParamPendingCreate{laneIdx, beat, std::clamp(value, 0, maxVal)};
             }
         }
         return 1;
@@ -333,11 +340,12 @@ int SongGrid::handleParamEvent(int event)
 
     case FL_DRAG: {
         if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
+            int maxVal  = laneMaxValue(localParamLanes[d->laneIdx].type);
             int laneVR  = visualRowForLaneId(localParamLanes[d->laneIdx].id);
             int eyInRow = ey - laneVR * rowHeight;
             int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
-            int newVal  = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
-            newVal = std::clamp(newVal, 0, 127);
+            int newVal  = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
+            newVal = std::clamp(newVal, 0, maxVal);
             auto& pt = localParamLanes[d->laneIdx].points[d->predPtIdx];
             if (newVal != pt.value) d->moved = true;
             pt.value = newVal;
@@ -364,11 +372,12 @@ int SongGrid::handleParamEvent(int event)
                 newBeat = std::clamp(newBeat, lo, hi);
             }
 
+            int maxVal   = laneMaxValue(localParamLanes[d->laneIdx].type);
             int laneVR   = visualRowForLaneId(localParamLanes[d->laneIdx].id);
             int eyInRow  = ey - laneVR * rowHeight;
             int mapped   = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
-            int newValue = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
-            newValue     = std::clamp(newValue, 0, 127);
+            int newValue = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
+            newValue     = std::clamp(newValue, 0, maxVal);
 
             auto& pt = localParamLanes[d->laneIdx].points[d->ptIdx];
             if (newBeat != pt.beat || newValue != pt.value) d->moved = true;

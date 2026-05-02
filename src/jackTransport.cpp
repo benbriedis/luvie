@@ -654,8 +654,8 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
         void* buf = findBuf(namedBufs, *p.portName);
         if (buf) {
             if (p.ccNumber < 0) {
-                // Pitch bend: map 0-127 → 0-16383 (14-bit).
-                int     val14 = (p.value * 16383) / 127;
+                // Pitch bend: value is already 0-16383 (14-bit).
+                int     val14 = p.value;
                 uint8_t msg[3] = {
                     static_cast<uint8_t>(0xE0 | (p.midiChannel & 0x0F)),
                     static_cast<uint8_t>(val14 & 0x7F),

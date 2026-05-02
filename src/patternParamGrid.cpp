@@ -89,7 +89,8 @@ void PatternParamGrid::rebuildLanes()
         if (p.id != patternId) continue;
         for (const auto& lane : p.paramLanes) {
             ParamLaneLocal local;
-            local.id = lane.id;
+            local.id   = lane.id;
+            local.type = lane.type;
             for (const auto& pt : lane.points)
                 local.points.push_back({pt.id, pt.beat, pt.value, pt.anchor});
             localLanes.push_back(std::move(local));
@@ -167,9 +168,10 @@ void PatternParamGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
     const int dotR = std::max(2, kParamRowH / 9);
     const int totalRange = kParamRowH - 1 - 2 * dotR;
     if (totalRange <= 0) return;
+    const int maxVal = laneMaxValue(lane.type);
 
     auto dotYFor = [&](int value) {
-        return rowY + dotR + (int)((127 - value) * totalRange / 127.0f);
+        return rowY + dotR + (int)((maxVal - value) * totalRange / (float)maxVal);
     };
 
     // Virtual dot (preceding off-screen point)
@@ -229,10 +231,11 @@ int PatternParamGrid::findParamPointAtCursor(int laneIdx, int rowY) const
     int bestIdx  = -1;
     float bestDist = (float)(hitR + 1);
 
+    const int maxVal = laneMaxValue(localLanes[laneIdx].type);
     for (int i = 0; i < (int)localLanes[laneIdx].points.size(); i++) {
         const auto& pt = localLanes[laneIdx].points[i];
         int dotX = x() + (int)((pt.beat - colOffset_) * colWidth_);
-        int dotY = rowY + dotR + (totalRange > 0 ? (int)((127 - pt.value) * totalRange / 127.0f) : 0);
+        int dotY = rowY + dotR + (totalRange > 0 ? (int)((maxVal - pt.value) * totalRange / (float)maxVal) : 0);
         float dx = (float)(ex - dotX);
         float dy = (float)(ey - dotY);
         float dist = std::sqrt(dx * dx + dy * dy);
@@ -277,13 +280,14 @@ int PatternParamGrid::handle(int event)
 
     int gridRight = std::min(w(), (numCols_ - colOffset_) * colWidth_);
 
-    auto dotYForRow = [&](int rowY, int value) {
-        return rowY + dotR + (totalRange > 0 ? (int)((127 - value) * totalRange / 127.0f) : 0);
+    auto dotYForRow = [&](int li, int rowY, int value) {
+        int mv = laneMaxValue(li < (int)localLanes.size() ? localLanes[li].type : std::string{});
+        return rowY + dotR + (totalRange > 0 ? (int)((mv - value) * totalRange / (float)mv) : 0);
     };
 
     auto virtualDotY = [&](int li, int predIdx) {
         int rowY = y() + (li - laneOffset) * kParamRowH;
-        return dotYForRow(rowY, localLanes[li].points[predIdx].value);
+        return dotYForRow(li, rowY, localLanes[li].points[predIdx].value);
     };
 
     auto isVirtualOverlapped = [&](int li) {
@@ -299,11 +303,12 @@ int PatternParamGrid::handle(int event)
         switch (event) {
         case FL_DRAG: {
             if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
+                int maxVal  = laneMaxValue(localLanes[d->laneIdx].type);
                 int laneVR  = d->laneIdx - laneOffset;
                 int eyInRow = ey - laneVR * kParamRowH;
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
-                int newVal  = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
-                newVal = std::clamp(newVal, 0, 127);
+                int newVal  = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
+                newVal = std::clamp(newVal, 0, maxVal);
                 auto& pt = localLanes[d->laneIdx].points[d->predPtIdx];
                 if (newVal != pt.value) d->moved = true;
                 pt.value = newVal;
@@ -327,11 +332,12 @@ int PatternParamGrid::handle(int event)
                     newBeat = std::clamp(newBeat, lo, hi);
                 }
 
+                int maxVal  = laneMaxValue(localLanes[d->laneIdx].type);
                 int laneVR  = d->laneIdx - laneOffset;
                 int eyInRow = ey - laneVR * kParamRowH;
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
-                int newValue = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
-                newValue = std::clamp(newValue, 0, 127);
+                int newValue = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
+                newValue = std::clamp(newValue, 0, maxVal);
 
                 auto& pt = localLanes[d->laneIdx].points[d->ptIdx];
                 if (newBeat != pt.beat || newValue != pt.value) d->moved = true;
@@ -391,8 +397,9 @@ int PatternParamGrid::handle(int event)
             if (ptIdx >= 0 && dotPopup) {
                 auto& pt = localLanes[laneIdx].points[ptIdx];
                 int ptId = pt.id; float beat = pt.beat; int val = pt.value; bool anc = pt.anchor;
+                int maxVal = laneMaxValue(localLanes[laneIdx].type);
                 paramState = ParamIdle{};
-                dotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc,
+                dotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
                         if (timeline) timeline->moveParamPoint(ptId, beat, newVal);
                     },
@@ -424,13 +431,14 @@ int PatternParamGrid::handle(int event)
                 }
             }
             if (!hitVirtual) {
-                float beat = (float)ex / colWidth_ + colOffset_;
+                int maxVal  = laneMaxValue(laneIdx < (int)localLanes.size() ? localLanes[laneIdx].type : std::string{});
+                float beat  = (float)ex / colWidth_ + colOffset_;
                 if (snap_ > 0.0f) beat = std::round(beat / snap_) * snap_;
                 beat = std::max(0.0f, beat);
                 int eyInRow = ey - vr * kParamRowH;
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
-                int value   = totalRange > 0 ? 127 - (int)(mapped * 127.0f / totalRange) : 63;
-                paramState  = ParamPendingCreate{laneIdx, beat, std::clamp(value, 0, 127)};
+                int value   = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
+                paramState  = ParamPendingCreate{laneIdx, beat, std::clamp(value, 0, maxVal)};
             }
         }
         return 1;

@@ -1,4 +1,5 @@
 #include "observableTimeline.hpp"
+#include "paramLaneTypes.hpp"
 #include <algorithm>
 #include <set>
 #include <cmath>
@@ -718,7 +719,7 @@ int ObservableTimeline::addParamLane(const std::string& type, int atIndex)
 	ParamLane lane;
 	lane.id   = laneId;
 	lane.type = type;
-	lane.points.push_back({nextId++, 0.0f, 63, true});
+	lane.points.push_back({nextId++, 0.0f, laneMaxValue(type) / 2, true});
 	data.paramLanes.push_back(std::move(lane));
 	RowRef ref{false, laneId};
 	if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
@@ -749,7 +750,7 @@ int ObservableTimeline::addParamPoint(int laneId, float beat, int value)
 		int ptId = nextId++;
 		auto it = std::lower_bound(lane.points.begin(), lane.points.end(),
 			beat, [](const ParamPoint& p, float b) { return p.beat < b; });
-		lane.points.insert(it, {ptId, beat, std::clamp(value, 0, 127), false});
+		lane.points.insert(it, {ptId, beat, std::clamp(value, 0, laneMaxValue(lane.type)), false});
 		notify();
 		return ptId;
 	}
@@ -794,7 +795,7 @@ int ObservableTimeline::addPatternParamLane(int patId, const std::string& type)
 		ParamLane lane;
 		lane.id   = laneId;
 		lane.type = type;
-		lane.points.push_back({nextId++, 0.0f, 63, true});
+		lane.points.push_back({nextId++, 0.0f, laneMaxValue(type) / 2, true});
 		p.paramLanes.push_back(std::move(lane));
 		notify();
 		return laneId;
@@ -823,7 +824,7 @@ void ObservableTimeline::moveParamPoint(int pointId, float beat, int value)
 				if (pt.id != pointId) continue;
 				if (!pt.anchor)
 					pt.beat  = std::max(0.0f, beat);
-				pt.value = std::clamp(value, 0, 127);
+				pt.value = std::clamp(value, 0, laneMaxValue(lane.type));
 				std::stable_sort(lane.points.begin(), lane.points.end(),
 					[](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
 				notify();
@@ -846,7 +847,7 @@ int ObservableTimeline::addPatternParamPoint(int patId, int laneId, float beat, 
 			int ptId = nextId++;
 			auto it = std::lower_bound(lane.points.begin(), lane.points.end(),
 				beat, [](const ParamPoint& p, float b) { return p.beat < b; });
-			lane.points.insert(it, {ptId, beat, std::clamp(value, 0, 127), false});
+			lane.points.insert(it, {ptId, beat, std::clamp(value, 0, laneMaxValue(lane.type)), false});
 			notify();
 			return ptId;
 		}

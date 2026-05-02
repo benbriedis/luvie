@@ -10,7 +10,7 @@ class ParamDotPopup : public BasePopup {
 public:
     ParamDotPopup();
 
-    void open(int wx, int wy, int value, bool isAnchor,
+    void open(int wx, int wy, int value, bool isAnchor, int maxVal,
               std::function<void(int)> onOk,
               std::function<void()>    onDelete);
 

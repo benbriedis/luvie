@@ -3,6 +3,13 @@
 
 #include <vector>
 #include <variant>
+#include <string>
+
+// Returns the maximum value for a param lane: 16383 for pitch bend, 127 for CC lanes.
+inline int laneMaxValue(const std::string& type)
+{
+    return (type == "Pitch") ? 16383 : 127;
+}
 
 struct ParamPtLocal {
     int   id;
@@ -13,6 +20,7 @@ struct ParamPtLocal {
 
 struct ParamLaneLocal {
     int                       id;
+    std::string               type;
     std::vector<ParamPtLocal> points;  // sorted by beat
 };
 

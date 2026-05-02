@@ -260,13 +260,10 @@ Also wrt MIDI GM1.0:  https://en.wikipedia.org/wiki/General_MIDI
 						as well as all General MIDI Level 1 System Messages.
 
 CC messages: Sent on a channel I think. GM1.0 values are:
-	0 - pitch bend
+	0 - pitch bend   [NOTE THE RANGE FOR THIS IS 0–16383 - IVE IMPLEMENTED THIS BIT]
 	1 - modulation wheel
 	7 - channel volume
 	etc
-
-TO CHECK: Claude said it did this... investigate...  Store pitch bend as 0-16383??
-	CC mapping: Modulation→CC1, Volume→CC7, Pan→CC10, Expression→CC11, Pitch→14-bit pitch bend (0–127 mapped to 0–16383).
 
              
 Registered parameters (RPN support) - a few standard parameters 

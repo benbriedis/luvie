@@ -37,7 +37,7 @@ struct TimeSigMarker {
 struct ParamPoint {
 	int   id;
 	float beat;
-	int   value   = 63;    // 0-127
+	int   value   = 63;    // 0-127 for CC, 0-16383 for pitch bend
 	bool  anchor  = false; // can't be deleted or moved horizontally
 };
 
