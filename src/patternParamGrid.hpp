@@ -9,6 +9,7 @@
 #include <FL/fl_draw.H>
 #include <functional>
 #include <vector>
+#include <string>
 
 inline constexpr int kParamRowH    = 45;
 inline constexpr int kMaxVisParams = 2;
@@ -21,9 +22,12 @@ class PatternParamLabels : public Fl_Widget {
     int                 patternId  = -1;
     int                 laneOffset = 0;
 
-    void draw() override;
+    void draw()           override;
+    int  handle(int event) override;
 
 public:
+    std::function<void(int laneId)> onRightClick;
+
     PatternParamLabels(int x, int y, int w)
         : Fl_Widget(x, y, w, kParamAreaH) {}
 

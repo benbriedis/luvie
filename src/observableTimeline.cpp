@@ -802,6 +802,19 @@ int ObservableTimeline::addPatternParamLane(int patId, const std::string& type)
 	return -1;
 }
 
+void ObservableTimeline::removePatternParamLane(int laneId)
+{
+	for (auto& p : data.patterns) {
+		auto it = std::find_if(p.paramLanes.begin(), p.paramLanes.end(),
+			[laneId](const ParamLane& l) { return l.id == laneId; });
+		if (it != p.paramLanes.end()) {
+			p.paramLanes.erase(it);
+			notify();
+			return;
+		}
+	}
+}
+
 void ObservableTimeline::moveParamPoint(int pointId, float beat, int value)
 {
 	auto tryMove = [&](std::vector<ParamLane>& lanes) {

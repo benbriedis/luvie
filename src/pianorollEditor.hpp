@@ -60,6 +60,7 @@ public:
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
+    void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     void onTimelineChanged() override;
     void resize(int x, int y, int w, int h) override;

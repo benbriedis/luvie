@@ -52,6 +52,33 @@ void PatternParamLabels::draw()
     fl_line(x(), y() + h() - 1, x() + w() - 1, y() + h() - 1);
 }
 
+int PatternParamLabels::handle(int event)
+{
+    switch (event) {
+    case FL_ENTER:
+        return 1;
+    case FL_PUSH:
+        if (Fl::event_button() == FL_RIGHT_MOUSE) {
+            int vr = (Fl::event_y() - y()) / kParamRowH;
+            int laneIdx = vr + laneOffset;
+            int laneId = -1;
+            if (timeline) {
+                for (const auto& p : timeline->get().patterns) {
+                    if (p.id != patternId) continue;
+                    if (laneIdx < (int)p.paramLanes.size())
+                        laneId = p.paramLanes[laneIdx].id;
+                    break;
+                }
+            }
+            if (onRightClick) onRightClick(laneId);
+            return 1;
+        }
+        return 1;
+    default:
+        return Fl_Widget::handle(event);
+    }
+}
+
 // ── PatternParamGrid ──────────────────────────────────────────────────────────
 
 void PatternParamGrid::rebuildLanes()

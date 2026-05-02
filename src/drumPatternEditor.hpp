@@ -80,6 +80,7 @@ public:
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
+    void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
                         const std::map<std::string, bool>& fallbacks);

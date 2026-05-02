@@ -97,6 +97,7 @@ public:
 	// Pattern-level param lane management
 	bool hasPatternParamLane(int patId, const std::string& type) const;
 	int  addPatternParamLane(int patId, const std::string& type);
+	void removePatternParamLane(int laneId);
 	int  addPatternParamPoint(int patId, int laneId, float beat, int value);
 
 	// Build a flat Note list for grid consumption (row = track index)

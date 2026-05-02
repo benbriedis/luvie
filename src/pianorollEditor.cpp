@@ -164,6 +164,25 @@ void PianorollEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
     };
 }
 
+void PianorollEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
+{
+    paramLabels.onRightClick = [this, popup](int laneId) {
+        if (!popup || !timeline || lastSelectedTrack < 0) return;
+        const auto& tracks = timeline->get().tracks;
+        if (lastSelectedTrack >= (int)tracks.size()) return;
+        int patId = tracks[lastSelectedTrack].patternId;
+        std::function<void()> onRemove;
+        if (laneId >= 0)
+            onRemove = [this, laneId]() { timeline->removePatternParamLane(laneId); };
+        popup->open(
+            Fl::event_x_root(), Fl::event_y_root(),
+            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); },
+            std::move(onRemove)
+        );
+    };
+}
+
 void PianorollEditor::onTimelineChanged()
 {
     if (!timeline) return;

@@ -137,8 +137,8 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
-    auto* pdPop     = new ParamDotPopup{};
-    auto* nlCtxPop  = new NoteLabelsContextPopup;
+    auto* pdPop      = new ParamDotPopup{};
+    auto* nlCtxPop   = new NoteLabelsContextPopup;
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -273,6 +273,9 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     patternEd->setNoteLabelsContextPopup(nlCtxPop);
     drumEd->setNoteLabelsContextPopup(nlCtxPop);
     pianorollEd->setNoteLabelsContextPopup(nlCtxPop);
+    patternEd->setParamLabelsContextPopup(nlCtxPop);
+    drumEd->setParamLabelsContextPopup(nlCtxPop);
+    pianorollEd->setParamLabelsContextPopup(nlCtxPop);
     patternEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);

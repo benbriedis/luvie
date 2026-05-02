@@ -47,6 +47,7 @@ public:
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
+    void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     int  numPatternBeats() const { return patternGrid.numCols; }
     void onTimelineChanged() override;
