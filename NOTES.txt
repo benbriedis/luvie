@@ -328,8 +328,6 @@ cf a pane resize drag between the parameter and notes grids
 
 Separate modern GUI elements into modern/  (separate out an app-specific code, creating GUI subclasses where desirable)
 
-UG: note right at the start of the song not playing?
-
 When 2 patterns share a channel and parameter maybe highlight in red and have a hover-over error message   
    
 Extra space under the parameter grid - maybe use a flex column?
@@ -340,21 +338,4 @@ cf looping and repositioning:
   and/or explicitly dealing with each notes and/or parameter...
        
 
-
-Design decisions
-----------------
-1. Re the use of "initial dots" for parameter rubberbands in both the song editor and pattern editors...
-   could be removed, but I think its better to have them for when we loop segments 
-   and otherwise reposition the playhead. In these cases it is fairly clear how the parameters are to be handled.
-
-1. Re use of trailing rubber band after the final parameter dot... Could be removed, but its clearer that the value has
-   been changed and we can see what it is, so the extra clutter is likely worth it.
-
-2. Re clashing of parameter values:
-	Sometimes an instrument may receive multiple contradictory parameter changes at the same moment. In these cases changes 
-	from the Song Editor parameter lanes receive the lowest priority, and for the patterns the priority increases with the 
-	pattern track number as read top to bottom on the UI (eg a change in track 7 trumps a change in track 2).       
-	My thinking: patterns are more specific than the song and should probably take priority for that reason.
-	My thinking: between patterns its good to have a simple rule. Also the lower patterns were more likely added later so the 
-	             user is more likely to expect them to take priority. 
 
