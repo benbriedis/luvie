@@ -1,5 +1,6 @@
 #include "patternEditor.hpp"
 #include "chords.hpp"
+#include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <climits>
@@ -215,6 +216,21 @@ int PatternEditor::handle(int event)
         return 1;
     }
     return Editor::handle(event);
+}
+
+void PatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
+{
+    noteLabels.onRightClick = [this, popup]() {
+        if (!popup || !timeline || lastSelectedTrack < 0) return;
+        const auto& tracks = timeline->get().tracks;
+        if (lastSelectedTrack >= (int)tracks.size()) return;
+        int patId = tracks[lastSelectedTrack].patternId;
+        popup->open(
+            Fl::event_x_root(), Fl::event_y_root(),
+            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); }
+        );
+    };
 }
 
 void PatternEditor::focusPattern()

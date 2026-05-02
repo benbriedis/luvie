@@ -769,6 +769,33 @@ void ObservableTimeline::removeParamPoint(int pointId)
 	}
 }
 
+bool ObservableTimeline::hasPatternParamLane(int patId, const std::string& type) const
+{
+	for (const auto& p : data.patterns) {
+		if (p.id != patId) continue;
+		for (const auto& lane : p.paramLanes)
+			if (lane.type == type) return true;
+		return false;
+	}
+	return false;
+}
+
+int ObservableTimeline::addPatternParamLane(int patId, const std::string& type)
+{
+	for (auto& p : data.patterns) {
+		if (p.id != patId) continue;
+		int laneId = nextId++;
+		ParamLane lane;
+		lane.id   = laneId;
+		lane.type = type;
+		lane.points.push_back({nextId++, 0.0f, 63, true});
+		p.paramLanes.push_back(std::move(lane));
+		notify();
+		return laneId;
+	}
+	return -1;
+}
+
 void ObservableTimeline::moveParamPoint(int pointId, float beat, int value)
 {
 	for (auto& lane : data.paramLanes) {

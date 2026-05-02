@@ -3,6 +3,7 @@
 
 #include "editor.hpp"
 #include "drumGrid.hpp"
+#include "noteLabelsContextPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
@@ -32,6 +33,7 @@ public:
     void setFallbackNoteNames(bool b) { fallbackNoteNames = b; redraw(); }
 
     std::function<void(int midiNote, int rowY, int rowH)> onRowDoubleClicked;
+    std::function<void()> onRightClick;
 };
 
 // ---------------------------------------------------------------------------
@@ -69,6 +71,7 @@ public:
     std::function<void(const std::string& chanName, int midiNote, const std::string& label)> onDrumLabelChanged;
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
+    void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
                         const std::map<std::string, bool>& fallbacks);
     void onTimelineChanged() override;

@@ -1,5 +1,6 @@
 #include "pianorollEditor.hpp"
 #include <FL/fl_draw.H>
+#include <FL/Fl.H>
 #include <algorithm>
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,18 @@ void PianorollLabels::draw()
         fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
                 FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
     }
+}
+
+int PianorollLabels::handle(int event)
+{
+    if (event == FL_PUSH) {
+        if (Fl::event_button() == FL_RIGHT_MOUSE) {
+            if (onRightClick) onRightClick();
+            return 1;
+        }
+        return 1;
+    }
+    return Fl_Widget::handle(event);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +125,21 @@ void PianorollEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl, 
     swapObserver(timeline, tl, this);
     playhead.setTransport(t, tl);
     playhead.setPatternTrack(trackIndex);
+}
+
+void PianorollEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
+{
+    labels.onRightClick = [this, popup]() {
+        if (!popup || !timeline || lastSelectedTrack < 0) return;
+        const auto& tracks = timeline->get().tracks;
+        if (lastSelectedTrack >= (int)tracks.size()) return;
+        int patId = tracks[lastSelectedTrack].patternId;
+        popup->open(
+            Fl::event_x_root(), Fl::event_y_root(),
+            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); }
+        );
+    };
 }
 
 void PianorollEditor::onTimelineChanged()

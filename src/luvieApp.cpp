@@ -21,6 +21,7 @@
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
 #include "paramDotPopup.hpp"
+#include "noteLabelsContextPopup.hpp"
 
 std::string LuvieApp::lastFileDir;
 
@@ -136,6 +137,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     auto* ctxPop    = new TrackContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop     = new ParamDotPopup{};
+    auto* nlCtxPop  = new NoteLabelsContextPopup;
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -267,6 +269,9 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     patternEd->setPatternPlayhead(transport, timeline, 0);
     drumEd->setPatternPlayhead(transport, timeline, 0);
     pianorollEd->setPatternPlayhead(transport, timeline, 0);
+    patternEd->setNoteLabelsContextPopup(nlCtxPop);
+    drumEd->setNoteLabelsContextPopup(nlCtxPop);
+    pianorollEd->setNoteLabelsContextPopup(nlCtxPop);
 
     // ---- Note label / params sync ----
     auto syncNoteLabels = [this]() {
@@ -302,6 +307,8 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);
     window->add(pdPop);  window->registerPopup(pdPop);
+    window->add(nlCtxPop); window->registerPopup(nlCtxPop);
+    window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
 
     // Connections overlay last — large sub-window, click-away via registerPopup.
     {

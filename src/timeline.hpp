@@ -34,12 +34,26 @@ struct TimeSigMarker {
 	int bottom;
 };
 
+struct ParamPoint {
+	int   id;
+	float beat;
+	int   value   = 63;    // 0-127
+	bool  anchor  = false; // can't be deleted or moved horizontally
+};
+
+struct ParamLane {
+	int                      id;
+	std::string              type;    // "Pitch", "Modulation", etc.
+	std::vector<ParamPoint>  points;  // sorted by beat
+};
+
 struct Pattern {
 	int   id;
 	float lengthBeats;
-	PatternType       type = PatternType::STANDARD;
-	std::vector<Note>     notes;
-	std::vector<DrumNote> drumNotes;
+	PatternType            type = PatternType::STANDARD;
+	std::vector<Note>      notes;
+	std::vector<DrumNote>  drumNotes;
+	std::vector<ParamLane> paramLanes;
 	std::string outputInstrumentName;  // empty = no routing assigned
 	int timeSigTop    = 4;
 	int timeSigBottom = 4;
@@ -58,19 +72,6 @@ struct Track {
 	std::string label;
 	int         patternId = 0;   // the pattern displayed in the pattern editor for this track
 	std::vector<PatternInstance> patterns;
-};
-
-struct ParamPoint {
-	int   id;
-	float beat;
-	int   value   = 63;    // 0-127
-	bool  anchor  = false; // can't be deleted or moved horizontally
-};
-
-struct ParamLane {
-	int                      id;
-	std::string              type;    // "Pitch", "Modulation", etc.
-	std::vector<ParamPoint>  points;  // sorted by beat
 };
 
 // One entry per visible row; determines display order of tracks and param lanes.

@@ -4,6 +4,7 @@
 #include "editor.hpp"
 #include "patternGrid.hpp"
 #include "noteLabels.hpp"
+#include "noteLabelsContextPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableTimeline.hpp"
@@ -37,6 +38,7 @@ public:
 
     void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
+    void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     int  numPatternBeats() const { return patternGrid.numCols; }
     void onTimelineChanged() override;
     void resize(int x, int y, int w, int h) override;

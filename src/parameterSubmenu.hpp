@@ -53,19 +53,23 @@ public:
         hide();
     }
 
-    void update(ObservableTimeline* tl) {
+    void update(const std::function<bool(const char*)>& hasFn) {
         for (int i = 0; i < numItems; ++i) {
-            bool has = tl && tl->hasParamLane(typeNames[i]);
+            bool has = hasFn(typeNames[i]);
             items[i]->label(has ? tickedLabels[i] : typeNames[i]);
             has ? items[i]->deactivate() : items[i]->activate();
         }
         redraw();
     }
 
+    void update(ObservableTimeline* tl) {
+        update([tl](const char* type) { return tl && tl->hasParamLane(type); });
+    }
+
     // Update state and show the submenu positioned to the right of `parent` at `btnY`,
     // clamping to stay inside the parent window.
-    void showFor(BasePopup* parent, int btnY, ObservableTimeline* tl) {
-        update(tl);
+    void showFor(BasePopup* parent, int btnY, const std::function<bool(const char*)>& hasFn) {
+        update(hasFn);
         int subX = parent->x() + parent->w();
         int subY = btnY;
         if (auto* win = parent->window()) {
@@ -75,6 +79,10 @@ public:
         }
         position(subX, subY);
         show();
+    }
+
+    void showFor(BasePopup* parent, int btnY, ObservableTimeline* tl) {
+        showFor(parent, btnY, [tl](const char* type) { return tl && tl->hasParamLane(type); });
     }
 };
 

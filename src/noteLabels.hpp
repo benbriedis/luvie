@@ -30,6 +30,7 @@ class NoteLabels : public Fl_Widget {
 
 public:
     std::function<void()> onFocus;
+    std::function<void()> onRightClick;
 
     NoteLabels(int x, int y, int w, int numRows, int rowHeight);
 

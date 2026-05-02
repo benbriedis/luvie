@@ -49,6 +49,10 @@ void DrumNoteLabels::draw()
 int DrumNoteLabels::handle(int event)
 {
     if (event == FL_PUSH) {
+        if (Fl::event_button() == FL_RIGHT_MOUSE) {
+            if (onRightClick) onRightClick();
+            return 1;
+        }
         if (Fl::event_clicks() >= 1 && onRowDoubleClicked) {
             int r = (Fl::event_y() - y()) / rowHeight;
             if (r >= 0 && r < numRows) {
@@ -150,6 +154,21 @@ void DrumPatternEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl
     swapObserver(timeline, tl, this);
     playhead.setTransport(t, tl);
     playhead.setPatternTrack(trackIndex);
+}
+
+void DrumPatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
+{
+    drumLabels.onRightClick = [this, popup]() {
+        if (!popup || !timeline || lastSelectedTrack < 0) return;
+        const auto& tracks = timeline->get().tracks;
+        if (lastSelectedTrack >= (int)tracks.size()) return;
+        int patId = tracks[lastSelectedTrack].patternId;
+        popup->open(
+            Fl::event_x_root(), Fl::event_y_root(),
+            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); }
+        );
+    };
 }
 
 void DrumPatternEditor::setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,

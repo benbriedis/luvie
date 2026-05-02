@@ -136,10 +136,13 @@ int NoteLabels::handle(int event) {
     case FL_ENTER:
         return 1;
     case FL_PUSH:
+        if (Fl::event_button() == FL_RIGHT_MOUSE) {
+            if (onRightClick) onRightClick();
+            return 1;
+        }
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             if (Fl::event_y() >= y() + h() - rowHeight) {
                 if (onFocus) onFocus();
-                return 1;
             }
         }
         return 1;
