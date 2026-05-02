@@ -19,13 +19,27 @@
 
 int main(int argc, char **argv) {
     bool verbose = false;
+    bool testMode = false;
     std::string projectPath;   // optional CLI project file (standalone only)
     int  fltk_argc = 1;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg == "--verbose" || arg == "-v")
+        if (arg == "--help" || arg == "-h") {
+            printf("Usage: luvie [options] [project-file]\n\n"
+                   "Options:\n"
+                   "  --verbose        Print notes and parameter changes during playback\n"
+                   "  --test           Use internal transport; skip JACK (implies --verbose)\n"
+                   "  -h, --help       Show this help message\n\n"
+                   "Arguments:\n"
+                   "  project-file     Path to a .json project file to open on startup\n\n"
+                   "Environment:\n"
+                   "  NSM_URL          Connect to a Non Session Manager at this OSC address\n");
+            return 0;
+        } else if (arg == "--verbose")
             verbose = true;
+        else if (arg == "--test")
+            testMode = verbose = true;
         else if (!arg.empty() && arg[0] != '-' && projectPath.empty())
             projectPath = arg;   // first non-flag arg treated as project file
         else
@@ -52,7 +66,7 @@ int main(int argc, char **argv) {
 
     JackTransport  jackTransport;
     SimpleTransport simpleTransport;
-    bool useJack = jackTransport.open();
+    bool useJack = !testMode && jackTransport.open();
     ITransport* transport = useJack
         ? static_cast<ITransport*>(&jackTransport)
         : static_cast<ITransport*>(&simpleTransport);

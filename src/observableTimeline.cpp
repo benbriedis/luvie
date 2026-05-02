@@ -719,7 +719,7 @@ int ObservableTimeline::addParamLane(const std::string& type, int atIndex)
 	ParamLane lane;
 	lane.id   = laneId;
 	lane.type = type;
-	lane.points.push_back({nextId++, 0.0f, laneMaxValue(type) / 2, true});
+	lane.points.push_back({nextId++, 0.0f, laneDefaultValue(type), true});
 	data.paramLanes.push_back(std::move(lane));
 	RowRef ref{false, laneId};
 	if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
@@ -795,7 +795,7 @@ int ObservableTimeline::addPatternParamLane(int patId, const std::string& type)
 		ParamLane lane;
 		lane.id   = laneId;
 		lane.type = type;
-		lane.points.push_back({nextId++, 0.0f, laneMaxValue(type) / 2, true});
+		lane.points.push_back({nextId++, 0.0f, laneDefaultValue(type), true});
 		p.paramLanes.push_back(std::move(lane));
 		notify();
 		return laneId;

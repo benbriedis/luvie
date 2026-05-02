@@ -11,6 +11,16 @@ inline int laneMaxValue(const std::string& type)
     return (type == "Pitch") ? 16383 : 127;
 }
 
+// Returns the MIDI default (reset) value for a param lane.
+inline int laneDefaultValue(const std::string& type)
+{
+    if (type == "Pitch")      return 8192;  // no bend
+    if (type == "Volume")     return 100;
+    if (type == "Pan")        return 64;    // center
+    if (type == "Expression") return 127;
+    return 0;  // Modulation and unknowns
+}
+
 struct ParamPtLocal {
     int   id;
     float beat;

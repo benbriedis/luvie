@@ -306,21 +306,16 @@ ETC...
 
 
 
-WHEN IMPLEMENTING parameter playing:
-  - 2 dots at the same position: only play the 2nd one (ie the 2nd one along the length of the rubberband)
-  - ensure parameter values are sent before note starts changes. (Ideally send note ends, then parameter changes, then note starts)
-
 Hook up to MIDI output - output MIDI commands every time a halfway boundary is reached
 
 cf "Track" ==> "Lane" generally
 
 Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
-Add parameters rubberbands to pattern editors too?
-   If a parameter is set in both places? Just play all the parameters as they come along?
-
-c having a "context is available' cursor
+cf having a "context is available' cursor
 ....
+
+Did I put a version number in the session files?
 
 Split observerableTimeline:   -- more related to song editor
        ==> observableSong
@@ -363,4 +358,3 @@ Design decisions
 	My thinking: between patterns its good to have a simple rule. Also the lower patterns were more likely added later so the 
 	             user is more likely to expect them to take priority. 
 
-Initial dots (for looping, repositioning playhead, explict good)
