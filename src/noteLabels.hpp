@@ -29,7 +29,6 @@ class NoteLabels : public Fl_Widget {
     int         handle(int event) override;
 
 public:
-    std::function<void()> onFocus;
     std::function<void()> onRightClick;
 
     NoteLabels(int x, int y, int w, int numRows, int rowHeight);

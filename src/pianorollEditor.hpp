@@ -52,6 +52,7 @@ class PianorollEditor : public BasePatternEditor {
     void setGridPattern(int patId) override;
 
 public:
+    void focusPattern() override;
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                     int rowHeight, int colWidth, float snap, Popup& popup);
     ~PianorollEditor();

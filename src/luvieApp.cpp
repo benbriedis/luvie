@@ -291,6 +291,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (onExtraParamsChanged) onExtraParamsChanged();
     };
     patternPanel->onParamsChanged = syncNoteLabels;
+    patternPanel->onFocus = [this]() {
+        if (drumEd && drumEd->visible())
+            drumEd->focusPattern();
+        else if (pianorollEd && pianorollEd->visible())
+            pianorollEd->focusPattern();
+        else if (patternEd)
+            patternEd->focusPattern();
+    };
     syncNoteLabels();
 
     // ---- Menu callbacks ----

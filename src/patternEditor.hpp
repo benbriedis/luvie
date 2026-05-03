@@ -17,7 +17,6 @@ class PatternEditor : public BasePatternEditor {
     int         chordType       = 0;
 
     int  computeDefaultOffset(int patId) const;
-    void focusPattern();
 
     int  labelsWidth()      const override { return labelsW; }
     int  totalRows()        const override { return noteLabels.getTotalTones(); }
@@ -46,6 +45,7 @@ public:
 
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
     int  numPatternBeats() const { return patternGrid.numCols; }
+    void focusPattern() override;
 };
 
 #endif

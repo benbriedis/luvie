@@ -57,6 +57,7 @@ protected:
 public:
     ~BasePatternEditor();
 
+    virtual void focusPattern() {}
     void setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);

@@ -7,24 +7,26 @@
 #include <FL/Fl_Window.H>
 #include <cmath>
 
-static constexpr int pad          = 3;
-static constexpr int sg           = 3;    // small gap within base group
-static constexpr int groupGap     = 12;   // between base group and chord
-static constexpr int ctrlH        = 24;
-static constexpr int labelW       = 55;
-static constexpr int nameW        = 150;
-static constexpr int toggleBtnW   = 26;
-static constexpr int rootChoiceW  = 110;
-static constexpr int choiceW      = 130;
+static constexpr int pad           = 3;
+static constexpr int sg            = 3;    // small gap within base group
+static constexpr int groupGap      = 12;   // between base group and chord
+static constexpr int ctrlH         = 24;
+static constexpr int labelW        = 55;
+static constexpr int nameW         = 150;
+static constexpr int recentreBtnW  = 26;
+static constexpr int toggleBtnW    = 26;
+static constexpr int rootChoiceW   = 110;
+static constexpr int choiceW       = 130;
 static constexpr int timeSigLabelW = 28;
 static constexpr int timeSigNumW   = 40;
 static constexpr int slashW        = 12;
 static constexpr int timeSigDenW   = 50;
 static constexpr int barsLabelW    = 36;
 static constexpr int barsInputW    = 40;
-static constexpr int outChoiceW   = 155;
+static constexpr int outChoiceW    = 155;
 
-static int nameX(int x)          { return x + pad; }
+static int recentreBtnX(int x)   { return x + pad; }
+static int nameX(int x)          { return recentreBtnX(x) + recentreBtnW + pad; }
 static int outChoiceX(int x)     { return nameX(x) + nameW + pad; }
 static int baseLabelX(int x)     { return outChoiceX(x) + outChoiceW + groupGap; }
 static int sharpFlatBtnX(int x)  { return baseLabelX(x) + labelW + sg; }
@@ -41,6 +43,7 @@ static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
+      recentreBtn (recentreBtnX(x),   ctrlY(y,h), recentreBtnW,  ctrlH),
       patternName (nameX(x),          ctrlY(y,h), nameW,         ctrlH),
       outChoice   (outChoiceX(x),     ctrlY(y,h), outChoiceW,    ctrlH),
       baseLabel   (baseLabelX(x),     ctrlY(y,h), labelW,        ctrlH, "Base"),
@@ -57,6 +60,11 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       input       (nameX(x),          ctrlY(y,h), nameW,         ctrlH)
 {
     box(FL_NO_BOX);
+
+    recentreBtn.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (self->onFocus) self->onFocus();
+    }, this);
 
     patternName.box(FL_NO_BOX);
     patternName.labelcolor(panelText);

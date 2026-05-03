@@ -132,6 +132,7 @@ cf Show recent projects - Probably need program settings to remember between run
 
 TODO review the format of the JSON file
      cf a Zod-like description?
+	 ** May help write migrators later **
      cf a version number?
 
 Allow the window close to be clicked even if a popup of menu is showing.
@@ -152,8 +153,6 @@ Song editor - scrollbar should follow playhead (at least by default).
 cf conversion routine to clone a regular pattern to pianoroll. The opposite way would be harder, but something could be attempted in time maybe.
 
 -------------------
-
-Drum patterns and pianoroll should have a 'center' button too. (Move down into controls row?)
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
 

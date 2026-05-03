@@ -115,6 +115,19 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
 
 DrumPatternEditor::~DrumPatternEditor() = default;
 
+void DrumPatternEditor::focusPattern()
+{
+    if (!pattern || lastSelectedTrack < 0) { setRowOffset(24); return; }
+    const auto& tracks = pattern->get().tracks;
+    if (lastSelectedTrack >= (int)tracks.size()) { setRowOffset(24); return; }
+    int patId = tracks[lastSelectedTrack].patternId;
+    auto notes = pattern->buildDrumPatternNotes(patId);
+    if (notes.empty()) { setRowOffset(24); return; }
+    int lowest = 127;
+    for (const auto& n : notes) lowest = std::min(lowest, n.note);
+    setRowOffset(std::max(0, lowest - 1));
+}
+
 void DrumPatternEditor::setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
                                        const std::map<std::string, bool>& fallbacks)
 {

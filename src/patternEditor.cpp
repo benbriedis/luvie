@@ -26,8 +26,6 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
 
     playhead.setOwner(this);
 
-    noteLabels.onFocus = [this]() { focusPattern(); };
-
     patternGrid.onDisabledDegreesChanged = [this](const std::vector<int>& dd, int gs, const std::set<int>& occ) {
         int oldTotal = noteLabels.getTotalTones();
         noteLabels.setDisabledDegrees(dd, gs, occ);

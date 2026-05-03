@@ -88,6 +88,19 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
 
 PianorollEditor::~PianorollEditor() = default;
 
+void PianorollEditor::focusPattern()
+{
+    if (!pattern || lastSelectedTrack < 0) { setRowOffset(48); return; }
+    const auto& tracks = pattern->get().tracks;
+    if (lastSelectedTrack >= (int)tracks.size()) { setRowOffset(48); return; }
+    int patId = tracks[lastSelectedTrack].patternId;
+    auto notes = pattern->buildPatternNotes(patId);
+    if (notes.empty()) { setRowOffset(48); return; }
+    int lowest = 127;
+    for (const auto& n : notes) lowest = std::min(lowest, n.pitch);
+    setRowOffset(std::max(0, lowest - 1));
+}
+
 void PianorollEditor::setGridPattern(int patId)
 {
     for (const auto& p : pattern->get().patterns) {

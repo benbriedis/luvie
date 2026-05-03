@@ -78,25 +78,6 @@ std::string NoteLabels::noteForRow(int virtualPos) const {
     return noteName(n, rootPitch, chordType, useSharp);
 }
 
-static void drawFocusBtn(int x, int y, int w, int h) {
-    static constexpr Fl_Color btnBg = 0x2D374800;
-    static constexpr Fl_Color btnFg = 0x94A3B800;
-    fl_color(btnBg);
-    fl_rectf(x, y, w, h);
-    int cx = x + w / 2;
-    int cy = y + h / 2;
-    int r  = std::min(w, h) / 4;
-    int tk = 3;  // tick length
-    fl_color(btnFg);
-    fl_line_style(FL_SOLID, 1);
-    fl_arc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
-    fl_line(cx,       cy - r - 1,   cx,       cy - r - 1 - tk);
-    fl_line(cx,       cy + r + 1,   cx,       cy + r + 1 + tk);
-    fl_line(cx - r - 1, cy,         cx - r - 1 - tk, cy);
-    fl_line(cx + r + 1, cy,         cx + r + 1 + tk, cy);
-    fl_line_style(0);
-}
-
 void NoteLabels::draw() {
     static constexpr Fl_Color bgCol     = 0x1F293700;
     static constexpr Fl_Color borderCol = 0x37415100;
@@ -120,15 +101,12 @@ void NoteLabels::draw() {
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }
 
-        // suppress label on the bottom row — occupied by focus button
-        if (r == numRows - 1) continue;
         std::string label = noteForRow(virtualPos);
         fl_color(FL_WHITE);
         fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
                 FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
     }
 
-    drawFocusBtn(x(), y() + h() - rowHeight, w(), rowHeight);
 }
 
 int NoteLabels::handle(int event) {
@@ -139,11 +117,6 @@ int NoteLabels::handle(int event) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();
             return 1;
-        }
-        if (Fl::event_button() == FL_LEFT_MOUSE) {
-            if (Fl::event_y() >= y() + h() - rowHeight) {
-                if (onFocus) onFocus();
-            }
         }
         return 1;
     default:

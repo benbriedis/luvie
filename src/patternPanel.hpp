@@ -6,11 +6,53 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Value_Input.H>
+#include <FL/Fl_Widget.H>
+#include <FL/Fl.H>
+#include <FL/fl_draw.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
 #include "panelStyle.hpp"
 #include <string>
 #include <vector>
+
+class RecenterButton : public Fl_Widget {
+    bool hovered = false;
+
+    void draw() override {
+        Fl_Color bg = hovered ? panelBgHover : panelBg;
+        fl_color(bg);
+        fl_rectf(x(), y(), w(), h());
+        fl_color(panelCtrlBorder);
+        fl_rect(x(), y(), w(), h());
+        int cx = x() + w() / 2;
+        int cy = y() + h() / 2;
+        int r  = std::min(w(), h()) / 4;
+        int tk = 3;
+        fl_color(0x94A3B800);
+        fl_line_style(FL_SOLID, 1);
+        fl_arc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
+        fl_line(cx,         cy - r - 1,     cx,         cy - r - 1 - tk);
+        fl_line(cx,         cy + r + 1,     cx,         cy + r + 1 + tk);
+        fl_line(cx - r - 1, cy,             cx - r - 1 - tk, cy);
+        fl_line(cx + r + 1, cy,             cx + r + 1 + tk, cy);
+        fl_line_style(0);
+    }
+
+    int handle(int event) override {
+        switch (event) {
+        case FL_ENTER: hovered = true;  redraw(); return 1;
+        case FL_LEAVE: hovered = false; redraw(); return 1;
+        case FL_PUSH:    return 1;
+        case FL_RELEASE:
+            if (Fl::event_inside(this)) do_callback();
+            return 1;
+        default: return Fl_Widget::handle(event);
+        }
+    }
+
+public:
+    RecenterButton(int x, int y, int w, int h) : Fl_Widget(x, y, w, h) {}
+};
 
 class PatternPanel : public Fl_Group, public ITimelineObserver {
 
@@ -21,6 +63,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     std::vector<std::string> stdInstrumentNames_;
     std::vector<std::string> drumInstrumentNames_;
 
+    RecenterButton recentreBtn;
     Fl_Box         patternName;
     Fl_Box         baseLabel;
     ModernButton   sharpFlatBtn;
@@ -53,6 +96,7 @@ public:
     ~PatternPanel();
 
     std::function<void()> onParamsChanged;
+    std::function<void()> onFocus;
 
     void commitEdit();
 
