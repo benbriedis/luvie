@@ -35,6 +35,12 @@ public:
     void removeDrumNote(int drumNoteId);
     std::vector<DrumNote> buildDrumPatternNotes(int patternId) const;
 
+    // Pattern lifecycle (creation/copy)
+    int createPattern(float lengthBeats);
+    int createDrumPattern(float lengthBeats);
+    int createPianorollPattern(float lengthBeats);
+    int copyPattern(int srcPatId);
+
     // Pattern properties
     void setPatternTimeSig(int patId, int top, int bottom);
     void setPatternLength(int patId, float lengthBeats);

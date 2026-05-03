@@ -139,12 +139,12 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
 
 PianorollEditor::~PianorollEditor()
 {
-    swapObserver(timeline, nullptr, this);
+    swapObserver(pattern, nullptr, this);
 }
 
 void PianorollEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex)
 {
-    swapObserver(timeline, pat, this);
+    swapObserver(pattern, pat, this);
     playhead.setTransport(t, pat ? pat->song() : nullptr);
     playhead.setPatternTrack(trackIndex);
 }
@@ -152,14 +152,14 @@ void PianorollEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat, 
 void PianorollEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
 {
     labels.onRightClick = [this, popup]() {
-        if (!popup || !timeline || lastSelectedTrack < 0) return;
-        const auto& tracks = timeline->get().tracks;
+        if (!popup || !pattern || lastSelectedTrack < 0) return;
+        const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack >= (int)tracks.size()) return;
         int patId = tracks[lastSelectedTrack].patternId;
         popup->open(
             Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); }
+            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); }
         );
     };
 }
@@ -167,17 +167,17 @@ void PianorollEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
 void PianorollEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
 {
     paramLabels.onRightClick = [this, popup](int laneId) {
-        if (!popup || !timeline || lastSelectedTrack < 0) return;
-        const auto& tracks = timeline->get().tracks;
+        if (!popup || !pattern || lastSelectedTrack < 0) return;
+        const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack >= (int)tracks.size()) return;
         int patId = tracks[lastSelectedTrack].patternId;
         std::function<void()> onRemove;
         if (laneId >= 0)
-            onRemove = [this, laneId]() { timeline->removePatternParamLane(laneId); };
+            onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
         popup->open(
             Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); },
+            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
             std::move(onRemove)
         );
     };
@@ -185,27 +185,27 @@ void PianorollEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
 
 void PianorollEditor::onTimelineChanged()
 {
-    if (!timeline) return;
-    int sel = timeline->get().selectedTrackIndex;
+    if (!pattern) return;
+    int sel = pattern->get().selectedTrackIndex;
     bool trackChanged = (sel != lastSelectedTrack);
     lastSelectedTrack = sel;
 
-    const auto& tracks = timeline->get().tracks;
+    const auto& tracks = pattern->get().tracks;
     if (sel >= 0 && sel < (int)tracks.size()) {
         int patId = tracks[sel].patternId;
         if (trackChanged) {
             playhead.setPatternTrack(sel);
-            for (const auto& p : timeline->get().patterns) {
+            for (const auto& p : pattern->get().patterns) {
                 if (p.id == patId && p.type == PatternType::PIANOROLL) {
-                    grid.setTimeline(timeline, patId);
+                    grid.setPattern(pattern, patId);
                     break;
                 }
             }
-            paramGrid.setTimeline(timeline, patId);
+            paramGrid.setPattern(pattern, patId);
         } else {
-            paramGrid.update(timeline, patId);
+            paramGrid.update(pattern, patId);
         }
-        paramLabels.setTimeline(timeline, patId);
+        paramLabels.setPattern(pattern, patId);
         updateParamScrollbar();
     }
 }

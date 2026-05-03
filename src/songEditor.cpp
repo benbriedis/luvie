@@ -94,6 +94,11 @@ void SongEditor::setTransport(ITransport* t, ObservableSong* tl)
     updateScrollBounds();
 }
 
+void SongEditor::setPattern(ObservablePattern* p)
+{
+    trackLabels.setPattern(p);
+}
+
 void SongEditor::setContextPopup(TrackContextPopup* p)
 {
     trackLabels.setContextPopup(p);

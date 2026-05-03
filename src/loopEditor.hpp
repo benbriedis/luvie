@@ -47,9 +47,10 @@ private:
     static constexpr int padY    = 12;
     static constexpr int cols    = 4;
 
-    ObservableSong* timeline     = nullptr;
-    ActivePatternSet*   aps          = nullptr;
-    TrackContextPopup*  contextPopup = nullptr;
+    ObservableSong*    timeline     = nullptr;
+    ObservablePattern* patternObs   = nullptr;
+    ActivePatternSet*  aps          = nullptr;
+    TrackContextPopup* contextPopup = nullptr;
     ITransport*         transport    = nullptr;
     LoopPanel*          panel        = nullptr;
 
@@ -73,6 +74,7 @@ public:
     std::function<void()> onToggleChanged;
 
     void setTimeline(ObservableSong* tl);
+    void setPattern(ObservablePattern* p) { patternObs = p; }
     void setActivePatterns(ActivePatternSet* a);
     void setTransport(ITransport* t);
     void setContextPopup(TrackContextPopup* popup);

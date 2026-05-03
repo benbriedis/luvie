@@ -60,11 +60,11 @@ int main(int argc, char **argv) {
 
     ObservableSong songTimeline(120.0f, 4, 4);
     songTimeline.defaultOutputInstrument = "Instrument 1";
+    ObservablePattern patternObs(&songTimeline);
     {
-        int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
+        int patId = patternObs.createPattern(LuvieApp::numPatternBeats);
         songTimeline.addTrack("Pattern 1", patId);
     }
-    ObservablePattern patternObs(&songTimeline);
 
     JackTransport  jackTransport;
     SimpleTransport simpleTransport;

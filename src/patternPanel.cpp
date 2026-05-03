@@ -112,14 +112,14 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     timeSigNum.when(FL_WHEN_RELEASE);
     timeSigNum.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        if (!self->timeline) return;
-        const auto& tl = self->timeline->get();
+        if (!self->pattern) return;
+        const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
         static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
         int den = (self->timeSigDen.value() >= 0) ? denoms[self->timeSigDen.value()] : 4;
-        self->timeline->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
+        self->pattern->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
     }, this);
 
     timeSigSlash.box(FL_NO_BOX);
@@ -133,14 +133,14 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     timeSigDen.value(2); // default: 4
     timeSigDen.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        if (!self->timeline) return;
-        const auto& tl = self->timeline->get();
+        if (!self->pattern) return;
+        const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
         static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
         int den = (self->timeSigDen.value() >= 0) ? denoms[self->timeSigDen.value()] : 4;
-        self->timeline->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
+        self->pattern->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
     }, this);
 
     barsLabel.box(FL_NO_BOX);
@@ -158,15 +158,15 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     barsInput.when(FL_WHEN_RELEASE);
     barsInput.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        if (!self->timeline) return;
-        const auto& tl = self->timeline->get();
+        if (!self->pattern) return;
+        const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
         int bars = std::max(1, (int)self->barsInput.value());
         for (const auto& p : tl.patterns) {
             if (p.id != patId) continue;
-            self->timeline->setPatternLength(patId, (float)(bars * p.timeSigTop));
+            self->pattern->setPatternLength(patId, (float)(bars * p.timeSigTop));
             break;
         }
     }, this);
@@ -174,8 +174,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     outChoice.value(0);
     outChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        if (!self->timeline) return;
-        const auto& tl = self->timeline->get();
+        if (!self->pattern) return;
+        const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
@@ -187,7 +187,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
             ? self->drumInstrumentNames_ : self->stdInstrumentNames_;
         int idx = self->outChoice.value();
         std::string name = (idx >= 0 && idx < (int)names.size()) ? names[idx] : "";
-        self->timeline->setPatternOutputInstrument(patId, name);
+        self->pattern->setPatternOutputInstrument(patId, name);
     }, this);
 
     input.hide();
@@ -223,8 +223,8 @@ void PatternPanel::setInstruments(const std::vector<std::string>& stdNames,
 
 void PatternPanel::refreshOutChoice()
 {
-    if (!timeline) { outChoice.value(0); return; }
-    const auto& tl = timeline->get();
+    if (!pattern) { outChoice.value(0); return; }
+    const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { outChoice.value(0); return; }
     int patId = tl.tracks[sel].patternId;
@@ -254,14 +254,14 @@ void PatternPanel::refreshOutChoice()
     // Current instrument not in the type-filtered list — assign first available.
     outChoice.value(0);
     if (!names.empty())
-        timeline->setPatternOutputInstrument(patId, names[0]);
+        pattern->setPatternOutputInstrument(patId, names[0]);
     outChoice.redraw();
 }
 
 void PatternPanel::refreshBars()
 {
-    if (!timeline) { barsInput.value(2); return; }
-    const auto& tl = timeline->get();
+    if (!pattern) { barsInput.value(2); return; }
+    const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { barsInput.value(2); return; }
     int patId = tl.tracks[sel].patternId;
@@ -276,8 +276,8 @@ void PatternPanel::refreshBars()
 void PatternPanel::refreshTimeSig()
 {
     static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
-    if (!timeline) { timeSigNum.value(4); timeSigDen.value(2); return; }
-    const auto& tl = timeline->get();
+    if (!pattern) { timeSigNum.value(4); timeSigDen.value(2); return; }
+    const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { timeSigNum.value(4); timeSigDen.value(2); return; }
     int patId = tl.tracks[sel].patternId;
@@ -308,12 +308,12 @@ void PatternPanel::updateRootChoiceLabels(int idx)
 
 PatternPanel::~PatternPanel()
 {
-    swapObserver(timeline, nullptr, this);
+    swapObserver(pattern, nullptr, this);
 }
 
-void PatternPanel::setTimeline(ObservablePattern* tl)
+void PatternPanel::setPattern(ObservablePattern* tl)
 {
-    swapObserver(timeline, tl, this);
+    swapObserver(pattern, tl, this);
     onTimelineChanged();
 }
 
@@ -337,8 +337,8 @@ void PatternPanel::setDrumMode(bool drum)
 
 void PatternPanel::onTimelineChanged()
 {
-    if (!timeline) return;
-    const auto& tl  = timeline->get();
+    if (!pattern) return;
+    const auto& tl  = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
         patternName.copy_label(tl.tracks[sel].label.c_str());
@@ -359,8 +359,8 @@ void PatternPanel::onTimelineChanged()
 
 void PatternPanel::startEdit()
 {
-    if (!timeline) return;
-    const auto& tl  = timeline->get();
+    if (!pattern) return;
+    const auto& tl  = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) return;
 
@@ -378,8 +378,8 @@ void PatternPanel::startEdit()
 
 void PatternPanel::checkDuplicate()
 {
-    if (!timeline) return;
-    const auto& tracks = timeline->get().tracks;
+    if (!pattern) return;
+    const auto& tracks = pattern->get().tracks;
     std::string current = input.value();
     bool dup = false;
     for (const auto& t : tracks)
@@ -396,12 +396,12 @@ void PatternPanel::commitEdit()
     InlineEditDispatch::uninstall();
     std::string newLabel = input.value();
     input.hide();
-    if (timeline) {
-        const auto& tracks = timeline->get().tracks;
+    if (pattern) {
+        const auto& tracks = pattern->get().tracks;
         bool dup = false;
         for (const auto& t : tracks)
             if (t.id != id && t.label == newLabel) { dup = true; break; }
-        timeline->song()->renameTrack(id, dup ? originalLabel : newLabel);
+        pattern->song()->renameTrack(id, dup ? originalLabel : newLabel);
     }
     redraw();
 }

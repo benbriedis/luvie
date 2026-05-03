@@ -276,29 +276,6 @@ void ObservableSong::removeTrack(int trackId)
     notify();
 }
 
-int ObservableSong::copyPattern(int srcPatId)
-{
-    const Pattern* src = nullptr;
-    for (const auto& p : data.patterns)
-        if (p.id == srcPatId) { src = &p; break; }
-    if (!src) return -1;
-
-    Pattern copy;
-    copy.id = nextId++;
-    copy.lengthBeats = src->lengthBeats;
-    copy.type = src->type;
-    for (auto n : src->notes) {
-        n.id = nextId++;
-        copy.notes.push_back(n);
-    }
-    for (auto n : src->drumNotes) {
-        n.id = nextId++;
-        copy.drumNotes.push_back(n);
-    }
-    data.patterns.push_back(copy);
-    return copy.id;
-}
-
 int ObservableSong::nextTrackNumberForType(PatternType type) const
 {
     int count = 0;
@@ -332,51 +309,6 @@ void ObservableSong::removeTrackAndPattern(int trackId)
     if (data.selectedTrackIndex >= (int)data.tracks.size())
         data.selectedTrackIndex = std::max(0, (int)data.tracks.size() - 1);
     notify();
-}
-
-// ---------------------------------------------------------------------------
-// Pattern lifecycle
-
-int ObservableSong::createPattern(float lengthBeats)
-{
-    int id = nextId++;
-    Pattern p;
-    p.id = id;
-    p.lengthBeats = lengthBeats;
-    p.outputInstrumentName = defaultOutputInstrument;
-    timeSigAt(0, p.timeSigTop, p.timeSigBottom);
-    data.patterns.push_back(p);
-    notify();
-    return id;
-}
-
-int ObservableSong::createDrumPattern(float lengthBeats)
-{
-    int id = nextId++;
-    Pattern p;
-    p.id = id;
-    p.lengthBeats = lengthBeats;
-    p.type = PatternType::DRUM;
-    p.outputInstrumentName = defaultDrumOutputInstrument.empty()
-        ? defaultOutputInstrument : defaultDrumOutputInstrument;
-    timeSigAt(0, p.timeSigTop, p.timeSigBottom);
-    data.patterns.push_back(std::move(p));
-    notify();
-    return id;
-}
-
-int ObservableSong::createPianorollPattern(float lengthBeats)
-{
-    int id = nextId++;
-    Pattern p;
-    p.id = id;
-    p.lengthBeats = lengthBeats;
-    p.type = PatternType::PIANOROLL;
-    p.outputInstrumentName = defaultOutputInstrument;
-    timeSigAt(0, p.timeSigTop, p.timeSigBottom);
-    data.patterns.push_back(std::move(p));
-    notify();
-    return id;
 }
 
 const PatternInstance* ObservableSong::instanceById(int instanceId) const

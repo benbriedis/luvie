@@ -8,7 +8,7 @@
 #include <set>
 
 class PatternGrid : public Grid, public ITimelineObserver {
-    ObservablePattern* timeline        = nullptr;
+    ObservablePattern* pattern        = nullptr;
     int                 patternId       = -1;
     int                 chordSize       = 3;
     int                 rowOffset       = 0;   // in virtual-row units
@@ -36,7 +36,7 @@ public:
     PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternGrid();
 
-    void setTimeline(ObservablePattern* tl, int patId);
+    void setPattern(ObservablePattern* tl, int patId);
     void setChordSize(int size) { chordSize = size; groupSize = size + (int)disabledDegrees.size(); redraw(); }
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);

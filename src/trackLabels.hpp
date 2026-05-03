@@ -7,9 +7,11 @@
 
 class TrackContextPopup;
 class ParamLaneContextPopup;
+class ObservablePattern;
 
 class TrackLabels : public Fl_Group, public ITimelineObserver {
-    ObservableSong*     timeline          = nullptr;
+    ObservableSong*         timeline          = nullptr;
+    ObservablePattern*      patternObs        = nullptr;
     TrackContextPopup*      contextPopup      = nullptr;
     ParamLaneContextPopup*  paramLanePopup    = nullptr;
     int                  numVisibleRows;
@@ -38,6 +40,7 @@ public:
     ~TrackLabels();
 
     void setTimeline(ObservableSong* tl);
+    void setPattern(ObservablePattern* p) { patternObs = p; }
     void setContextPopup(TrackContextPopup* p) { contextPopup = p; }
     void setParamLaneContextPopup(ParamLaneContextPopup* p) { paramLanePopup = p; }
     void setRowOffset(int offset);

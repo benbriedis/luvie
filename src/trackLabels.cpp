@@ -203,12 +203,12 @@ int TrackLabels::handle(int event)
             if (row >= 0 && row < (int)ro.size()) {
                 const auto& ref = ro[row];
                 if (ref.isTrack) {
-                    if (contextPopup)
-                        contextPopup->open(ref.id, timeline,
+                    if (contextPopup && patternObs)
+                        contextPopup->open(ref.id, patternObs,
                                            Fl::event_x_root(), Fl::event_y_root());
                 } else {
-                    if (paramLanePopup)
-                        paramLanePopup->open(ref.id, timeline,
+                    if (paramLanePopup && patternObs)
+                        paramLanePopup->open(ref.id, patternObs,
                                              Fl::event_x_root(), Fl::event_y_root());
                 }
             }

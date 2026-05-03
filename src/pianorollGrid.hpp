@@ -5,7 +5,7 @@
 #include "observablePattern.hpp"
 
 class PianorollGrid : public Grid, public ITimelineObserver {
-    ObservablePattern* timeline  = nullptr;
+    ObservablePattern* pattern  = nullptr;
     int                 patternId = -1;
     int                 rowOffset = 0;
 
@@ -26,7 +26,7 @@ public:
     PianorollGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
     ~PianorollGrid();
 
-    void setTimeline(ObservablePattern* tl, int patId);
+    void setPattern(ObservablePattern* tl, int patId);
     void setRowOffset(int offset);
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void onTimelineChanged() override;

@@ -23,7 +23,7 @@ class PatternEditor : public Editor, public ITimelineObserver {
     PatternGrid         patternGrid;
     PatternParamLabels  paramLabels;
     PatternParamGrid    paramGrid;
-    ObservablePattern* timeline          = nullptr;
+    ObservablePattern* pattern          = nullptr;
     int                 lastSelectedTrack = -1;
     float               lastLengthBeats   = -1.0f;
     int                 rootPitch         = 0;

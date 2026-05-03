@@ -10,12 +10,12 @@ PianorollGrid::PianorollGrid(int numRows, int numCols, int rowHeight, int colWid
 
 PianorollGrid::~PianorollGrid()
 {
-    swapObserver(timeline, nullptr, this);
+    swapObserver(pattern, nullptr, this);
 }
 
-void PianorollGrid::setTimeline(ObservablePattern* tl, int patId)
+void PianorollGrid::setPattern(ObservablePattern* tl, int patId)
 {
-    swapObserver(timeline, tl, this);
+    swapObserver(pattern, tl, this);
     patternId = patId;
     rebuildNotes();
     redraw();
@@ -24,9 +24,9 @@ void PianorollGrid::setTimeline(ObservablePattern* tl, int patId)
 void PianorollGrid::rebuildNotes()
 {
     notes.clear();
-    if (!timeline || patternId < 0) { clampSelection(); return; }
+    if (!pattern || patternId < 0) { clampSelection(); return; }
 
-    auto patNotes = timeline->buildPatternNotes(patternId);
+    auto patNotes = pattern->buildPatternNotes(patternId);
     for (auto n : patNotes) {
         int visual = (rowOffset + numRows - 1) - n.pitch;
         if (visual < 0 || visual >= numRows) continue;
@@ -54,14 +54,14 @@ void PianorollGrid::toggleNote()
     int   visual_row = ey / rowHeight;
     float col        = (float)(ex / colWidth) + colOffset;
 
-    if (!timeline || patternId < 0) {
+    if (!pattern || patternId < 0) {
         Grid::toggleNote();
         return;
     }
 
     for (auto& n : notes) {
         if (n.pitch == visual_row && n.beat == col) {
-            timeline->removeNote(n.id);
+            pattern->removeNote(n.id);
             return;
         }
     }
@@ -74,32 +74,32 @@ void PianorollGrid::toggleNote()
                                   && col < n.beat + n.length
                                   && col + 1.0f > n.beat; });
     if (clear)
-        timeline->addNote(patternId, col, midiNote, 1.0f);
+        pattern->addNote(patternId, col, midiNote, 1.0f);
 }
 
 std::function<void()> PianorollGrid::makeDeleteCallback(int noteIdx)
 {
-    if (!timeline) return nullptr;
+    if (!pattern) return nullptr;
     int id = notes[noteIdx].id;
-    return [this, id]() { timeline->removeNote(id); };
+    return [this, id]() { pattern->removeNote(id); };
 }
 
 void PianorollGrid::onCommitMove(const StateDragMove& s)
 {
-    if (!timeline) return;
+    if (!pattern) return;
     int id       = notes[s.noteIdx].id;
     int midiNote = rowOffset + numRows - 1 - (int)notes[s.noteIdx].pitch;
-    timeline->moveNote(id, notes[s.noteIdx].beat, (float)midiNote);
+    pattern->moveNote(id, notes[s.noteIdx].beat, (float)midiNote);
 }
 
 void PianorollGrid::onCommitResize(const StateDragResize& s)
 {
-    if (!timeline) return;
+    if (!pattern) return;
     int id = notes[s.noteIdx].id;
     if (s.side == Side::Left)
-        timeline->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
+        pattern->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
     else
-        timeline->resizeNoteRight(id, notes[s.noteIdx].length);
+        pattern->resizeNoteRight(id, notes[s.noteIdx].length);
 }
 
 void PianorollGrid::setRowOffset(int offset)
@@ -129,8 +129,8 @@ Fl_Color PianorollGrid::rowBgColor(int row) const
 
 Fl_Color PianorollGrid::columnColor(int col) const
 {
-    if (!timeline) return 0x00EE0000;
-    for (const auto& p : timeline->get().patterns) {
+    if (!pattern) return 0x00EE0000;
+    for (const auto& p : pattern->get().patterns) {
         if (p.id == patternId) {
             bool isBarStart = p.timeSigTop > 0 && col % p.timeSigTop == 0;
             return isBarStart ? 0x00660000 : 0x00EE0000;

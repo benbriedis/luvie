@@ -43,11 +43,7 @@ public:
     int  trackIndexForId(int trackId) const;
     void moveRow(int fromRowIdx, int toGapIdx);
 
-    // Pattern lifecycle (creation/deletion; not note editing)
-    int createPattern(float lengthBeats);
-    int createDrumPattern(float lengthBeats);
-    int createPianorollPattern(float lengthBeats);
-    int copyPattern(int srcPatId);
+    // Pattern lifecycle helpers (not note editing)
     int nextTrackNumberForType(PatternType type) const;
     void removeTrackAndPattern(int trackId);
     const Pattern*         patternForInstance(int instanceId) const;

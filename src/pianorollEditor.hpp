@@ -42,7 +42,7 @@ class PianorollEditor : public Editor, public ITimelineObserver {
     PianorollGrid       grid;
     PatternParamLabels  paramLabels;
     PatternParamGrid    paramGrid;
-    ObservablePattern* timeline          = nullptr;
+    ObservablePattern* pattern          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
     int                 paramLaneOffset   = 0;

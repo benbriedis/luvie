@@ -67,8 +67,8 @@ TrackContextPopup::TrackContextPopup()
     paramSubmenu = new ParameterSubmenu();
     paramSubmenu->onSelect = [this](const char* type) {
         hide();
-        if (!timeline || timeline->hasParamLane(type)) return;
-        timeline->addParamLane(type, rowOrderIdxForTrackId(targetTrackId) + 1);
+        if (!timeline || timeline->song()->hasParamLane(type)) return;
+        timeline->song()->addParamLane(type, rowOrderIdxForTrackId(targetTrackId) + 1);
     };
 
     end();
@@ -84,7 +84,7 @@ int TrackContextPopup::rowOrderIdxForTrackId(int trackId) const
     return -1;
 }
 
-void TrackContextPopup::open(int trackId, ObservableSong* tl, int wx, int wy)
+void TrackContextPopup::open(int trackId, ObservablePattern* tl, int wx, int wy)
 {
     timeline      = tl;
     targetTrackId = trackId;
@@ -104,7 +104,7 @@ void TrackContextPopup::doOpenPattern()
 {
     hide();
     if (onOpenPattern && timeline) {
-        int trackIdx = timeline->trackIndexForId(targetTrackId);
+        int trackIdx = timeline->song()->trackIndexForId(targetTrackId);
         if (trackIdx >= 0) onOpenPattern(trackIdx);
     }
 }
@@ -113,9 +113,9 @@ void TrackContextPopup::doAdd()
 {
     hide();
     if (!timeline) return;
-    int n     = timeline->nextTrackNumberForType(PatternType::STANDARD);
+    int n     = timeline->song()->nextTrackNumberForType(PatternType::STANDARD);
     int patId = timeline->createPattern(numPatternBeats);
-    timeline->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
+    timeline->song()->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -123,9 +123,9 @@ void TrackContextPopup::doAddDrum()
 {
     hide();
     if (!timeline) return;
-    int n     = timeline->nextTrackNumberForType(PatternType::DRUM);
+    int n     = timeline->song()->nextTrackNumberForType(PatternType::DRUM);
     int patId = timeline->createDrumPattern(numPatternBeats);
-    timeline->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
+    timeline->song()->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -133,9 +133,9 @@ void TrackContextPopup::doAddPianoroll()
 {
     hide();
     if (!timeline) return;
-    int n     = timeline->nextTrackNumberForType(PatternType::PIANOROLL);
+    int n     = timeline->song()->nextTrackNumberForType(PatternType::PIANOROLL);
     int patId = timeline->createPianorollPattern(numPatternBeats);
-    timeline->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
+    timeline->song()->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -155,10 +155,10 @@ void TrackContextPopup::doCopy()
     if (srcPatId < 0) return;
     int newPatId = timeline->copyPattern(srcPatId);
     if (newPatId < 0) return;
-    int n = timeline->nextTrackNumberForType(srcType);
+    int n = timeline->song()->nextTrackNumberForType(srcType);
     static constexpr const char* prefixes[] = { "Pattern", "Drum", "Pianoroll" };
     const char* prefix = prefixes[static_cast<int>(srcType)];
-    timeline->addTrack(std::string(prefix) + " " + std::to_string(n), newPatId, rowOrderIdxForTrackId(targetTrackId) + 1);
+    timeline->song()->addTrack(std::string(prefix) + " " + std::to_string(n), newPatId, rowOrderIdxForTrackId(targetTrackId) + 1);
     if (auto* win = window()) win->redraw();
 }
 
@@ -166,12 +166,12 @@ void TrackContextPopup::doDelete()
 {
     hide();
     if (!timeline) return;
-    timeline->removeTrackAndPattern(targetTrackId);
+    timeline->song()->removeTrackAndPattern(targetTrackId);
     if (auto* win = window()) win->redraw();
 }
 
 void TrackContextPopup::doShowParamSubmenu()
 {
     if (!paramSubmenu) return;
-    paramSubmenu->showFor(this, y() + 1 + 6*btnH, timeline);
+    paramSubmenu->showFor(this, y() + 1 + 6*btnH, timeline->song());
 }

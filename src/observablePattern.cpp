@@ -175,6 +175,74 @@ std::vector<DrumNote> ObservablePattern::buildDrumPatternNotes(int patternId) co
 }
 
 // ---------------------------------------------------------------------------
+// Pattern lifecycle
+
+int ObservablePattern::createPattern(float lengthBeats)
+{
+    int id = song_->nextId++;
+    Pattern p;
+    p.id = id;
+    p.lengthBeats = lengthBeats;
+    p.outputInstrumentName = song_->defaultOutputInstrument;
+    song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+    song_->data.patterns.push_back(p);
+    song_->notify();
+    return id;
+}
+
+int ObservablePattern::createDrumPattern(float lengthBeats)
+{
+    int id = song_->nextId++;
+    Pattern p;
+    p.id = id;
+    p.lengthBeats = lengthBeats;
+    p.type = PatternType::DRUM;
+    p.outputInstrumentName = song_->defaultDrumOutputInstrument.empty()
+        ? song_->defaultOutputInstrument : song_->defaultDrumOutputInstrument;
+    song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+    song_->data.patterns.push_back(std::move(p));
+    song_->notify();
+    return id;
+}
+
+int ObservablePattern::createPianorollPattern(float lengthBeats)
+{
+    int id = song_->nextId++;
+    Pattern p;
+    p.id = id;
+    p.lengthBeats = lengthBeats;
+    p.type = PatternType::PIANOROLL;
+    p.outputInstrumentName = song_->defaultOutputInstrument;
+    song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+    song_->data.patterns.push_back(std::move(p));
+    song_->notify();
+    return id;
+}
+
+int ObservablePattern::copyPattern(int srcPatId)
+{
+    const Pattern* src = nullptr;
+    for (const auto& p : song_->data.patterns)
+        if (p.id == srcPatId) { src = &p; break; }
+    if (!src) return -1;
+
+    Pattern copy;
+    copy.id = song_->nextId++;
+    copy.lengthBeats = src->lengthBeats;
+    copy.type = src->type;
+    for (auto n : src->notes) {
+        n.id = song_->nextId++;
+        copy.notes.push_back(n);
+    }
+    for (auto n : src->drumNotes) {
+        n.id = song_->nextId++;
+        copy.drumNotes.push_back(n);
+    }
+    song_->data.patterns.push_back(copy);
+    return copy.id;
+}
+
+// ---------------------------------------------------------------------------
 // Pattern properties
 
 static void truncatePatternNotes(Pattern& p)

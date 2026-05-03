@@ -4,7 +4,7 @@
 #include "basePopup.hpp"
 #include "modernButton.hpp"
 #include "popupStyle.hpp"
-#include "observableSong.hpp"
+#include "observablePattern.hpp"
 #include "parameterSubmenu.hpp"
 #include "appWindow.hpp"
 
@@ -15,7 +15,7 @@ class ParamLaneContextPopup : public BasePopup {
     static constexpr int numPatternBeats = 8;
     static constexpr Fl_Color hoverCol   = 0xDDEEFF00;
 
-    ObservableSong* timeline = nullptr;
+    ObservablePattern* timeline = nullptr;
     int                 laneId   = -1;
 
     static ModernButton* makeItem(int y, int w, const char* label) {
@@ -39,39 +39,39 @@ class ParamLaneContextPopup : public BasePopup {
     void doAdd() {
         hide();
         if (!timeline) return;
-        int n     = timeline->nextTrackNumberForType(PatternType::STANDARD);
+        int n     = timeline->song()->nextTrackNumberForType(PatternType::STANDARD);
         int patId = timeline->createPattern(numPatternBeats);
-        timeline->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
+        timeline->song()->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
     }
 
     void doAddDrum() {
         hide();
         if (!timeline) return;
-        int n     = timeline->nextTrackNumberForType(PatternType::DRUM);
+        int n     = timeline->song()->nextTrackNumberForType(PatternType::DRUM);
         int patId = timeline->createDrumPattern(numPatternBeats);
-        timeline->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
+        timeline->song()->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
     }
 
     void doAddPianoroll() {
         hide();
         if (!timeline) return;
-        int n     = timeline->nextTrackNumberForType(PatternType::PIANOROLL);
+        int n     = timeline->song()->nextTrackNumberForType(PatternType::PIANOROLL);
         int patId = timeline->createPianorollPattern(numPatternBeats);
-        timeline->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
+        timeline->song()->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
         if (auto* win = window()) win->redraw();
     }
 
     void doShowParamSubmenu() {
         if (!paramSubmenu) return;
-        paramSubmenu->showFor(this, y() + 1 + 3*btnH, timeline);
+        paramSubmenu->showFor(this, y() + 1 + 3*btnH, timeline->song());
     }
 
     void doRemove() {
         hide();
         if (!timeline || laneId < 0) return;
-        timeline->removeParamLane(laneId);
+        timeline->song()->removeParamLane(laneId);
         if (auto* win = window()) win->redraw();
     }
 
@@ -117,20 +117,20 @@ public:
         paramSubmenu = new ParameterSubmenu();
         paramSubmenu->onSelect = [this](const char* type) {
             hide();
-            if (!timeline || timeline->hasParamLane(type)) return;
+            if (!timeline || timeline->song()->hasParamLane(type)) return;
             int atIndex = -1;
             const auto& lanes = timeline->get().paramLanes;
             for (int i = 0; i < (int)lanes.size(); i++) {
                 if (lanes[i].id == laneId) { atIndex = i + 1; break; }
             }
-            timeline->addParamLane(type, atIndex);
+            timeline->song()->addParamLane(type, atIndex);
         };
 
         end();
         hide();
     }
 
-    void open(int laneId_, ObservableSong* tl, int wx, int wy) {
+    void open(int laneId_, ObservablePattern* tl, int wx, int wy) {
         timeline = tl;
         laneId   = laneId_;
         position(wx, wy);

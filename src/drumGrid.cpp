@@ -23,12 +23,12 @@ DrumGrid::DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float 
 
 DrumGrid::~DrumGrid()
 {
-    swapObserver(timeline, nullptr, this);
+    swapObserver(pattern, nullptr, this);
 }
 
-void DrumGrid::setTimeline(ObservablePattern* tl, int patId)
+void DrumGrid::setPattern(ObservablePattern* tl, int patId)
 {
-    swapObserver(timeline, tl, this);
+    swapObserver(pattern, tl, this);
     patternId = patId;
     rebuildNotes();
     redraw();
@@ -37,9 +37,9 @@ void DrumGrid::setTimeline(ObservablePattern* tl, int patId)
 void DrumGrid::rebuildNotes()
 {
     notes.clear();
-    if (!timeline || patternId < 0) return;
+    if (!pattern || patternId < 0) return;
 
-    for (const auto& n : timeline->buildDrumPatternNotes(patternId)) {
+    for (const auto& n : pattern->buildDrumPatternNotes(patternId)) {
         int vr = rowOffset + numRows - 1 - n.note;
         if (vr >= 0 && vr < numRows)
             notes.push_back(n);
@@ -105,9 +105,9 @@ void DrumGrid::draw()
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + (i - colOffset) * colWidth;
         bool isBar = false;
-        if (timeline) {
+        if (pattern) {
             int top, bottom;
-            timeline->song()->timeSigAt(0, top, bottom);
+            pattern->song()->timeSigAt(0, top, bottom);
             isBar = (top > 0) && (i % top == 0);
         } else {
             isBar = (i % 4 == 0);
@@ -155,7 +155,7 @@ int DrumGrid::handle(int evt)
                 int dotY = y() + vr * rowHeight + rowHeight / 2;
                 int id   = n.id;
                 popup.openAt(dotX, dotY, this, rowHeight,
-                    [this, id]() { if (timeline) timeline->removeDrumNote(id); });
+                    [this, id]() { if (pattern) pattern->removeDrumNote(id); });
             }
             return 1;
         }
@@ -203,20 +203,20 @@ int DrumGrid::handle(int evt)
 
     case FL_RELEASE: {
         if (auto* d = std::get_if<DrumStateDrag>(&state)) {
-            if (d->moved && timeline) {
+            if (d->moved && pattern) {
                 // Capture before clearing state
                 int   id       = notes[d->noteIdx].id;
                 float beat     = notes[d->noteIdx].beat;
                 int   midiNote = notes[d->noteIdx].note;
                 float vel      = notes[d->noteIdx].velocity;
-                state = DrumStateIdle{};  // clear BEFORE timeline ops so rebuild runs
-                timeline->removeDrumNote(id);
-                timeline->addDrumNote(patternId, midiNote, beat, vel);
-            } else if (!d->moved && timeline) {
+                state = DrumStateIdle{};  // clear BEFORE pattern ops so rebuild runs
+                pattern->removeDrumNote(id);
+                pattern->addDrumNote(patternId, midiNote, beat, vel);
+            } else if (!d->moved && pattern) {
                 // Pure click on existing note → remove it
                 int id = notes[d->noteIdx].id;
                 state = DrumStateIdle{};  // clear BEFORE so onTimelineChanged rebuilds
-                timeline->removeDrumNote(id);
+                pattern->removeDrumNote(id);
             } else {
                 state = DrumStateIdle{};
             }
@@ -267,13 +267,13 @@ void DrumGrid::createNote()
     if (snap > 0.0f) beat = std::round(beat / snap) * snap;
     int   midiNote = rowOffset + numRows - 1 - vr;
     if (midiNote < 0 || midiNote > 127) return;
-    if (!timeline || patternId < 0) return;
+    if (!pattern || patternId < 0) return;
 
-    timeline->addDrumNote(patternId, midiNote, beat);
+    pattern->addDrumNote(patternId, midiNote, beat);
 }
 
 void DrumGrid::removeNote(int idx)
 {
-    if (!timeline || idx < 0 || idx >= (int)notes.size()) return;
-    timeline->removeDrumNote(notes[idx].id);
+    if (!pattern || idx < 0 || idx >= (int)notes.size()) return;
+    pattern->removeDrumNote(notes[idx].id);
 }

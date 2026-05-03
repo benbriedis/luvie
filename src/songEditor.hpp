@@ -46,6 +46,7 @@ public:
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }
 
     void setTransport(ITransport* t, ObservableSong* tl);
+    void setPattern(ObservablePattern* p);
     void setContextPopup(TrackContextPopup* p);
     void setParamLaneContextPopup(ParamLaneContextPopup* p);
     void setTrackView(int trackIndex, bool beatResolution);

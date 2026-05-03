@@ -25,8 +25,8 @@ void PatternParamLabels::draw()
     fl_rectf(x() + w() - 1, y(), 1, h());
 
     const Pattern* pat = nullptr;
-    if (timeline) {
-        for (const auto& p : timeline->get().patterns)
+    if (pattern) {
+        for (const auto& p : pattern->get().patterns)
             if (p.id == patternId) { pat = &p; break; }
     }
 
@@ -62,8 +62,8 @@ int PatternParamLabels::handle(int event)
             int vr = (Fl::event_y() - y()) / kParamRowH;
             int laneIdx = vr + laneOffset;
             int laneId = -1;
-            if (timeline) {
-                for (const auto& p : timeline->get().patterns) {
+            if (pattern) {
+                for (const auto& p : pattern->get().patterns) {
                     if (p.id != patternId) continue;
                     if (laneIdx < (int)p.paramLanes.size())
                         laneId = p.paramLanes[laneIdx].id;
@@ -84,8 +84,8 @@ int PatternParamLabels::handle(int event)
 void PatternParamGrid::rebuildLanes()
 {
     localLanes.clear();
-    if (!timeline || patternId < 0) return;
-    for (const auto& p : timeline->get().patterns) {
+    if (!pattern || patternId < 0) return;
+    for (const auto& p : pattern->get().patterns) {
         if (p.id != patternId) continue;
         for (const auto& lane : p.paramLanes) {
             ParamLaneLocal local;
@@ -99,9 +99,9 @@ void PatternParamGrid::rebuildLanes()
     }
 }
 
-void PatternParamGrid::setTimeline(ObservablePattern* tl, int patId)
+void PatternParamGrid::setPattern(ObservablePattern* tl, int patId)
 {
-    timeline  = tl;
+    pattern  = tl;
     patternId = patId;
     paramState = ParamIdle{};
     rebuildLanes();
@@ -110,7 +110,7 @@ void PatternParamGrid::setTimeline(ObservablePattern* tl, int patId)
 
 void PatternParamGrid::update(ObservablePattern* tl, int patId)
 {
-    timeline  = tl;
+    pattern  = tl;
     patternId = patId;
     if (!std::holds_alternative<ParamDragState>(paramState) &&
         !std::holds_alternative<ParamVirtualDrag>(paramState)) {
@@ -140,8 +140,8 @@ void PatternParamGrid::draw()
 
     // Vertical column lines matching patternGrid colors
     int timeSigTop = 4;
-    if (timeline) {
-        for (const auto& p : timeline->get().patterns)
+    if (pattern) {
+        for (const auto& p : pattern->get().patterns)
             if (p.id == patternId) { timeSigTop = p.timeSigTop; break; }
     }
     int endCol = colOffset_ + w() / colWidth_ + 2;
@@ -353,22 +353,22 @@ int PatternParamGrid::handle(int event)
                 auto& pt = localLanes[d->laneIdx].points[d->predPtIdx];
                 int ptId = pt.id; float beat = pt.beat; int value = pt.value; bool moved = d->moved;
                 paramState = ParamIdle{};
-                if (moved && timeline) timeline->moveParamPoint(ptId, beat, value);
+                if (moved && pattern) pattern->moveParamPoint(ptId, beat, value);
                 else { rebuildLanes(); redraw(); }
             } else if (auto* d = std::get_if<ParamDragState>(&paramState)) {
                 auto& pt = localLanes[d->laneIdx].points[d->ptIdx];
                 int ptId = pt.id; float beat = pt.beat; int value = pt.value;
                 bool moved = d->moved; float origBeat = d->origBeat;
                 paramState = ParamIdle{};
-                if (moved && timeline) {
+                if (moved && pattern) {
                     float validBeat = canPlaceDot(d->laneIdx, beat, ptId) ? beat : origBeat;
-                    timeline->moveParamPoint(ptId, validBeat, value);
+                    pattern->moveParamPoint(ptId, validBeat, value);
                 } else { rebuildLanes(); redraw(); }
             } else if (auto* d = std::get_if<ParamPendingCreate>(&paramState)) {
                 int li = d->laneIdx; float beat = d->beat; int value = d->value;
                 paramState = ParamIdle{};
-                if (timeline && li >= 0 && li < (int)localLanes.size() && canPlaceDot(li, beat))
-                    timeline->addPatternParamPoint(patternId, localLanes[li].id, beat, value);
+                if (pattern && li >= 0 && li < (int)localLanes.size() && canPlaceDot(li, beat))
+                    pattern->addPatternParamPoint(patternId, localLanes[li].id, beat, value);
                 else
                     redraw();
             } else {
@@ -401,10 +401,10 @@ int PatternParamGrid::handle(int event)
                 paramState = ParamIdle{};
                 dotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
-                        if (timeline) timeline->moveParamPoint(ptId, beat, newVal);
+                        if (pattern) pattern->moveParamPoint(ptId, beat, newVal);
                     },
                     [this, ptId, anc]() {
-                        if (timeline && !anc) timeline->removeParamPoint(ptId);
+                        if (pattern && !anc) pattern->removeParamPoint(ptId);
                     });
             } else {
                 paramState = ParamIdle{};

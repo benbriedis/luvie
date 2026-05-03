@@ -203,7 +203,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     pianorollEd->hide();
 
     patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
-    patternPanel->setTimeline(pattern);
+    patternPanel->setPattern(pattern);
     tab2->add(patternPanel);
     tab2->resizable(patternEd);
     tabs->add(*tab2);
@@ -223,6 +223,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         tempoRuler->setOffsetX(off);
         tempoRuler->setClipLeft(clipLeft);
     };
+    og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);
     og2->setParamLaneContextPopup(plcPop);
     og2->onEndReached = [this]() { bottomPane->notifyEndReached(); };
@@ -255,6 +256,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // ---- Wire up loop editor ----
     loopEd->setTimeline(song);
+    loopEd->setPattern(pattern);
     loopEd->setTransport(transport);
     loopEd->setContextPopup(ctxPop);
 

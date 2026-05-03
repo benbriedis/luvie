@@ -11,12 +11,12 @@ PatternGrid::PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, 
 
 PatternGrid::~PatternGrid()
 {
-    swapObserver(timeline, nullptr, this);
+    swapObserver(pattern, nullptr, this);
 }
 
-void PatternGrid::setTimeline(ObservablePattern* tl, int patId)
+void PatternGrid::setPattern(ObservablePattern* tl, int patId)
 {
-    swapObserver(timeline, tl, this);
+    swapObserver(pattern, tl, this);
     patternId = patId;
     rebuildNotes();
     redraw();
@@ -42,9 +42,9 @@ int PatternGrid::virtualToAbsRow(int virtualPos) const
 void PatternGrid::rebuildNotes()
 {
     notes.clear();
-    if (!timeline || patternId < 0) { clampSelection(); return; }
+    if (!pattern || patternId < 0) { clampSelection(); return; }
 
-    auto patNotes = timeline->buildPatternNotes(patternId);
+    auto patNotes = pattern->buildPatternNotes(patternId);
 
     // Recompute disabled degrees from current pattern
     std::set<int> ddSet;
@@ -105,7 +105,7 @@ void PatternGrid::toggleNote()
     int   visual_row = ey / rowHeight;
     float col        = (float)(ex / colWidth) + colOffset;
 
-    if (!timeline || patternId < 0) {
+    if (!pattern || patternId < 0) {
         Grid::toggleNote();
         return;
     }
@@ -113,7 +113,7 @@ void PatternGrid::toggleNote()
     // Remove a note if one is at exactly this position
     for (auto& n : notes) {
         if (n.pitch == visual_row && n.beat == col) {
-            timeline->removeNote(n.id);
+            pattern->removeNote(n.id);
             return;
         }
     }
@@ -128,34 +128,34 @@ void PatternGrid::toggleNote()
                                   && col < n.beat + n.length
                                   && col + 1.0f > n.beat; });
     if (clear)
-        timeline->addNote(patternId, col, abs_row, 1.0f);
+        pattern->addNote(patternId, col, abs_row, 1.0f);
 }
 
 std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)
 {
-    if (!timeline) return nullptr;
+    if (!pattern) return nullptr;
     int id = notes[noteIdx].id;
-    return [this, id]() { timeline->removeNote(id); };
+    return [this, id]() { pattern->removeNote(id); };
 }
 
 void PatternGrid::onCommitMove(const StateDragMove& s)
 {
-    if (!timeline || notes[s.noteIdx].disabled) return;
+    if (!pattern || notes[s.noteIdx].disabled) return;
     int id         = notes[s.noteIdx].id;
     int virtualPos = rowOffset + numRows - 1 - (int)notes[s.noteIdx].pitch;
     int abs_row    = virtualToAbsRow(virtualPos);
     if (abs_row < 0) return;
-    timeline->moveNote(id, notes[s.noteIdx].beat, (float)abs_row);
+    pattern->moveNote(id, notes[s.noteIdx].beat, (float)abs_row);
 }
 
 void PatternGrid::onCommitResize(const StateDragResize& s)
 {
-    if (!timeline || notes[s.noteIdx].disabled) return;
+    if (!pattern || notes[s.noteIdx].disabled) return;
     int id = notes[s.noteIdx].id;
     if (s.side == Side::Left)
-        timeline->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
+        pattern->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
     else
-        timeline->resizeNoteRight(id, notes[s.noteIdx].length);
+        pattern->resizeNoteRight(id, notes[s.noteIdx].length);
 }
 
 void PatternGrid::setRowOffset(int offset)
@@ -186,8 +186,8 @@ Fl_Color PatternGrid::rowBgColor(int row) const
 
 Fl_Color PatternGrid::columnColor(int col) const
 {
-    if (!timeline) return 0x00EE0000;
-    for (const auto& p : timeline->get().patterns) {
+    if (!pattern) return 0x00EE0000;
+    for (const auto& p : pattern->get().patterns) {
         if (p.id == patternId) {
             bool isBarStart = p.timeSigTop > 0 && col % p.timeSigTop == 0;
             return isBarStart ? 0x00660000 : 0x00EE0000;

@@ -14,7 +14,7 @@
 
 class PatternPanel : public Fl_Group, public ITimelineObserver {
 
-    ObservablePattern* timeline      = nullptr;
+    ObservablePattern* pattern      = nullptr;
     int                 editingTrackId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
@@ -67,7 +67,7 @@ public:
     void setInstruments(const std::vector<std::string>& stdNames,
                         const std::vector<std::string>& drumNames);
 
-    void setTimeline(ObservablePattern* tl);
+    void setPattern(ObservablePattern* tl);
     void setDrumMode(bool drum);
     void onTimelineChanged() override;
 };

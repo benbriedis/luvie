@@ -99,14 +99,14 @@ void PatternEditor::setNoteParams(int root, int chord, bool sharp)
     patternGrid.setChordSize(chordDefs[chord].size);
 
     int patId = -1;
-    if (timeline && lastSelectedTrack >= 0) {
-        const auto& tracks = timeline->get().tracks;
+    if (pattern && lastSelectedTrack >= 0) {
+        const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack < (int)tracks.size())
             patId = tracks[lastSelectedTrack].patternId;
     }
 
-    if (timeline && patId > 0 && chordDefs[oldChordType].size != chordDefs[chord].size)
-        timeline->remapPatternNotes(patId, chordDefs[oldChordType].size, chordDefs[chord].size);
+    if (pattern && patId > 0 && chordDefs[oldChordType].size != chordDefs[chord].size)
+        pattern->remapPatternNotes(patId, chordDefs[oldChordType].size, chordDefs[chord].size);
 
     setRowOffset(computeDefaultOffset(patId));
 }
@@ -123,8 +123,8 @@ int PatternEditor::computeDefaultOffset(int patId) const
     };
 
     std::vector<Note> allNotes;
-    if (timeline && patId >= 0)
-        allNotes = timeline->buildPatternNotes(patId);
+    if (pattern && patId >= 0)
+        allNotes = pattern->buildPatternNotes(patId);
 
     int maxOffset = std::max(0, total - patternGrid.numRows);
 
@@ -265,14 +265,14 @@ int PatternEditor::handle(int event)
 void PatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
 {
     noteLabels.onRightClick = [this, popup]() {
-        if (!popup || !timeline || lastSelectedTrack < 0) return;
-        const auto& tracks = timeline->get().tracks;
+        if (!popup || !pattern || lastSelectedTrack < 0) return;
+        const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack >= (int)tracks.size()) return;
         int patId = tracks[lastSelectedTrack].patternId;
         popup->open(
             Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); }
+            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); }
         );
     };
 }
@@ -280,17 +280,17 @@ void PatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
 void PatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
 {
     paramLabels.onRightClick = [this, popup](int laneId) {
-        if (!popup || !timeline || lastSelectedTrack < 0) return;
-        const auto& tracks = timeline->get().tracks;
+        if (!popup || !pattern || lastSelectedTrack < 0) return;
+        const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack >= (int)tracks.size()) return;
         int patId = tracks[lastSelectedTrack].patternId;
         std::function<void()> onRemove;
         if (laneId >= 0)
-            onRemove = [this, laneId]() { timeline->removePatternParamLane(laneId); };
+            onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
         popup->open(
             Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return timeline->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { timeline->addPatternParamLane(patId, type); },
+            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
+            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
             std::move(onRemove)
         );
     };
@@ -299,8 +299,8 @@ void PatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
 void PatternEditor::focusPattern()
 {
     int patId = -1;
-    if (timeline && lastSelectedTrack >= 0) {
-        const auto& tracks = timeline->get().tracks;
+    if (pattern && lastSelectedTrack >= 0) {
+        const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack < (int)tracks.size())
             patId = tracks[lastSelectedTrack].patternId;
     }
@@ -309,20 +309,20 @@ void PatternEditor::focusPattern()
 
 PatternEditor::~PatternEditor()
 {
-    swapObserver(timeline, nullptr, this);
+    swapObserver(pattern, nullptr, this);
 }
 
 void PatternEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex)
 {
-    swapObserver(timeline, pat, this);
+    swapObserver(pattern, pat, this);
     playhead.setTransport(t, pat ? pat->song() : nullptr);
     playhead.setPatternTrack(trackIndex);
 }
 
 void PatternEditor::onTimelineChanged()
 {
-    if (!timeline) return;
-    const auto& tl  = timeline->get();
+    if (!pattern) return;
+    const auto& tl  = pattern->get();
     int sel         = tl.selectedTrackIndex;
     bool trackChanged = (sel != lastSelectedTrack);
     lastSelectedTrack = sel;
@@ -332,14 +332,14 @@ void PatternEditor::onTimelineChanged()
 
     if (trackChanged && patId > 0) {
         playhead.setPatternTrack(sel);
-        patternGrid.setTimeline(timeline, patId);
+        patternGrid.setPattern(pattern, patId);
         setRowOffset(computeDefaultOffset(patId));
         lastLengthBeats = -1.0f;
-        paramGrid.setTimeline(timeline, patId);
+        paramGrid.setPattern(pattern, patId);
     } else {
-        paramGrid.update(timeline, patId);
+        paramGrid.update(pattern, patId);
     }
-    paramLabels.setTimeline(timeline, patId);
+    paramLabels.setPattern(pattern, patId);
     updateParamScrollbar();
 
     float lb = 0.0f;

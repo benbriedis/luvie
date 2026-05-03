@@ -51,7 +51,7 @@ class DrumPatternEditor : public Editor, public ITimelineObserver {
     InlineInput         drumLabelInput;
     PatternParamLabels  paramLabels;
     PatternParamGrid    paramGrid;
-    ObservablePattern* timeline          = nullptr;
+    ObservablePattern* pattern          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
     int                 editingMidiNote   = -1;
