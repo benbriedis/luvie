@@ -119,7 +119,7 @@ int MarkerRuler::handle(int event)
 	case FL_MOVE: {
 		int bar = findBarAt(Fl::event_x());
 		Fl_Cursor cur = FL_CURSOR_CROSS;
-		if (bar >= 0) cur = isFixed(bar) ? FL_CURSOR_DEFAULT : FL_CURSOR_WE;
+		if (bar >= 0) cur = FL_CURSOR_HELP;
 		window()->cursor(cur);
 		return 1;
 	}

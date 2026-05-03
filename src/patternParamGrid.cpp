@@ -56,6 +56,7 @@ int PatternParamLabels::handle(int event)
 {
     switch (event) {
     case FL_ENTER:
+        window()->cursor(FL_CURSOR_HELP);
         return 1;
     case FL_PUSH:
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
@@ -459,7 +460,7 @@ int PatternParamGrid::handle(int event)
                 }
             }
         }
-        if (window()) window()->cursor(useHand ? FL_CURSOR_HAND : FL_CURSOR_DEFAULT);
+        if (window()) window()->cursor(useHand ? FL_CURSOR_HELP : FL_CURSOR_DEFAULT);
         return 0;
     }
 

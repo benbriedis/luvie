@@ -187,7 +187,7 @@ void TrackLabels::draw()
 int TrackLabels::handle(int event)
 {
     if (event == FL_ENTER) {
-        window()->cursor(FL_CURSOR_DEFAULT);
+        window()->cursor(FL_CURSOR_HELP);
         return 1;
     }
 

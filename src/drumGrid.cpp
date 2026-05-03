@@ -237,7 +237,7 @@ int DrumGrid::handle(int evt)
         int idx = findNoteAtCursor();
         if (idx >= 0) {
             state = DrumStateHover{idx};
-            if (window()) window()->cursor(FL_CURSOR_HAND);
+            if (window()) window()->cursor(FL_CURSOR_HELP);
         } else {
             state = DrumStateIdle{};
             if (window()) window()->cursor(FL_CURSOR_DEFAULT);

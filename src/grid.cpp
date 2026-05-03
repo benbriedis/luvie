@@ -234,7 +234,7 @@ void Grid::findNoteForCursor()
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
             state = StateHoverMove{(int)i, ex - leftEdge, ey - (int)n.pitch * rowHeight};
-            window()->cursor(FL_CURSOR_HAND);
+            window()->cursor(FL_CURSOR_HELP);
             redraw();
             return;
         }

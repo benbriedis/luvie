@@ -48,6 +48,10 @@ void DrumNoteLabels::draw()
 
 int DrumNoteLabels::handle(int event)
 {
+    if (event == FL_ENTER) {
+        window()->cursor(FL_CURSOR_HELP);
+        return 1;
+    }
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();

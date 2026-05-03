@@ -447,7 +447,7 @@ int SongGrid::handleParamEvent(int event)
                 }
             }
         }
-        if (window()) window()->cursor(useHand ? FL_CURSOR_HAND : FL_CURSOR_DEFAULT);
+        if (window()) window()->cursor(useHand ? FL_CURSOR_HELP : FL_CURSOR_DEFAULT);
         return 0;
     }
 

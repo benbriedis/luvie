@@ -234,8 +234,6 @@ ETC...
 
 
 
-cf "Track" ==> "Lane" generally
-
 Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
 ....
@@ -249,13 +247,9 @@ cf a pane resize drag between the parameter and notes grids
 
 When 2 patterns share a channel and parameter maybe highlight in red and have a hover-over error message   
    
-Extra space under the parameter grid - maybe use a flex column?
 
-
-cf looping and repositioning:
-  using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
-  and/or explicitly dealing with each notes and/or parameter...
        
+Extra space under the parameter grid - maybe use a flex column?
 
 
 
@@ -269,12 +263,16 @@ Cf Transpose vs fixed modes aka
 Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
 
 
+cf looping and repositioning:
+	using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
+	and/or explicitly dealing with each notes and/or parameter...
+	THINK using 120 + 121 should do the job... if a synth has extra controllers you'd expect them to be handled by 121.
+	These should be issued BEFORE the new parameter messages are sent of course.
 
 
+Add extra chords & scales
 
-cf having a "context is available' cursor
-
-TODO add application icon
+cf "Track" ==> "Lane" generally
 
 Allow the quantisation to be modified in pattern editors.
    Song editors... maybe set to a 'beat'?
@@ -287,4 +285,13 @@ Allow the song to be longer. Maybe allow song length to be set in top menu?
   Then again, it does belong to the song context...
   Could have #bars in transport and allow it to be editted...
   Or put it in a context popup when right clicking in the grid or playhead ruler.
+
+- Maybe give the "Control Row" its own class or function.
+  - Make it flex?
+
+- Claude says: DrumPatternEditor also overrides handle (Escape key) and resize (cancel edit first)
+          What are these about?
+
+TODO replace FL_CURSOR_HELP with equivalent to CSS's context-menu (use forbidden icon as a model)
+
 
