@@ -8,7 +8,8 @@
 #include "itimelineobserver.hpp"
 #include "activePatternSet.hpp"
 
-class ObservableTimeline;
+class ObservableSong;
+class ObservablePattern;
 
 class AppWindow;
 class ModernTabs;
@@ -24,8 +25,8 @@ class TrackContextPopup;
 class OutputsOverlay;
 
 // Builds and wires the shared Luvie UI layout (tabs, editors, transport bar, popups).
-// Callers create AppWindow, ObservableTimeline, and ITransport, configure the optional
-// callbacks, then call build().
+// Callers create AppWindow, ObservableSong, ObservablePattern, and ITransport,
+// configure the optional callbacks, then call build().
 class LuvieApp {
 public:
     LuvieApp() = default;
@@ -76,19 +77,20 @@ public:
     PianorollEditor*   pianorollEd  = nullptr;
     PatternPanel*      patternPanel = nullptr;
     LoopEditor*        loopEd       = nullptr;
-    Transport*            bottomPane          = nullptr;
-    OutputsOverlay*   outputsOverlay  = nullptr;
+    Transport*         bottomPane   = nullptr;
+    OutputsOverlay*    outputsOverlay = nullptr;
 
-    void build(AppWindow* window, ObservableTimeline* timeline, ITransport* transport);
+    void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern, ITransport* transport);
 
 private:
-    ObservableTimeline* timeline_ = nullptr;
+    ObservableSong*    song_    = nullptr;
+    ObservablePattern* pattern_ = nullptr;
 
-    static void saveCb   (Fl_Widget*, void* data);
-    static void saveAsCb (Fl_Widget*, void* data);
-    static void importCb (Fl_Widget*, void* data);
-    static void exportCb      (Fl_Widget*, void* data);
-    static void outputsCb (Fl_Widget*, void* data);
+    static void saveCb      (Fl_Widget*, void* data);
+    static void saveAsCb    (Fl_Widget*, void* data);
+    static void importCb    (Fl_Widget*, void* data);
+    static void exportCb    (Fl_Widget*, void* data);
+    static void outputsCb   (Fl_Widget*, void* data);
 
     struct EditorSwitcher : ITimelineObserver {
         LuvieApp* app;

@@ -5,7 +5,7 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Box.H>
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 
 class TransportButton : public Fl_Button {
 public:
@@ -32,7 +32,7 @@ class Transport : public Fl_Group, public ITimelineObserver {
 
 	ITransport*         transport;
 	ITransport*         controlTransport = nullptr;  // if set, buttons use this; otherwise transport
-	ObservableTimeline* timeline;
+	ObservableSong* timeline;
 	bool                stoppedAtEnd     = false;
 	bool                lastPlayingState = false;
 	char                posText[64];
@@ -41,7 +41,7 @@ class Transport : public Fl_Group, public ITimelineObserver {
 	void        updatePosition();
 
 public:
-	Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeline* tl);
+	Transport(int x, int y, int w, int h, ITransport* t, ObservableSong* tl);
 	~Transport();
 	void notifyEndReached();
 	void notifySeek() { stoppedAtEnd = false; }

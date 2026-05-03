@@ -7,7 +7,7 @@
 #include "trackLabels.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "gridScrollPane.hpp"
 #include <vector>
 
@@ -21,7 +21,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     TrackLabels        trackLabels;
     SongGrid           songGrid;
     GridScrollPane*    scrollbar      = nullptr;
-    ObservableTimeline* timeline      = nullptr;
+    ObservableSong* timeline      = nullptr;
     int                numVisibleRows;
     int                rowOffset      = 0;
     int                colOffset      = 0;
@@ -45,7 +45,7 @@ public:
     void setSongPopup(SongPopup* p)         { songGrid.setSongPopup(p); }
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }
 
-    void setTransport(ITransport* t, ObservableTimeline* tl);
+    void setTransport(ITransport* t, ObservableSong* tl);
     void setContextPopup(TrackContextPopup* p);
     void setParamLaneContextPopup(ParamLaneContextPopup* p);
     void setTrackView(int trackIndex, bool beatResolution);

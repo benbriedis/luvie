@@ -1,7 +1,7 @@
 #ifndef TRACK_LABELS_HPP
 #define TRACK_LABELS_HPP
 
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "inlineInput.hpp"
 #include <FL/Fl_Group.H>
 
@@ -9,7 +9,7 @@ class TrackContextPopup;
 class ParamLaneContextPopup;
 
 class TrackLabels : public Fl_Group, public ITimelineObserver {
-    ObservableTimeline*     timeline          = nullptr;
+    ObservableSong*     timeline          = nullptr;
     TrackContextPopup*      contextPopup      = nullptr;
     ParamLaneContextPopup*  paramLanePopup    = nullptr;
     int                  numVisibleRows;
@@ -37,7 +37,7 @@ public:
     TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight);
     ~TrackLabels();
 
-    void setTimeline(ObservableTimeline* tl);
+    void setTimeline(ObservableSong* tl);
     void setContextPopup(TrackContextPopup* p) { contextPopup = p; }
     void setParamLaneContextPopup(ParamLaneContextPopup* p) { paramLanePopup = p; }
     void setRowOffset(int offset);

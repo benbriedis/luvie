@@ -8,7 +8,7 @@
 #include "paramDotPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
@@ -42,7 +42,7 @@ class PianorollEditor : public Editor, public ITimelineObserver {
     PianorollGrid       grid;
     PatternParamLabels  paramLabels;
     PatternParamGrid    paramGrid;
-    ObservableTimeline* timeline          = nullptr;
+    ObservablePattern* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
     int                 paramLaneOffset   = 0;
@@ -58,7 +58,7 @@ public:
                     int rowHeight, int colWidth, float snap, Popup& popup);
     ~PianorollEditor();
 
-    void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
+    void setPatternPlayhead(ITransport* t, ObservablePattern* tl, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }

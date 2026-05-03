@@ -2,7 +2,8 @@
 #include "FL/Fl_Menu_Item.H"
 #include "FL/Fl_Native_File_Chooser.H"
 #include "timelineIO.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
+#include "observablePattern.hpp"
 #include <filesystem>
 #include "appWindow.hpp"
 #include "songEditor.hpp"
@@ -27,8 +28,8 @@
 std::string LuvieApp::lastFileDir;
 
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
-    if (!app->patternEd || !app->drumEd || !app->pianorollEd || !app->timeline_) return;
-    const auto& data = app->timeline_->get();
+    if (!app->patternEd || !app->drumEd || !app->pianorollEd || !app->song_) return;
+    const auto& data = app->song_->get();
     int sel = data.selectedTrackIndex;
     PatternType type = PatternType::STANDARD;
     if (sel >= 0 && sel < (int)data.tracks.size()) {
@@ -72,7 +73,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     AppState state;
     if (!loadAppState(path, state)) return;
 
-    app->timeline_->loadTimeline(state.timeline);
+    app->song_->loadTimeline(state.timeline);
     if (app->patternPanel)
         app->patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
 }
@@ -95,7 +96,7 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     lastFileDir = std::filesystem::path(path).parent_path().string();
 
     AppState state;
-    state.timeline = app->timeline_->get();
+    state.timeline = app->song_->get();
     if (app->patternPanel) {
         state.rootPitch = app->patternPanel->rootPitch();
         state.chordType = app->patternPanel->chordType();
@@ -104,8 +105,9 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     saveAppState(state, path);
 }
 
-void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport* transport) {
-    timeline_ = timeline;
+void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern, ITransport* transport) {
+    song_    = song;
+    pattern_ = pattern;
 
     const int off        = menuBarH;
     const int tabsH      = defaultWinH() - bottomH - menuBarH;
@@ -113,7 +115,6 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     const int numRows     = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
     const int drumNumRows = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowH;
 
-    // Reset current group so nothing auto-parents unexpectedly
     Fl_Group::current(nullptr);
 
     // ---- Menu bar ----
@@ -158,11 +159,11 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     tab1->color(bgColor);
 
     auto* timeSigRuler = new MarkerRuler(0, off + tabBarH, winW, markerRulerH,
-        80, 60, MarkerRuler::TIME_SIG, timeline, tsPop);
+        80, 60, MarkerRuler::TIME_SIG, song, tsPop);
     tab1->add(timeSigRuler);
 
     auto* tempoRuler = new MarkerRuler(0, off + tabBarH + markerRulerH, winW, markerRulerH,
-        80, 60, MarkerRuler::TEMPO, timeline, tPop);
+        80, 60, MarkerRuler::TEMPO, song, tPop);
     tab1->add(tempoRuler);
 
     auto* og2 = new SongEditor(0, off + tabBarH + 2*markerRulerH, winW,
@@ -202,20 +203,20 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     pianorollEd->hide();
 
     patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
-    patternPanel->setTimeline(timeline);
+    patternPanel->setTimeline(pattern);
     tab2->add(patternPanel);
     tab2->resizable(patternEd);
     tabs->add(*tab2);
 
     // ---- Transport bar ----
     Fl_Group::current(nullptr);
-    bottomPane = new Transport(0, off + tabsH, winW, bottomH, transport, timeline);
+    bottomPane = new Transport(0, off + tabsH, winW, bottomH, transport, song);
     window->add(bottomPane);
     if (disableTransportButtons)
         bottomPane->disableButtons();
 
     // ---- Wire up song editor ----
-    og2->setTransport(transport, timeline);
+    og2->setTransport(transport, song);
     og2->onRulerOffsetChanged = [timeSigRuler, tempoRuler](int off, int clipLeft) {
         timeSigRuler->setOffsetX(off);
         timeSigRuler->setClipLeft(clipLeft);
@@ -229,8 +230,8 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         bottomPane->notifySeek();
         if (onExtraSeek) onExtraSeek();
     };
-    auto openPatternTab = [this, timeline, tab2](int trackIndex) {
-        timeline->selectTrack(trackIndex);
+    auto openPatternTab = [this, song, tab2](int trackIndex) {
+        song->selectTrack(trackIndex);
         tabs->value(tab2);
         tabs->redraw();
     };
@@ -253,7 +254,7 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     pianorollEd->setPlayheadActivePatterns(&aps);
 
     // ---- Wire up loop editor ----
-    loopEd->setTimeline(timeline);
+    loopEd->setTimeline(song);
     loopEd->setTransport(transport);
     loopEd->setContextPopup(ctxPop);
 
@@ -267,9 +268,9 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     };
 
     // ---- Wire up pattern editors ----
-    patternEd->setPatternPlayhead(transport, timeline, 0);
-    drumEd->setPatternPlayhead(transport, timeline, 0);
-    pianorollEd->setPatternPlayhead(transport, timeline, 0);
+    patternEd->setPatternPlayhead(transport, pattern, 0);
+    drumEd->setPatternPlayhead(transport, pattern, 0);
+    pianorollEd->setPatternPlayhead(transport, pattern, 0);
     patternEd->setNoteLabelsContextPopup(nlCtxPop);
     drumEd->setNoteLabelsContextPopup(nlCtxPop);
     pianorollEd->setNoteLabelsContextPopup(nlCtxPop);
@@ -303,7 +304,6 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
         item->callback(outputsCb, this);
 
     // ---- Popups — added last (FLTK dispatches in reverse order) ----
-    // Small popups first so they take priority in the click-away check.
     window->add(p1);     window->registerPopup(p1);
     window->add(p2);     window->registerPopup(p2);
     window->add(sp);     window->registerPopup(sp);
@@ -337,12 +337,12 @@ void LuvieApp::build(AppWindow* window, ObservableTimeline* timeline, ITransport
     window->size_range(minW, minH);
 
     // ---- Timeline observers ----
-    timeline->addObserver(&editorSwitcher_);
+    song_->addObserver(&editorSwitcher_);
     if (onExtraTimelineChange)
-        timeline->addObserver(&changeNotifier_);
+        song_->addObserver(&changeNotifier_);
 
     // ---- Initial state ----
-    timeline->selectTrack(0);
+    song_->selectTrack(0);
 }
 
 void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
@@ -371,8 +371,8 @@ void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
 }
 
 LuvieApp::~LuvieApp() {
-    if (timeline_) {
-        timeline_->removeObserver(&editorSwitcher_);
-        timeline_->removeObserver(&changeNotifier_);
+    if (song_) {
+        song_->removeObserver(&editorSwitcher_);
+        song_->removeObserver(&changeNotifier_);
     }
 }

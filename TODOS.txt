@@ -1,0 +1,286 @@
+
+FUTURE FUNCTIONALITY
+====================
+- Linear ramping of tempos...
+
+- Could provide input triggers for patterns when in loop mode (useful to Ableton-style pads).
+
+- Pianoroll and drum patterns - allow importing of patterns.
+
+- Pianoroll and drum patterns - should support recording of patterns..
+
+- being able to click and drag to create a bunch of notes. (maybe choose a special "strafe" mode?)
+
+- Maybe allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
+  Likely to lead on to sample filters, envelopes, trimming, ...
+
+- cf make install (required for RaySession) may be Linux specific...
+
+TO TEST
+=======
+1. If multiple midi plugins get called in same cycle and emit notes, are multiple notes outputted successfully?
+
+
+DISTRO TO DOS?
+==============
+-CMake?  (how much is Ardour used in Windows an Mac?)
+
+Think about installation of dependencies - eg 
+   nlohmann/json
+Nice if we had an install script that installed everything locally (FLTK, JSON, Jack and LV2 deps)
+
+- Add support for Debian build
+
+- Snap, Flatpak, AppImage? - research which is best for audio plugins (if any. NB LV2 plugin install might be more complex)
+
+
+
+TODOs
+=====
+Unit tests?
+
+
+8/3/26
+------
+Re time signatures and live looping mode
+~~~
+Do we get warning if deleting the plugin and notes have been added?
+  In standalone probably want a warning too.
+
+
+- The O(n²) searches in ObservableTimeline — with 10-20 tracks they're negligible, and the structure
+isn't complex enough to warrant indexing yet.
+- Floating-point bar comparisons — no evidence of actual bugs from this.
+- The Point/Point2 naming — they serve genuinely different purposes.
+
+
+cf being able to select a group of notes? cf picking the tool from the context menu?
+
+Cf Transpose vs fixed modes aka 
+   Relative vs Absolute/Fixed modes (probably best on a pattern-by-pattern basis I think)
+   - Both can have 'disabled' notes. Fixed mode can play them, Transpose cannot (until we select a chord/scale with as many notes).
+   - Be reticent about allowing notes to be added or deleted to these rows?
+   - THINK best to basically just to implement relative mode for the moment. If I put in an absolute mode in time, then
+     sort out a translation process backwards and forwards.
+
+Luvie (GUI) in window titlebar is odd.
+
+BUG? When changing chord the position of the notes change...
+
+Connect up to ALSA midi rather than Jack?
+
+Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
+
+Shrinking pattern editor horizontally - could reorangise things a bit before resorting to cropping in smaller windows.
+
+Maybe put horizontal scrollbar lower?
+   Lighter theme scrollbar?
+
+
+Look in future for any polling loops it may have added in.
+
+TODO add application icon
+
+
+======================
+
+
+Re drum mapping (future)
+------------------------
+MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
+- Doesn't look like DrumGizmo supports this yet
+
+( Proprietary SysEx (System Exclusive) Messages: Many drum machines use SysEx messages to transmit their 
+  entire internal patch state, including custom drum mappings, to a sequencer to be saved as a data dump )
+
+------------------------------TODOs---------------------------
+
+1. Transport
+	a. BUG: Luvie play/pause should update when the Jack transport is started or stopped by a different client.
+	b. Improvement: positioning the playhead is bit approximate (possibly due to the buffers). Could it be made smoother?
+	   Google talks about using pre-rolls. NB Ardour manages to achieve smoothness, but other programs can also be gittery.
+	c. When no Jack connection the transport position labels don't update, but probably could.
+	d. Document somehow that Ardour should be using the Jack sync rather than internal sync.
+	   NB having Ardour set to Master doesn't seem to affect anything at the moment.
+	e. BUG: Moving a note around on the Pattern editor moves the playhead forward a pixel or so (standalone, no jack)
+	
+
+2. Loop editor
+	a. Swap between it an song editor based on displayed tab.
+	   Disable swapping between them when playing.
+	b. This editor needs its own tempo and time signature fields to replace those provided by the song editor.
+	NOTE the pattern editor really needs a #beats field (rather than a #bars, which can be inconsistent between song editor and loop editor...
+	   a bit forced though - is there a better way? Dont REALLY want to have to have a time signature field for every pattern which is probably
+	   the "proper" way.
+	)
+
+4. Drum patterns
+	2. Hand cursor tends to obscure the note during the move operation.
+	3. cf optimising the control rows at the bottom as the drum pattern editor lacks the pitch-related controls.
+
+
+Loop mode: maybe remove rewind button and position labels in the transports
+
+In song mode maybe have loop editor show what's currently playing 
+   (in which case preserve the loop state) 
+   
+May need vertical scroll in loop editor
+  
+cf moving transport outside tabs
+
+When in loop mode disable song playhead?? Or let run - may be useful to recording in Ardour or something
+
+cf Removing Time from Loop Editor?  Put in Pattern Editor?? Remove line or make dotted?
+   Or use initial time or put into settings?
+
+
+ISSUE: In RaySession our transport does not seem to update (OK in Ardour)
+
+cf Show recent projects - Probably need program settings to remember between runs...
+   Ditto if I want to remember the last Save As / Export / Import directory.
+
+TODO review the format of the JSON file
+     cf a Zod-like description?
+     cf a version number?
+
+Allow the window close to be clicked even if a popup of menu is showing.
+
+Implement undo/redo (possible on an editor-by-editor basis? or current edit only?)
+    Only enable Save & Save As if a change has been made (and not undone).
+
+.........................
+
+- cf Is pitch randomisation possible for drums?
+
+- Outputs overlay: click outside the port field doesnt register unless clicking into another field
+  Should probably lose focus at this point.
+- Outputs overlay - focused items don't fully defocus.
+    
+
+----------
+Song editor - scrollbar should follow playhead (at least by default).
+
+cf conversion routine to clone a regular pattern to pianoroll. The opposite way would be harder, but something could be attempted in time maybe.
+
+-------------------
+
+Drum patterns and pianoroll should have a 'center' button too. (Move down into controls row?)
+
+Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
+
+cf thinner playhead lines in Loop Editor
+
+In the pattern editor reconsider the transport info 
+    (BPM, time signature etc - some is likely to be confusing or not needed
+
+Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
+
+Maybe split the pause/pause button
+
+Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
+   Also allow editting (maybe not saving)
+   
+In time add a BPM=crotchet, BMP=dotted crotchet, BPM=quaver option I guess.   
+FROM GOOGLE:
+	Handling Beats Per Minute (BPM) in 8/8 time is generally treated as an 8th note pulse, where each 8th note gets one beat, rather than a quarter note. Because 8/8 is often used for irregular, additive rhythms (like 3+3+2 or 3+2+3), the tempo is usually set to the 8th note (
+	) to maintain a steady pulse throughout changing groupings.
+
+	DAW/Click Setting: In a Digital Audio Workstation (DAW), you would set the tempo based on the 8th note (in DAW terms) to get an accurate, consistent pulse   
+  
+In Pattern Editor clicking awy from the numerator of bar fields doesn't lose the focus and update the data.
+  Also clicking #Bars and dragging the mouse left or right changes the number of bars. Dont think I want.
+
+The load drum map buttons need a better visual indication the buttons are pressed.
+	Should be able to tab into them too.
+
+Also wrt MIDI GM1.0:  https://en.wikipedia.org/wiki/General_MIDI
+	Channel messages 	Support for controller number 1, 7, 10, 11, 64, 100, 101, 121 and 123; 
+	                    support for channel pressure and pitch bend controllers. 
+	Other messages		Respond to the data entry controller and the RPNs for fine and coarse tuning and pitch bend range, 
+						as well as all General MIDI Level 1 System Messages.
+
+CC messages: Sent on a channel I think. GM1.0 values are:
+	0 - pitch bend   [NOTE THE RANGE FOR THIS IS 0–16383 - IVE IMPLEMENTED THIS BIT]
+	1 - modulation wheel
+	7 - channel volume
+	etc
+
+             
+Registered parameters (RPN support) - a few standard parameters 
+SysEx messages - 2 standard GMs
+
+
+NB MIDI2.0 has a mechanism for instrument discovery...
+
+TO TEST Program number: a) connect to Casio b) maybe connect to some software synth?
+
+When I start up in standalone mode (with -v) and close the application (using the window X) I don't get my audio back.
+   Seems as if Pipewire is lost somehow? I can get it back using qjackctl.
+
+2. Add an 'expression' section at the bottom of BOTH the patterns and song editors
+   that allow for rubber bands on a range of parameters.
+
+
+TEST Luvie as plugin, NSM and standalone again
+
+
+cf these weird parameters:
+    0,0 Pitch bend range
+    1,0 Channel Fine tuning
+    2,0 Channel Coarse tuning
+portamento, sostenuto, soft pedal (cc#65-67), sustain.
+CC 	Default function
+70 	Sound Variation
+71 	Timbre/Harmonic Intensity (filter resonance)
+72 	Release Time
+73 	Attack Time
+74 	Brightness (cutoff frequency)
+	
+CC 	Default function
+75 	Decay Time
+76 	Vibrato Rate
+77 	Vibrato Depth
+78 	Vibrato Delay
+79 	Metronome Rate 
+ETC...
+
+
+
+cf "Track" ==> "Lane" generally
+
+Clicking and dragging to reorder the tracks in the song editor doesnt look great.
+
+....
+
+Did I put a version number in the session files?
+
+   
+TODO check MIDI parameters are saved and restored OK - both for the song editor and patterns
+
+cf a pane resize drag between the parameter and notes grids
+
+When 2 patterns share a channel and parameter maybe highlight in red and have a hover-over error message   
+   
+Extra space under the parameter grid - maybe use a flex column?
+
+
+cf looping and repositioning:
+  using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
+  and/or explicitly dealing with each notes and/or parameter...
+       
+
+
+cf having a "context is available' cursor
+
+Allow the quantisation to be modified in pattern editors.
+   Song editors... maybe set to a 'beat'?
+
+Application icon
+
+Mute & solo selectors and indicators in Song Editor.
+
+Allow the song to be longer. Maybe allow song length to be set in top menu?
+  Then again, it does belong to the song context...
+  Could have #bars in transport and allow it to be editted...
+  Or put it in a context popup when right clicking in the grid or playhead ruler.
+

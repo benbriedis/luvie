@@ -4,7 +4,7 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
 #include <vector>
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "activePatternSet.hpp"
 #include "trackContextPopup.hpp"
 #include "itransport.hpp"
@@ -12,7 +12,7 @@
 
 // Dark control bar at the bottom of the Loop Editor
 class LoopPanel : public Fl_Group, public ITimelineObserver {
-    ObservableTimeline* timeline = nullptr;
+    ObservableSong* timeline = nullptr;
 
     Fl_Box      bpmLabel;
     InlineInput bpmInput;
@@ -31,7 +31,7 @@ public:
     LoopPanel(int x, int y, int w, int h);
     ~LoopPanel();
 
-    void setTimeline(ObservableTimeline* tl);
+    void setTimeline(ObservableSong* tl);
     void onTimelineChanged() override;
 };
 
@@ -47,7 +47,7 @@ private:
     static constexpr int padY    = 12;
     static constexpr int cols    = 4;
 
-    ObservableTimeline* timeline     = nullptr;
+    ObservableSong* timeline     = nullptr;
     ActivePatternSet*   aps          = nullptr;
     TrackContextPopup*  contextPopup = nullptr;
     ITransport*         transport    = nullptr;
@@ -72,7 +72,7 @@ public:
 
     std::function<void()> onToggleChanged;
 
-    void setTimeline(ObservableTimeline* tl);
+    void setTimeline(ObservableSong* tl);
     void setActivePatterns(ActivePatternSet* a);
     void setTransport(ITransport* t);
     void setContextPopup(TrackContextPopup* popup);

@@ -18,7 +18,7 @@ Playhead::~Playhead()
 	swapObserver(obsTl, nullptr, this);
 }
 
-void Playhead::setTransport(ITransport* t, ObservableTimeline* tl)
+void Playhead::setTransport(ITransport* t, ObservableSong* tl)
 {
 	Fl::remove_timeout(timerCb, this);
 	transport = t;

@@ -51,7 +51,7 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
 
 // ── UI-thread setters ─────────────────────────────────────────────────────────
 
-void JackTransport::setTimeline(ObservableTimeline* tl)
+void JackTransport::setTimeline(ObservableSong* tl)
 {
     if (timeline) timeline->removeObserver(this);
     timeline = tl;

@@ -1,5 +1,4 @@
 #include "modernTabs.hpp"
-#include "editor.hpp"
 #include <FL/fl_draw.H>
 
 ModernTabs::ModernTabs(int x, int y, int w, int h) : Fl_Tabs(x, y, w, h) {}
@@ -58,7 +57,7 @@ void ModernTabs::draw() {
 	if (!(damage() & ~FL_DAMAGE_CHILD)) return;
 
 	// Tab bar background
-	fl_color(bgColor);
+	fl_color(FL_WHITE);
 	fl_rectf(x(), y(), w(), tbH);
 
 	// Bottom separator
@@ -84,7 +83,7 @@ void ModernTabs::draw() {
 		Fl_Color ac = (i < (int)tabAccents.size()) ? tabAccents[i] : defaultAccent;
 
 		// Tab background
-		fl_color(active ? bgColor : inactiveTab);
+		fl_color(active ? FL_WHITE : inactiveTab);
 		fl_rectf(tx, y(), tw, tbH - 1);
 
 		// Vertical divider between tabs

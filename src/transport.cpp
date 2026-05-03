@@ -178,7 +178,7 @@ void Transport::setControlTransport(ITransport* ct)
 	playPauseBtn->redraw();
 }
 
-Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableTimeline* tl)
+Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableSong* tl)
 	: Fl_Group(x, y, w, h), transport(t), timeline(tl)
 {
 	box(FL_FLAT_BOX);

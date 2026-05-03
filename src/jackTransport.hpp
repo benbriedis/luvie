@@ -2,7 +2,7 @@
 #define JACK_TRANSPORT_HPP
 
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "activePatternSet.hpp"
 #include "timeline.hpp"
 #include <jack/jack.h>
@@ -17,7 +17,7 @@
 /*
  * JackTransport — ITransport implementation that:
  *   - Drives play/pause/seek via the JACK transport API (so all JACK apps stay in sync)
- *   - Outputs MIDI note events generated from the ObservableTimeline on JACK MIDI ports
+ *   - Outputs MIDI note events generated from the ObservableSong on JACK MIDI ports
  *
  * Thread model:
  *   - All public ITransport methods and setters are called on the UI (main) thread.
@@ -32,7 +32,7 @@ public:
 
     bool open(const char* clientName = "luvie", bool enableMidi = true);
 
-    void setTimeline(ObservableTimeline* tl);
+    void setTimeline(ObservableSong* tl);
     void setActivePatterns(ActivePatternSet* aps);
     void setNoteParams(int rootPitch, int chordType);
 
@@ -91,7 +91,7 @@ private:
     std::atomic<bool>           jackAlive{false};
 
     // ── UI-thread-only state ──────────────────────────────────────────────────
-    ObservableTimeline*              timeline     = nullptr;
+    ObservableSong*              timeline     = nullptr;
     ActivePatternSet*                aps          = nullptr;
     int                              rootPitch    = 0;
     int                              chordType    = 0;

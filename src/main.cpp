@@ -6,7 +6,8 @@
 #include "appWindow.hpp"
 #include "simpleTransport.hpp"
 #include "jackTransport.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
+#include "observablePattern.hpp"
 #include "patternPanel.hpp"
 #include "transport.hpp"
 #include "noteLabels.hpp"
@@ -57,12 +58,13 @@ int main(int argc, char **argv) {
     window.color(bgColor);
     window.end();
 
-    ObservableTimeline songTimeline(120.0f, 4, 4);
+    ObservableSong songTimeline(120.0f, 4, 4);
     songTimeline.defaultOutputInstrument = "Instrument 1";
     {
         int patId = songTimeline.createPattern(LuvieApp::numPatternBeats);
         songTimeline.addTrack("Pattern 1", patId);
     }
+    ObservablePattern patternObs(&songTimeline);
 
     JackTransport  jackTransport;
     SimpleTransport simpleTransport;
@@ -92,7 +94,7 @@ int main(int argc, char **argv) {
                                         app.patternPanel->chordType());
     };
 
-    app.build(&window, &songTimeline, transport);
+    app.build(&window, &songTimeline, &patternObs, transport);
 
     if (useJack)
         jackTransport.setActivePatterns(&app.aps);

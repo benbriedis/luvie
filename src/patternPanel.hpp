@@ -1,7 +1,7 @@
 #ifndef PATTERN_PANEL_HPP
 #define PATTERN_PANEL_HPP
 
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include "inlineInput.hpp"
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
@@ -14,7 +14,7 @@
 
 class PatternPanel : public Fl_Group, public ITimelineObserver {
 
-    ObservableTimeline* timeline      = nullptr;
+    ObservablePattern* timeline      = nullptr;
     int                 editingTrackId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
@@ -67,7 +67,7 @@ public:
     void setInstruments(const std::vector<std::string>& stdNames,
                         const std::vector<std::string>& drumNames);
 
-    void setTimeline(ObservableTimeline* tl);
+    void setTimeline(ObservablePattern* tl);
     void setDrumMode(bool drum);
     void onTimelineChanged() override;
 };

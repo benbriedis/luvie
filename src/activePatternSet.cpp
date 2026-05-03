@@ -1,5 +1,5 @@
 #include "activePatternSet.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "timeline.hpp"
 #include <algorithm>
 
@@ -18,7 +18,7 @@ void ActivePatternSet::removeObserver(IActivePatternObserver* o)
 	observers.erase(std::remove(observers.begin(), observers.end(), o), observers.end());
 }
 
-void ActivePatternSet::sync(const ObservableTimeline& tl, float currentBar)
+void ActivePatternSet::sync(const ObservableSong& tl, float currentBar)
 {
 	const Timeline& data = tl.get();
 

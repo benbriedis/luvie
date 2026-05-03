@@ -4,7 +4,7 @@
 #include "basePopup.hpp"
 #include "modernButton.hpp"
 #include "popupStyle.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "parameterSubmenu.hpp"
 #include "appWindow.hpp"
 
@@ -15,7 +15,7 @@ class ParamLaneContextPopup : public BasePopup {
     static constexpr int numPatternBeats = 8;
     static constexpr Fl_Color hoverCol   = 0xDDEEFF00;
 
-    ObservableTimeline* timeline = nullptr;
+    ObservableSong* timeline = nullptr;
     int                 laneId   = -1;
 
     static ModernButton* makeItem(int y, int w, const char* label) {
@@ -130,7 +130,7 @@ public:
         hide();
     }
 
-    void open(int laneId_, ObservableTimeline* tl, int wx, int wy) {
+    void open(int laneId_, ObservableSong* tl, int wx, int wy) {
         timeline = tl;
         laneId   = laneId_;
         position(wx, wy);

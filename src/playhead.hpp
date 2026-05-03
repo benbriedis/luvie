@@ -2,7 +2,7 @@
 #define PLAYHEAD_HPP
 
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "activePatternSet.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
@@ -10,7 +10,7 @@
 
 class Playhead : public ITimelineObserver {
 	ITransport*         transport    = nullptr;
-	ObservableTimeline* obsTl        = nullptr;
+	ObservableSong* obsTl        = nullptr;
 	ActivePatternSet*   aps          = nullptr;
 	int                 numCols;
 	int                 colWidth;
@@ -40,7 +40,7 @@ public:
 	Playhead(int numCols, int colWidth);
 	~Playhead();
 
-	void setTransport(ITransport* t, ObservableTimeline* tl);
+	void setTransport(ITransport* t, ObservableSong* tl);
 	void setActivePatterns(ActivePatternSet* a) { aps = a; }
 	void setOwner(Fl_Widget* w)   { owner   = w; }
 	void setVerbose(bool v)       { verbose = v; }

@@ -7,7 +7,7 @@
 #include <cstdio>
 
 MarkerRuler::MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
-                         Kind kind, ObservableTimeline* timeline, MarkerPopup* popup)
+                         Kind kind, ObservableSong* timeline, MarkerPopup* popup)
 	: Fl_Widget(x, y, w, h),
 	  kind(kind), numCols(numCols), colWidth(colWidth), timeline(timeline), popup(popup)
 {

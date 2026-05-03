@@ -14,7 +14,7 @@ PatternGrid::~PatternGrid()
     swapObserver(timeline, nullptr, this);
 }
 
-void PatternGrid::setTimeline(ObservableTimeline* tl, int patId)
+void PatternGrid::setTimeline(ObservablePattern* tl, int patId)
 {
     swapObserver(timeline, tl, this);
     patternId = patId;

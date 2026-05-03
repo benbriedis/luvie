@@ -84,7 +84,7 @@ LoopPanel::~LoopPanel()
     swapObserver(timeline, nullptr, this);
 }
 
-void LoopPanel::setTimeline(ObservableTimeline* tl)
+void LoopPanel::setTimeline(ObservableSong* tl)
 {
     swapObserver(timeline, tl, this);
     onTimelineChanged();
@@ -167,7 +167,7 @@ LoopEditor::~LoopEditor()
     swapActiveObserver(aps, nullptr, this);
 }
 
-void LoopEditor::setTimeline(ObservableTimeline* tl)
+void LoopEditor::setTimeline(ObservableSong* tl)
 {
     swapObserver(timeline, tl, this);
     panel->setTimeline(tl);

@@ -3,7 +3,7 @@
 
 #include "basePopup.hpp"
 #include "modernButton.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "popupStyle.hpp"
 #include <functional>
 
@@ -62,7 +62,7 @@ public:
         redraw();
     }
 
-    void update(ObservableTimeline* tl) {
+    void update(ObservableSong* tl) {
         update([tl](const char* type) { return tl && tl->hasParamLane(type); });
     }
 
@@ -81,7 +81,7 @@ public:
         show();
     }
 
-    void showFor(BasePopup* parent, int btnY, ObservableTimeline* tl) {
+    void showFor(BasePopup* parent, int btnY, ObservableSong* tl) {
         showFor(parent, btnY, [tl](const char* type) { return tl && tl->hasParamLane(type); });
     }
 };

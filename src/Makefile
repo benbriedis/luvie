@@ -12,13 +12,13 @@ JACK_LIBS   := $(shell pkg-config --libs   jack 2>/dev/null)
 LO_CFLAGS   := $(shell pkg-config --cflags liblo 2>/dev/null)
 LO_LIBS     := $(shell pkg-config --libs   liblo 2>/dev/null)
 
-CXXFLAGS = $(FLTK_CXXFLAGS) $(JACK_CFLAGS) $(LO_CFLAGS) -std=c++23 -g -fPIC -MMD -MP
+CXXFLAGS = $(FLTK_CXXFLAGS) $(JACK_CFLAGS) $(LO_CFLAGS) -std=c++23 -g -fPIC -MMD -MP -Imodern
 LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS) $(LO_LIBS)
 
 BUILDDIR = build
 TARGET   = $(BUILDDIR)/luvie
 
-SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp songPopup.cpp modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableTimeline.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp songPopup.cpp modern/modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableSong.cpp observablePattern.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp
 
 OBJS     = $(SRCS:%.cpp=$(BUILDDIR)/%.o)
 DEPS     = $(SRCS:%.cpp=$(BUILDDIR)/%.d)
@@ -40,6 +40,7 @@ $(LIB): $(LIB_OBJS)
 	ar rcs $@ $^
 
 $(BUILDDIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
 	$(CC) $(CXXFLAGS) -c $< -o $@
 
 -include $(DEPS)

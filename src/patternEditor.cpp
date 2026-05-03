@@ -312,10 +312,10 @@ PatternEditor::~PatternEditor()
     swapObserver(timeline, nullptr, this);
 }
 
-void PatternEditor::setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex)
+void PatternEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex)
 {
-    swapObserver(timeline, tl, this);
-    playhead.setTransport(t, tl);
+    swapObserver(timeline, pat, this);
+    playhead.setTransport(t, pat ? pat->song() : nullptr);
     playhead.setPatternTrack(trackIndex);
 }
 

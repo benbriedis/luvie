@@ -26,7 +26,7 @@ DrumGrid::~DrumGrid()
     swapObserver(timeline, nullptr, this);
 }
 
-void DrumGrid::setTimeline(ObservableTimeline* tl, int patId)
+void DrumGrid::setTimeline(ObservablePattern* tl, int patId)
 {
     swapObserver(timeline, tl, this);
     patternId = patId;
@@ -107,7 +107,7 @@ void DrumGrid::draw()
         bool isBar = false;
         if (timeline) {
             int top, bottom;
-            timeline->timeSigAt(0, top, bottom);
+            timeline->song()->timeSigAt(0, top, bottom);
             isBar = (top > 0) && (i % top == 0);
         } else {
             isBar = (i % 4 == 0);

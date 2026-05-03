@@ -3,12 +3,11 @@
 
 #include <FL/Fl_Choice.H>
 #include <FL/fl_draw.H>
-#include "panelStyle.hpp"
 
 class ModernChoice : public Fl_Choice {
     bool     hovered   = false;
-    Fl_Color borderCol = panelCtrlBorder;
-    Fl_Color arrowCol  = panelArrow;
+    Fl_Color borderCol = 0x47556900;
+    Fl_Color arrowCol  = 0x94A3B800;
     Fl_Color hoverCol  = 0;  // 0 = auto (lighten bg)
 
     void draw() override {
@@ -54,7 +53,7 @@ public:
     ModernChoice(int x, int y, int w, int h)
         : Fl_Choice(x, y, w, h, nullptr) {
         box(FL_NO_BOX);
-        color(panelBg);
+        color(0x1E293B00);
         labelcolor(FL_WHITE);
     }
 

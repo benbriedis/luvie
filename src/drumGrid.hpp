@@ -1,7 +1,7 @@
 #ifndef DRUM_GRID_HPP
 #define DRUM_GRID_HPP
 
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include "popup.hpp"
 #include <FL/Fl_Box.H>
 #include <vector>
@@ -27,7 +27,7 @@ using DrumState = std::variant<DrumStateIdle, DrumStateHover, DrumStateDrag>;
 // ---------------------------------------------------------------------------
 
 class DrumGrid : public Fl_Box, public ITimelineObserver {
-    ObservableTimeline* timeline  = nullptr;
+    ObservablePattern* timeline  = nullptr;
     int                 patternId = -1;
     int                 rowOffset = 0;   // MIDI note at the bottom visual row
     int                 colOffset = 0;
@@ -66,7 +66,7 @@ public:
     void setPlayhead(Playhead* p) { playhead = p; }
     ~DrumGrid();
 
-    void setTimeline(ObservableTimeline* tl, int patId);
+    void setTimeline(ObservablePattern* tl, int patId);
     void setRowOffset(int offset);
     void setColOffset(int off) { colOffset = off; redraw(); }
     void setNumRows(int n)     { numRows   = n;   rebuildNotes(); }

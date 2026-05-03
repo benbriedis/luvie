@@ -2,7 +2,7 @@
 #define PATTERN_PARAM_GRID_HPP
 
 #include "paramLaneTypes.hpp"
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include "paramDotPopup.hpp"
 #include <FL/Fl_Widget.H>
 #include <FL/Fl.H>
@@ -18,7 +18,7 @@ inline constexpr int kParamAreaH   = kMaxVisParams * kParamRowH;
 // ── Left column: type labels for each visible param lane ─────────────────────
 
 class PatternParamLabels : public Fl_Widget {
-    ObservableTimeline* timeline   = nullptr;
+    ObservablePattern* timeline   = nullptr;
     int                 patternId  = -1;
     int                 laneOffset = 0;
 
@@ -31,7 +31,7 @@ public:
     PatternParamLabels(int x, int y, int w)
         : Fl_Widget(x, y, w, kParamAreaH) {}
 
-    void setTimeline(ObservableTimeline* tl, int patId) {
+    void setTimeline(ObservablePattern* tl, int patId) {
         timeline  = tl;
         patternId = patId;
         redraw();
@@ -42,7 +42,7 @@ public:
 // ── Rubberband editing grid ───────────────────────────────────────────────────
 
 class PatternParamGrid : public Fl_Widget {
-    ObservableTimeline* timeline   = nullptr;
+    ObservablePattern* timeline   = nullptr;
     int                 patternId  = -1;
     int                 colOffset_ = 0;
     int                 numCols_   = 8;
@@ -67,8 +67,8 @@ public:
     PatternParamGrid(int x, int y, int w, int colWidth, float snap)
         : Fl_Widget(x, y, w, kParamAreaH), colWidth_(colWidth), snap_(snap) {}
 
-    void setTimeline(ObservableTimeline* tl, int patId);
-    void update(ObservableTimeline* tl, int patId);   // respects active drag
+    void setTimeline(ObservablePattern* tl, int patId);
+    void update(ObservablePattern* tl, int patId);   // respects active drag
     void setColOffset(int off) { colOffset_ = off; redraw(); }
     void setNumCols(int n)     { numCols_   = n;   redraw(); }
     void setLaneOffset(int off){ laneOffset = off; rebuildLanes(); redraw(); }

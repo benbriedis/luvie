@@ -6,16 +6,16 @@
 #include <unordered_set>
 #include <vector>
 
-class ObservableTimeline;
+class ObservableSong;
 
 // Runtime state tracking which patterns are currently playing and their phase.
 // Populated by sync() in song mode; managed explicitly via activate/deactivate
-// in loop mode. Separate from ObservableTimeline (persistent song data).
+// in loop mode. Separate from ObservableSong (persistent song data).
 class ActivePatternSet {
 public:
 	// Song-mode sync: compute what should be active from the timeline at currentBar
 	// and reconcile with any manual overrides. Notifies observers if anything changed.
-	void sync(const ObservableTimeline& tl, float currentBar);
+	void sync(const ObservableSong& tl, float currentBar);
 
 	// Loop-mode explicit control. Both notify observers.
 	void activate(int patId, float anchorBar);

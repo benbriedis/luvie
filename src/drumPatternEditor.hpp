@@ -8,7 +8,7 @@
 #include "paramDotPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
 #include "inlineInput.hpp"
 #include <FL/Fl_Widget.H>
@@ -51,7 +51,7 @@ class DrumPatternEditor : public Editor, public ITimelineObserver {
     InlineInput         drumLabelInput;
     PatternParamLabels  paramLabels;
     PatternParamGrid    paramGrid;
-    ObservableTimeline* timeline          = nullptr;
+    ObservablePattern* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
     int                 colOffset         = 0;
     int                 editingMidiNote   = -1;
@@ -78,7 +78,7 @@ public:
 
     std::function<void(const std::string& chanName, int midiNote, const std::string& label)> onDrumLabelChanged;
 
-    void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
+    void setPatternPlayhead(ITransport* t, ObservablePattern* tl, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }

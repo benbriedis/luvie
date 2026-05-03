@@ -9,7 +9,7 @@
 #include "paramDotPopup.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
 #include <vector>
 
@@ -23,7 +23,7 @@ class PatternEditor : public Editor, public ITimelineObserver {
     PatternGrid         patternGrid;
     PatternParamLabels  paramLabels;
     PatternParamGrid    paramGrid;
-    ObservableTimeline* timeline          = nullptr;
+    ObservablePattern* timeline          = nullptr;
     int                 lastSelectedTrack = -1;
     float               lastLengthBeats   = -1.0f;
     int                 rootPitch         = 0;
@@ -44,7 +44,7 @@ public:
                   int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternEditor();
 
-    void setPatternPlayhead(ITransport* t, ObservableTimeline* tl, int trackIndex);
+    void setPatternPlayhead(ITransport* t, ObservablePattern* tl, int trackIndex);
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);

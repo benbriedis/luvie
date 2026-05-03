@@ -13,7 +13,7 @@ PianorollGrid::~PianorollGrid()
     swapObserver(timeline, nullptr, this);
 }
 
-void PianorollGrid::setTimeline(ObservableTimeline* tl, int patId)
+void PianorollGrid::setTimeline(ObservablePattern* tl, int patId)
 {
     swapObserver(timeline, tl, this);
     patternId = patId;

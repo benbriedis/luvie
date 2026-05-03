@@ -2,7 +2,7 @@
 #define SONG_GRID_HPP
 
 #include "grid.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "songPopup.hpp"
 #include "paramDotPopup.hpp"
 #include "paramLaneTypes.hpp"
@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SongGrid : public Grid, public ITimelineObserver {
-    ObservableTimeline* timeline          = nullptr;
+    ObservableSong* timeline          = nullptr;
     SongPopup*          songPopup         = nullptr;
     ParamDotPopup*      paramDotPopup     = nullptr;
     int                 trackFilter       = -1;
@@ -57,7 +57,7 @@ public:
 
     int handle(int event) override;
 
-    void setTimeline(ObservableTimeline* tl);
+    void setTimeline(ObservableSong* tl);
     void setTrackView(int trackFilter, bool beatResolution);
     void setRowOffset(int offset);
     void onTimelineChanged() override;

@@ -2,7 +2,7 @@
 #define MARKER_RULER_HPP
 
 #include <FL/Fl_Widget.H>
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "markerPopup.hpp"
 
 class MarkerRuler : public Fl_Widget, public ITimelineObserver {
@@ -10,7 +10,7 @@ public:
 	enum Kind { TEMPO, TIME_SIG };
 
 	MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
-	            Kind kind, ObservableTimeline* timeline, MarkerPopup* popup);
+	            Kind kind, ObservableSong* timeline, MarkerPopup* popup);
 	~MarkerRuler();
 
 	void onTimelineChanged() override { redraw(); }
@@ -20,7 +20,7 @@ private:
 	Kind                kind;
 	int                 numCols;
 	int                 colWidth;
-	ObservableTimeline* timeline;
+	ObservableSong* timeline;
 	MarkerPopup*        popup;
 
 	int  draggingBar    = -1;

@@ -82,7 +82,7 @@ SongEditor::~SongEditor()
     swapObserver(timeline, nullptr, this);
 }
 
-void SongEditor::setTransport(ITransport* t, ObservableTimeline* tl)
+void SongEditor::setTransport(ITransport* t, ObservableSong* tl)
 {
     swapObserver(timeline, tl, this);
     playhead.setTransport(t, tl);

@@ -37,7 +37,7 @@ TrackLabels::~TrackLabels()
     swapObserver(timeline, nullptr, this);
 }
 
-void TrackLabels::setTimeline(ObservableTimeline* tl)
+void TrackLabels::setTimeline(ObservableSong* tl)
 {
     swapObserver(timeline, tl, this);
     redraw();

@@ -99,7 +99,7 @@ void PatternParamGrid::rebuildLanes()
     }
 }
 
-void PatternParamGrid::setTimeline(ObservableTimeline* tl, int patId)
+void PatternParamGrid::setTimeline(ObservablePattern* tl, int patId)
 {
     timeline  = tl;
     patternId = patId;
@@ -108,7 +108,7 @@ void PatternParamGrid::setTimeline(ObservableTimeline* tl, int patId)
     redraw();
 }
 
-void PatternParamGrid::update(ObservableTimeline* tl, int patId)
+void PatternParamGrid::update(ObservablePattern* tl, int patId)
 {
     timeline  = tl;
     patternId = patId;

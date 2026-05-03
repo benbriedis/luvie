@@ -311,7 +311,7 @@ PatternPanel::~PatternPanel()
     swapObserver(timeline, nullptr, this);
 }
 
-void PatternPanel::setTimeline(ObservableTimeline* tl)
+void PatternPanel::setTimeline(ObservablePattern* tl)
 {
     swapObserver(timeline, tl, this);
     onTimelineChanged();
@@ -401,7 +401,7 @@ void PatternPanel::commitEdit()
         bool dup = false;
         for (const auto& t : tracks)
             if (t.id != id && t.label == newLabel) { dup = true; break; }
-        timeline->renameTrack(id, dup ? originalLabel : newLabel);
+        timeline->song()->renameTrack(id, dup ? originalLabel : newLabel);
     }
     redraw();
 }

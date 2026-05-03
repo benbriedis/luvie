@@ -84,7 +84,7 @@ int TrackContextPopup::rowOrderIdxForTrackId(int trackId) const
     return -1;
 }
 
-void TrackContextPopup::open(int trackId, ObservableTimeline* tl, int wx, int wy)
+void TrackContextPopup::open(int trackId, ObservableSong* tl, int wx, int wy)
 {
     timeline      = tl;
     targetTrackId = trackId;

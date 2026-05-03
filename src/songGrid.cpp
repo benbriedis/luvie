@@ -79,7 +79,7 @@ SongGrid::~SongGrid()
     swapObserver(timeline, nullptr, this);
 }
 
-void SongGrid::setTimeline(ObservableTimeline* tl)
+void SongGrid::setTimeline(ObservableSong* tl)
 {
     swapObserver(timeline, tl, this);
     rebuildNotes();

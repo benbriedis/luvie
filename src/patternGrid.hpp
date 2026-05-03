@@ -2,13 +2,13 @@
 #define PATTERN_GRID_HPP
 
 #include "grid.hpp"
-#include "observableTimeline.hpp"
+#include "observablePattern.hpp"
 #include <vector>
 #include <functional>
 #include <set>
 
 class PatternGrid : public Grid, public ITimelineObserver {
-    ObservableTimeline* timeline        = nullptr;
+    ObservablePattern* timeline        = nullptr;
     int                 patternId       = -1;
     int                 chordSize       = 3;
     int                 rowOffset       = 0;   // in virtual-row units
@@ -36,7 +36,7 @@ public:
     PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
     ~PatternGrid();
 
-    void setTimeline(ObservableTimeline* tl, int patId);
+    void setTimeline(ObservablePattern* tl, int patId);
     void setChordSize(int size) { chordSize = size; groupSize = size + (int)disabledDegrees.size(); redraw(); }
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);

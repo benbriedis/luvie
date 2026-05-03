@@ -3,7 +3,7 @@
 
 #include "basePopup.hpp"
 #include "modernButton.hpp"
-#include "observableTimeline.hpp"
+#include "observableSong.hpp"
 #include "parameterSubmenu.hpp"
 #include <functional>
 
@@ -23,7 +23,7 @@ private:
     ModernButton*       copyBtn;
     ModernButton*       deleteBtn;
     ModernButton*       addParamBtn;
-    ObservableTimeline* timeline      = nullptr;
+    ObservableSong* timeline      = nullptr;
     int                 targetTrackId = -1;
 
     static constexpr int numPatternBeats = 8;
@@ -44,7 +44,7 @@ public:
 
     std::function<void(int trackIndex)>  onOpenPattern;
 
-    void open(int trackId, ObservableTimeline* tl, int wx, int wy);
+    void open(int trackId, ObservableSong* tl, int wx, int wy);
 };
 
 #endif
