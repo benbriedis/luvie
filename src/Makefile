@@ -18,7 +18,7 @@ LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS) $(LO_LIBS)
 BUILDDIR = build
 TARGET   = $(BUILDDIR)/luvie
 
-SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp songPopup.cpp modern/modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableSong.cpp observablePattern.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp basePatternEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp popup.cpp songPopup.cpp modern/modernTabs.cpp cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableSong.cpp observablePattern.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp
 
 OBJS     = $(SRCS:%.cpp=$(BUILDDIR)/%.o)
 DEPS     = $(SRCS:%.cpp=$(BUILDDIR)/%.d)

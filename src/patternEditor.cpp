@@ -1,19 +1,15 @@
 #include "patternEditor.hpp"
 #include "chords.hpp"
 #include <FL/Fl.H>
-#include <FL/fl_draw.H>
 #include <algorithm>
 #include <climits>
 #include <set>
 
 PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
+    : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW),
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
-      patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
-      paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, labelsW),
-      paramGrid(x + scrollbarW + labelsW, y + rulerH + numRows * rowHeight,
-                visibleW - scrollbarW - labelsW, colWidth, snap)
+      patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     rulerOffsetX = scrollbarW + labelsW;
 
@@ -90,6 +86,8 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
     end();
 }
 
+PatternEditor::~PatternEditor() = default;
+
 void PatternEditor::setNoteParams(int root, int chord, bool sharp)
 {
     int oldChordType = chordType;
@@ -131,7 +129,6 @@ int PatternEditor::computeDefaultOffset(int patId) const
     int gs = patternGrid.getGroupSize();
     int cs = patternGrid.getChordSize();
 
-    // number of enabled chord tones (for searching by MIDI)
     int numChordTones = (total / gs) * cs;
 
     if (allNotes.empty()) {
@@ -140,13 +137,11 @@ int PatternEditor::computeDefaultOffset(int patId) const
         for (int n = 0; n < numChordTones; n++) {
             if (midiForTone(n) <= A3) bestChordTone = n;
         }
-        // Convert chord-tone index to virtual-row index
         int octave     = bestChordTone / cs;
         int degree     = bestChordTone % cs;
         int virtualPos = octave * gs + degree;
         return std::clamp(virtualPos - 1, 0, maxOffset);
     } else {
-        // Find lowest enabled note in chord-space, convert to virtual row
         int lowest = INT_MAX;
         for (const auto& n : allNotes)
             if (!n.disabled) lowest = std::min(lowest, (int)n.pitch);
@@ -158,144 +153,6 @@ int PatternEditor::computeDefaultOffset(int patId) const
     }
 }
 
-void PatternEditor::setRowOffset(int offset)
-{
-    int total  = noteLabels.getTotalTones();
-    int maxOff = std::max(0, total - patternGrid.numRows);
-    offset = std::clamp(offset, 0, maxOff);
-    noteLabels.setRowOffset(offset);
-    patternGrid.setRowOffset(offset);
-    if (scrollbar)
-        scrollbar->value(maxOff - offset, patternGrid.numRows, 0, total);
-}
-
-void PatternEditor::setColOffset(int offset)
-{
-    if (!hScrollbar) return;
-    int visibleCols = patternGrid.w() / patternGrid.colWidth;
-    colOffset = std::clamp(offset, 0, std::max(0, patternGrid.numCols - visibleCols));
-    hScrollPixel = colOffset * patternGrid.colWidth;
-    patternGrid.setColOffset(colOffset);
-    paramGrid.setColOffset(colOffset);
-    hScrollbar->value(colOffset, visibleCols, 0, patternGrid.numCols);
-
-    int totalGridW = patternGrid.numCols * patternGrid.colWidth;
-    if (totalGridW > patternGrid.w())
-        hScrollbar->show();
-    else
-        hScrollbar->hide();
-    redraw();
-}
-
-void PatternEditor::updateParamScrollbar()
-{
-    int total = paramGrid.numLanes();
-    if (total > kMaxVisParams) {
-        int maxOff = total - kMaxVisParams;
-        paramLaneOffset = std::clamp(paramLaneOffset, 0, maxOff);
-        if (paramScrollbar)
-            paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
-    } else {
-        paramLaneOffset = 0;
-    }
-    paramGrid.setLaneOffset(paramLaneOffset);
-    paramLabels.setLaneOffset(paramLaneOffset);
-    relayout();
-}
-
-void PatternEditor::relayout()
-{
-    const int bx = x(), gy = y(), bw = w(), bh = h();
-    const int lanes      = paramGrid.numLanes();
-    const int visRows    = std::min(lanes, kMaxVisParams);
-    const int paramAreaH = visRows * kParamRowH;
-
-    const int newNumRows   = std::max(1, (bh - rulerH - paramAreaH - hScrollH) / patternGrid.rowHeight);
-    const int visibleGridW = std::max(1, bw - scrollbarW - labelsW);
-    const int gridH        = newNumRows * patternGrid.rowHeight;
-    const int paramY       = gy + rulerH + gridH;
-
-    scrollbar->resize(bx, gy + rulerH, scrollbarW, gridH);
-    noteLabels.setNumRows(newNumRows);
-    noteLabels.resize(bx + scrollbarW, gy + rulerH, labelsW, gridH);
-    patternGrid.setNumRows(newNumRows);
-    patternGrid.resize(bx + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
-
-    if (paramAreaH > 0) {
-        paramLabels.resize(bx + scrollbarW, paramY, labelsW, paramAreaH);
-        paramGrid.resize(bx + scrollbarW + labelsW, paramY, visibleGridW, paramAreaH);
-        paramLabels.show();
-        paramGrid.show();
-        if (lanes > kMaxVisParams) {
-            paramScrollbar->resize(bx, paramY, scrollbarW, paramAreaH);
-            paramScrollbar->show();
-        } else {
-            paramScrollbar->hide();
-        }
-    } else {
-        paramLabels.hide();
-        paramGrid.hide();
-        paramScrollbar->hide();
-    }
-
-    hScrollbar->resize(bx + scrollbarW + labelsW, paramY + paramAreaH, visibleGridW, hScrollH);
-
-    setRowOffset(noteLabels.getRowOffset());
-    setColOffset(colOffset);
-}
-
-void PatternEditor::resize(int x, int /*y*/, int w, int h)
-{
-    Fl_Widget::resize(x, y(), w, h);
-    relayout();
-}
-
-int PatternEditor::handle(int event)
-{
-    if (event == FL_MOUSEWHEEL) {
-        if (Fl::event_dx() != 0)
-            setColOffset(colOffset + Fl::event_dx());
-        else
-            setRowOffset(noteLabels.getRowOffset() - Fl::event_dy());
-        return 1;
-    }
-    return Editor::handle(event);
-}
-
-void PatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
-{
-    noteLabels.onRightClick = [this, popup]() {
-        if (!popup || !pattern || lastSelectedTrack < 0) return;
-        const auto& tracks = pattern->get().tracks;
-        if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].patternId;
-        popup->open(
-            Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); }
-        );
-    };
-}
-
-void PatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
-{
-    paramLabels.onRightClick = [this, popup](int laneId) {
-        if (!popup || !pattern || lastSelectedTrack < 0) return;
-        const auto& tracks = pattern->get().tracks;
-        if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].patternId;
-        std::function<void()> onRemove;
-        if (laneId >= 0)
-            onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
-        popup->open(
-            Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
-            std::move(onRemove)
-        );
-    };
-}
-
 void PatternEditor::focusPattern()
 {
     int patId = -1;
@@ -305,18 +162,6 @@ void PatternEditor::focusPattern()
             patId = tracks[lastSelectedTrack].patternId;
     }
     setRowOffset(computeDefaultOffset(patId));
-}
-
-PatternEditor::~PatternEditor()
-{
-    swapObserver(pattern, nullptr, this);
-}
-
-void PatternEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex)
-{
-    swapObserver(pattern, pat, this);
-    playhead.setTransport(t, pat ? pat->song() : nullptr);
-    playhead.setPatternTrack(trackIndex);
 }
 
 void PatternEditor::onTimelineChanged()

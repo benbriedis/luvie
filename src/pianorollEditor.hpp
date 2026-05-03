@@ -1,15 +1,9 @@
 #ifndef PIANOROLL_EDITOR_HPP
 #define PIANOROLL_EDITOR_HPP
 
-#include "editor.hpp"
-#include "noteLabelsContextPopup.hpp"
-#include "patternParamGrid.hpp"
+#include "basePatternEditor.hpp"
 #include "pianorollGrid.hpp"
-#include "paramDotPopup.hpp"
 #include "popup.hpp"
-#include "itransport.hpp"
-#include "observablePattern.hpp"
-#include "gridScrollPane.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
 
@@ -32,38 +26,35 @@ public:
 
 // ---------------------------------------------------------------------------
 
-class PianorollEditor : public Editor, public ITimelineObserver {
-    static constexpr int labelsW    = 70;
-    static constexpr int scrollbarW = 14;
+class PianorollEditor : public BasePatternEditor {
+    static constexpr int labelsW = 70;
 
-    GridScrollPane*     scrollbar         = nullptr;
-    GridScrollPane*     paramScrollbar    = nullptr;
-    PianorollLabels     labels;
-    PianorollGrid       grid;
-    PatternParamLabels  paramLabels;
-    PatternParamGrid    paramGrid;
-    ObservablePattern* pattern          = nullptr;
-    int                 lastSelectedTrack = -1;
-    int                 colOffset         = 0;
-    int                 paramLaneOffset   = 0;
+    PianorollLabels labels;
+    PianorollGrid   grid;
 
-    void setRowOffset(int offset);
-    void setColOffset(int offset);
-    void relayout();
-    void updateParamScrollbar();
-    int  handle(int event) override;
+    int  labelsWidth()      const override { return labelsW; }
+    int  totalRows()        const override { return PianorollGrid::totalRows; }
+    int  gridNumRows()      const override { return grid.numRows; }
+    int  gridNumCols()      const override { return grid.numCols; }
+    int  gridRowHeight()    const override { return grid.rowHeight; }
+    int  gridColWidth()     const override { return grid.colWidth; }
+    int  gridWidgetW()      const override { return grid.w(); }
+    int  currentRowOffset() const override { return grid.getRowOffset(); }
+    void gridSetRowOffset(int off) override { grid.setRowOffset(off); }
+    void gridSetColOffset(int off) override { grid.setColOffset(off); }
+    void gridSetNumRows(int n)     override { grid.setNumRows(n); }
+    void gridResize(int x, int y, int w, int h) override { grid.resize(x, y, w, h); }
+    void labelsSetRowOffset(int off) override { labels.setRowOffset(off); }
+    void labelsSetNumRows(int n)     override { labels.setNumRows(n); }
+    void labelsResize(int x, int y, int w, int h) override { labels.resize(x, y, w, h); }
+    void labelsSetOnRightClick(std::function<void()> fn) override { labels.onRightClick = std::move(fn); }
 
 public:
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                     int rowHeight, int colWidth, float snap, Popup& popup);
     ~PianorollEditor();
 
-    void setPatternPlayhead(ITransport* t, ObservablePattern* tl, int trackIndex);
-    void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
-    void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
-    void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     void onTimelineChanged() override;
-    void resize(int x, int y, int w, int h) override;
 };
 
 #endif

@@ -62,12 +62,9 @@ int PianorollLabels::handle(int event)
 
 PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                                  int rowHeight, int colWidth, float snap, Popup& popup)
-    : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
+    : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW),
       labels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
-      grid(numRows, numCols, rowHeight, colWidth, snap, popup),
-      paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, labelsW),
-      paramGrid(x + scrollbarW + labelsW, y + rulerH + numRows * rowHeight,
-                visibleW - scrollbarW - labelsW, colWidth, snap)
+      grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     rulerOffsetX = scrollbarW + labelsW;
 
@@ -125,8 +122,7 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
     playhead.setOwner(this);
     seekingEnabled = false;
 
-    // Default view: centre around middle C (MIDI 60)
-    setRowOffset(48);
+    setRowOffset(48);  // default view: centre around middle C (MIDI 60)
 
     int totalGridW = numCols * colWidth;
     if (totalGridW > visibleGridW) {
@@ -137,51 +133,7 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
     end();
 }
 
-PianorollEditor::~PianorollEditor()
-{
-    swapObserver(pattern, nullptr, this);
-}
-
-void PianorollEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex)
-{
-    swapObserver(pattern, pat, this);
-    playhead.setTransport(t, pat ? pat->song() : nullptr);
-    playhead.setPatternTrack(trackIndex);
-}
-
-void PianorollEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
-{
-    labels.onRightClick = [this, popup]() {
-        if (!popup || !pattern || lastSelectedTrack < 0) return;
-        const auto& tracks = pattern->get().tracks;
-        if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].patternId;
-        popup->open(
-            Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); }
-        );
-    };
-}
-
-void PianorollEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
-{
-    paramLabels.onRightClick = [this, popup](int laneId) {
-        if (!popup || !pattern || lastSelectedTrack < 0) return;
-        const auto& tracks = pattern->get().tracks;
-        if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].patternId;
-        std::function<void()> onRemove;
-        if (laneId >= 0)
-            onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
-        popup->open(
-            Fl::event_x_root(), Fl::event_y_root(),
-            [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
-            std::move(onRemove)
-        );
-    };
-}
+PianorollEditor::~PianorollEditor() = default;
 
 void PianorollEditor::onTimelineChanged()
 {
@@ -208,107 +160,4 @@ void PianorollEditor::onTimelineChanged()
         paramLabels.setPattern(pattern, patId);
         updateParamScrollbar();
     }
-}
-
-void PianorollEditor::setRowOffset(int offset)
-{
-    int maxOff = std::max(0, PianorollGrid::totalRows - grid.numRows);
-    offset = std::clamp(offset, 0, maxOff);
-    labels.setRowOffset(offset);
-    grid.setRowOffset(offset);
-    if (scrollbar)
-        scrollbar->value(maxOff - offset, grid.numRows, 0, PianorollGrid::totalRows);
-}
-
-void PianorollEditor::setColOffset(int offset)
-{
-    if (!hScrollbar) return;
-    int visibleCols = grid.w() / grid.colWidth;
-    colOffset = std::clamp(offset, 0, std::max(0, grid.numCols - visibleCols));
-    hScrollPixel = colOffset * grid.colWidth;
-    grid.setColOffset(colOffset);
-    paramGrid.setColOffset(colOffset);
-    hScrollbar->value(colOffset, visibleCols, 0, grid.numCols);
-
-    int totalGridW = grid.numCols * grid.colWidth;
-    if (totalGridW > grid.w())
-        hScrollbar->show();
-    else
-        hScrollbar->hide();
-    redraw();
-}
-
-void PianorollEditor::updateParamScrollbar()
-{
-    int total = paramGrid.numLanes();
-    if (total > kMaxVisParams) {
-        int maxOff = total - kMaxVisParams;
-        paramLaneOffset = std::clamp(paramLaneOffset, 0, maxOff);
-        if (paramScrollbar)
-            paramScrollbar->value(paramLaneOffset, kMaxVisParams, 0, total);
-    } else {
-        paramLaneOffset = 0;
-    }
-    paramGrid.setLaneOffset(paramLaneOffset);
-    paramLabels.setLaneOffset(paramLaneOffset);
-    relayout();
-}
-
-void PianorollEditor::relayout()
-{
-    const int bx = x(), gy = y(), bw = w(), bh = h();
-    const int lanes      = paramGrid.numLanes();
-    const int visRows    = std::min(lanes, kMaxVisParams);
-    const int paramAreaH = visRows * kParamRowH;
-
-    const int newNumRows   = std::max(1, (bh - rulerH - paramAreaH - hScrollH) / grid.rowHeight);
-    const int visibleGridW = std::max(1, bw - scrollbarW - labelsW);
-    const int gridH        = newNumRows * grid.rowHeight;
-    const int paramY       = gy + rulerH + gridH;
-
-    scrollbar->resize(bx, gy + rulerH, scrollbarW, gridH);
-    labels.setNumRows(newNumRows);
-    labels.resize(bx + scrollbarW, gy + rulerH, labelsW, gridH);
-    grid.setNumRows(newNumRows);
-    grid.resize(bx + scrollbarW + labelsW, gy + rulerH, visibleGridW, gridH);
-
-    if (paramAreaH > 0) {
-        paramLabels.resize(bx + scrollbarW, paramY, labelsW, paramAreaH);
-        paramGrid.resize(bx + scrollbarW + labelsW, paramY, visibleGridW, paramAreaH);
-        paramLabels.show();
-        paramGrid.show();
-        if (lanes > kMaxVisParams) {
-            paramScrollbar->resize(bx, paramY, scrollbarW, paramAreaH);
-            paramScrollbar->show();
-        } else {
-            paramScrollbar->hide();
-        }
-    } else {
-        paramLabels.hide();
-        paramGrid.hide();
-        paramScrollbar->hide();
-    }
-
-    hScrollbar->resize(bx + scrollbarW + labelsW, paramY + paramAreaH, visibleGridW, hScrollH);
-
-    setRowOffset(grid.getRowOffset());
-    setColOffset(colOffset);
-}
-
-void PianorollEditor::resize(int x, int /*y*/, int w, int h)
-{
-    Fl_Widget::resize(x, y(), w, h);
-    relayout();
-}
-
-int PianorollEditor::handle(int event)
-{
-    if (event == FL_MOUSEWHEEL) {
-        if (Fl::event_dx() != 0)
-            setColOffset(colOffset + Fl::event_dx());
-        else
-            setRowOffset(grid.getRowOffset() - Fl::event_dy());
-        return 1;
-    }
-    return Editor::handle(event);
 }
