@@ -11,62 +11,20 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
-    rulerOffsetX = scrollbarW + labelsW;
-
     const int gridH        = numRows * rowHeight;
-    const int paramY       = y + rulerH + gridH;
     const int visibleGridW = visibleW - scrollbarW - labelsW;
-
-    scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
-    scrollbar->linesize(1);
-    scrollbar->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<PatternEditor*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        int total  = self->noteLabels.getTotalTones();
-        int maxOff = std::max(0, total - self->patternGrid.numRows);
-        self->setRowOffset(maxOff - (int)sb->value());
-    }, this);
-
-    paramScrollbar = new GridScrollPane(x, paramY, scrollbarW, kParamAreaH);
-    paramScrollbar->linesize(1);
-    paramScrollbar->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<PatternEditor*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        self->paramLaneOffset = (int)sb->value();
-        self->paramGrid.setLaneOffset(self->paramLaneOffset);
-        self->paramLabels.setLaneOffset(self->paramLaneOffset);
-    }, this);
-    paramScrollbar->hide();
-
-    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY,
-                                    visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
-    hScrollbar->linesize(1);
-    hScrollbar->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<PatternEditor*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        self->setColOffset((int)sb->value());
-    }, this);
-    hScrollbar->hide();
 
     noteLabels.position(x + scrollbarW, y + rulerH);
     patternGrid.position(x + scrollbarW + labelsW, y + rulerH);
     patternGrid.size(visibleGridW, gridH);
     patternGrid.setPlayhead(&playhead);
 
-    paramLabels.hide();
-    paramGrid.hide();
-    paramGrid.setNumCols(numCols);
-
-    add(*scrollbar);
-    add(*paramScrollbar);
-    add(*hScrollbar);
     add(noteLabels);
     add(patternGrid);
     add(paramLabels);
     add(paramGrid);
 
     playhead.setOwner(this);
-    seekingEnabled = false;
 
     noteLabels.onFocus = [this]() { focusPattern(); };
 
@@ -76,12 +34,6 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
         if (noteLabels.getTotalTones() != oldTotal)
             setRowOffset(noteLabels.getRowOffset());
     };
-
-    int totalGridW = numCols * colWidth;
-    if (totalGridW > visibleGridW) {
-        hScrollbar->value(0, visibleGridW / colWidth, 0, numCols);
-        hScrollbar->show();
-    }
 
     end();
 }
@@ -164,31 +116,19 @@ void PatternEditor::focusPattern()
     setRowOffset(computeDefaultOffset(patId));
 }
 
-void PatternEditor::onTimelineChanged()
+void PatternEditor::setGridPattern(int patId)
 {
-    if (!pattern) return;
-    const auto& tl  = pattern->get();
-    int sel         = tl.selectedTrackIndex;
-    bool trackChanged = (sel != lastSelectedTrack);
-    lastSelectedTrack = sel;
+    if (patId <= 0) return;
+    patternGrid.setPattern(pattern, patId);
+    setRowOffset(computeDefaultOffset(patId));
+    lastLengthBeats = -1.0f;
+}
 
-    if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-    int patId = tl.tracks[sel].patternId;
-
-    if (trackChanged && patId > 0) {
-        playhead.setPatternTrack(sel);
-        patternGrid.setPattern(pattern, patId);
-        setRowOffset(computeDefaultOffset(patId));
-        lastLengthBeats = -1.0f;
-        paramGrid.setPattern(pattern, patId);
-    } else {
-        paramGrid.update(pattern, patId);
-    }
-    paramLabels.setPattern(pattern, patId);
-    updateParamScrollbar();
-
+void PatternEditor::afterTimelineChanged(int patId)
+{
+    if (patId <= 0 || !pattern) return;
     float lb = 0.0f;
-    for (const auto& p : tl.patterns)
+    for (const auto& p : pattern->get().patterns)
         if (p.id == patId) { lb = p.lengthBeats; break; }
 
     if (lb != lastLengthBeats && lb > 0.0f) {

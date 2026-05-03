@@ -69,6 +69,9 @@ class DrumPatternEditor : public BasePatternEditor {
     void labelsResize(int x, int y, int w, int h) override { drumLabels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { drumLabels.onRightClick = std::move(fn); }
 
+    void setGridPattern(int patId) override;
+    void afterTimelineChanged(int patId) override;
+
 public:
     DrumPatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                       int rowHeight, int colWidth, float snap, Popup& popup);
@@ -78,7 +81,6 @@ public:
 
     void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
                         const std::map<std::string, bool>& fallbacks);
-    void onTimelineChanged() override;
     void resize(int x, int y, int w, int h) override;
 };
 

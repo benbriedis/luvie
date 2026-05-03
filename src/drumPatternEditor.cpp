@@ -77,41 +77,8 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
       drumGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
       drumLabelInput(x + scrollbarW, y + rulerH, labelsW, rowHeight)
 {
-    rulerOffsetX = scrollbarW + labelsW;
-
-    const int gridH       = numRows * rowHeight;
-    const int paramY      = y + rulerH + gridH;
+    const int gridH        = numRows * rowHeight;
     const int visibleGridW = visibleW - scrollbarW - labelsW;
-
-    scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
-    scrollbar->linesize(1);
-    scrollbar->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<DrumPatternEditor*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        int maxOff = std::max(0, DrumGrid::totalRows - self->drumGrid.numRows);
-        self->setRowOffset(maxOff - (int)sb->value());
-    }, this);
-
-    paramScrollbar = new GridScrollPane(x, paramY, scrollbarW, kParamAreaH);
-    paramScrollbar->linesize(1);
-    paramScrollbar->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<DrumPatternEditor*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        self->paramLaneOffset = (int)sb->value();
-        self->paramGrid.setLaneOffset(self->paramLaneOffset);
-        self->paramLabels.setLaneOffset(self->paramLaneOffset);
-    }, this);
-    paramScrollbar->hide();
-
-    hScrollbar = new GridScrollPane(x + scrollbarW + labelsW, paramY,
-                                    visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
-    hScrollbar->linesize(1);
-    hScrollbar->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<DrumPatternEditor*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        self->setColOffset((int)sb->value());
-    }, this);
-    hScrollbar->hide();
 
     drumLabels.position(x + scrollbarW, y + rulerH);
     drumGrid.position(x + scrollbarW + labelsW, y + rulerH);
@@ -133,13 +100,6 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     }, this);
     drumLabelInput.onUnfocus([this]() { commitDrumLabelEdit(); });
 
-    paramLabels.hide();
-    paramGrid.hide();
-    paramGrid.setNumCols(numCols);
-
-    add(*scrollbar);
-    add(*paramScrollbar);
-    add(*hScrollbar);
     add(drumLabels);
     add(drumGrid);
     add(drumLabelInput);
@@ -147,16 +107,8 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     add(paramGrid);
 
     playhead.setOwner(this);
-    seekingEnabled = false;
 
-    const int defaultOffset = 24;
-    setRowOffset(defaultOffset);
-
-    int totalGridW = numCols * colWidth;
-    if (totalGridW > visibleGridW) {
-        hScrollbar->value(0, visibleGridW / colWidth, 0, numCols);
-        hScrollbar->show();
-    }
+    setRowOffset(24);  // default view around MIDI 36 (bass drum area)
 
     end();
 }
@@ -257,31 +209,18 @@ void DrumPatternEditor::applyCurrentDrumMap()
     drumLabels.setFallbackNoteNames(false);
 }
 
-void DrumPatternEditor::onTimelineChanged()
+void DrumPatternEditor::setGridPattern(int patId)
 {
-    if (!pattern) return;
-    int sel = pattern->get().selectedTrackIndex;
-    bool trackChanged = (sel != lastSelectedTrack);
-    lastSelectedTrack = sel;
-
-    const auto& tracks = pattern->get().tracks;
-    if (sel >= 0 && sel < (int)tracks.size()) {
-        int patId = tracks[sel].patternId;
-        if (trackChanged) {
-            playhead.setPatternTrack(sel);
-            for (const auto& p : pattern->get().patterns) {
-                if (p.id == patId && p.type == PatternType::DRUM) {
-                    drumGrid.setPattern(pattern, patId);
-                    break;
-                }
-            }
-            paramGrid.setPattern(pattern, patId);
-        } else {
-            paramGrid.update(pattern, patId);
+    for (const auto& p : pattern->get().patterns) {
+        if (p.id == patId && p.type == PatternType::DRUM) {
+            drumGrid.setPattern(pattern, patId);
+            break;
         }
-        paramLabels.setPattern(pattern, patId);
-        updateParamScrollbar();
     }
+}
+
+void DrumPatternEditor::afterTimelineChanged(int /*patId*/)
+{
     applyCurrentDrumMap();
 }
 

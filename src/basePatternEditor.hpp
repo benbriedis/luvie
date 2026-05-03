@@ -39,8 +39,11 @@ protected:
     virtual void labelsSetRowOffset(int offset)           = 0;
     virtual void labelsSetNumRows(int n)                  = 0;
     virtual void labelsResize(int x, int y, int w, int h) = 0;
-    // Called by setNoteLabelsContextPopup to install the shared right-click lambda
     virtual void labelsSetOnRightClick(std::function<void()> fn) = 0;
+
+    // onTimelineChanged skeleton hooks
+    virtual void setGridPattern(int patId)    = 0;
+    virtual void afterTimelineChanged(int /*patId*/) {}
 
     void setRowOffset(int offset);
     void setColOffset(int offset);
@@ -59,7 +62,7 @@ public:
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     void resize(int x, int y, int w, int h) override;
-    void onTimelineChanged() override = 0;
+    void onTimelineChanged() override;
 };
 
 #endif

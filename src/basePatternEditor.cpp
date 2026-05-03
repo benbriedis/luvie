@@ -8,7 +8,58 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
       paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, lw),
       paramGrid(x + scrollbarW + lw, y + rulerH + numRows * rowHeight,
                 visibleW - scrollbarW - lw, colWidth, snap)
-{}
+{
+    rulerOffsetX = scrollbarW + lw;
+    seekingEnabled = false;
+
+    const int gridH        = numRows * rowHeight;
+    const int paramY       = y + rulerH + gridH;
+    const int visibleGridW = visibleW - scrollbarW - lw;
+
+    scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
+    scrollbar->linesize(1);
+    scrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<BasePatternEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        int maxOff = std::max(0, self->totalRows() - self->gridNumRows());
+        self->setRowOffset(maxOff - (int)sb->value());
+    }, this);
+
+    paramScrollbar = new GridScrollPane(x, paramY, scrollbarW, kParamAreaH);
+    paramScrollbar->linesize(1);
+    paramScrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<BasePatternEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->paramLaneOffset = (int)sb->value();
+        self->paramGrid.setLaneOffset(self->paramLaneOffset);
+        self->paramLabels.setLaneOffset(self->paramLaneOffset);
+    }, this);
+    paramScrollbar->hide();
+
+    hScrollbar = new GridScrollPane(x + scrollbarW + lw, paramY,
+                                    visibleGridW, hScrollH, GridScrollPane::HORIZONTAL);
+    hScrollbar->linesize(1);
+    hScrollbar->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<BasePatternEditor*>(d);
+        auto* sb   = static_cast<GridScrollPane*>(w);
+        self->setColOffset((int)sb->value());
+    }, this);
+    hScrollbar->hide();
+
+    if (numCols * colWidth > visibleGridW) {
+        hScrollbar->value(0, visibleGridW / colWidth, 0, numCols);
+        hScrollbar->show();
+    }
+
+    paramLabels.hide();
+    paramGrid.hide();
+    paramGrid.setNumCols(numCols);
+
+    // Establish child ordering; subclass ctors append their own widgets after these
+    add(*scrollbar);
+    add(*paramScrollbar);
+    add(*hScrollbar);
+}
 
 BasePatternEditor::~BasePatternEditor()
 {
@@ -54,6 +105,32 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
             std::move(onRemove)
         );
     };
+}
+
+void BasePatternEditor::onTimelineChanged()
+{
+    if (!pattern) return;
+    int sel = pattern->get().selectedTrackIndex;
+    bool trackChanged = (sel != lastSelectedTrack);
+    lastSelectedTrack = sel;
+
+    const auto& tracks = pattern->get().tracks;
+    if (sel < 0 || sel >= (int)tracks.size()) {
+        afterTimelineChanged(-1);
+        return;
+    }
+    int patId = tracks[sel].patternId;
+
+    if (trackChanged) {
+        playhead.setPatternTrack(sel);
+        setGridPattern(patId);
+        paramGrid.setPattern(pattern, patId);
+    } else {
+        paramGrid.update(pattern, patId);
+    }
+    paramLabels.setPattern(pattern, patId);
+    updateParamScrollbar();
+    afterTimelineChanged(patId);
 }
 
 void BasePatternEditor::setRowOffset(int offset)

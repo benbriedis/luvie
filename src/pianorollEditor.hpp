@@ -49,12 +49,12 @@ class PianorollEditor : public BasePatternEditor {
     void labelsResize(int x, int y, int w, int h) override { labels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { labels.onRightClick = std::move(fn); }
 
+    void setGridPattern(int patId) override;
+
 public:
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                     int rowHeight, int colWidth, float snap, Popup& popup);
     ~PianorollEditor();
-
-    void onTimelineChanged() override;
 };
 
 #endif

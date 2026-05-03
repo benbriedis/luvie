@@ -36,6 +36,9 @@ class PatternEditor : public BasePatternEditor {
     void labelsResize(int x, int y, int w, int h) override { noteLabels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { noteLabels.onRightClick = std::move(fn); }
 
+    void setGridPattern(int patId) override;
+    void afterTimelineChanged(int patId) override;
+
 public:
     PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                   int rowHeight, int colWidth, float snap, Popup& popup);
@@ -43,7 +46,6 @@ public:
 
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
     int  numPatternBeats() const { return patternGrid.numCols; }
-    void onTimelineChanged() override;
 };
 
 #endif
