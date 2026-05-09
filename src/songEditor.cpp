@@ -4,6 +4,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 SongEditor::SongEditor(int x, int y, int visibleW,
@@ -120,8 +121,31 @@ void SongEditor::onTimelineChanged()
     updateScrollBounds();
 }
 
+int SongEditor::computeNumCols() const
+{
+    static constexpr int minCols = 60;
+    static constexpr int step    = 20;
+    if (!timeline) return minCols;
+    float maxEnd = 0.0f;
+    const auto& data = timeline->get();
+    for (const auto& track : data.tracks)
+        for (const auto& inst : track.patterns)
+            maxEnd = std::max(maxEnd, inst.startBar + inst.length);
+    for (const auto& m : data.bpms)
+        maxEnd = std::max(maxEnd, (float)m.bar);
+    for (const auto& m : data.timeSigs)
+        maxEnd = std::max(maxEnd, (float)m.bar);
+    int rounded = (int)(std::ceil(maxEnd / step) * step);
+    return std::max(minCols, rounded + step);
+}
+
 void SongEditor::updateScrollBounds()
 {
+    int newNumCols = computeNumCols();
+    if (newNumCols != songGrid.numCols) {
+        songGrid.numCols = newNumCols;
+        if (onNumColsChanged) onNumColsChanged(newNumCols);
+    }
     if (!timeline || !scrollbar) return;
     int total = (int)timeline->get().rowOrder.size();
     int visRows  = std::min(total, numVisibleRows);

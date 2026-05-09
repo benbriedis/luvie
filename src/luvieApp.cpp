@@ -159,15 +159,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tab1->color(bgColor);
 
     auto* timeSigRuler = new MarkerRuler(0, off + tabBarH, winW, markerRulerH,
-        80, 60, MarkerRuler::TIME_SIG, song, tsPop);
+        60, 60, MarkerRuler::TIME_SIG, song, tsPop);
     tab1->add(timeSigRuler);
 
     auto* tempoRuler = new MarkerRuler(0, off + tabBarH + markerRulerH, winW, markerRulerH,
-        80, 60, MarkerRuler::TEMPO, song, tPop);
+        60, 60, MarkerRuler::TEMPO, song, tPop);
     tab1->add(tempoRuler);
 
     auto* og2 = new SongEditor(0, off + tabBarH + 2*markerRulerH, winW,
-                               10, 80, 45, 60, 0.25, *p2);
+                               10, 60, 45, 60, 0.25, *p2);
     tab1->add(og2);
     tab1->resizable(og2);
     tabs->add(*tab1);
@@ -222,6 +222,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         timeSigRuler->setClipLeft(clipLeft);
         tempoRuler->setOffsetX(off);
         tempoRuler->setClipLeft(clipLeft);
+    };
+    og2->onNumColsChanged = [timeSigRuler, tempoRuler](int n) {
+        timeSigRuler->setNumCols(n);
+        tempoRuler->setNumCols(n);
     };
     og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);

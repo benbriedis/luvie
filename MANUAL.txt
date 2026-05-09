@@ -12,3 +12,8 @@ Double clicking on note label in drum pattern allows the instrument name to be e
 
 In the pattern editor double click on the pattern name to edit.
 
+
+
+TODO some videos to walk through the S/W
+   - write some script notes as I'm testing and writing some music
+

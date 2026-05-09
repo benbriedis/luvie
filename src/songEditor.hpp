@@ -31,6 +31,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     void setRowOffset(int offset);
     void setColOffset(int offset);
     void drawRulerLabels() override;
+    int  computeNumCols() const;
 
 public:
     SongEditor(int x, int y, int visibleW,
@@ -41,6 +42,7 @@ public:
     std::function<void(int trackIndex)>            onPatternDoubleClick;
     std::function<void(int trackIndex)>            onOpenPattern;
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
+    std::function<void(int numCols)>               onNumColsChanged;
 
     void setSongPopup(SongPopup* p)         { songGrid.setSongPopup(p); }
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }

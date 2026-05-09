@@ -45,8 +45,9 @@ private:
 	void openPopupFor(int bar);
 
 public:
-	void setOffsetX(int ox)  { offsetX  = ox; redraw(); }
-	void setClipLeft(int cl) { clipLeft = cl; redraw(); }
+	void setOffsetX(int ox)   { offsetX  = ox; redraw(); }
+	void setClipLeft(int cl)  { clipLeft = cl; redraw(); }
+	void setNumCols(int n)    { numCols  = n;  redraw(); }
 };
 
 #endif
