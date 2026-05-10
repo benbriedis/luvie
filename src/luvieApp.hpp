@@ -41,7 +41,7 @@ public:
     static constexpr int markerRulerH    = 18;
     static constexpr int winW            = 920;
     static constexpr int numPatternBeats = 8;
-    static constexpr int panelH          = 50;
+    static constexpr int panelH          = 32;
     static constexpr int rowHeight       = 30;
 
     static int defaultWinH() {

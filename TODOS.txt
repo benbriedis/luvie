@@ -279,7 +279,7 @@ Allow the quantisation to be modified in pattern editors.
 
 Application icon
 
-Mute & solo selectors and indicators in Song Editor.
+Mute & solo selectors and indicators in Song Editor and Drum Pattern Editor.
 
 Allow the song to be longer. Maybe allow song length to be set in top menu?
   Then again, it does belong to the song context...
@@ -289,6 +289,5 @@ Allow the song to be longer. Maybe allow song length to be set in top menu?
 - Maybe give the "Control Row" its own class or function.
   - Make it flex?
 
-- Claude says: DrumPatternEditor also overrides handle (Escape key) and resize (cancel edit first)
-          What are these about?
+- Claude says: DrumPatternEditor also overrides handle (Escape key) and resize (cancel edit first).  What are these about?
 
