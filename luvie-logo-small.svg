@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Small version: simplified shapes, no filters, fewer gradient stops -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 195" width="48" height="48">
+  <defs>
+    <!-- Silver gradient, simplified 3-stop -->
+    <linearGradient id="g-silver-s" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ededf8"/>
+      <stop offset="50%"  stop-color="#c0c0d2"/>
+      <stop offset="100%" stop-color="#9898aa"/>
+    </linearGradient>
+
+    <!-- Left bevel -->
+    <linearGradient id="g-bevel-s" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <!-- Heart fill -->
+    <radialGradient id="g-heart-s" cx="42%" cy="36%" r="62%">
+      <stop offset="0%"   stop-color="#ffdce8" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#ff3366" stop-opacity="0.38"/>
+    </radialGradient>
+  </defs>
+
+  <!-- L body — no chamfers at this scale -->
+  <path d="M 55,15  L 95,15  L 95,143  L 153,143  L 153,171  L 55,171  Z"
+    fill="url(#g-silver-s)"/>
+
+  <!-- Minimal left bevel -->
+  <path d="M 55,15  L 61,15  L 61,171  L 55,171  Z"
+    fill="url(#g-bevel-s)" opacity="0.60"/>
+
+  <!-- Spine ridge — just a single line at this scale -->
+  <line x1="75" y1="16" x2="75" y2="142"
+    stroke="#ffffff" stroke-width="2" opacity="0.25"/>
+
+  <!-- Outer edge -->
+  <path d="M 55,15  L 95,15  L 95,143  L 153,143  L 153,171  L 55,171  Z"
+    fill="none" stroke="#9898b0" stroke-width="1.2" opacity="0.50"/>
+
+  <!-- Heart -->
+  <path d="M 110,65
+    C 90,44  55,57  55,97
+    C 55,128  110,143  110,143
+    C 110,143  165,128  165,97
+    C 165,57  130,44  110,65  Z"
+    fill="url(#g-heart-s)"/>
+
+  <!-- Heart rim -->
+  <path d="M 110,65
+    C 90,44  55,57  55,97
+    C 55,128  110,143  110,143
+    C 110,143  165,128  165,97
+    C 165,57  130,44  110,65  Z"
+    fill="none" stroke="#ff4466" stroke-width="1.8" opacity="0.55"/>
+</svg>

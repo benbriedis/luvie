@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 195" width="512" height="512">
+  <defs>
+    <!-- Metallic silver - diagonal multi-stop for that polished blade look -->
+    <linearGradient id="g-silver" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#eeeef8"/>
+      <stop offset="18%"  stop-color="#c2c2d4"/>
+      <stop offset="35%"  stop-color="#f6f6ff"/>
+      <stop offset="52%"  stop-color="#b0b0c4"/>
+      <stop offset="70%"  stop-color="#d4d4e6"/>
+      <stop offset="88%"  stop-color="#9898aa"/>
+      <stop offset="100%" stop-color="#bcbccc"/>
+    </linearGradient>
+
+    <!-- Left-face bevel: bright on left, fades right -->
+    <linearGradient id="g-bevel-h" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <!-- Top-face bevel: bright on top, fades down -->
+    <linearGradient id="g-bevel-v" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <!-- Ridge highlight on spine, fades toward tip -->
+    <linearGradient id="g-ridge" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="60%"  stop-color="#ffffff" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <!-- Pink-red radial for heart -->
+    <radialGradient id="g-heart" cx="42%" cy="36%" r="62%">
+      <stop offset="0%"   stop-color="#ffdce8" stop-opacity="0.85"/>
+      <stop offset="45%"  stop-color="#ff99b5" stop-opacity="0.68"/>
+      <stop offset="100%" stop-color="#ff3366" stop-opacity="0.38"/>
+    </radialGradient>
+
+    <!-- Heart rim stroke gradient -->
+    <linearGradient id="g-heart-rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ffbbcc" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#ff3355" stop-opacity="0.35"/>
+    </linearGradient>
+
+    <!-- Metal texture: subtle fractal noise blended in soft-light -->
+    <filter id="f-metal" x="-5%" y="-5%" width="110%" height="110%"
+            color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85 0.45"
+                    numOctaves="4" seed="12" result="noise"/>
+      <feColorMatrix type="matrix"
+        values="0 0 0 0 0.85  0 0 0 0 0.85  0 0 0 0 0.95  0 0 0 0.13 0"
+        in="noise" result="tinted"/>
+      <feComposite operator="in" in="tinted" in2="SourceGraphic" result="masked"/>
+      <feBlend mode="soft-light" in="SourceGraphic" in2="masked"/>
+    </filter>
+
+    <!-- Heart texture: soft pink noise -->
+    <filter id="f-heart" x="-5%" y="-5%" width="110%" height="110%"
+            color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.55 0.35"
+                    numOctaves="3" seed="7" result="noise"/>
+      <feColorMatrix type="matrix"
+        values="0 0 0 0 1  0 0 0 0 0.55  0 0 0 0 0.72  0 0 0 0.10 0"
+        in="noise" result="pinkTint"/>
+      <feComposite operator="in" in="pinkTint" in2="SourceGraphic" result="masked"/>
+      <feBlend mode="soft-light" in="SourceGraphic" in2="masked"/>
+    </filter>
+  </defs>
+
+  <!-- ======================================================= -->
+  <!-- L  —  sword-styled capital letter                        -->
+  <!-- Vertical stroke x=55..95, Horizontal stroke x=55..153   -->
+  <!-- Chamfers: top-right (95,23) and bottom-right (145,171)   -->
+  <!-- ======================================================= -->
+
+  <!-- Main L body -->
+  <path d="M 55,15  L 87,15  L 95,23  L 95,143  L 153,143
+           L 153,163  L 145,171  L 55,171  Z"
+    fill="url(#g-silver)" filter="url(#f-metal)"/>
+
+  <!-- Left bevel face (7 px wide, runs full height) -->
+  <path d="M 55,15  L 62,22  L 62,171  L 55,171  Z"
+    fill="url(#g-bevel-h)" opacity="0.65"/>
+
+  <!-- Top bevel face (vertical stroke top) -->
+  <path d="M 55,15  L 87,15  L 95,23  L 62,22  Z"
+    fill="url(#g-bevel-v)" opacity="0.55"/>
+
+  <!-- Top bevel face (horizontal stroke top) -->
+  <path d="M 95,143  L 153,143  L 153,150  L 95,150  Z"
+    fill="url(#g-bevel-v)" opacity="0.45"/>
+
+  <!-- Spine ridge — vertical stroke (blade fuller) -->
+  <path d="M 73,23  L 77,23  L 77,143  L 73,143  Z"
+    fill="url(#g-ridge)" opacity="0.50"/>
+
+  <!-- Spine ridge — horizontal stroke -->
+  <path d="M 95,157  L 148,157  L 148,160  L 95,160  Z"
+    fill="#ffffff" opacity="0.20"/>
+
+  <!-- Dark receding edge — right side of vertical stroke -->
+  <path d="M 95,23  L 91,27  L 91,143  L 95,143  Z"
+    fill="#202030" opacity="0.28"/>
+
+  <!-- Dark receding edge — bottom of horizontal stroke -->
+  <path d="M 145,171  L 141,167  L 95,167  L 95,171  Z"
+    fill="#202030" opacity="0.22"/>
+
+  <!-- Chamfer facet highlights -->
+  <polygon points="87,15 95,15 95,23"
+    fill="#e0e0f0" opacity="0.30"/>
+  <polygon points="153,163 153,171 145,171"
+    fill="#606070" opacity="0.35"/>
+
+  <!-- Crossguard diamond at L inner corner — the "guard" of the sword -->
+  <polygon points="95,137  103,143  95,149  87,143"
+    fill="#cacad8" opacity="0.75" stroke="#e0e0f0" stroke-width="0.6"/>
+  <!-- Diamond inner glint -->
+  <polygon points="95,139  100,143  95,147  90,143"
+    fill="#f0f0ff" opacity="0.35"/>
+
+  <!-- Outer edge outline -->
+  <path d="M 55,15  L 87,15  L 95,23  L 95,143  L 153,143
+           L 153,163  L 145,171  L 55,171  Z"
+    fill="none" stroke="#9898aa" stroke-width="0.7" opacity="0.55"/>
+
+  <!-- Top glint line (sword-like bright highlight along top edge) -->
+  <line x1="56" y1="16" x2="86" y2="16"
+    stroke="#f4f4ff" stroke-width="1.4" stroke-linecap="round" opacity="0.70"/>
+  <!-- Left glint line -->
+  <line x1="56" y1="16" x2="56" y2="170"
+    stroke="#f0f0ff" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+  <!-- Bottom dark line -->
+  <line x1="56" y1="170" x2="144" y2="170"
+    stroke="#505060" stroke-width="1.0" opacity="0.38"/>
+
+  <!-- ============================================================= -->
+  <!-- HEART — sits in crook of L; tip touches horizontal stroke top -->
+  <!-- Center x=110, tip at (110,143), spans x=55..165, y=~44..143  -->
+  <!-- ============================================================= -->
+
+  <!-- Heart fill -->
+  <path d="M 110,65
+    C 90,44  55,57  55,97
+    C 55,128  110,143  110,143
+    C 110,143  165,128  165,97
+    C 165,57  130,44  110,65  Z"
+    fill="url(#g-heart)" filter="url(#f-heart)"/>
+
+  <!-- Heart rim -->
+  <path d="M 110,65
+    C 90,44  55,57  55,97
+    C 55,128  110,143  110,143
+    C 110,143  165,128  165,97
+    C 165,57  130,44  110,65  Z"
+    fill="none"
+    stroke="url(#g-heart-rim)"
+    stroke-width="1.6"
+    opacity="0.68"/>
+
+  <!-- Gloss highlight on upper-left of heart -->
+  <path d="M 82,80  C 67,70  58,82  59,97"
+    fill="none" stroke="#ffffff"
+    stroke-width="2.8" stroke-linecap="round" opacity="0.42"/>
+
+</svg>
