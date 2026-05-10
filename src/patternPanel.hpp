@@ -27,7 +27,7 @@ struct KeySection : Fl_Flex {
     static constexpr int kGap     = 3;
     static constexpr int kLabelW  = 55;
     static constexpr int kBtnW    = 26;
-    static constexpr int kChoiceW = 110;
+    static constexpr int kChoiceW = 52;
     static constexpr int kWidth   = kLabelW + kGap + kBtnW + kGap + kChoiceW;
     Fl_Box       baseLabel;
     ModernButton sharpFlatBtn;
