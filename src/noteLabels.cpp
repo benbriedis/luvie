@@ -1,5 +1,6 @@
 #include "noteLabels.hpp"
 #include "chords.hpp"
+#include "cursors.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 #include <algorithm>
@@ -113,7 +114,7 @@ void NoteLabels::draw() {
 int NoteLabels::handle(int event) {
     switch (event) {
     case FL_ENTER:
-        window()->cursor(FL_CURSOR_HELP);
+        window()->cursor(contextMenuCursorImage(), 0, 0);
         return 1;
     case FL_PUSH:
         if (Fl::event_button() == FL_RIGHT_MOUSE) {

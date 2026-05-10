@@ -4,5 +4,6 @@
 #include <FL/Fl_RGB_Image.H>
 
 const Fl_RGB_Image* forbiddenCursorImage();
+const Fl_RGB_Image* contextMenuCursorImage();
 
 #endif

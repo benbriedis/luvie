@@ -1,5 +1,6 @@
 #include "trackLabels.hpp"
 #include "trackContextPopup.hpp"
+#include "cursors.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "inlineEditDispatch.hpp"
 #include <FL/fl_draw.H>
@@ -187,8 +188,12 @@ void TrackLabels::draw()
 int TrackLabels::handle(int event)
 {
     if (event == FL_ENTER) {
-        window()->cursor(FL_CURSOR_HELP);
+        window()->cursor(contextMenuCursorImage(), 0, 0);
         return 1;
+    }
+    if (event == FL_LEAVE) {
+        window()->cursor(FL_CURSOR_DEFAULT);
+        return 0;
     }
 
     if (Fl_Group::handle(event))

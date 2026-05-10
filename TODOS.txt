@@ -292,6 +292,3 @@ Allow the song to be longer. Maybe allow song length to be set in top menu?
 - Claude says: DrumPatternEditor also overrides handle (Escape key) and resize (cancel edit first)
           What are these about?
 
-TODO replace FL_CURSOR_HELP with equivalent to CSS's context-menu (use forbidden icon as a model)
-
-

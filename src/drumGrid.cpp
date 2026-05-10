@@ -1,6 +1,7 @@
 #include "drumGrid.hpp"
 #include "playhead.hpp"
 #include "editor.hpp"
+#include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -237,7 +238,7 @@ int DrumGrid::handle(int evt)
         int idx = findNoteAtCursor();
         if (idx >= 0) {
             state = DrumStateHover{idx};
-            if (window()) window()->cursor(FL_CURSOR_HELP);
+            if (window()) window()->cursor(contextMenuCursorImage(), 0, 0);
         } else {
             state = DrumStateIdle{};
             if (window()) window()->cursor(FL_CURSOR_DEFAULT);

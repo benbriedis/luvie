@@ -1,5 +1,6 @@
 #include "markerRuler.hpp"
 #include "popup.hpp"
+#include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -118,9 +119,8 @@ int MarkerRuler::handle(int event)
 		return 0;
 	case FL_MOVE: {
 		int bar = findBarAt(Fl::event_x());
-		Fl_Cursor cur = FL_CURSOR_CROSS;
-		if (bar >= 0) cur = FL_CURSOR_HELP;
-		window()->cursor(cur);
+		if (bar >= 0) window()->cursor(contextMenuCursorImage(), 0, 0);
+		else window()->cursor(FL_CURSOR_CROSS);
 		return 1;
 	}
 	case FL_PUSH: {

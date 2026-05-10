@@ -1,5 +1,6 @@
 #include "drumPatternEditor.hpp"
 #include "inlineEditDispatch.hpp"
+#include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -49,7 +50,7 @@ void DrumNoteLabels::draw()
 int DrumNoteLabels::handle(int event)
 {
     if (event == FL_ENTER) {
-        window()->cursor(FL_CURSOR_HELP);
+        window()->cursor(contextMenuCursorImage(), 0, 0);
         return 1;
     }
     if (event == FL_PUSH) {

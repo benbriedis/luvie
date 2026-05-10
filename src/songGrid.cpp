@@ -1,6 +1,7 @@
 #include "songGrid.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"
+#include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -447,7 +448,10 @@ int SongGrid::handleParamEvent(int event)
                 }
             }
         }
-        if (window()) window()->cursor(useHand ? FL_CURSOR_HELP : FL_CURSOR_DEFAULT);
+        if (window()) {
+            if (useHand) window()->cursor(contextMenuCursorImage(), 0, 0);
+            else         window()->cursor(FL_CURSOR_DEFAULT);
+        }
         return 0;
     }
 

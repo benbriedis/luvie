@@ -159,6 +159,11 @@ int Grid::handle(int event)
         case FL_ENTER:
             return 1;
 
+        case FL_LEAVE:
+            state = StateIdle{};
+            window()->cursor(FL_CURSOR_DEFAULT);
+            return 0;
+
         case FL_MOVE:
             findNoteForCursor();
             return 0;
@@ -234,7 +239,7 @@ void Grid::findNoteForCursor()
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
             state = StateHoverMove{(int)i, ex - leftEdge, ey - (int)n.pitch * rowHeight};
-            window()->cursor(FL_CURSOR_HELP);
+            window()->cursor(contextMenuCursorImage(), 0, 0);
             redraw();
             return;
         }
