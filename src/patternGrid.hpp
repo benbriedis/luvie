@@ -15,7 +15,11 @@ class PatternGrid : public Grid, public ITimelineObserver {
     std::vector<int>    disabledDegrees;        // sorted ascending; unique disabled degrees
     int                 groupSize       = 3;   // chordSize + disabledDegrees.size()
 
+    bool                         rapidMode  = false;
+    std::set<std::pair<int,int>> rapidCells;   // (visual_row, abs_col) visited in current drag
+
     void rebuildNotes();
+    void rapidTryCreate(int ex, int ey);
 
     // Convert a virtual row index to chord-space abs_row (-1 if in a disabled slot)
     int virtualToAbsRow(int virtualPos) const;
@@ -29,6 +33,8 @@ protected:
     void onCommitResize(const StateDragResize& s) override;
     void toggleNote() override;
 
+    int handle(int event) override;
+
 public:
     // Fired on every rebuild; args: (disabledDegrees, groupSize, occupiedDisabledVirtualPositions)
     std::function<void(const std::vector<int>&, int, const std::set<int>&)> onDisabledDegreesChanged;
@@ -40,6 +46,7 @@ public:
     void setChordSize(int size) { chordSize = size; groupSize = size + (int)disabledDegrees.size(); redraw(); }
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);
+    void setRapidMode(bool r);
     void onTimelineChanged() override;
 
     int getGroupSize()       const { return groupSize; }

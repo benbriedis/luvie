@@ -308,6 +308,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         else if (patternEd)
             patternEd->focusPattern();
     };
+    patternPanel->onRapidChanged = [this](bool r) {
+        if (patternEd) patternEd->setRapidMode(r);
+    };
     syncNoteLabels();
 
     // ---- Menu callbacks ----

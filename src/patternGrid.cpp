@@ -165,6 +165,100 @@ void PatternGrid::setRowOffset(int offset)
     redraw();
 }
 
+void PatternGrid::setRapidMode(bool r)
+{
+    rapidMode = r;
+    rapidCells.clear();
+    state = StateIdle{};
+    if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+    redraw();
+}
+
+void PatternGrid::rapidTryCreate(int ex, int ey)
+{
+    int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+    if (ex < 0 || ex >= gridRight || ey < 0 || ey >= h()) return;
+
+    int   visual_row = ey / rowHeight;
+    int   col_int    = ex / colWidth;
+    float col        = float(col_int) + colOffset;
+
+    if (visual_row < 0 || visual_row >= numRows) return;
+    if (col + 1.0f > numCols) return;
+
+    auto key = std::make_pair(visual_row, col_int + (int)colOffset);
+    if (rapidCells.count(key)) return;
+    rapidCells.insert(key);
+
+    bool clear = std::none_of(notes.begin(), notes.end(),
+        [=](const Note& n) {
+            return (int)n.pitch == visual_row
+                && col < n.beat + n.length
+                && col + 1.0f > n.beat;
+        });
+    if (!clear || !pattern || patternId < 0) return;
+
+    int virtualPos = rowOffset + numRows - 1 - visual_row;
+    int abs_row    = virtualToAbsRow(virtualPos);
+    if (abs_row < 0) return;
+
+    pattern->addNote(patternId, col, abs_row, 1.0f);
+}
+
+int PatternGrid::handle(int event)
+{
+    if (!rapidMode)
+        return Grid::handle(event);
+
+    switch (event) {
+    case FL_PUSH: {
+        rapidCells.clear();
+        if (Fl::event_button() == FL_LEFT_MOUSE) {
+            int   ex         = Fl::event_x() - x();
+            int   ey         = Fl::event_y() - y();
+            int   gridRight  = std::min(w(), (numCols - colOffset) * colWidth);
+            if (ex >= 0 && ex < gridRight && ey >= 0 && ey < h()) {
+                int   visual_row = ey / rowHeight;
+                int   col_int    = ex / colWidth;
+                float col        = float(col_int) + colOffset;
+                auto  key        = std::make_pair(visual_row, col_int + (int)colOffset);
+                bool  removed    = false;
+                if (pattern && patternId >= 0) {
+                    for (const auto& n : notes) {
+                        if ((int)n.pitch == visual_row && n.beat == col) {
+                            pattern->removeNote(n.id);
+                            removed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!removed)
+                    rapidTryCreate(ex, ey);
+            }
+        }
+        return 1;
+    }
+    case FL_DRAG:
+        if (Fl::event_state(FL_BUTTON1))
+            rapidTryCreate(Fl::event_x() - x(), Fl::event_y() - y());
+        return 1;
+    case FL_RELEASE:
+        rapidCells.clear();
+        return 1;
+    case FL_ENTER:
+        window()->cursor(FL_CURSOR_CROSS);
+        return 1;
+    case FL_MOVE:
+        window()->cursor(FL_CURSOR_CROSS);
+        return 0;
+    case FL_LEAVE:
+        window()->cursor(FL_CURSOR_DEFAULT);
+        return 0;
+    default:
+        return 0;
+    }
+}
+
 // Row line i sits between visual rows i-1 and i.
 // The corresponding virtual position below line i is: rowOffset + numRows - i
 // Dark if that position is the bottom of an octave group (virtualPos % groupSize == 0).

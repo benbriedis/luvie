@@ -26,6 +26,8 @@ static constexpr int barsInputW    = 40;
 static constexpr int snapLabelW    = 40;
 static constexpr int snapChoiceW   = 70;
 static constexpr int outChoiceW    = 155;
+static constexpr int rapidBtnW     = 52;
+static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
 
 static constexpr int kSnapNoteDenoms[] = { 4, 8, 16, 32, 0 };  // 0 = Free
 static constexpr int kSnapDefault      = 2;  // 1/16
@@ -171,7 +173,9 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       patternName    (0, 0, nameW,       ctrlH),
       outChoice      (0, 0, outChoiceW,  ctrlH),
       harmonyControls(0, 0, ctrlH),
-      timeControls   (0, 0, ctrlH)
+      timeControls   (0, 0, ctrlH),
+      rapidBtn       (0, 0, rapidBtnW,   ctrlH, "Rapid"),
+      spacer         (0, 0, 0,           0)
 {
     // Group ctors called begin()/end() internally; controlRow is still current.
     controlRow.gap(sg);
@@ -182,7 +186,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     controlRow.fixed(&outChoice,       outChoiceW);
     controlRow.fixed(&harmonyControls, HarmonyControls::kWidth);
     controlRow.fixed(&timeControls,    TimeControls::kWidth);
-    new Fl_Box(0, 0, 0, 0);  // flexible spacer fills remaining width
+    // spacer is flexible (no fixed() call) — fills space between controls and rapidBtn
+    controlRow.fixed(&rapidBtn,        rapidBtnW);
     controlRow.end();
 
     // Move input after controlRow so it renders on top (z-order)
@@ -356,6 +361,19 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         self->pattern->setPatternOutputInstrument(patId, name);
     }, this);
 
+    rapidBtn.type(FL_TOGGLE_BUTTON);
+    rapidBtn.color(panelBg);
+    rapidBtn.labelcolor(panelText);
+    rapidBtn.setBorderWidth(1);
+    rapidBtn.setBorderColor(panelCtrlBorder);
+    rapidBtn.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        bool on = self->rapidBtn.value() != 0;
+        self->rapidBtn.color(on ? kRapidActiveColor : panelBg);
+        self->rapidBtn.redraw();
+        if (self->onRapidChanged) self->onRapidChanged(on);
+    }, this);
+
     input.hide();
     input.box(FL_FLAT_BOX);
     input.color(0x37415100);
@@ -490,10 +508,18 @@ void PatternPanel::setPattern(ObservablePattern* tl)
 
 void PatternPanel::setDrumMode(bool drum)
 {
-    if (drum)
+    if (drum) {
         harmonyControls.hide();
-    else
+        if (rapidBtn.value()) {
+            rapidBtn.value(0);
+            rapidBtn.color(panelBg);
+            if (onRapidChanged) onRapidChanged(false);
+        }
+        rapidBtn.hide();
+    } else {
         harmonyControls.show();
+        rapidBtn.show();
+    }
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }

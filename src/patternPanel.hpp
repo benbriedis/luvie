@@ -38,7 +38,7 @@ struct KeySection : Fl_Flex {
 struct ChordSection : Fl_Flex {
     static constexpr int kGap     = 3;
     static constexpr int kLabelW  = 55;
-    static constexpr int kChoiceW = 130;
+    static constexpr int kChoiceW = 98;
     static constexpr int kWidth   = kLabelW + kGap + kChoiceW;
     Fl_Box       chordLabel;
     ModernChoice chordChoice;
@@ -163,6 +163,8 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     ModernChoice    outChoice;
     HarmonyControls harmonyControls;
     TimeControls    timeControls;
+    ModernButton    rapidBtn;        // immediately after timeControls
+    Fl_Box          spacer;          // flexible gap fills remaining space
 
     float computeSnapBeats() const;
 
@@ -185,6 +187,7 @@ public:
     std::function<void()>      onParamsChanged;
     std::function<void()>      onFocus;
     std::function<void(float)> onSnapChanged;
+    std::function<void(bool)>  onRapidChanged;
 
     void commitEdit();
 
