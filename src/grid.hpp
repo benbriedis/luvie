@@ -84,6 +84,7 @@ public:
     void setPlayhead(Playhead* p) { playhead  = p; }
     void setColOffset(int off)    { colOffset = off; redraw(); }
     int  getColOffset() const     { return colOffset; }
+    void setSnap(float s)         { snap = s; }
 };
 
 #endif

@@ -70,6 +70,7 @@ public:
     void setRowOffset(int offset);
     void setColOffset(int off) { colOffset = off; redraw(); }
     void setNumRows(int n)     { numRows   = n;   rebuildNotes(); }
+    void setSnap(float s)      { snap = s; }
     void onTimelineChanged()   override;
 
     int getRowOffset() const { return rowOffset; }

@@ -76,8 +76,12 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     ModernChoice   timeSigDen;
     Fl_Box         barsLabel;
     Fl_Value_Input barsInput;
+    Fl_Box         snapLabel;
+    ModernChoice   snapChoice;
     ModernChoice   outChoice;
     InlineInput    input;
+
+    float computeSnapBeats() const;
 
     void startEdit();
     void cancelEdit();
@@ -95,8 +99,9 @@ public:
     PatternPanel(int x, int y, int w, int h);
     ~PatternPanel();
 
-    std::function<void()> onParamsChanged;
-    std::function<void()> onFocus;
+    std::function<void()>      onParamsChanged;
+    std::function<void()>      onFocus;
+    std::function<void(float)> onSnapChanged;
 
     void commitEdit();
 

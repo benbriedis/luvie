@@ -53,6 +53,7 @@ class PianorollEditor : public BasePatternEditor {
 
 public:
     void focusPattern() override;
+    void setSnap(float s) override { grid.setSnap(s); BasePatternEditor::setSnap(s); }
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                     int rowHeight, int colWidth, float snap, Popup& popup);
     ~PianorollEditor();

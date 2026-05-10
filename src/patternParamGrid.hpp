@@ -73,6 +73,7 @@ public:
     void setNumCols(int n)     { numCols_   = n;   redraw(); }
     void setLaneOffset(int off){ laneOffset = off; rebuildLanes(); redraw(); }
     void setParamDotPopup(ParamDotPopup* p) { dotPopup = p; }
+    void setSnap(float s)      { snap_ = s; }
     int  numLanes() const { return (int)localLanes.size(); }
 };
 

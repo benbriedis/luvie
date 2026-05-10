@@ -46,6 +46,7 @@ public:
     void setNoteParams(int rootPitch, int chordType, bool useSharp);
     int  numPatternBeats() const { return patternGrid.numCols; }
     void focusPattern() override;
+    void setSnap(float s) override { patternGrid.setSnap(s); BasePatternEditor::setSnap(s); }
 };
 
 #endif

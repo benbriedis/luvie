@@ -80,6 +80,7 @@ public:
     std::function<void(const std::string& chanName, int midiNote, const std::string& label)> onDrumLabelChanged;
 
     void focusPattern() override;
+    void setSnap(float s) override { drumGrid.setSnap(s); BasePatternEditor::setSnap(s); }
     void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
                         const std::map<std::string, bool>& fallbacks);
     void resize(int x, int y, int w, int h) override;

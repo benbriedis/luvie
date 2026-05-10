@@ -23,6 +23,8 @@ static constexpr int slashW        = 12;
 static constexpr int timeSigDenW   = 50;
 static constexpr int barsLabelW    = 36;
 static constexpr int barsInputW    = 40;
+static constexpr int snapLabelW    = 40;
+static constexpr int snapChoiceW   = 70;
 static constexpr int outChoiceW    = 155;
 
 static int recentreBtnX(int x)   { return x + pad; }
@@ -39,7 +41,24 @@ static int timeSigSlashX(int x)  { return timeSigNumX(x) + timeSigNumW; }
 static int timeSigDenX(int x)    { return timeSigSlashX(x) + slashW; }
 static int barsLabelX(int x)     { return timeSigDenX(x) + timeSigDenW + groupGap; }
 static int barsInputX(int x)     { return barsLabelX(x) + barsLabelW; }
+static int snapLabelX(int x)     { return barsInputX(x) + barsInputW + groupGap; }
+static int snapChoiceX(int x)    { return snapLabelX(x) + snapLabelW; }
 static int ctrlY(int y, int h)   { return y + (h - ctrlH) / 2; }
+
+static constexpr int kSnapNoteDenoms[] = { 4, 8, 16, 32, 0 };  // 0 = Free
+static constexpr int kSnapDefault      = 2;  // 1/16
+
+float PatternPanel::computeSnapBeats() const
+{
+    int idx = snapChoice.value();
+    if (idx < 0 || idx >= 5) return 0.0f;
+    int noteDenom = kSnapNoteDenoms[idx];
+    if (noteDenom == 0) return 0.0f;
+    static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
+    int tsIdx   = timeSigDen.value();
+    int tsDenom = (tsIdx >= 0 && tsIdx < 6) ? denoms[tsIdx] : 4;
+    return (float)tsDenom / (float)noteDenom;
+}
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
@@ -57,6 +76,8 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       timeSigDen  (timeSigDenX(x),    ctrlY(y,h), timeSigDenW,   ctrlH),
       barsLabel   (barsLabelX(x),    ctrlY(y,h), barsLabelW,    ctrlH, "Bars"),
       barsInput   (barsInputX(x),    ctrlY(y,h), barsInputW,    ctrlH),
+      snapLabel   (snapLabelX(x),    ctrlY(y,h), snapLabelW,    ctrlH, "Snap"),
+      snapChoice  (snapChoiceX(x),   ctrlY(y,h), snapChoiceW,   ctrlH),
       input       (nameX(x),          ctrlY(y,h), nameW,         ctrlH)
 {
     box(FL_NO_BOX);
@@ -128,6 +149,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
         int den = (self->timeSigDen.value() >= 0) ? denoms[self->timeSigDen.value()] : 4;
         self->pattern->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
+        if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
     }, this);
 
     timeSigSlash.box(FL_NO_BOX);
@@ -149,6 +171,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
         int den = (self->timeSigDen.value() >= 0) ? denoms[self->timeSigDen.value()] : 4;
         self->pattern->setPatternTimeSig(patId, (int)self->timeSigNum.value(), den);
+        if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
     }, this);
 
     barsLabel.box(FL_NO_BOX);
@@ -177,6 +200,22 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
             self->pattern->setPatternLength(patId, (float)(bars * p.timeSigTop));
             break;
         }
+    }, this);
+
+    snapLabel.box(FL_NO_BOX);
+    snapLabel.labelcolor(panelText);
+    snapLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    for (const char* v : {"1\\/4", "1\\/8", "1\\/16", "1\\/32", "Free"})
+        snapChoice.add(v);
+    snapChoice.value(kSnapDefault);
+    snapChoice.color(panelBorder);
+    snapChoice.labelcolor(panelText);
+    snapChoice.setBorderColor(panelCtrlBorder);
+    snapChoice.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        if (self->onSnapChanged)
+            self->onSnapChanged(self->computeSnapBeats());
     }, this);
 
     outChoice.value(0);

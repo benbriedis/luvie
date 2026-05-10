@@ -58,6 +58,7 @@ public:
     ~BasePatternEditor();
 
     virtual void focusPattern() {}
+    virtual void setSnap(float s) { paramGrid.setSnap(s); }
     void setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
