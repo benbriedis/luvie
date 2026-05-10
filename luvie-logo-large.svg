@@ -1,168 +1,309 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 195" width="512" height="512">
-  <defs>
-    <!-- Metallic silver - diagonal multi-stop for that polished blade look -->
-    <linearGradient id="g-silver" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#eeeef8"/>
-      <stop offset="18%"  stop-color="#c2c2d4"/>
-      <stop offset="35%"  stop-color="#f6f6ff"/>
-      <stop offset="52%"  stop-color="#b0b0c4"/>
-      <stop offset="70%"  stop-color="#d4d4e6"/>
-      <stop offset="88%"  stop-color="#9898aa"/>
-      <stop offset="100%" stop-color="#bcbccc"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 170 195"
+   width="512"
+   height="512"
+   version="1.1"
+   id="svg386"
+   sodipodi:docname="luvie-logo-large.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview388"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.6347656"
+     inkscape:cx="245.60096"
+     inkscape:cy="256.91756"
+     inkscape:window-width="1670"
+     inkscape:window-height="1162"
+     inkscape:window-x="26"
+     inkscape:window-y="23"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg386" />
+  <defs
+     id="defs346">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient3203">
+      <stop
+         style="stop-color:#b90000;stop-opacity:1;"
+         offset="0"
+         id="stop3199" />
+      <stop
+         style="stop-color:#b90000;stop-opacity:0;"
+         offset="1"
+         id="stop3201" />
     </linearGradient>
-
-    <!-- Left-face bevel: bright on left, fades right -->
-    <linearGradient id="g-bevel-h" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    <linearGradient
+       id="linearGradient3193"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#b90000;stop-opacity:1;"
+         offset="0"
+         id="stop3191" />
     </linearGradient>
-
-    <!-- Top-face bevel: bright on top, fades down -->
-    <linearGradient id="g-bevel-v" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
-    </linearGradient>
-
-    <!-- Ridge highlight on spine, fades toward tip -->
-    <linearGradient id="g-ridge" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.75"/>
-      <stop offset="60%"  stop-color="#ffffff" stop-opacity="0.30"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
-    </linearGradient>
-
-    <!-- Pink-red radial for heart -->
-    <radialGradient id="g-heart" cx="42%" cy="36%" r="62%">
-      <stop offset="0%"   stop-color="#ffdce8" stop-opacity="0.85"/>
-      <stop offset="45%"  stop-color="#ff99b5" stop-opacity="0.68"/>
-      <stop offset="100%" stop-color="#ff3366" stop-opacity="0.38"/>
+    <!-- Radial silver: bright highlight upper-left, darkens toward edges — convex/bulging look -->
+    <radialGradient
+       id="g-silver"
+       cx="72" cy="58" r="115"
+       gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="25%"  stop-color="#ededf8"/>
+      <stop offset="55%"  stop-color="#d0d0e0"/>
+      <stop offset="85%"  stop-color="#b0b0c2"/>
+      <stop offset="100%" stop-color="#9898aa"/>
     </radialGradient>
-
-    <!-- Heart rim stroke gradient -->
-    <linearGradient id="g-heart-rim" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#ffbbcc" stop-opacity="0.80"/>
-      <stop offset="100%" stop-color="#ff3355" stop-opacity="0.35"/>
+    <!-- Left-face bevel: bright on left, fades right -->
+    <linearGradient
+       id="g-bevel-h"
+       x1="0%"
+       y1="0%"
+       x2="100%"
+       y2="0%">
+      <stop
+         offset="0%"
+         stop-color="#ffffff"
+         stop-opacity="0.6"
+         id="stop299" />
+      <stop
+         offset="100%"
+         stop-color="#ffffff"
+         stop-opacity="0.0"
+         id="stop301" />
     </linearGradient>
-
+    <!-- Top-face bevel: bright on top, fades down -->
+    <linearGradient
+       id="g-bevel-v"
+       x1="0%"
+       y1="0%"
+       x2="0%"
+       y2="100%">
+      <stop
+         offset="0%"
+         stop-color="#ffffff"
+         stop-opacity="0.6"
+         id="stop304" />
+      <stop
+         offset="100%"
+         stop-color="#ffffff"
+         stop-opacity="0.0"
+         id="stop306" />
+    </linearGradient>
+    <!-- Ridge highlight on spine, fades toward tip -->
+    <linearGradient
+       id="g-ridge"
+       x1="0%"
+       y1="0%"
+       x2="0%"
+       y2="100%">
+      <stop
+         offset="0%"
+         stop-color="#ffffff"
+         stop-opacity="0.75"
+         id="stop309" />
+      <stop
+         offset="60%"
+         stop-color="#ffffff"
+         stop-opacity="0.30"
+         id="stop311" />
+      <stop
+         offset="100%"
+         stop-color="#ffffff"
+         stop-opacity="0.0"
+         id="stop313" />
+    </linearGradient>
+    <!-- Unified top-left lit overlay -->
+    <linearGradient id="g-lit" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.38"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+    <!-- Pink-red radial for heart -->
+    <radialGradient
+       id="g-heart"
+       cx="102.54558"
+       cy="54.984359"
+       r="69.106804"
+       gradientTransform="matrix(0.98687823,0,0,1.0132962,7.9830309,9.7731155)"
+       fx="102.54558"
+       fy="54.984359"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0%"
+         stop-color="#ffdce8"
+         stop-opacity="0.85"
+         id="stop316" />
+      <stop
+         offset="45%"
+         stop-color="#ff99b5"
+         stop-opacity="0.68"
+         id="stop318" />
+      <stop
+         offset="100%"
+         stop-color="#ff3366"
+         stop-opacity="0.38"
+         id="stop320" />
+    </radialGradient>
+    <!-- Heart rim stroke gradient -->
+    <linearGradient
+       id="g-heart-rim"
+       x1="54.913408"
+       y1="14.079515"
+       x2="167.98234"
+       y2="127.14845"
+       gradientTransform="matrix(0.83866738,0.32236146,-0.34428351,0.89570057,48.49262,-14.275739)"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0%"
+         stop-color="#ffbbcc"
+         stop-opacity="0.80"
+         id="stop323" />
+      <stop
+         offset="100%"
+         stop-color="#ff3355"
+         stop-opacity="0.35"
+         id="stop325" />
+    </linearGradient>
     <!-- Metal texture: subtle fractal noise blended in soft-light -->
-    <filter id="f-metal" x="-5%" y="-5%" width="110%" height="110%"
-            color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.85 0.45"
-                    numOctaves="4" seed="12" result="noise"/>
-      <feColorMatrix type="matrix"
-        values="0 0 0 0 0.85  0 0 0 0 0.85  0 0 0 0 0.95  0 0 0 0.13 0"
-        in="noise" result="tinted"/>
-      <feComposite operator="in" in="tinted" in2="SourceGraphic" result="masked"/>
-      <feBlend mode="soft-light" in="SourceGraphic" in2="masked"/>
+    <filter
+       id="f-metal"
+       x="0"
+       y="0"
+       width="1"
+       height="1"
+       color-interpolation-filters="sRGB">
+      <feTurbulence
+         type="fractalNoise"
+         baseFrequency="0.85 0.45"
+         numOctaves="4"
+         seed="12"
+         result="noise"
+         id="feTurbulence328" />
+      <feColorMatrix
+         type="matrix"
+         values="0 0 0 0 0.85  0 0 0 0 0.85  0 0 0 0 0.95  0 0 0 0.13 0"
+         in="noise"
+         result="tinted"
+         id="feColorMatrix330" />
+      <feComposite
+         operator="in"
+         in="tinted"
+         in2="SourceGraphic"
+         result="masked"
+         id="feComposite332" />
+      <feBlend
+         mode="soft-light"
+         in="SourceGraphic"
+         in2="masked"
+         id="feBlend334" />
     </filter>
-
     <!-- Heart texture: soft pink noise -->
-    <filter id="f-heart" x="-5%" y="-5%" width="110%" height="110%"
-            color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.55 0.35"
-                    numOctaves="3" seed="7" result="noise"/>
-      <feColorMatrix type="matrix"
-        values="0 0 0 0 1  0 0 0 0 0.55  0 0 0 0 0.72  0 0 0 0.10 0"
-        in="noise" result="pinkTint"/>
-      <feComposite operator="in" in="pinkTint" in2="SourceGraphic" result="masked"/>
-      <feBlend mode="soft-light" in="SourceGraphic" in2="masked"/>
+    <filter
+       id="f-heart"
+       x="0"
+       y="0"
+       width="1"
+       height="1"
+       color-interpolation-filters="sRGB">
+      <feTurbulence
+         type="fractalNoise"
+         baseFrequency="0.55 0.35"
+         numOctaves="3"
+         seed="7"
+         result="noise"
+         id="feTurbulence337" />
+      <feColorMatrix
+         type="matrix"
+         values="0 0 0 0 1  0 0 0 0 0.55  0 0 0 0 0.72  0 0 0 0.10 0"
+         in="noise"
+         result="pinkTint"
+         id="feColorMatrix339" />
+      <feComposite
+         operator="in"
+         in="pinkTint"
+         in2="SourceGraphic"
+         result="masked"
+         id="feComposite341" />
+      <feBlend
+         mode="soft-light"
+         in="SourceGraphic"
+         in2="masked"
+         id="feBlend343" />
     </filter>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3203"
+       id="linearGradient3205"
+       x1="54.65"
+       y1="93"
+       x2="153.35"
+       y2="93"
+       gradientUnits="userSpaceOnUse" />
   </defs>
-
   <!-- ======================================================= -->
-  <!-- L  —  sword-styled capital letter                        -->
-  <!-- Vertical stroke x=55..95, Horizontal stroke x=55..153   -->
-  <!-- Chamfers: top-right (95,23) and bottom-right (145,171)   -->
+  <!-- L  —  rounded, slightly convex letter                   -->
+  <!-- Vertical stroke x≈55..95, Horizontal stroke x≈55..153  -->
   <!-- ======================================================= -->
 
   <!-- Main L body -->
-  <path d="M 55,15  L 87,15  L 95,23  L 95,143  L 153,143
-           L 153,163  L 145,171  L 55,171  Z"
-    fill="url(#g-silver)" filter="url(#f-metal)"/>
+  <path
+     id="path348"
+     d="M 55,15 L 95,15 L 95,143 L 153,143 L 153,171 L 55,171 Z"
+     fill="url(#g-silver)"
+     filter="url(#f-metal)" />
 
-  <!-- Left bevel face (7 px wide, runs full height) -->
-  <path d="M 55,15  L 62,22  L 62,171  L 55,171  Z"
-    fill="url(#g-bevel-h)" opacity="0.65"/>
-
-  <!-- Top bevel face (vertical stroke top) -->
-  <path d="M 55,15  L 87,15  L 95,23  L 62,22  Z"
-    fill="url(#g-bevel-v)" opacity="0.55"/>
-
-  <!-- Top bevel face (horizontal stroke top) -->
-  <path d="M 95,143  L 153,143  L 153,150  L 95,150  Z"
-    fill="url(#g-bevel-v)" opacity="0.45"/>
-
-  <!-- Spine ridge — vertical stroke (blade fuller) -->
-  <path d="M 73,23  L 77,23  L 77,143  L 73,143  Z"
-    fill="url(#g-ridge)" opacity="0.50"/>
+  <!-- Spine ridge — vertical stroke -->
+  <path
+     d="M 73,20 L 77,20 L 77,143 L 73,143 Z"
+     fill="url(#g-ridge)" opacity="0.45" />
 
   <!-- Spine ridge — horizontal stroke -->
-  <path d="M 95,157  L 148,157  L 148,160  L 95,160  Z"
-    fill="#ffffff" opacity="0.20"/>
-
-  <!-- Dark receding edge — right side of vertical stroke -->
-  <path d="M 95,23  L 91,27  L 91,143  L 95,143  Z"
-    fill="#202030" opacity="0.28"/>
-
-  <!-- Dark receding edge — bottom of horizontal stroke -->
-  <path d="M 145,171  L 141,167  L 95,167  L 95,171  Z"
-    fill="#202030" opacity="0.22"/>
-
-  <!-- Chamfer facet highlights -->
-  <polygon points="87,15 95,15 95,23"
-    fill="#e0e0f0" opacity="0.30"/>
-  <polygon points="153,163 153,171 145,171"
-    fill="#606070" opacity="0.35"/>
-
-  <!-- Crossguard diamond at L inner corner — the "guard" of the sword -->
-  <polygon points="95,137  103,143  95,149  87,143"
-    fill="#cacad8" opacity="0.75" stroke="#e0e0f0" stroke-width="0.6"/>
-  <!-- Diamond inner glint -->
-  <polygon points="95,139  100,143  95,147  90,143"
-    fill="#f0f0ff" opacity="0.35"/>
+  <path
+     d="M 95,157 L 148,157 L 148,160 L 95,160 Z"
+     fill="#ffffff" opacity="0.18" />
 
   <!-- Outer edge outline -->
-  <path d="M 55,15  L 87,15  L 95,23  L 95,143  L 153,143
-           L 153,163  L 145,171  L 55,171  Z"
-    fill="none" stroke="#9898aa" stroke-width="0.7" opacity="0.55"/>
-
-  <!-- Top glint line (sword-like bright highlight along top edge) -->
-  <line x1="56" y1="16" x2="86" y2="16"
-    stroke="#f4f4ff" stroke-width="1.4" stroke-linecap="round" opacity="0.70"/>
-  <!-- Left glint line -->
-  <line x1="56" y1="16" x2="56" y2="170"
-    stroke="#f0f0ff" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
-  <!-- Bottom dark line -->
-  <line x1="56" y1="170" x2="144" y2="170"
-    stroke="#505060" stroke-width="1.0" opacity="0.38"/>
-
+  <path
+     d="M 55,15 L 95,15 L 95,143 L 153,143 L 153,171 L 55,171 Z"
+     fill="none" stroke="#9898aa" stroke-width="0.8" opacity="0.50" />
   <!-- ============================================================== -->
   <!-- HEART — top bumps align with L top (y=15); tip at (110,128)  -->
   <!-- Center x=110, spans x=55..165, y=~15..128                    -->
   <!-- ============================================================== -->
-
   <!-- Heart fill -->
-  <path d="M 110,25
-    C 90,4  55,17  55,57
-    C 55,115  110,128  110,128
-    C 110,128  165,115  165,57
-    C 165,17  130,4  110,25  Z"
-    fill="url(#g-heart)" filter="url(#f-heart)"/>
-
+  <path
+     d="m 117.98303,34.773115 c -19.999999,-21 -54.999999,-8 -54.999999,32 0,58.000005 54.999999,71.000005 54.999999,71.000005 0,0 55,-13 55,-71.000005 0,-40 -35,-53 -55,-32 z"
+     fill="url(#g-heart)"
+     filter="url(#f-heart)"
+     id="path380"
+     style="fill:url(#g-heart)"
+     transform="matrix(0.84642068,0.32237715,-0.33788115,0.88712738,45.482376,-25.248651)" />
   <!-- Heart rim -->
-  <path d="M 110,25
-    C 90,4  55,17  55,57
-    C 55,115  110,128  110,128
-    C 110,128  165,115  165,57
-    C 165,17  130,4  110,25  Z"
-    fill="none"
-    stroke="url(#g-heart-rim)"
-    stroke-width="1.6"
-    opacity="0.68"/>
-
+  <path
+     d="M 133.46505,43.752362 C 123.60695,18.654927 89.449687,18.7166 75.857256,54.079163 56.148232,105.35488 98.464539,134.81096 98.464539,134.81096 c 0,0 51.151401,6.47043 70.860421,-44.805296 13.59243,-35.362563 -11.72975,-58.286557 -35.85991,-46.253302 z"
+     fill="none"
+     stroke="url(#g-heart-rim)"
+     stroke-width="1.48566"
+     opacity="0.68"
+     id="path382"
+     style="stroke:url(#g-heart-rim)" />
   <!-- Gloss highlight on upper-left of heart -->
-  <path d="M 82,40  C 67,30  58,42  59,57"
-    fill="none" stroke="#ffffff"
-    stroke-width="2.8" stroke-linecap="round" opacity="0.42"/>
-
+  <path
+     d="M 117.28436,49.269991 C 103.44596,35.987068 91.513464,46.243608 89.545904,61.642665"
+     fill="none"
+     stroke="#ffffff"
+     stroke-width="2.95359"
+     stroke-linecap="round"
+     opacity="0.42"
+     id="path384" />
 </svg>

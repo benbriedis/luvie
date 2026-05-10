@@ -291,3 +291,17 @@ Allow the song to be longer. Maybe allow song length to be set in top menu?
 
 - Claude says: DrumPatternEditor also overrides handle (Escape key) and resize (cancel edit first).  What are these about?
 
+
+Wider initial app (so we can fit in pattern editor controls at start)
+
+Width of popups sometimes goes wrong: too wide.
+
+cf Adding a Settings button in the control row:
+   - Move/Add toggle or maybe better 'Rapid Add'
+   
+flex wrap? - need grid. Otherwise cf < >  ?? 
+   Or just require the user to grow the page?
+   Or more an item or two down to the transport?
+
+MINOR: In time maybe adjust width of the chord name select box
+
