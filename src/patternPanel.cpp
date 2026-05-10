@@ -314,7 +314,15 @@ void PatternPanel::initTimeControls()
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
         int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
-        self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den);
+        int top = (int)ts.timeSigNum.value();
+        for (const auto& p : tl.patterns) {
+            if (p.id == patId && p.timeSigBottom > 0) {
+                top = std::max(1, (int)std::round((float)p.timeSigTop * den / p.timeSigBottom));
+                ts.timeSigNum.value(top);
+                break;
+            }
+        }
+        self->pattern->setPatternTimeSig(patId, top, den);
         if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
     }, this);
 
