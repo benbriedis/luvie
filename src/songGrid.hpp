@@ -36,6 +36,7 @@ class SongGrid : public Grid, public ITimelineObserver {
 protected:
     void draw() override;
     Fl_Color rowBgColor(int visualRow) const override;
+    void moving(StateDragMove& s) override;
     void resizing(StateDragResize& s) override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     void openContextMenu(int idx) override;

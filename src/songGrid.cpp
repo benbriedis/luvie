@@ -548,8 +548,27 @@ void SongGrid::onBeginDrag(int noteIdx)
     tickBarPos = notes[noteIdx].beat - startOffset / dragBeatsPerBar;
 }
 
+void SongGrid::moving(StateDragMove& s)
+{
+    if (timeline) {
+        float ex      = Fl::event_x() - x();
+        float rawBeat = (ex - s.grabX) / (float)colWidth + colOffset;
+        int   bpb, dummy;
+        timeline->timeSigAt((int)std::max(0.0f, rawBeat), bpb, dummy);
+        snap = 1.0f / bpb;
+    }
+    Grid::moving(s);
+}
+
 void SongGrid::resizing(StateDragResize& s)
 {
+    if (timeline) {
+        float ex      = Fl::event_x() - x();
+        float rawBeat = ex / (float)colWidth + colOffset;
+        int   bpb, dummy;
+        timeline->timeSigAt((int)std::max(0.0f, rawBeat), bpb, dummy);
+        snap = 1.0f / bpb;
+    }
     Grid::resizing(s);
     if (s.side == Side::Left) {
         float newOffset = (notes[s.noteIdx].beat - tickBarPos) * dragBeatsPerBar;

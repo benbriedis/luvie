@@ -62,7 +62,7 @@ protected:
     int  handle(int event) override;
     void findNoteForCursor();
     int  overlappingNote(int noteIdx) const;
-    void moving(StateDragMove& s);
+    virtual void moving(StateDragMove& s);
     virtual void resizing(StateDragResize& s);
     void clampSelection();
 
