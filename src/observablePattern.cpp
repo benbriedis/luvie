@@ -258,9 +258,21 @@ void ObservablePattern::setPatternTimeSig(int patId, int top, int bottom)
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
             int bars = std::max(1, (int)std::round(p.lengthBeats / (float)p.timeSigTop));
+            float denomScale = (p.timeSigBottom > 0) ? (float)bottom / (float)p.timeSigBottom : 1.0f;
             p.timeSigTop    = top;
             p.timeSigBottom = bottom;
             p.lengthBeats   = (float)(bars * top);
+            if (denomScale != 1.0f) {
+                for (auto& n : p.notes) {
+                    n.beat   *= denomScale;
+                    n.length *= denomScale;
+                }
+                for (auto& n : p.drumNotes)
+                    n.beat *= denomScale;
+                for (auto& lane : p.paramLanes)
+                    for (auto& pt : lane.points)
+                        pt.beat *= denomScale;
+            }
             truncatePatternNotes(p);
             song_->notify();
             return;
