@@ -12,6 +12,7 @@
 #include <FL/fl_draw.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
+#include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
 #include <string>
 #include <vector>
@@ -25,7 +26,7 @@
 
 struct KeySection : Fl_Flex {
     static constexpr int kGap     = 3;
-    static constexpr int kLabelW  = 55;
+    static constexpr int kLabelW  = 40;
     static constexpr int kBtnW    = 26;
     static constexpr int kChoiceW = 52;
     static constexpr int kWidth   = kLabelW + kGap + kBtnW + kGap + kChoiceW;
@@ -48,24 +49,24 @@ struct ChordSection : Fl_Flex {
 struct TimeSigSection : Fl_Flex {
     static constexpr int kGap    = 3;
     static constexpr int kLabelW = 28;
-    static constexpr int kNumW   = 40;
+    static constexpr int kNumW   = 26;
     static constexpr int kSlashW = 12;
     static constexpr int kDenW   = 50;
     static constexpr int kWidth  = kLabelW + kGap + kNumW + kGap + kSlashW + kGap + kDenW;
-    Fl_Box         timeSigLabel;
-    Fl_Value_Input timeSigNum;
-    Fl_Box         timeSigSlash;
-    ModernChoice   timeSigDen;
+    Fl_Box           timeSigLabel;
+    ModernValueInput timeSigNum;
+    Fl_Box           timeSigSlash;
+    ModernChoice     timeSigDen;
     TimeSigSection(int x, int y, int h);
 };
 
 struct BarsSection : Fl_Flex {
     static constexpr int kGap    = 3;
     static constexpr int kLabelW = 36;
-    static constexpr int kInputW = 40;
+    static constexpr int kInputW = 26;
     static constexpr int kWidth  = kLabelW + kGap + kInputW;
-    Fl_Box         barsLabel;
-    Fl_Value_Input barsInput;
+    Fl_Box           barsLabel;
+    ModernValueInput barsInput;
     BarsSection(int x, int y, int h);
 };
 

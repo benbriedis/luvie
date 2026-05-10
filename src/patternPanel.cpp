@@ -230,7 +230,7 @@ void PatternPanel::initHarmonyControls()
     ks.baseLabel.labelcolor(panelText);
     ks.baseLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    ks.sharpFlatBtn.color(panelBg);
+    ks.sharpFlatBtn.color(HarmonyControls::kBg);
     ks.sharpFlatBtn.labelcolor(panelText);
     ks.sharpFlatBtn.setBorderWidth(1);
     ks.sharpFlatBtn.setBorderColor(panelCtrlBorder);
@@ -250,6 +250,8 @@ void PatternPanel::initHarmonyControls()
         auto* self = static_cast<PatternPanel*>(d);
         if (self->onParamsChanged) self->onParamsChanged();
     };
+    ks.rootChoice.color(HarmonyControls::kBg);
+    ks.rootChoice.setBorderColor(panelCtrlBorder);
     ks.rootChoice.callback(paramsCb, this);
 
     cs.chordLabel.box(FL_NO_BOX);
@@ -259,6 +261,8 @@ void PatternPanel::initHarmonyControls()
     for (const auto& def : chordDefs)
         cs.chordChoice.add(def.name);
     cs.chordChoice.value(0);
+    cs.chordChoice.color(HarmonyControls::kBg);
+    cs.chordChoice.setBorderColor(panelCtrlBorder);
     cs.chordChoice.callback(paramsCb, this);
 }
 
@@ -272,8 +276,8 @@ void PatternPanel::initTimeControls()
     ts.timeSigLabel.labelcolor(panelText);
     ts.timeSigLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    ts.timeSigNum.box(FL_FLAT_BOX);
-    ts.timeSigNum.color(panelBorder);
+    ts.timeSigNum.color(TimeControls::kBg);
+    ts.timeSigNum.setBorderColor(panelCtrlBorder);
     ts.timeSigNum.textcolor(panelText);
     ts.timeSigNum.cursor_color(panelText);
     ts.timeSigNum.labelcolor(panelText);
@@ -298,7 +302,7 @@ void PatternPanel::initTimeControls()
     ts.timeSigSlash.box(FL_NO_BOX);
     ts.timeSigSlash.labelcolor(panelText);
 
-    ts.timeSigDen.color(panelBorder);
+    ts.timeSigDen.color(TimeControls::kBg);
     ts.timeSigDen.labelcolor(panelText);
     ts.timeSigDen.setBorderColor(panelCtrlBorder);
     for (const char* v : {"1", "2", "4", "8", "16", "32"})
@@ -330,8 +334,8 @@ void PatternPanel::initTimeControls()
     bs.barsLabel.labelcolor(panelText);
     bs.barsLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    bs.barsInput.box(FL_FLAT_BOX);
-    bs.barsInput.color(panelBorder);
+    bs.barsInput.color(TimeControls::kBg);
+    bs.barsInput.setBorderColor(panelCtrlBorder);
     bs.barsInput.textcolor(panelText);
     bs.barsInput.cursor_color(panelText);
     bs.barsInput.labelcolor(panelText);
@@ -362,7 +366,7 @@ void PatternPanel::initTimeControls()
     for (const char* v : {"1\\/4", "1\\/8", "1\\/16", "1\\/32", "Free"})
         ss.snapChoice.add(v);
     ss.snapChoice.value(kSnapDefault);
-    ss.snapChoice.color(panelBorder);
+    ss.snapChoice.color(TimeControls::kBg);
     ss.snapChoice.labelcolor(panelText);
     ss.snapChoice.setBorderColor(panelCtrlBorder);
     ss.snapChoice.callback([](Fl_Widget*, void* d) {
