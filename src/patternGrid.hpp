@@ -6,6 +6,7 @@
 #include <vector>
 #include <functional>
 #include <set>
+#include <optional>
 
 class PatternGrid : public Grid, public ITimelineObserver {
     ObservablePattern* pattern        = nullptr;
@@ -15,11 +16,24 @@ class PatternGrid : public Grid, public ITimelineObserver {
     std::vector<int>    disabledDegrees;        // sorted ascending; unique disabled degrees
     int                 groupSize       = 3;   // chordSize + disabledDegrees.size()
 
-    bool                         rapidMode  = false;
-    std::set<std::pair<int,int>> rapidCells;   // (visual_row, abs_col) visited in current drag
+    struct RapidCell {
+        int row, col;
+        bool operator==(const RapidCell& o) const { return row == o.row && col == o.col; }
+    };
+
+    bool                         rapidMode           = false;
+    bool                         rapidRemovedOnClick = false;
+    std::set<std::pair<int,int>> rapidCells;
+    std::optional<RapidCell>     rapidLast;
+    std::optional<RapidCell>     rapidPending;
 
     void rebuildNotes();
-    void rapidTryCreate(int ex, int ey);
+    bool screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const;
+    void rapidTryCreate(int visualRow, int absCol);
+    void processRapidCell(RapidCell cur);
+    static bool rapidIsDiagonal(RapidCell a, RapidCell b) {
+        return std::abs(a.row - b.row) == 1 && std::abs(a.col - b.col) == 1;
+    }
 
     // Convert a virtual row index to chord-space abs_row (-1 if in a disabled slot)
     int virtualToAbsRow(int virtualPos) const;

@@ -167,42 +167,73 @@ void PatternGrid::setRowOffset(int offset)
 
 void PatternGrid::setRapidMode(bool r)
 {
-    rapidMode = r;
+    rapidMode           = r;
+    rapidRemovedOnClick = false;
     rapidCells.clear();
+    rapidLast    = std::nullopt;
+    rapidPending = std::nullopt;
     state = StateIdle{};
     if (window()) window()->cursor(FL_CURSOR_DEFAULT);
     redraw();
 }
 
-void PatternGrid::rapidTryCreate(int ex, int ey)
+bool PatternGrid::screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const
 {
     int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
-    if (ex < 0 || ex >= gridRight || ey < 0 || ey >= h()) return;
+    if (ex < 0 || ex >= gridRight || ey < 0 || ey >= h()) return false;
+    outRow    = ey / rowHeight;
+    outAbsCol = ex / colWidth + colOffset;
+    return true;
+}
 
-    int   visual_row = ey / rowHeight;
-    int   col_int    = ex / colWidth;
-    float col        = float(col_int) + colOffset;
+void PatternGrid::rapidTryCreate(int visualRow, int absCol)
+{
+    if (visualRow < 0 || visualRow >= numRows || absCol < 0 || absCol + 1 > numCols) return;
 
-    if (visual_row < 0 || visual_row >= numRows) return;
-    if (col + 1.0f > numCols) return;
-
-    auto key = std::make_pair(visual_row, col_int + (int)colOffset);
+    auto key = std::make_pair(visualRow, absCol);
     if (rapidCells.count(key)) return;
     rapidCells.insert(key);
 
+    float col = float(absCol);
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) {
-            return (int)n.pitch == visual_row
+            return (int)n.pitch == visualRow
                 && col < n.beat + n.length
                 && col + 1.0f > n.beat;
         });
     if (!clear || !pattern || patternId < 0) return;
 
-    int virtualPos = rowOffset + numRows - 1 - visual_row;
+    int virtualPos = rowOffset + numRows - 1 - visualRow;
     int abs_row    = virtualToAbsRow(virtualPos);
     if (abs_row < 0) return;
 
     pattern->addNote(patternId, col, abs_row, 1.0f);
+}
+
+void PatternGrid::processRapidCell(RapidCell cur)
+{
+    if (!rapidPending) {
+        if (!rapidLast || rapidIsDiagonal(*rapidLast, cur)) {
+            rapidTryCreate(cur.row, cur.col);
+            rapidLast = cur;
+        } else {
+            rapidPending = cur;
+        }
+    } else {
+        if (rapidLast && rapidIsDiagonal(*rapidLast, cur)) {
+            // cur is diagonal to last placed — the pending cell was a stepping stone, skip it
+            rapidTryCreate(cur.row, cur.col);
+            rapidLast    = cur;
+            rapidPending = std::nullopt;
+        } else {
+            // not diagonal — commit the pending cell, then reconsider cur from there
+            RapidCell pending = *rapidPending;
+            rapidPending = std::nullopt;
+            rapidTryCreate(pending.row, pending.col);
+            rapidLast = pending;
+            processRapidCell(cur);
+        }
+    }
 }
 
 int PatternGrid::handle(int event)
@@ -213,37 +244,53 @@ int PatternGrid::handle(int event)
     switch (event) {
     case FL_PUSH: {
         rapidCells.clear();
+        rapidLast    = std::nullopt;
+        rapidPending = std::nullopt;
+
         if (Fl::event_button() == FL_LEFT_MOUSE) {
-            int   ex         = Fl::event_x() - x();
-            int   ey         = Fl::event_y() - y();
-            int   gridRight  = std::min(w(), (numCols - colOffset) * colWidth);
-            if (ex >= 0 && ex < gridRight && ey >= 0 && ey < h()) {
-                int   visual_row = ey / rowHeight;
-                int   col_int    = ex / colWidth;
-                float col        = float(col_int) + colOffset;
-                auto  key        = std::make_pair(visual_row, col_int + (int)colOffset);
-                bool  removed    = false;
+            int row, absCol;
+            if (screenToCell(Fl::event_x() - x(), Fl::event_y() - y(), row, absCol)) {
+                float col = float(absCol);
+                bool removed = false;
                 if (pattern && patternId >= 0) {
                     for (const auto& n : notes) {
-                        if ((int)n.pitch == visual_row && n.beat == col) {
+                        if ((int)n.pitch == row && n.beat == col) {
                             pattern->removeNote(n.id);
                             removed = true;
                             break;
                         }
                     }
                 }
+                        rapidLast           = RapidCell{row, absCol};
+                rapidRemovedOnClick = removed;
                 if (!removed)
-                    rapidTryCreate(ex, ey);
+                    rapidTryCreate(row, absCol);
             }
         }
         return 1;
     }
-    case FL_DRAG:
-        if (Fl::event_state(FL_BUTTON1))
-            rapidTryCreate(Fl::event_x() - x(), Fl::event_y() - y());
+    case FL_DRAG: {
+        if (!Fl::event_state(FL_BUTTON1)) return 1;
+        int row, absCol;
+        if (!screenToCell(Fl::event_x() - x(), Fl::event_y() - y(), row, absCol)) return 1;
+        RapidCell cur{row, absCol};
+        if ((rapidLast    && cur == *rapidLast)    ||
+            (rapidPending && cur == *rapidPending)) return 1;
+        if (rapidRemovedOnClick && rapidLast) {
+            rapidTryCreate(rapidLast->row, rapidLast->col);
+            rapidRemovedOnClick = false;
+        }
+        processRapidCell(cur);
         return 1;
+    }
     case FL_RELEASE:
+        if (rapidPending) {
+            rapidTryCreate(rapidPending->row, rapidPending->col);
+            rapidPending = std::nullopt;
+        }
+        rapidRemovedOnClick = false;
         rapidCells.clear();
+        rapidLast = std::nullopt;
         return 1;
     case FL_ENTER:
         window()->cursor(FL_CURSOR_CROSS);
