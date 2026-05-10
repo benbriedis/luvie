@@ -168,6 +168,18 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
 
     float computeSnapBeats() const;
 
+    void initControlRowLayout();
+    void initPatternName();
+    void initHarmonyControls();
+    void initTimeControls();
+    void initOutChoice();
+    void initRapidBtn();
+    void initInput();
+
+    void configureStandardRow();
+    void configureDrumRow();
+    void configurePianorollRow();
+
     void startEdit();
     void cancelEdit();
     void checkDuplicate();
@@ -195,15 +207,11 @@ public:
     int  chordType() const { return harmonyControls.chordSec.chordChoice.value(); }
     bool isSharp()   const { return useSharp; }
 
-    // Set chord/root/sharp without triggering onParamsChanged.
     void setParams(int root, int chord, bool sharp);
-
-    // Update the available instrument lists shown in the Out dropdown.
     void setInstruments(const std::vector<std::string>& stdNames,
                         const std::vector<std::string>& drumNames);
 
     void setPattern(ObservablePattern* tl);
-    void setDrumMode(bool drum);
     void onTimelineChanged() override;
 };
 

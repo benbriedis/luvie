@@ -177,6 +177,18 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       rapidBtn       (0, 0, rapidBtnW,   ctrlH, "Rapid"),
       spacer         (0, 0, 0,           0)
 {
+    initControlRowLayout();
+    initPatternName();
+    initHarmonyControls();
+    initTimeControls();
+    initOutChoice();
+    initRapidBtn();
+    initInput();
+    end();
+}
+
+void PatternPanel::initControlRowLayout()
+{
     // Group ctors called begin()/end() internally; controlRow is still current.
     controlRow.gap(sg);
     controlRow.margin(pad, 2, pad, 2);
@@ -186,7 +198,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     controlRow.fixed(&outChoice,       outChoiceW);
     controlRow.fixed(&harmonyControls, HarmonyControls::kWidth);
     controlRow.fixed(&timeControls,    TimeControls::kWidth);
-    // spacer is flexible (no fixed() call) — fills space between controls and rapidBtn
+    // spacer is flexible — fills space between controls and rapidBtn
     controlRow.fixed(&rapidBtn,        rapidBtnW);
     controlRow.end();
 
@@ -195,7 +207,10 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     add(&input);
 
     box(FL_NO_BOX);
+}
 
+void PatternPanel::initPatternName()
+{
     recentreBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         if (self->onFocus) self->onFocus();
@@ -204,12 +219,12 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     patternName.box(FL_NO_BOX);
     patternName.labelcolor(panelText);
     patternName.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
+}
 
+void PatternPanel::initHarmonyControls()
+{
     auto& ks = harmonyControls.keySec;
     auto& cs = harmonyControls.chordSec;
-    auto& ts = timeControls.timeSigSec;
-    auto& bs = timeControls.barsSec;
-    auto& ss = timeControls.snapSec;
 
     ks.baseLabel.box(FL_NO_BOX);
     ks.baseLabel.labelcolor(panelText);
@@ -219,7 +234,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     ks.sharpFlatBtn.labelcolor(panelText);
     ks.sharpFlatBtn.setBorderWidth(1);
     ks.sharpFlatBtn.setBorderColor(panelCtrlBorder);
-
     ks.sharpFlatBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         auto& ks   = self->harmonyControls.keySec;
@@ -246,6 +260,13 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         cs.chordChoice.add(def.name);
     cs.chordChoice.value(0);
     cs.chordChoice.callback(paramsCb, this);
+}
+
+void PatternPanel::initTimeControls()
+{
+    auto& ts = timeControls.timeSigSec;
+    auto& bs = timeControls.barsSec;
+    auto& ss = timeControls.snapSec;
 
     ts.timeSigLabel.box(FL_NO_BOX);
     ts.timeSigLabel.labelcolor(panelText);
@@ -341,7 +362,10 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         if (self->onSnapChanged)
             self->onSnapChanged(self->computeSnapBeats());
     }, this);
+}
 
+void PatternPanel::initOutChoice()
+{
     outChoice.value(0);
     outChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
@@ -350,7 +374,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.tracks[sel].patternId;
-        // Determine which list is currently shown
         PatternType type = PatternType::STANDARD;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }
@@ -360,7 +383,10 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         std::string name = (idx >= 0 && idx < (int)names.size()) ? names[idx] : "";
         self->pattern->setPatternOutputInstrument(patId, name);
     }, this);
+}
 
+void PatternPanel::initRapidBtn()
+{
     rapidBtn.type(FL_TOGGLE_BUTTON);
     rapidBtn.color(panelBg);
     rapidBtn.labelcolor(panelText);
@@ -373,7 +399,10 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         self->rapidBtn.redraw();
         if (self->onRapidChanged) self->onRapidChanged(on);
     }, this);
+}
 
+void PatternPanel::initInput()
+{
     input.hide();
     input.box(FL_FLAT_BOX);
     input.color(0x37415100);
@@ -384,8 +413,6 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
         static_cast<PatternPanel*>(d)->commitEdit();
     }, this);
     input.onUnfocus([this]() { commitEdit(); });
-
-    end();
 }
 
 void PatternPanel::setParams(int root, int chord, bool sharp)
@@ -506,20 +533,36 @@ void PatternPanel::setPattern(ObservablePattern* tl)
     onTimelineChanged();
 }
 
-void PatternPanel::setDrumMode(bool drum)
+void PatternPanel::configureStandardRow()
 {
-    if (drum) {
-        harmonyControls.hide();
-        if (rapidBtn.value()) {
-            rapidBtn.value(0);
-            rapidBtn.color(panelBg);
-            if (onRapidChanged) onRapidChanged(false);
-        }
-        rapidBtn.hide();
-    } else {
-        harmonyControls.show();
-        rapidBtn.show();
+    harmonyControls.show();
+    rapidBtn.show();
+    controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
+    redraw();
+}
+
+void PatternPanel::configureDrumRow()
+{
+    harmonyControls.hide();
+    if (rapidBtn.value()) {
+        rapidBtn.value(0);
+        rapidBtn.color(panelBg);
+        if (onRapidChanged) onRapidChanged(false);
     }
+    rapidBtn.hide();
+    controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
+    redraw();
+}
+
+void PatternPanel::configurePianorollRow()
+{
+    harmonyControls.hide();
+    if (rapidBtn.value()) {
+        rapidBtn.value(0);
+        rapidBtn.color(panelBg);
+        if (onRapidChanged) onRapidChanged(false);
+    }
+    rapidBtn.hide();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -532,13 +575,17 @@ void PatternPanel::onTimelineChanged()
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
         patternName.copy_label(tl.tracks[sel].label.c_str());
         int patId = tl.tracks[sel].patternId;
-        bool hideChord = false;
+        PatternType type = PatternType::STANDARD;
         for (const auto& p : tl.patterns)
-            if (p.id == patId) { hideChord = (p.type == PatternType::DRUM || p.type == PatternType::PIANOROLL); break; }
-        setDrumMode(hideChord);
+            if (p.id == patId) { type = p.type; break; }
+        switch (type) {
+        case PatternType::DRUM:      configureDrumRow();      break;
+        case PatternType::PIANOROLL: configurePianorollRow(); break;
+        default:                     configureStandardRow();  break;
+        }
     } else {
         patternName.copy_label("");
-        setDrumMode(false);
+        configureStandardRow();
     }
     refreshOutChoice();
     refreshTimeSig();
