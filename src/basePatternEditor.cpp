@@ -120,9 +120,11 @@ void BasePatternEditor::onTimelineChanged()
         return;
     }
     int patId = tracks[sel].patternId;
+    bool patChanged = (patId != lastPatId);
+    lastPatId = patId;
 
-    if (trackChanged) {
-        playhead.setPatternTrack(sel);
+    if (trackChanged) playhead.setPatternTrack(sel);
+    if (trackChanged || patChanged) {
         setGridPattern(patId);
         paramGrid.setPattern(pattern, patId);
     } else {

@@ -20,3 +20,8 @@ help inform future developers to maintain functionality and consistency in the a
 	My thinking: between patterns its good to have a simple rule. Also the lower patterns were more likely added later so the 
 	             user is more likely to expect them to take priority. 
 
+FOLLOW
+======
+1. At the moment I'm deliberately omitting follow for patterns as it think it would be too jumpy.
+2. In the song editor I'm scolling page by page rather than keep the playhead in the center, 
+   which should give a stabler experience I think, and be lighter on the CPU.

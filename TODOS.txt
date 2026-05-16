@@ -9,8 +9,6 @@ FUTURE FUNCTIONALITY
 
 - Pianoroll and drum patterns - should support recording of patterns..
 
-- being able to click and drag to create a bunch of notes. (maybe choose a special "strafe" mode?)
-
 - Maybe allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
   Likely to lead on to sample filters, envelopes, trimming, ...
 
@@ -104,10 +102,6 @@ MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
 	   a bit forced though - is there a better way? Dont REALLY want to have to have a time signature field for every pattern which is probably
 	   the "proper" way.
 	)
-
-4. Drum patterns
-	2. Hand cursor tends to obscure the note during the move operation.
-	3. cf optimising the control rows at the bottom as the drum pattern editor lacks the pitch-related controls.
 
 
 Loop mode: maybe remove rewind button and position labels in the transports
@@ -231,7 +225,7 @@ Clicking and dragging to reorder the tracks in the song editor doesnt look great
 
 ....
 
-Did I put a version number in the session files?
+Did I put a version number in the session files? [THINK IT MIGHT BE THERE - TO CHECK]
 
    
 TODO check MIDI parameters are saved and restored OK - both for the song editor and patterns
@@ -240,6 +234,8 @@ cf a pane resize drag between the parameter and notes grids
 
 When 2 patterns share a channel and parameter maybe highlight in red and have a hover-over error message   
    
+
+MINOR FEATURE: maybe a clear all button (or context menu options) for mute and/or solo buttons? (song editor, pattern editor)
 
 
 cf looping and repositioning:  [NOTE there isn't necessary a problem here. Maybe ask AI.]
@@ -254,6 +250,9 @@ Standard pattern editor control row may be too wide? Wrap? Use < >  ??
    Or just require the user to grow the page?
    Or more an item or two down to the transport?
 
+SMALL BUG: There is still a messy cursor transition in the pattern editors when hovering over the 
+           transport ruler and dropping down into the label column - cursor doesn't reliably change.
+           
 MINOR: In time maybe adjust width of the chord name select box
 
 
