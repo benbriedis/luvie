@@ -31,7 +31,7 @@ void Playhead::onTimelineChanged()
 	if (transport) {
 		float bars    = transport->position();
 		float clamped = std::clamp(bars, 0.0f, (float)numCols);
-		if (clamped != bars)
+		if (patternTrack < 0 && clamped != bars)
 			transport->seek(clamped);
 		if (aps && obsTl && patternTrack < 0 && !loopActive)
 			aps->sync(*obsTl, bars);
