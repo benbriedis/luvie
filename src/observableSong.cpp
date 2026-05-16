@@ -257,6 +257,29 @@ void ObservableSong::renameTrack(int trackId, std::string newLabel)
         if (t.id == trackId) { t.label = std::move(newLabel); notify(); return; }
 }
 
+void ObservableSong::setTrackSolo(int trackId, bool s)
+{
+    for (auto& t : data.tracks)
+        if (t.id == trackId) { t.solo = s; notify(); return; }
+}
+
+void ObservableSong::setTrackMute(int trackId, bool m)
+{
+    for (auto& t : data.tracks)
+        if (t.id == trackId) { t.mute = m; notify(); return; }
+}
+
+bool ObservableSong::isTrackPlaying(int trackId) const
+{
+    bool anySolo = false;
+    for (const auto& t : data.tracks) if (t.solo) { anySolo = true; break; }
+    for (const auto& t : data.tracks) {
+        if (t.id != trackId) continue;
+        return !t.mute && (!anySolo || t.solo);
+    }
+    return false;
+}
+
 void ObservableSong::selectTrack(int index)
 {
     data.selectedTrackIndex = index;

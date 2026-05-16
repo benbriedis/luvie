@@ -12,11 +12,12 @@ SongEditor::SongEditor(int x, int y, int visibleW,
                        float snap, Popup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
+      trackControls(x + labelW, y + rulerH, controlsW, numRows, rowHeight),
       songGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
       numVisibleRows(numRows)
 {
     baseX        = x;
-    rulerOffsetX = labelW;  // no scrollbar initially
+    rulerOffsetX = labelW + controlsW;  // no scrollbar initially
 
     const int gridH = numRows * rowHeight;
 
@@ -29,8 +30,8 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     }, this);
     scrollbar->hide();
 
-    hScrollbar = new GridScrollPane(x + labelW, y + rulerH + numRows * rowHeight,
-                                    visibleW - labelW, hScrollH,
+    hScrollbar = new GridScrollPane(x + labelW + controlsW, y + rulerH + numRows * rowHeight,
+                                    visibleW - labelW - controlsW, hScrollH,
                                     GridScrollPane::HORIZONTAL);
     hScrollbar->linesize(1);
     hScrollbar->callback([](Fl_Widget* w, void* d) {
@@ -41,12 +42,14 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     hScrollbar->hide();
 
     trackLabels.position(x, y + rulerH);
-    songGrid.position(x + labelW, y + rulerH);
+    trackControls.position(x + labelW, y + rulerH);
+    songGrid.position(x + labelW + controlsW, y + rulerH);
     songGrid.setPlayhead(&playhead);
 
     add(*scrollbar);
     add(*hScrollbar);
     add(trackLabels);
+    add(trackControls);
     add(songGrid);
 
     playhead.setOwner(this);
@@ -92,6 +95,7 @@ void SongEditor::setTransport(ITransport* t, ObservableSong* tl)
     songGrid.onOpenPattern        = [this](int i) { if (onOpenPattern) onOpenPattern(i); };
     songGrid.setTimeline(tl);
     trackLabels.setTimeline(tl);
+    trackControls.setTimeline(tl);
     updateScrollBounds();
 }
 
@@ -168,13 +172,14 @@ void SongEditor::updateScrollBounds()
         scrollbar->hide();
     }
 
-    // Reposition labels and grid based on scrollbar presence
+    // Reposition labels, controls, and grid based on scrollbar presence
     trackLabels.position(baseX + sbW, trackLabels.y());
-    songGrid.position(baseX + sbW + labelW, songGrid.y());
-    rulerOffsetX = sbW + labelW;
+    trackControls.position(baseX + sbW + labelW, trackControls.y());
+    songGrid.position(baseX + sbW + labelW + controlsW, songGrid.y());
+    rulerOffsetX = sbW + labelW + controlsW;
 
     // Horizontal scroll
-    int visibleGridW  = std::max(0, w() - sbW - labelW);
+    int visibleGridW  = std::max(0, w() - sbW - labelW - controlsW);
     int totalGridW    = songGrid.numCols * songGrid.colWidth;
     bool needsHScroll = totalGridW > visibleGridW;
     int visibleCols   = songGrid.colWidth > 0 ? visibleGridW / songGrid.colWidth : 0;
@@ -187,7 +192,7 @@ void SongEditor::updateScrollBounds()
         colOffset = 0;
         hScrollbar->hide();
     }
-    hScrollbar->position(baseX + sbW + labelW, y() + rulerH + gridH);
+    hScrollbar->position(baseX + sbW + labelW + controlsW, y() + rulerH + gridH);
     hScrollbar->size(visibleGridW, hScrollH);
 
     hScrollPixel = colOffset * songGrid.colWidth;
@@ -200,9 +205,12 @@ void SongEditor::updateScrollBounds()
     songGrid.size(visibleGridW, gridH);
     trackLabels.setNumVisibleRows(visRows);
     trackLabels.size(trackLabels.w(), gridH);
+    trackControls.setNumVisibleRows(visRows);
+    trackControls.size(trackControls.w(), gridH);
 
     songGrid.setRowOffset(rowOffset);
     trackLabels.setRowOffset(rowOffset);
+    trackControls.setRowOffset(rowOffset);
     redraw();
 }
 
@@ -218,12 +226,13 @@ void SongEditor::setRowOffset(int offset)
     }
     songGrid.setRowOffset(rowOffset);
     trackLabels.setRowOffset(rowOffset);
+    trackControls.setRowOffset(rowOffset);
 }
 
 void SongEditor::setColOffset(int offset)
 {
     if (!hScrollbar) return;
-    int visibleGridW = std::max(0, w() - (scrollbar && scrollbar->visible() ? scrollbarW : 0) - labelW);
+    int visibleGridW = std::max(0, w() - (scrollbar && scrollbar->visible() ? scrollbarW : 0) - labelW - controlsW);
     int visibleCols  = songGrid.colWidth > 0 ? visibleGridW / songGrid.colWidth : 0;
     colOffset  = std::clamp(offset, 0, std::max(0, songGrid.numCols - visibleCols));
     hScrollPixel = colOffset * songGrid.colWidth;

@@ -22,8 +22,12 @@ void ActivePatternSet::sync(const ObservableSong& tl, float currentBar)
 {
 	const Timeline& data = tl.get();
 
+	bool anySolo = std::any_of(data.tracks.begin(), data.tracks.end(),
+	                           [](const Track& t) { return t.solo; });
+
 	std::unordered_map<int, float> songResult;
 	for (const auto& track : data.tracks) {
+		if (track.mute || (anySolo && !track.solo)) continue;
 		for (const auto& inst : track.patterns) {
 			if (currentBar < inst.startBar || currentBar >= inst.startBar + inst.length)
 				continue;

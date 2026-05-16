@@ -71,6 +71,8 @@ struct Track {
 	int         id;
 	std::string label;
 	int         patternId = 0;   // the pattern displayed in the pattern editor for this track
+	bool        solo      = false;
+	bool        mute      = false;
 	std::vector<PatternInstance> patterns;
 };
 

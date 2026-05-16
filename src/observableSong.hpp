@@ -39,6 +39,9 @@ public:
     int  addTrack(std::string label = "", int patternId = 0, int atIndex = -1);
     void removeTrack(int trackId);
     void renameTrack(int trackId, std::string newLabel);
+    void setTrackSolo(int trackId, bool solo);
+    void setTrackMute(int trackId, bool mute);
+    bool isTrackPlaying(int trackId) const;
     void selectTrack(int index);
     int  trackIndexForId(int trackId) const;
     void moveRow(int fromRowIdx, int toGapIdx);

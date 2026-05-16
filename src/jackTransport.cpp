@@ -214,13 +214,16 @@ void JackTransport::rebuildSnapshot()
         return evts;
     };
 
+    bool anySolo = std::any_of(tl.tracks.begin(), tl.tracks.end(),
+                               [](const Track& t) { return t.solo; });
+
     if (loopMode) {
         if (!aps) return;
         const auto& actives = aps->patterns();
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
-            if (actives.count(track.patternId)) {
+            if (!track.mute && (!anySolo || track.solo) && actives.count(track.patternId)) {
                 float anchorBar = actives.at(track.patternId);
                 const Pattern* pat = nullptr;
                 for (const auto& p : tl.patterns)
@@ -264,6 +267,11 @@ void JackTransport::rebuildSnapshot()
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
+            if (track.mute || (anySolo && !track.solo)) {
+                newSnap.tracks.push_back(std::move(ts));
+                ++trackIdx;
+                continue;
+            }
             for (const PatternInstance& inst : track.patterns) {
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;

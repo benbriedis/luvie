@@ -113,6 +113,8 @@ static json trackToJson(const Track& t) {
         {"id",        t.id},
         {"label",     t.label},
         {"patternId", t.patternId},
+        {"solo",      t.solo},
+        {"mute",      t.mute},
         {"patterns",  jinsts},
     };
 }
@@ -122,6 +124,8 @@ static Track trackFromJson(const json& j) {
     t.id        = j.at("id");
     t.label     = j.at("label");
     t.patternId = j.value("patternId", 0);
+    t.solo      = j.value("solo", false);
+    t.mute      = j.value("mute", false);
     for (const auto& jinst : j.value("patterns", json::array())) t.patterns.push_back(instanceFromJson(jinst));
     return t;
 }

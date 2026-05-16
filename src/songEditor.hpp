@@ -5,6 +5,7 @@
 #include "songGrid.hpp"
 #include "songPopup.hpp"
 #include "trackLabels.hpp"
+#include "trackControls.hpp"
 #include "popup.hpp"
 #include "itransport.hpp"
 #include "observableSong.hpp"
@@ -16,9 +17,11 @@ class ParamLaneContextPopup;
 
 class SongEditor : public Editor, public ITimelineObserver {
     static constexpr int labelW    = 80;
+    static constexpr int controlsW = 30;
     static constexpr int scrollbarW = 14;
 
     TrackLabels        trackLabels;
+    TrackControls      trackControls;
     SongGrid           songGrid;
     GridScrollPane*    scrollbar      = nullptr;
     ObservableSong* timeline      = nullptr;
