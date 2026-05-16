@@ -50,6 +50,8 @@ int Editor::handle(int event)
                 const int grabZone = 8;
                 int dist = std::abs(Fl::event_x() - (x() + rulerOffsetX - hScrollPixel + playhead.xOffset()));
                 window()->cursor(dist <= grabZone ? FL_CURSOR_WE : FL_CURSOR_CROSS);
+            } else {
+                window()->cursor(FL_CURSOR_DEFAULT);
             }
             return 1;
         }

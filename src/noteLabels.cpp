@@ -112,17 +112,12 @@ void NoteLabels::draw() {
 }
 
 int NoteLabels::handle(int event) {
-    switch (event) {
-    case FL_ENTER:
-        window()->cursor(contextMenuCursorImage(), 0, 0);
-        return 1;
-    case FL_PUSH:
+    if (int r = contextMenuCursorHandle(this, event); r >= 0) return r;
+    if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();
-            return 1;
         }
         return 1;
-    default:
-        return Fl_Widget::handle(event);
     }
+    return Fl_Widget::handle(event);
 }

@@ -47,10 +47,7 @@ void PianorollLabels::draw()
 
 int PianorollLabels::handle(int event)
 {
-    if (event == FL_ENTER) {
-        window()->cursor(contextMenuCursorImage(), 0, 0);
-        return 1;
-    }
+    if (int r = contextMenuCursorHandle(this, event); r >= 0) return r;
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();

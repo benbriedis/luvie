@@ -187,14 +187,7 @@ void TrackLabels::draw()
 
 int TrackLabels::handle(int event)
 {
-    if (event == FL_ENTER) {
-        window()->cursor(contextMenuCursorImage(), 0, 0);
-        return 1;
-    }
-    if (event == FL_LEAVE) {
-        window()->cursor(FL_CURSOR_DEFAULT);
-        return 0;
-    }
+    if (int r = widgetCursorHandle(this, event, contextMenuCursorImage()); r >= 0) return r;
 
     if (Fl_Group::handle(event))
         return 1;

@@ -150,13 +150,10 @@ Implement undo/redo (possible on an editor-by-editor basis? or current edit only
 ----------
 Song editor - scrollbar should follow playhead (at least by default).
 
-cf conversion routine to clone a regular pattern to pianoroll. The opposite way would be harder, but something could be attempted in time maybe.
 
 -------------------
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
-
-cf thinner playhead lines in Loop Editor
 
 In the pattern editor reconsider the transport info 
     (BPM, time signature etc - some is likely to be confusing or not needed
@@ -248,60 +245,37 @@ cf a pane resize drag between the parameter and notes grids
 When 2 patterns share a channel and parameter maybe highlight in red and have a hover-over error message   
    
 
-       
-Extra space under the parameter grid - maybe use a flex column?
 
-
-
-Cf Transpose vs fixed modes aka 
-   Relative vs Absolute/Fixed modes (probably best on a pattern-by-pattern basis I think)
-   - Both can have 'disabled' notes. Fixed mode can play them, Transpose cannot (until we select a chord/scale with as many notes).
-   - Be reticent about allowing notes to be added or deleted to these rows?
-   - THINK best to basically just to implement relative mode for the moment. If I put in an absolute mode in time, then
-     sort out a translation process backwards and forwards.
-
-Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
-
-
-cf looping and repositioning:
+cf looping and repositioning:  [NOTE there isn't necessary a problem here. Maybe ask AI.]
 	using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
 	and/or explicitly dealing with each notes and/or parameter...
 	THINK using 120 + 121 should do the job... if a synth has extra controllers you'd expect them to be handled by 121.
 	These should be issued BEFORE the new parameter messages are sent of course.
 
 
-Add extra chords & scales
 
-cf "Track" ==> "Lane" generally
-
-Allow the quantisation to be modified in pattern editors.
-   Song editors... maybe set to a 'beat'?
-
-Application icon
-
-Mute & solo selectors and indicators in Song Editor and Drum Pattern Editor.
-
-Allow the song to be longer. Maybe allow song length to be set in top menu?
-  Then again, it does belong to the song context...
-  Could have #bars in transport and allow it to be editted...
-  Or put it in a context popup when right clicking in the grid or playhead ruler.
-
-- Maybe give the "Control Row" its own class or function.
-  - Make it flex?
-
-- Claude says: DrumPatternEditor also overrides handle (Escape key) and resize (cancel edit first).  What are these about?
-
-
-Wider initial app (so we can fit in pattern editor controls at start)
-
-Width of popups sometimes goes wrong: too wide.
-
-cf Adding a Settings button in the control row:
-   - Move/Add toggle or maybe better 'Rapid Add'
-   
-flex wrap? - need grid. Otherwise cf < >  ?? 
+Standard pattern editor control row may be too wide? Wrap? Use < >  ?? 
    Or just require the user to grow the page?
    Or more an item or two down to the transport?
 
 MINOR: In time maybe adjust width of the chord name select box
 
+
+Conversion routine to clone a regular pattern to pianoroll? The opposite way would be harder, but something could be attempted in time maybe.
+
+cf Adding a Settings button in the control row:
+   - Move/Add toggle or maybe better 'Rapid Add'
+  
+
+Size of popups sometimes goes wrong: too wide.
+
+--------
+
+Application icon
+
+cf "Track" ==> "Lane" generally
+
+Wider initial app (so we can fit in pattern editor controls at start)
+
+Add more chords and scales?
+	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?

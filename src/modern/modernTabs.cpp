@@ -1,5 +1,6 @@
 #include "modernTabs.hpp"
 #include <FL/fl_draw.H>
+#include <FL/Fl_Window.H>
 
 ModernTabs::ModernTabs(int x, int y, int w, int h) : Fl_Tabs(x, y, w, h) {}
 
@@ -118,6 +119,10 @@ int ModernTabs::handle(int event) {
 	int tbH = tabBarH();
 	int ex  = Fl::event_x(), ey = Fl::event_y();
 	bool inBar = (ey >= y() && ey < y() + tbH && ex >= x() && ex < x() + w());
+
+	// Reset any custom cursor when the mouse is in the tab bar
+	if (inBar && (event == FL_MOVE || event == FL_ENTER))
+		window()->cursor(FL_CURSOR_DEFAULT);
 
 	// Mode toggle button interaction
 	if (leftReserve > 0 && inBar && ex < x() + toggleW) {
