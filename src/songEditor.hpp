@@ -17,7 +17,7 @@ class ParamLaneContextPopup;
 
 class SongEditor : public Editor, public ITimelineObserver {
     static constexpr int labelW    = 80;
-    static constexpr int controlsW = 30;
+    static constexpr int controlsW = 22;
     static constexpr int scrollbarW = 14;
 
     TrackLabels        trackLabels;

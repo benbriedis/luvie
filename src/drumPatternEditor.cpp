@@ -5,6 +5,12 @@
 #include <FL/fl_draw.H>
 #include <algorithm>
 
+static constexpr Fl_Color colBtnOff  = 0x29354800;
+static constexpr Fl_Color colSoloOn  = 0x22C55E00;
+static constexpr Fl_Color colMuteOn  = 0xEF444400;
+static constexpr Fl_Color colTextOn  = FL_WHITE;
+static constexpr Fl_Color colTextOff = 0x64748B00;
+
 // ---------------------------------------------------------------------------
 // DrumNoteLabels
 // ---------------------------------------------------------------------------
@@ -72,21 +78,69 @@ int DrumNoteLabels::handle(int event)
 }
 
 // ---------------------------------------------------------------------------
+// DrumRowControls
+// ---------------------------------------------------------------------------
+
+DrumRowControls::DrumRowControls(int x, int y, int w, int numRows, int rowHeight)
+    : Fl_Widget(x, y, w, numRows * rowHeight),
+      numRows(numRows), rowHeight(rowHeight)
+{}
+
+void DrumRowControls::draw()
+{
+    static constexpr Fl_Color bgCol     = 0x1F293700;
+    static constexpr Fl_Color borderCol = 0x37415100;
+
+    int pad  = 1;
+    int half = w() / 2;
+
+    for (int i = 0; i < numRows; i++) {
+        int ry  = y() + i * rowHeight;
+        int bh  = rowHeight - 2 * pad;
+
+        fl_color(bgCol);
+        fl_rectf(x(), ry, w(), rowHeight);
+        fl_color(borderCol);
+        fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+
+        fl_font(FL_HELVETICA_BOLD, 9);
+
+        // S (solo) — left half
+        int sx = x() + pad;
+        int sw = half - pad - pad;
+        fl_color(colBtnOff);
+        fl_rectf(sx, ry + pad, sw, bh);
+        fl_color(colTextOff);
+        fl_draw("S", sx, ry + pad, sw, bh, FL_ALIGN_CENTER);
+
+        // M (mute) — right half
+        int mx = x() + half + pad;
+        int mw = w() - half - pad - pad;
+        fl_color(colBtnOff);
+        fl_rectf(mx, ry + pad, mw, bh);
+        fl_color(colTextOff);
+        fl_draw("M", mx, ry + pad, mw, bh, FL_ALIGN_CENTER);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // DrumPatternEditor
 // ---------------------------------------------------------------------------
 
 DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                                      int rowHeight, int colWidth, float snap, Popup& popup)
-    : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW),
+    : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW + controlsW),
       drumLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
+      drumRowControls(x + scrollbarW + labelsW, y + rulerH, controlsW, numRows, rowHeight),
       drumGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
       drumLabelInput(x + scrollbarW, y + rulerH, labelsW, rowHeight)
 {
     const int gridH        = numRows * rowHeight;
-    const int visibleGridW = visibleW - scrollbarW - labelsW;
+    const int visibleGridW = visibleW - scrollbarW - labelsW - controlsW;
 
     drumLabels.position(x + scrollbarW, y + rulerH);
-    drumGrid.position(x + scrollbarW + labelsW, y + rulerH);
+    drumRowControls.position(x + scrollbarW + labelsW, y + rulerH);
+    drumGrid.position(x + scrollbarW + labelsW + controlsW, y + rulerH);
     drumGrid.size(visibleGridW, gridH);
     drumGrid.setPlayhead(&playhead);
 
@@ -106,6 +160,7 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     drumLabelInput.onUnfocus([this]() { commitDrumLabelEdit(); });
 
     add(drumLabels);
+    add(drumRowControls);
     add(drumGrid);
     add(drumLabelInput);
     add(paramLabels);

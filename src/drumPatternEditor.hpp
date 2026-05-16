@@ -10,11 +10,11 @@
 #include <map>
 #include <string>
 
-// Simple left-panel widget that shows MIDI note numbers (or instrument names) for each row
+// Shows MIDI note numbers (or instrument names) for each drum row
 class DrumNoteLabels : public Fl_Widget {
     int numRows;
     int rowHeight;
-    int rowOffset         = 0;
+    int rowOffset          = 0;
     bool fallbackNoteNames = false;
     std::map<int, std::string> drumMap;
 
@@ -34,13 +34,29 @@ public:
 
 // ---------------------------------------------------------------------------
 
-class DrumPatternEditor : public BasePatternEditor {
-    static constexpr int labelsW = 90;
+// Mute/Solo button column for each drum row (visual only — not wired up yet)
+class DrumRowControls : public Fl_Widget {
+    int numRows;
+    int rowHeight;
+    int rowOffset = 0;
+    void draw() override;
+public:
+    DrumRowControls(int x, int y, int w, int numRows, int rowHeight);
+    void setRowOffset(int offset) { rowOffset = offset; redraw(); }
+    void setNumRows(int n)        { numRows   = n;       redraw(); }
+};
 
-    DrumNoteLabels drumLabels;
-    DrumGrid       drumGrid;
-    InlineInput    drumLabelInput;
-    int            editingMidiNote = -1;
+// ---------------------------------------------------------------------------
+
+class DrumPatternEditor : public BasePatternEditor {
+    static constexpr int labelsW   = 90;
+    static constexpr int controlsW = 36;
+
+    DrumNoteLabels  drumLabels;
+    DrumRowControls drumRowControls;
+    DrumGrid        drumGrid;
+    InlineInput     drumLabelInput;
+    int             editingMidiNote = -1;
 
     std::map<std::string, std::map<int, std::string>> allDrumMaps;
     std::map<std::string, bool>                       allFallbackModes;
@@ -52,7 +68,7 @@ class DrumPatternEditor : public BasePatternEditor {
     void cancelDrumLabelEdit();
     int  handle(int event) override;
 
-    int  labelsWidth()      const override { return labelsW; }
+    int  labelsWidth()      const override { return labelsW + controlsW; }
     int  totalRows()        const override { return DrumGrid::totalRows; }
     int  gridNumRows()      const override { return drumGrid.numRows; }
     int  gridNumCols()      const override { return drumGrid.numCols; }
@@ -64,9 +80,18 @@ class DrumPatternEditor : public BasePatternEditor {
     void gridSetColOffset(int off) override { drumGrid.setColOffset(off); }
     void gridSetNumRows(int n)     override { drumGrid.setNumRows(n); }
     void gridResize(int x, int y, int w, int h) override { drumGrid.resize(x, y, w, h); }
-    void labelsSetRowOffset(int off) override { drumLabels.setRowOffset(off); }
-    void labelsSetNumRows(int n)     override { drumLabels.setNumRows(n); }
-    void labelsResize(int x, int y, int w, int h) override { drumLabels.resize(x, y, w, h); }
+    void labelsSetRowOffset(int off) override {
+        drumLabels.setRowOffset(off);
+        drumRowControls.setRowOffset(off);
+    }
+    void labelsSetNumRows(int n) override {
+        drumLabels.setNumRows(n);
+        drumRowControls.setNumRows(n);
+    }
+    void labelsResize(int x, int y, int w, int h) override {
+        drumLabels.resize(x, y, labelsW, h);
+        drumRowControls.resize(x + labelsW, y, controlsW, h);
+    }
     void labelsSetOnRightClick(std::function<void()> fn) override { drumLabels.onRightClick = std::move(fn); }
 
     void setGridPattern(int patId) override;
