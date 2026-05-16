@@ -210,7 +210,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // ---- Transport bar ----
     Fl_Group::current(nullptr);
-    bottomPane = new Transport(0, off + tabsH, winW, bottomH, transport, song);
+    bottomPane = new Transport(0, off + tabsH, winW, bottomH, transport);
     window->add(bottomPane);
     if (disableTransportButtons)
         bottomPane->disableButtons();

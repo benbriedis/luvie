@@ -3,9 +3,8 @@
 
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Button.H>
-#include <FL/Fl_Box.H>
 #include "itransport.hpp"
-#include "observableSong.hpp"
+#include "itimelineobserver.hpp"
 
 class TransportButton : public Fl_Button {
 public:
@@ -28,20 +27,14 @@ public:
 class Transport : public Fl_Group, public ITimelineObserver {
 	TransportButton*    rewindBtn;
 	TransportButton*    playPauseBtn;
-	Fl_Box*             posLabel;
 
 	ITransport*         transport;
 	ITransport*         controlTransport = nullptr;  // if set, buttons use this; otherwise transport
-	ObservableSong* timeline;
 	bool                stoppedAtEnd     = false;
 	bool                lastPlayingState = false;
-	char                posText[64];
-
-	static void pollCb(void* data);
-	void        updatePosition();
 
 public:
-	Transport(int x, int y, int w, int h, ITransport* t, ObservableSong* tl);
+	Transport(int x, int y, int w, int h, ITransport* t);
 	~Transport();
 	void notifyEndReached();
 	void notifySeek() { stoppedAtEnd = false; }

@@ -3,7 +3,6 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
-#include <cstdio>
 
 static constexpr Fl_Color borderColor = 0xCBD5E100;  // slate blue-grey
 static constexpr Fl_Color pressedColor = 0x3B82F600; // blue accent
@@ -81,35 +80,10 @@ void TransportButton::draw() {
 
 // ---------------------------------------------------------------------------
 
-void Transport::pollCb(void* data) {
-	auto* self = static_cast<Transport*>(data);
-	self->updatePosition();
-	if (self->transport && self->transport->isPlaying())
-		Fl::repeat_timeout(1.0, pollCb, data);
-	// Timer stops when not playing; syncPlayState() restarts it on next play.
-}
-
 void Transport::notifyEndReached() {
 	stoppedAtEnd = true;
 	playPauseBtn->setAlt(false);
 	playPauseBtn->redraw();
-	updatePosition();
-}
-
-void Transport::updatePosition() {
-	int bar = 1, beat = 1;
-	int top = 4, bottom = 4;
-	if (transport && timeline) {
-		float pos    = transport->position();  // bars, 0-indexed float
-		int   barInt = (int)pos;
-		timeline->timeSigAt(barInt, top, bottom);
-		bar  = barInt + 1;
-		beat = (int)((pos - (float)barInt) * top) + 1;
-	}
-	float bpm = timeline ? timeline->bpmAt(bar - 1) : 120.0f;
-	std::snprintf(posText, sizeof(posText), "Bar %d  Beat %d      %d/%d      %.4g BPM", bar, beat, top, bottom, (double)bpm);
-	posLabel->label(posText);
-	posLabel->redraw();
 }
 
 // ---------------------------------------------------------------------------
@@ -122,22 +96,18 @@ void Transport::resize(int x, int y, int w, int h)
 	const int gap    = 12;
 	const int totalW = bw + gap + pw;
 	int bx = x + (w - totalW) / 2;
-	bx = std::max(x + 10, bx);          // don't push buttons off the left edge
+	bx = std::max(x + 10, bx);
 	int by = y + (h - rewindBtn->h()) / 2;
 	rewindBtn->position(bx, by);
 	playPauseBtn->position(bx + bw + gap, by);
-	posLabel->position(bx + totalW + 20, by);
 }
 
 Transport::~Transport()
 {
-	Fl::remove_timeout(pollCb, this);
-	if (timeline) timeline->removeObserver(this);
 }
 
 void Transport::onTimelineChanged()
 {
-	updatePosition();
 }
 
 void Transport::syncPlayState()
@@ -147,17 +117,8 @@ void Transport::syncPlayState()
 		lastPlayingState = playing;
 		playPauseBtn->setAlt(playing);
 		playPauseBtn->redraw();
-		if (playing) {
+		if (playing)
 			stoppedAtEnd = false;
-			Fl::remove_timeout(pollCb, this);        // avoid duplicates
-			Fl::add_timeout(1.0, pollCb, this);      // start position label updates
-		} else {
-			Fl::remove_timeout(pollCb, this);
-			updatePosition();
-		}
-	} else if (playing) {
-		// Same play state but position may have jumped — refresh the label.
-		updatePosition();
 	}
 }
 
@@ -178,8 +139,8 @@ void Transport::setControlTransport(ITransport* ct)
 	playPauseBtn->redraw();
 }
 
-Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableSong* tl)
-	: Fl_Group(x, y, w, h), transport(t), timeline(tl)
+Transport::Transport(int x, int y, int w, int h, ITransport* t)
+	: Fl_Group(x, y, w, h), transport(t)
 {
 	box(FL_FLAT_BOX);
 	color(bgColor);
@@ -201,7 +162,6 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableSong* 
 		t->lastPlayingState = false;
 		t->playPauseBtn->setAlt(false);
 		t->playPauseBtn->redraw();
-		t->updatePosition();
 	}, this);
 
 	playPauseBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
@@ -223,24 +183,9 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t, ObservableSong* 
 			ct->play();
 			t->lastPlayingState = true;
 			btn->setAlt(true);
-			Fl::add_timeout(1.0, pollCb, t);  // start position label updates
 		}
-		t->updatePosition();
 		btn->redraw();
 	}, this);
 
-	// Position label — sits to the right of the buttons
-	const int labelX = bx + totalW + 20;
-	const int labelW = x + w - labelX - 10;
-	posLabel = new Fl_Box(labelX, by, labelW, btnSize);
-	posLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-	posLabel->labelcolor(iconColor);
-
-	if (timeline) {
-		timeline->addObserver(this);
-		onTimelineChanged();  // posLabel is now initialised
-	} else {
-		updatePosition();
-	}
 	end();
 }
