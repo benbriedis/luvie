@@ -31,7 +31,7 @@ public:
         color(popupBg);
         box(FL_BORDER_BOX);
 
-        auto* addBtn = new ModernButton(1, 1, popW - 2, btnH, "Add parameter \xe2\x96\xb6");
+        auto* addBtn = new ModernButton(1, 1, popW - 2, btnH, "Add automation \xe2\x96\xb6");
         addBtn->color(popupBg);
         addBtn->labelcolor(popupText);
         addBtn->setHoverColor(hoverCol);

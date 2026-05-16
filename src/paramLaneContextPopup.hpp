@@ -87,7 +87,7 @@ public:
         auto* addBtn          = makeItem(1,           popW, "Add Pattern");
         auto* addDrumBtn      = makeItem(1 + btnH,    popW, "Add Drum Pattern");
         auto* addPianorollBtn = makeItem(1 + 2*btnH,  popW, "Add Pianoroll Pattern");
-        auto* addParamBtn     = makeItem(1 + 3*btnH,  popW, "Add parameter \xe2\x96\xb6");
+        auto* addParamBtn     = makeItem(1 + 3*btnH,  popW, "Add automation \xe2\x96\xb6");
         auto* removeBtn       = makeItem(1 + 4*btnH,  popW, "Remove parameter");
 
         addBtn->callback([](Fl_Widget*, void* d) {

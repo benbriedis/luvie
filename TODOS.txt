@@ -16,6 +16,42 @@ FUTURE FUNCTIONALITY
 
 - cf make install (required for RaySession) may be Linux specific...
 
+MIDI 2.0 and other MIDI extensions
+==================================
+Currently Ardour doesn't appear to support Midi2 very well, although it is coming.
+LV2 can with extensions.
+Probably could/should leave to later. (+ seek advice)
+
+	Re drum mapping 
+	---------------
+	MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
+	- Doesn't look like DrumGizmo supports this yet
+
+	( Proprietary SysEx (System Exclusive) Messages: Many drum machines use SysEx messages to transmit their 
+	  entire internal patch state, including custom drum mappings, to a sequencer to be saved as a data dump )
+
+
+	Other parameters:
+	-----------------
+		0,0 Pitch bend range
+		1,0 Channel Fine tuning
+		2,0 Channel Coarse tuning
+	portamento, sostenuto, soft pedal (cc#65-67), sustain.
+	CC 	Default function
+	70 	Sound Variation
+	71 	Timbre/Harmonic Intensity (filter resonance)
+	72 	Release Time
+	73 	Attack Time
+	74 	Brightness (cutoff frequency)
+		
+	CC 	Default function
+	75 	Decay Time
+	76 	Vibrato Rate
+	77 	Vibrato Depth
+	78 	Vibrato Delay
+	79 	Metronome Rate 
+	ETC...
+
 TO TEST
 =======
 1. If multiple midi plugins get called in same cycle and emit notes, are multiple notes outputted successfully?
@@ -74,13 +110,6 @@ Look in future for any polling loops it may have added in.
 ======================
 
 
-Re drum mapping (future)
-------------------------
-MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
-- Doesn't look like DrumGizmo supports this yet
-
-( Proprietary SysEx (System Exclusive) Messages: Many drum machines use SysEx messages to transmit their 
-  entire internal patch state, including custom drum mappings, to a sequencer to be saved as a data dump )
 
 ------------------------------TODOs---------------------------
 
@@ -168,25 +197,7 @@ In Pattern Editor clicking away from the numerator of bar fields doesn't lose th
 The load drum map buttons need a better visual indication the buttons are pressed.
 	Should be able to tab into them too.
 
-Also wrt MIDI GM1.0:  https://en.wikipedia.org/wiki/General_MIDI
-	Channel messages 	Support for controller number 1, 7, 10, 11, 64, 100, 101, 121 and 123; 
-	                    support for channel pressure and pitch bend controllers. 
-	Other messages		Respond to the data entry controller and the RPNs for fine and coarse tuning and pitch bend range, 
-						as well as all General MIDI Level 1 System Messages.
-
-CC messages: Sent on a channel I think. GM1.0 values are:
-	0 - pitch bend   [NOTE THE RANGE FOR THIS IS 0–16383 - IVE IMPLEMENTED THIS BIT]
-	1 - modulation wheel
-	7 - channel volume
-	etc
-
              
-Registered parameters (RPN support) - a few standard parameters 
-SysEx messages - 2 standard GMs
-
-
-NB MIDI2.0 has a mechanism for instrument discovery...
-
 TO TEST Program number: a) connect to Casio b) maybe connect to some software synth?
 
 When I start up in standalone mode (with -v) and close the application (using the window X) I don't get my audio back.
@@ -199,27 +210,6 @@ When I start up in standalone mode (with -v) and close the application (using th
 TEST Luvie as plugin, NSM and standalone again
 
 
-cf these weird parameters:
-    0,0 Pitch bend range
-    1,0 Channel Fine tuning
-    2,0 Channel Coarse tuning
-portamento, sostenuto, soft pedal (cc#65-67), sustain.
-CC 	Default function
-70 	Sound Variation
-71 	Timbre/Harmonic Intensity (filter resonance)
-72 	Release Time
-73 	Attack Time
-74 	Brightness (cutoff frequency)
-	
-CC 	Default function
-75 	Decay Time
-76 	Vibrato Rate
-77 	Vibrato Depth
-78 	Vibrato Delay
-79 	Metronome Rate 
-ETC...
-
-
 
 Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
@@ -227,8 +217,6 @@ Clicking and dragging to reorder the tracks in the song editor doesnt look great
 
 Did I put a version number in the session files? [THINK IT MIGHT BE THERE - TO CHECK]
 
-   
-TODO check MIDI parameters are saved and restored OK - both for the song editor and patterns
 
 cf a pane resize drag between the parameter and notes grids
 
@@ -237,6 +225,8 @@ When 2 patterns share a channel and parameter maybe highlight in red and have a 
 
 MINOR FEATURE: maybe a clear all button (or context menu options) for mute and/or solo buttons? (song editor, pattern editor)
 
+
+TODO check MIDI parameters are saved and restored OK - both for the song editor and patterns
 
 cf looping and repositioning:  [NOTE there isn't necessary a problem here. Maybe ask AI.]
 	using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
@@ -255,25 +245,52 @@ SMALL BUG: There is still a messy cursor transition in the pattern editors when 
            
 MINOR: In time maybe adjust width of the chord name select box
 
+MINOR BUG: when editting label text can get a danky FLTK popup appear when right clicking.
+           Might happen in other edit boxes...
 
-Conversion routine to clone a regular pattern to pianoroll? The opposite way would be harder, but something could be attempted in time maybe.
+
+Conversion routine to clone a regular pattern to pianoroll? 
+	The opposite way would be harder, but something could be attempted in time maybe.
 
 cf Adding a Settings button in the control row:
    - Move/Add toggle or maybe better 'Rapid Add'
   
 
-Size of popups sometimes goes wrong: too wide.
+BUG: Size of popups sometimes goes wrong: too wide.
+
+Coding: 
+	Move to modern?  widgetCursorHandle() 
+	Chop up some long files?
+	Subdirectories?
+
+
+TEST 
+	are solo/mute stored? Probably should be I guess  (song editor, pattern editor)
+	STILL A BUG? Sometimes can't add notes to the drum editor  [MAY have been fixed]
+	STILL A BUG? Sometime first track cant be set to drum editor [ONLY SAW ONCE.. maybe related to above error?]
 
 --------
 
 Application icon
 
-cf "Track" ==> "Lane" generally
-
 Wider initial app (so we can fit in pattern editor controls at start)
+
+Loop editor: BPM should be a spinner.  Change so dragging up and down spins, not left and right + reduce the sensitivity
 
 Add more chords and scales?
 	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
 
+BUG: left clicking in left of rulers creates extra markers
+FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
+         allow it to be editted.
 
+Drum pattern editor - should probably disallow putting notes on the final vertical grid (look at other pattern editors too)
+
+
+Create a shortcut mechanism and menu...  (cf dividing by editor type) 
+   cf start/stop    - map to space
+      open pattern  - eg map to <Enter>
+      open context? - eg context button  (currently not working)
+      solo? mute?
+      
 

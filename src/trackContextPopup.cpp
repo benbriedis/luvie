@@ -29,7 +29,7 @@ TrackContextPopup::TrackContextPopup()
     addPianorollBtn = makeItem(1 + 3*btnH,  popW, "Add Pianoroll Pattern");
     copyBtn         = makeItem(1 + 4*btnH,  popW, "Copy Pattern");
     deleteBtn       = makeItem(1 + 5*btnH,  popW, "Delete Pattern");
-    addParamBtn     = makeItem(1 + 6*btnH,  popW, "Add parameter \xe2\x96\xb6");
+    addParamBtn     = makeItem(1 + 6*btnH,  popW, "Add automation \xe2\x96\xb6");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doOpenPattern();
