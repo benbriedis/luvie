@@ -163,7 +163,11 @@ void JackTransport::rebuildSnapshot()
             }
         }
         if (pat->type == PatternType::DRUM) {
+            bool anySolo = !pat->drumSolo.empty();
             for (const DrumNote& dn : pat->drumNotes) {
+                bool isSolo = pat->drumSolo.count(dn.note) > 0;
+                bool isMute = pat->drumMute.count(dn.note) > 0;
+                if (isMute || (anySolo && !isSolo)) continue;
                 int midi = std::clamp(dn.note, 0, 127);
                 is.notes.push_back({midi, dn.beat, drumNoteLen, dn.velocity});
             }

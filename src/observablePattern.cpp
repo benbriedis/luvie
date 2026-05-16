@@ -174,6 +174,28 @@ std::vector<DrumNote> ObservablePattern::buildDrumPatternNotes(int patternId) co
     return {};
 }
 
+void ObservablePattern::setDrumNoteSolo(int patternId, int note, bool s)
+{
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patternId) continue;
+        if (s) pat.drumSolo.insert(note);
+        else   pat.drumSolo.erase(note);
+        song_->notify();
+        return;
+    }
+}
+
+void ObservablePattern::setDrumNoteMute(int patternId, int note, bool m)
+{
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patternId) continue;
+        if (m) pat.drumMute.insert(note);
+        else   pat.drumMute.erase(note);
+        song_->notify();
+        return;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Pattern lifecycle
 

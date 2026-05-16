@@ -34,16 +34,20 @@ public:
 
 // ---------------------------------------------------------------------------
 
-// Mute/Solo button column for each drum row (visual only — not wired up yet)
+// Mute/Solo button column for each drum row
 class DrumRowControls : public Fl_Widget {
     int numRows;
     int rowHeight;
-    int rowOffset = 0;
+    int rowOffset          = 0;
+    ObservablePattern* pattern = nullptr;
+    int patternId          = -1;
     void draw() override;
+    int  handle(int event) override;
 public:
     DrumRowControls(int x, int y, int w, int numRows, int rowHeight);
     void setRowOffset(int offset) { rowOffset = offset; redraw(); }
     void setNumRows(int n)        { numRows   = n;       redraw(); }
+    void setPattern(ObservablePattern* p, int patId) { pattern = p; patternId = patId; redraw(); }
 };
 
 // ---------------------------------------------------------------------------

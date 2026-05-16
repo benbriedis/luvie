@@ -91,12 +91,29 @@ void DrumRowControls::draw()
     static constexpr Fl_Color bgCol     = 0x1F293700;
     static constexpr Fl_Color borderCol = 0x37415100;
 
+    const std::set<int>* solo = nullptr;
+    const std::set<int>* mute = nullptr;
+    bool anySolo = false;
+    if (pattern && patternId >= 0) {
+        for (const auto& p : pattern->get().patterns) {
+            if (p.id != patternId) continue;
+            solo    = &p.drumSolo;
+            mute    = &p.drumMute;
+            anySolo = !p.drumSolo.empty();
+            break;
+        }
+    }
+
     int pad  = 1;
     int half = w() / 2;
 
     for (int i = 0; i < numRows; i++) {
-        int ry  = y() + i * rowHeight;
-        int bh  = rowHeight - 2 * pad;
+        int midiNote = rowOffset + numRows - 1 - i;
+        int ry       = y() + i * rowHeight;
+        int bh       = rowHeight - 2 * pad;
+
+        bool isSolo = solo && solo->count(midiNote);
+        bool isMute = mute && mute->count(midiNote);
 
         fl_color(bgCol);
         fl_rectf(x(), ry, w(), rowHeight);
@@ -108,19 +125,41 @@ void DrumRowControls::draw()
         // S (solo) — left half
         int sx = x() + pad;
         int sw = half - pad - pad;
-        fl_color(colBtnOff);
+        fl_color(isSolo ? colSoloOn : colBtnOff);
         fl_rectf(sx, ry + pad, sw, bh);
-        fl_color(colTextOff);
+        fl_color(isSolo ? colTextOn : colTextOff);
         fl_draw("S", sx, ry + pad, sw, bh, FL_ALIGN_CENTER);
 
         // M (mute) — right half
         int mx = x() + half + pad;
         int mw = w() - half - pad - pad;
-        fl_color(colBtnOff);
+        fl_color(isMute ? colMuteOn : colBtnOff);
         fl_rectf(mx, ry + pad, mw, bh);
-        fl_color(colTextOff);
+        fl_color(isMute ? colTextOn : colTextOff);
         fl_draw("M", mx, ry + pad, mw, bh, FL_ALIGN_CENTER);
     }
+}
+
+int DrumRowControls::handle(int event)
+{
+    if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE && pattern && patternId >= 0) {
+        int r = (Fl::event_y() - y()) / rowHeight;
+        if (r < 0 || r >= numRows) return 1;
+        int midiNote = rowOffset + numRows - 1 - r;
+        if (midiNote < 0 || midiNote > 127) return 1;
+
+        bool isSoloBtn = Fl::event_x() < x() + w() / 2;
+        for (const auto& p : pattern->get().patterns) {
+            if (p.id != patternId) continue;
+            if (isSoloBtn)
+                pattern->setDrumNoteSolo(patternId, midiNote, !p.drumSolo.count(midiNote));
+            else
+                pattern->setDrumNoteMute(patternId, midiNote, !p.drumMute.count(midiNote));
+            break;
+        }
+        return 1;
+    }
+    return 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,9 +331,10 @@ void DrumPatternEditor::setGridPattern(int patId)
     }
 }
 
-void DrumPatternEditor::afterTimelineChanged(int /*patId*/)
+void DrumPatternEditor::afterTimelineChanged(int patId)
 {
     applyCurrentDrumMap();
+    drumRowControls.setPattern(patId >= 0 ? pattern : nullptr, patId);
 }
 
 void DrumPatternEditor::resize(int x, int /*y*/, int w, int h)

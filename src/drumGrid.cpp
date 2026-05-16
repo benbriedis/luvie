@@ -39,8 +39,8 @@ void DrumGrid::rebuildNotes()
 {
     notes.clear();
     if (!pattern || patternId < 0) return;
-
-    for (const auto& n : pattern->buildDrumPatternNotes(patternId)) {
+    auto all = pattern->buildDrumPatternNotes(patternId);
+    for (const auto& n : all) {
         int vr = rowOffset + numRows - 1 - n.note;
         if (vr >= 0 && vr < numRows)
             notes.push_back(n);

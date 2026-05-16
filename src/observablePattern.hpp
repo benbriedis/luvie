@@ -34,6 +34,8 @@ public:
     void addDrumNote(int patternId, int note, float beat, float velocity = 0.8f);
     void removeDrumNote(int drumNoteId);
     std::vector<DrumNote> buildDrumPatternNotes(int patternId) const;
+    void setDrumNoteSolo(int patternId, int note, bool solo);
+    void setDrumNoteMute(int patternId, int note, bool mute);
 
     // Pattern lifecycle (creation/copy)
     int createPattern(float lengthBeats);

@@ -57,12 +57,18 @@ static json patternToJson(const Pattern& p) {
     for (const auto& n : p.notes)     jnotes.push_back(noteToJson(n));
     json jdrum = json::array();
     for (const auto& d : p.drumNotes) jdrum.push_back(drumNoteToJson(d));
+    json jdrumSolo = json::array();
+    for (int n : p.drumSolo) jdrumSolo.push_back(n);
+    json jdrumMute = json::array();
+    for (int n : p.drumMute) jdrumMute.push_back(n);
     return {
         {"id",                p.id},
         {"lengthBeats",       p.lengthBeats},
         {"type",              (int)p.type},
         {"notes",             jnotes},
         {"drumNotes",         jdrum},
+        {"drumSolo",          jdrumSolo},
+        {"drumMute",          jdrumMute},
         {"outputInstrumentName", p.outputInstrumentName},
         {"timeSigTop",        p.timeSigTop},
         {"timeSigBottom",     p.timeSigBottom},
@@ -79,6 +85,8 @@ static Pattern patternFromJson(const json& j) {
     p.timeSigBottom     = j.value("timeSigBottom", 4);
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));
     for (const auto& jd : j.value("drumNotes", json::array())) p.drumNotes.push_back(drumNoteFromJson(jd));
+    for (int n : j.value("drumSolo", json::array())) p.drumSolo.insert(n);
+    for (int n : j.value("drumMute", json::array())) p.drumMute.insert(n);
     return p;
 }
 

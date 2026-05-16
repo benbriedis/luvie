@@ -1,6 +1,7 @@
 #ifndef TIMELINE_HPP
 #define TIMELINE_HPP
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,8 @@ struct Pattern {
 	PatternType            type = PatternType::STANDARD;
 	std::vector<Note>      notes;
 	std::vector<DrumNote>  drumNotes;
+	std::set<int>          drumSolo;   // MIDI notes to solo (empty = all play)
+	std::set<int>          drumMute;   // MIDI notes to silence
 	std::vector<ParamLane> paramLanes;
 	std::string outputInstrumentName;  // empty = no routing assigned
 	int timeSigTop    = 4;
