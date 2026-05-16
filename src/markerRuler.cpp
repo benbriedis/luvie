@@ -118,12 +118,17 @@ int MarkerRuler::handle(int event)
 		window()->cursor(FL_CURSOR_DEFAULT);
 		return 0;
 	case FL_MOVE: {
+		if (Fl::event_x() < x() + clipLeft) {
+			window()->cursor(FL_CURSOR_DEFAULT);
+			return 1;
+		}
 		int bar = findBarAt(Fl::event_x());
 		if (bar >= 0) window()->cursor(contextMenuCursorImage(), 0, 0);
 		else window()->cursor(FL_CURSOR_CROSS);
 		return 1;
 	}
 	case FL_PUSH: {
+		if (Fl::event_x() < x() + clipLeft) return 1;
 		if (Fl::event_button() == FL_LEFT_MOUSE) {
 			int bar = findBarAt(Fl::event_x());
 			pushedOnMarker = (bar >= 0);

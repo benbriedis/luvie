@@ -22,10 +22,11 @@ void Editor::draw()
 
 int Editor::handle(int event)
 {
-    bool inRuler = Fl::event_y() >= y() && Fl::event_y() < y() + rulerH;
+    bool inRuler     = Fl::event_y() >= y() && Fl::event_y() < y() + rulerH;
+    bool inGridRuler = inRuler && Fl::event_x() >= x() + rulerOffsetX;
     switch (event) {
     case FL_PUSH:
-        if (inRuler && Fl::event_button() == FL_LEFT_MOUSE && seekingEnabled) {
+        if (inGridRuler && Fl::event_button() == FL_LEFT_MOUSE && seekingEnabled) {
             rulerDragging = true;
             playhead.seek(Fl::event_x(), x() + rulerOffsetX - hScrollPixel);
             if (onSeek) onSeek();
@@ -46,7 +47,7 @@ int Editor::handle(int event)
         break;
     case FL_MOVE:
         if (inRuler) {
-            if (seekingEnabled) {
+            if (seekingEnabled && inGridRuler) {
                 const int grabZone = 8;
                 int dist = std::abs(Fl::event_x() - (x() + rulerOffsetX - hScrollPixel + playhead.xOffset()));
                 window()->cursor(dist <= grabZone ? FL_CURSOR_WE : FL_CURSOR_CROSS);
