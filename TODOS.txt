@@ -147,10 +147,6 @@ Implement undo/redo (possible on an editor-by-editor basis? or current edit only
 - Outputs overlay - focused items don't fully defocus.
     
 
-----------
-Song editor - scrollbar should follow playhead (at least by default).
-
-
 -------------------
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
@@ -279,3 +275,6 @@ Wider initial app (so we can fit in pattern editor controls at start)
 
 Add more chords and scales?
 	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
+
+
+

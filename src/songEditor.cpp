@@ -88,9 +88,11 @@ SongEditor::~SongEditor()
 
 void SongEditor::setTransport(ITransport* t, ObservableSong* tl)
 {
+    transport = t;
     swapObserver(timeline, tl, this);
     playhead.setTransport(t, tl);
     playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
+    playhead.onTick       = [this]() { followPlayhead(); };
     songGrid.onPatternDoubleClick = [this](int i) { if (onPatternDoubleClick) onPatternDoubleClick(i); };
     songGrid.onOpenPattern        = [this](int i) { if (onOpenPattern) onOpenPattern(i); };
     songGrid.setTimeline(tl);
@@ -240,6 +242,31 @@ void SongEditor::setColOffset(int offset)
     hScrollbar->value(colOffset, visibleCols, 0, songGrid.numCols);
     if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
     redraw();
+}
+
+void SongEditor::followPlayhead()
+{
+    if (!transport) return;
+    bool  playing = transport->isPlaying();
+    float bar     = transport->position();
+
+    int   sbW          = (scrollbar && scrollbar->visible()) ? scrollbarW : 0;
+    int   visibleGridW = std::max(1, w() - sbW - labelW - controlsW);
+    int   visibleCols  = songGrid.colWidth > 0 ? visibleGridW / songGrid.colWidth : 1;
+    float playheadPx   = (bar - colOffset) * songGrid.colWidth;
+
+    if (playing) {
+        if (!wasPlaying) {
+            // Just started — snap if playhead is off screen
+            if (playheadPx < 0.0f || playheadPx >= (float)visibleGridW)
+                setColOffset((int)bar);
+        } else {
+            // Page forward the moment the playhead crosses the visible right edge
+            if (playheadPx >= (float)visibleGridW)
+                setColOffset(colOffset + visibleCols);
+        }
+    }
+    wasPlaying = playing;
 }
 
 void SongEditor::resize(int x, int /*y*/, int w, int h)

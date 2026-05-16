@@ -24,17 +24,20 @@ class SongEditor : public Editor, public ITimelineObserver {
     TrackControls      trackControls;
     SongGrid           songGrid;
     GridScrollPane*    scrollbar      = nullptr;
-    ObservableSong* timeline      = nullptr;
+    ITransport*        transport      = nullptr;
+    ObservableSong*    timeline       = nullptr;
     int                numVisibleRows;
     int                rowOffset      = 0;
     int                colOffset      = 0;
     int                baseX          = 0;
+    bool               wasPlaying     = false;
 
     void updateScrollBounds();
     void setRowOffset(int offset);
     void setColOffset(int offset);
     void drawRulerLabels() override;
     int  computeNumCols() const;
+    void followPlayhead();
 
 public:
     SongEditor(int x, int y, int visibleW,

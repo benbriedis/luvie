@@ -35,6 +35,7 @@ class Playhead : public ITimelineObserver {
 
 public:
 	std::function<void()>        onEndReached;
+	std::function<void()>        onTick;
 	std::function<std::string(int)> pitchName;   // optional: pitch index → "E4" etc.
 
 	Playhead(int numCols, int colWidth);

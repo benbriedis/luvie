@@ -92,6 +92,7 @@ void Playhead::tick()
 		lastPosition = transport->position();
 	}
 	if (owner && owner->visible_r()) owner->redraw();
+	if (onTick) onTick();
 }
 
 void Playhead::checkVerboseNotes(float prevPos, float curPos)
