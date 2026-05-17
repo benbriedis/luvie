@@ -451,7 +451,7 @@ int JackTransport::process(jack_nframes_t nframes)
 
     bool jumped = !firstCall && wasPlaying && (pos.frame != lastFrame + nframes);
 
-    // On stop or jump: silence all active notes.
+    // On stop or jump: silence active notes, then reset all controllers on instrument channels.
     if (!namedBufs.empty() && ((!nowPlaying && wasPlaying) || jumped)) {
         for (auto& an : activeNotes) {
             uint8_t msg[3] = {
@@ -463,6 +463,24 @@ int JackTransport::process(jack_nframes_t nframes)
             if (b) jack_midi_event_write(b, 0, msg, 3);
         }
         activeNotes.clear();
+
+        if (snapMutex.try_lock()) {
+            std::set<std::pair<std::string,int>> seen;
+            for (const auto& track : snap.tracks)
+                for (const auto& inst : track.instances)
+                    if (!inst.portName.empty())
+                        seen.insert({inst.portName, inst.midiChannel});
+            for (const auto& [port, ch] : seen) {
+                void* buf = findBuf(namedBufs, port);
+                if (!buf) continue;
+                uint8_t base = static_cast<uint8_t>(0xB0 | (ch & 0x0F));
+                uint8_t resetMsg[3]  = { base, 121, 0 };  // Reset All Controllers
+                uint8_t allOffMsg[3] = { base, 123, 0 };  // All Notes Off
+                jack_midi_event_write(buf, 0, resetMsg,  3);
+                jack_midi_event_write(buf, 0, allOffMsg, 3);
+            }
+            snapMutex.unlock();
+        }
     }
 
     if (nowPlaying && !namedBufs.empty()) {

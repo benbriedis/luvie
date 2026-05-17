@@ -272,7 +272,7 @@ TEST
 
 --------
 
-Logo - less 'red' and more 'pink'.
+Logo - less 'red' and more 'bubblegum pink'.
 	   probably what to thinken the base of the L (top side)
        At the top of the heart in the middle at the point where the two arcs meet, probably want to extend the
 	   left arc a little way into the heart - using a stroke that cuts away the heart underneith.
