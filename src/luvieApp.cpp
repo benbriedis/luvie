@@ -27,6 +27,11 @@
 
 std::string LuvieApp::lastFileDir;
 
+void LuvieApp::ChangeNotifier::onTimelineChanged() {
+    if (app->outputsOverlay) app->outputsOverlay->refreshInstrumentButtons();
+    if (app->onExtraTimelineChange) app->onExtraTimelineChange();
+}
+
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
     if (!app->patternEd || !app->drumEd || !app->pianorollEd || !app->song_) return;
     const auto& data = app->song_->get();
@@ -348,6 +353,23 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
                 item->clear();
         };
+        outputsOverlay->onInstrumentRenamed = [this](const std::string& old, const std::string& nw) {
+            song_->renamePatternOutputInstrument(old, nw);
+        };
+        outputsOverlay->isInstrumentInUse = [this](const std::string& name) {
+            for (const auto& p : song_->get().patterns)
+                if (p.outputInstrumentName == name) return true;
+            return false;
+        };
+        outputsOverlay->onInstrumentsChanged = [this]() {
+            pushInstruments();
+            if (onInstrumentsChanged) onInstrumentsChanged();
+        };
+        if (drumEd) {
+            drumEd->onDrumLabelChanged = [this](const std::string& instrName, int midiNote, const std::string& label) {
+                outputsOverlay->updateInstrumentDrumMap(instrName, midiNote, label);
+            };
+        }
         window->add(outputsOverlay);
         window->registerPopup(outputsOverlay);
     }
@@ -360,10 +382,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // ---- Timeline observers ----
     song_->addObserver(&editorSwitcher_);
-    if (onExtraTimelineChange)
-        song_->addObserver(&changeNotifier_);
+    song_->addObserver(&changeNotifier_);
 
     // ---- Initial state ----
+    pushInstruments();
     song_->selectTrack(0);
 }
 
@@ -388,6 +410,35 @@ void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
         app->outputsOverlay->show();
     else
         app->outputsOverlay->hide();
+}
+
+void LuvieApp::pushInstruments() {
+    if (!outputsOverlay) return;
+    const auto& instrs = outputsOverlay->getInstruments();
+    song_->defaultOutputInstrument = "";
+    song_->defaultDrumOutputInstrument = "";
+    for (const auto& ci : instrs) {
+        if (!ci.isDrum && song_->defaultOutputInstrument.empty())
+            song_->defaultOutputInstrument = ci.name;
+        if (ci.isDrum && song_->defaultDrumOutputInstrument.empty())
+            song_->defaultDrumOutputInstrument = ci.name;
+    }
+    if (patternPanel) {
+        std::vector<std::string> stdNames, drumNames;
+        for (const auto& ci : instrs)
+            (ci.isDrum ? drumNames : stdNames).push_back(ci.name);
+        patternPanel->setInstruments(stdNames, drumNames);
+    }
+    if (drumEd) {
+        std::map<std::string, std::map<int, std::string>> allMaps;
+        std::map<std::string, bool> allFallbacks;
+        for (const auto& ci : instrs) {
+            allMaps[ci.name]      = ci.drumMap;
+            allFallbacks[ci.name] = ci.fallbackNoteNames;
+        }
+        drumEd->setAllDrumMaps(allMaps, allFallbacks);
+    }
+    outputsOverlay->refreshInstrumentButtons();
 }
 
 LuvieApp::~LuvieApp() {

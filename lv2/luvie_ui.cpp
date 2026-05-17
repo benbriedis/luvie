@@ -24,18 +24,17 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "../src/jackTransport.hpp"
 #include "../src/observableSong.hpp"
 #include "../src/observablePattern.hpp"
+#include "../src/outputsOverlay.hpp"
 #include "../src/patternPanel.hpp"
 #include "../src/chords.hpp"
 #include "../src/luvieApp.hpp"
+#include "../src/timelineIO.hpp"
 #include "timeline_serial.h"
-#include <nlohmann/json.hpp>
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 
 /* File used to pass state between DSP restore and UI open, and between UI sessions */
 static std::string g_stateFilePath;
-
-using json = nlohmann::json;
 
 /* -----------------------------------------------------------------------
    Forward declarations
@@ -198,9 +197,24 @@ static void sendTimeline(LuvieUI* ui)
         }
     }
 
+    /* Build instrument name → 0-indexed MIDI channel map */
+    std::map<std::string, uint8_t> instrChannelMap;
+    if (ui->app.outputsOverlay) {
+        for (const auto& ci : ui->app.outputsOverlay->getInstruments())
+            instrChannelMap[ci.name] = (uint8_t)std::clamp(ci.midiChannel - 1, 0, 15);
+    }
+
     /* Tracks */
     for (const auto& track : tl.tracks) {
-        SerialTrackHeader sth = { track.id, 0, {0,0,0},
+        uint8_t channel = 0;
+        for (const auto& pat : tl.patterns) {
+            if (pat.id == track.patternId && !pat.outputInstrumentName.empty()) {
+                auto it = instrChannelMap.find(pat.outputInstrumentName);
+                if (it != instrChannelMap.end()) channel = it->second;
+                break;
+            }
+        }
+        SerialTrackHeader sth = { track.id, channel, {0,0,0},
                                   (uint32_t)track.patterns.size() };
         memcpy(p, &sth, sizeof(sth)); p += sizeof(sth);
 
@@ -228,81 +242,18 @@ static std::string serializeStateToString(LuvieUI* ui)
 {
     if (!ui->song || !ui->app.patternPanel)
         return {};
-
-    const Timeline& tl = ui->song->get();
-
-    json j;
-    j["version"]            = 1;
-    j["rootPitch"]          = ui->app.patternPanel->rootPitch();
-    j["chordType"]          = ui->app.patternPanel->chordType();
-    j["useSharp"]           = ui->app.patternPanel->isSharp();
-    j["selectedTrackIndex"] = tl.selectedTrackIndex;
-
-    json timeSigs = json::array();
-    for (const auto& ts : tl.timeSigs)
-        timeSigs.push_back({{"bar", ts.bar}, {"top", ts.top}, {"bottom", ts.bottom}});
-    j["timeSigs"] = timeSigs;
-
-    json bpms = json::array();
-    for (const auto& bm : tl.bpms)
-        bpms.push_back({{"bar", bm.bar}, {"bpm", bm.bpm}});
-    j["bpms"] = bpms;
-
-    json patterns = json::array();
-    for (const auto& pat : tl.patterns) {
-        json notes = json::array();
-        for (const auto& n : pat.notes)
-            notes.push_back({
-                {"id",             n.id},
-                {"pitch",          n.pitch},
-                {"beat",           n.beat},
-                {"length",         n.length},
-                {"velocity",       n.velocity},
-                {"disabled",       n.disabled},
-                {"disabledDegree", n.disabledDegree}
-            });
-
-        json drumNotes = json::array();
-        for (const auto& dn : pat.drumNotes)
-            drumNotes.push_back({
-                {"id",       dn.id},
-                {"note",     dn.note},
-                {"beat",     dn.beat},
-                {"velocity", dn.velocity}
-            });
-
-        patterns.push_back({
-            {"id",          pat.id},
-            {"lengthBeats", pat.lengthBeats},
-            {"type",        (int)pat.type},
-            {"notes",       notes},
-            {"drumNotes",   drumNotes}
-        });
-    }
-    j["patterns"] = patterns;
-
-    json tracks = json::array();
-    for (const auto& track : tl.tracks) {
-        json instances = json::array();
-        for (const auto& inst : track.patterns)
-            instances.push_back({
-                {"id",          inst.id},
-                {"patternId",   inst.patternId},
-                {"startBar",    inst.startBar},
-                {"length",      inst.length},
-                {"startOffset", inst.startOffset}
-            });
-
-        tracks.push_back({
-            {"id",        track.id},
-            {"label",     track.label},
-            {"patternId", track.patternId},
-            {"instances", instances}
-        });
-    }
-    j["tracks"] = tracks;
-
-    return j.dump();
+    AppState state;
+    state.timeline  = ui->song->get();
+    state.rootPitch = ui->app.patternPanel->rootPitch();
+    state.chordType = ui->app.patternPanel->chordType();
+    state.sharp     = ui->app.patternPanel->isSharp();
+    if (ui->app.outputsOverlay)
+        for (const auto& ci : ui->app.outputsOverlay->getInstruments())
+            state.jackInstruments.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+                                             ci.isDrum, ci.fallbackNoteNames,
+                                             ci.programNumber, ci.bankMsb, ci.bankLsb,
+                                             ci.gm1Instrument});
+    return appStateToJsonString(state);
 }
 
 static void sendFullState(LuvieUI* ui)
@@ -331,83 +282,24 @@ static void sendFullState(LuvieUI* ui)
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
 {
     if (!ui->song || !ui->app.patternPanel || size == 0) return;
-
-    json j;
-    try {
-        j = json::parse(data, data + size);
-    } catch (...) {
+    AppState state;
+    if (!appStateFromJsonString(std::string(reinterpret_cast<const char*>(data), size), state)) {
         fprintf(stderr, "[luvie_ui] deserializeFullState: JSON parse failed\n");
         return;
     }
-
-    if (j.value("version", 0) != 1) {
-        fprintf(stderr, "[luvie_ui] deserializeFullState: bad version\n");
-        return;
-    }
-
-    Timeline tl;
-    tl.selectedTrackIndex = j.value("selectedTrackIndex", -1);
-
-    for (const auto& ts : j.value("timeSigs", json::array()))
-        tl.timeSigs.push_back({ts["bar"], ts["top"], ts["bottom"]});
-
-    for (const auto& bm : j.value("bpms", json::array()))
-        tl.bpms.push_back({bm["bar"], bm.value("bpm", 120.0f)});
-
-    for (const auto& p : j.value("patterns", json::array())) {
-        Pattern pat;
-        pat.id          = p["id"];
-        pat.lengthBeats = p.value("lengthBeats", 8.0f);
-        pat.type        = (PatternType)p.value("type", 0);
-        for (const auto& n : p.value("notes", json::array())) {
-            Note note;
-            note.id             = n["id"];
-            note.pitch          = n.value("pitch", 0);
-            note.beat           = n.value("beat", 0.0f);
-            note.length         = n.value("length", 1.0f);
-            note.velocity       = n.value("velocity", 0.0f);
-            note.disabled       = n.value("disabled", false);
-            note.disabledDegree = n.value("disabledDegree", -1);
-            pat.notes.push_back(note);
-        }
-        for (const auto& dn : p.value("drumNotes", json::array())) {
-            DrumNote drumNote;
-            drumNote.id       = dn["id"];
-            drumNote.note     = dn.value("note", 0);
-            drumNote.beat     = dn.value("beat", 0.0f);
-            drumNote.velocity = dn.value("velocity", 0.8f);
-            pat.drumNotes.push_back(drumNote);
-        }
-        tl.patterns.push_back(std::move(pat));
-    }
-
-    for (const auto& t : j.value("tracks", json::array())) {
-        Track track;
-        track.id        = t["id"];
-        track.label     = t.value("label", "");
-        track.patternId = t.value("patternId", 0);
-        for (const auto& inst : t.value("instances", json::array())) {
-            PatternInstance pi;
-            pi.id          = inst["id"];
-            pi.patternId   = inst.value("patternId", 0);
-            pi.startBar    = inst.value("startBar", 0.0f);
-            pi.length      = inst.value("length", 4.0f);
-            pi.startOffset = inst.value("startOffset", 0.0f);
-            track.patterns.push_back(pi);
-        }
-        tl.tracks.push_back(std::move(track));
-    }
-
-    /* Apply restored state without triggering intermediate sends */
     ui->restoringState = true;
-    ui->app.patternPanel->setParams(
-        j.value("rootPitch", 0),
-        j.value("chordType", 0),
-        j.value("useSharp", true));
-    ui->song->loadTimeline(tl);
+    ui->app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+    ui->song->loadTimeline(state.timeline);
+    if (ui->app.outputsOverlay) {
+        std::vector<OutputsOverlay::InstrumentInfo> instrs;
+        for (const auto& c : state.jackInstruments)
+            instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
+                              c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
+                              c.gm1Instrument});
+        ui->app.outputsOverlay->setInstruments(instrs);
+        ui->app.pushInstruments();
+    }
     ui->restoringState = false;
-
-    /* Now send the correct state to the DSP */
     sendTimeline(ui);
     sendFullState(ui);
 }
@@ -510,9 +402,9 @@ static LV2UI_Handle instantiate(
     /* ---- Timeline + transport ---- */
     ui->song    = new ObservableSong(120.0f, 4, 4);
     ui->pattern = new ObservablePattern(ui->song);
-    for (int i = 1; i <= 8; i++) {
+    {
         int patId = ui->pattern->createPattern(LuvieApp::numPatternBeats);
-        ui->song->addTrack("Pattern " + std::to_string(i), patId);
+        ui->song->addTrack("Pattern 1", patId);
     }
     ui->simpleTransport = new SimpleTransport;
     ui->simpleTransport->setTimeline(ui->song);
@@ -542,6 +434,14 @@ static LV2UI_Handle instantiate(
     /* ---- Build all shared UI ---- */
     ui->app.build(ui->window, ui->song, ui->pattern, ui->simpleTransport);
     ui->app.disableSaveMenu(/*save=*/true, /*saveAs=*/true);
+
+    /* ---- Wire DSP sends when instruments change ---- */
+    ui->app.onInstrumentsChanged = [ui]() {
+        if (!ui->restoringState) {
+            sendTimeline(ui);
+            sendFullState(ui);
+        }
+    };
 
     /* ---- Restore from file if available ---- */
     if (!g_stateFilePath.empty()) {

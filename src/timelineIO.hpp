@@ -31,6 +31,10 @@ struct AppState {
     std::vector<JackInstrument> jackInstruments;
 };
 
+// Serialize/deserialize AppState to/from a JSON string.
+std::string appStateToJsonString(const AppState& state);
+bool appStateFromJsonString(const std::string& jsonStr, AppState& state);
+
 // Save/load the full AppState to/from a JSON file.
 // Return true on success.
 bool saveAppState(const AppState& state, const std::string& filePath);

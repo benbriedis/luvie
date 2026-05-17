@@ -1,6 +1,7 @@
 #include "timelineIO.hpp"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <sstream>
 
 using json = nlohmann::json;
 
@@ -212,7 +213,7 @@ static Timeline timelineFromJson(const json& j) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-bool saveAppState(const AppState& state, const std::string& filePath) {
+std::string appStateToJsonString(const AppState& state) {
     json jconns = json::array();
     for (const auto& c : state.jackOutputs)
         jconns.push_back({{"portName", c.portName}});
@@ -229,26 +230,21 @@ bool saveAppState(const AppState& state, const std::string& filePath) {
                            {"gm1Instrument", c.gm1Instrument}});
     }
     json j = {
-        {"version",          1},
-        {"rootPitch",        state.rootPitch},
-        {"chordType",        state.chordType},
-        {"sharp",            state.sharp},
-        {"timeline",         timelineToJson(state.timeline)},
-        {"jackOutputs",  jconns},
-        {"jackInstruments",  jinstrs},
+        {"version",         1},
+        {"rootPitch",       state.rootPitch},
+        {"chordType",       state.chordType},
+        {"sharp",           state.sharp},
+        {"timeline",        timelineToJson(state.timeline)},
+        {"jackOutputs",     jconns},
+        {"jackInstruments", jinstrs},
     };
-    std::ofstream f(filePath);
-    if (!f) return false;
-    f << j.dump(2);
-    return f.good();
+    return j.dump(2);
 }
 
-bool loadAppState(const std::string& filePath, AppState& state) {
-    std::ifstream f(filePath);
-    if (!f) return false;
+bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     json j;
     try {
-        f >> j;
+        j = json::parse(jsonStr);
     } catch (...) {
         return false;
     }
@@ -260,7 +256,7 @@ bool loadAppState(const std::string& filePath, AppState& state) {
     for (const auto& jc : j.value("jackOutputs", json::array()))
         state.jackOutputs.push_back({jc.value("portName", "")});
     auto instrArray = j.contains("jackInstruments") ? j.value("jackInstruments", json::array())
-                                                      : j.value("jackChannels",    json::array());
+                                                    : j.value("jackChannels",    json::array());
     for (const auto& jc : instrArray) {
         JackInstrument ch;
         ch.name        = jc.value("name", "");
@@ -278,4 +274,18 @@ bool loadAppState(const std::string& filePath, AppState& state) {
         state.jackInstruments.push_back(std::move(ch));
     }
     return true;
+}
+
+bool saveAppState(const AppState& state, const std::string& filePath) {
+    std::ofstream f(filePath);
+    if (!f) return false;
+    f << appStateToJsonString(state);
+    return f.good();
+}
+
+bool loadAppState(const std::string& filePath, AppState& state) {
+    std::ifstream f(filePath);
+    if (!f) return false;
+    std::string str((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    return appStateFromJsonString(str, state);
 }

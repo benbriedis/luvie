@@ -48,12 +48,6 @@ int main(int argc, char **argv) {
     }
     argc = fltk_argc;
 
-    struct TimelineWatcher : ITimelineObserver {
-        std::function<void()> onChange;
-        void onTimelineChanged() override { if (onChange) onChange(); }
-    };
-    TimelineWatcher timelineWatcher;
-
     AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
     window.color(bgColor);
     window.end();
@@ -110,34 +104,6 @@ int main(int argc, char **argv) {
     // --- JACK port management ---------------------------------------------
     OutputsOverlay* connOverlay = app.outputsOverlay;
 
-    // Helper: push current instrument list to jackTransport and patternPanel.
-    auto pushInstrumentRoutings = [&]() {
-        if (!connOverlay) return;
-        const auto& instrs = connOverlay->getInstruments();
-        // Update timeline defaults to first instrument of each type.
-        songTimeline.defaultOutputInstrument     = "";
-        songTimeline.defaultDrumOutputInstrument = "";
-        for (const auto& ci : instrs) {
-            if (!ci.isDrum && songTimeline.defaultOutputInstrument.empty())
-                songTimeline.defaultOutputInstrument = ci.name;
-            if (ci.isDrum && songTimeline.defaultDrumOutputInstrument.empty())
-                songTimeline.defaultDrumOutputInstrument = ci.name;
-        }
-        if (useJack) {
-            std::vector<JackTransport::InstrumentRouting> routings;
-            for (const auto& ci : instrs)
-                routings.push_back({ci.name, ci.portName, ci.midiChannel,
-                                    ci.programNumber, ci.bankMsb, ci.bankLsb});
-            jackTransport.setInstruments(routings);
-        }
-        if (app.patternPanel) {
-            std::vector<std::string> stdNames, drumNames;
-            for (const auto& ci : instrs)
-                (ci.isDrum ? drumNames : stdNames).push_back(ci.name);
-            app.patternPanel->setInstruments(stdNames, drumNames);
-        }
-    };
-
     // Helper: send program change (+ bank select) for all instruments that have one set.
     auto sendAllProgramChanges = [&]() {
         if (!useJack || !connOverlay) return;
@@ -148,16 +114,14 @@ int main(int argc, char **argv) {
         }
     };
 
-    // Helper: push drum maps from instruments to drum editor.
-    auto pushDrumMaps = [&]() {
-        if (!connOverlay || !app.drumEd) return;
-        std::map<std::string, std::map<int, std::string>> allMaps;
-        std::map<std::string, bool> allFallbacks;
-        for (const auto& ci : connOverlay->getInstruments()) {
-            allMaps[ci.name]      = ci.drumMap;
-            allFallbacks[ci.name] = ci.fallbackNoteNames;
-        }
-        app.drumEd->setAllDrumMaps(allMaps, allFallbacks);
+    // JACK-specific instrument callback: push routings to jackTransport.
+    app.onInstrumentsChanged = [&]() {
+        if (!useJack || !connOverlay) return;
+        std::vector<JackTransport::InstrumentRouting> routings;
+        for (const auto& ci : connOverlay->getInstruments())
+            routings.push_back({ci.name, ci.portName, ci.midiChannel,
+                                ci.programNumber, ci.bankMsb, ci.bankLsb});
+        jackTransport.setInstruments(routings);
     };
 
     if (connOverlay) {
@@ -170,66 +134,39 @@ int main(int argc, char **argv) {
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             if (useJack) jackTransport.renameMidiPort(oldName, newName);
         };
-        connOverlay->onInstrumentRenamed = [&](const std::string& oldName, const std::string& newName) {
-            songTimeline.renamePatternOutputInstrument(oldName, newName);
-        };
-        connOverlay->isInstrumentInUse = [&](const std::string& name) {
-            for (const auto& p : songTimeline.get().patterns)
-                if (p.outputInstrumentName == name) return true;
-            return false;
-        };
-        connOverlay->onInstrumentsChanged = [&]() {
-            pushInstrumentRoutings();
-            pushDrumMaps();
-            connOverlay->refreshInstrumentButtons();
-        };
         connOverlay->onProgramChanged = [&](const std::string&) {
-            pushInstrumentRoutings();
+            if (app.onInstrumentsChanged) app.onInstrumentsChanged();
             sendAllProgramChanges();
         };
 
-        timelineWatcher.onChange = [&]() { connOverlay->refreshInstrumentButtons(); };
-        songTimeline.addObserver(&timelineWatcher);
-
-        // Register the default port and push initial instrument routings.
+        // Register the default port and push initial JACK instrument routings.
         if (useJack) {
             for (const auto& name : connOverlay->getOutputs())
                 jackTransport.addMidiPort(name);
         }
-        pushInstrumentRoutings();
-        pushDrumMaps();
-    }
-
-    if (app.drumEd) {
-        app.drumEd->onDrumLabelChanged = [&](const std::string& instrName, int midiNote, const std::string& label) {
-            if (connOverlay) connOverlay->updateInstrumentDrumMap(instrName, midiNote, label);
-        };
+        if (app.onInstrumentsChanged) app.onInstrumentsChanged();
     }
 
     // Helper: unregister all current ports, then register ports from the overlay.
     auto applyLoadedOutputs = [&](const AppState& state) {
         if (!connOverlay) return;
-        // Unregister existing ports
         if (useJack)
             for (const auto& name : connOverlay->getOutputs())
                 jackTransport.removeMidiPort(name);
-        // Load new port list
         std::vector<std::string> names;
         for (const auto& c : state.jackOutputs) names.push_back(c.portName);
         connOverlay->setOutputs(names);
-        // Register loaded ports
         if (useJack)
             for (const auto& name : connOverlay->getOutputs())
                 jackTransport.addMidiPort(name);
-        // Load instruments and push routings.
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
             instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument});
         connOverlay->setInstruments(instrs);
-        pushInstrumentRoutings();
-        pushDrumMaps();
+        app.pushInstruments();
+        if (app.onInstrumentsChanged) app.onInstrumentsChanged();
         sendAllProgramChanges();
     };
 

@@ -55,6 +55,7 @@ public:
     std::function<void()>           onExtraSeek;
     std::function<void()>           onExtraParamsChanged;
     std::function<void()>           onExtraTimelineChange;
+    std::function<void()>           onInstrumentsChanged;
 
     static std::string lastFileDir;  // remembered across Save As / Import / Export
 
@@ -81,6 +82,7 @@ public:
     OutputsOverlay*    outputsOverlay = nullptr;
 
     void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern, ITransport* transport);
+    void pushInstruments();
 
 private:
     ObservableSong*    song_    = nullptr;
@@ -101,8 +103,6 @@ private:
     struct ChangeNotifier : ITimelineObserver {
         LuvieApp* app;
         explicit ChangeNotifier(LuvieApp* a) : app(a) {}
-        void onTimelineChanged() override {
-            if (app->onExtraTimelineChange) app->onExtraTimelineChange();
-        }
+        void onTimelineChanged() override;
     } changeNotifier_{this};
 };
