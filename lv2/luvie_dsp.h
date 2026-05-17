@@ -18,8 +18,7 @@
 /* Port indices */
 enum {
     PORT_CONTROL_IN  = 0,
-    PORT_MIDI_OUT    = 1,
-    PORT_NOTIFY_OUT  = 2
+    PORT_NOTIFY_OUT  = 1
 };
 
 typedef struct {
@@ -33,20 +32,9 @@ typedef struct {
     LV2_URID time_beatsPerBar;
     LV2_URID time_beatsPerMinute;
     LV2_URID time_speed;
-    LV2_URID midi_Event;
     LV2_URID atom_Chunk;
-    LV2_URID luvie_timeline;
     LV2_URID luvie_state;         /* full JSON state blob */
 } URIs;
-
-/* Active note being played (awaiting note-off) */
-typedef struct {
-    uint8_t pitch;
-    uint8_t channel;
-    float   endBeat;   /* absolute beat when note-off is due */
-} ActiveNote;
-
-#define MAX_ACTIVE_NOTES 64
 
 typedef struct {
     LV2_URID_Map*  map;
@@ -55,7 +43,6 @@ typedef struct {
 
     /* Ports */
     const LV2_Atom_Sequence* controlIn;
-    LV2_Atom_Sequence*       midiOut;
     LV2_Atom_Sequence*       notifyOut;
 
     URIs uris;
@@ -66,11 +53,6 @@ typedef struct {
     float   barBeat;       /* beat within current bar (from host) */
     float   beatsPerBar;   /* time signature numerator */
     float   bpm;
-
-    DspTimeline timeline;
-
-    ActiveNote activeNotes[MAX_ACTIVE_NOTES];
-    int        numActiveNotes;
 
     /* Saved JSON state for LV2 state save/restore */
     char*    stateJson;      /* heap-allocated, NULL if none */

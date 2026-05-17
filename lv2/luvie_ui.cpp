@@ -1,4 +1,5 @@
 #include "lv2_external_ui.h"
+#include "luvie_dsp.h"
 #include <lv2/core/lv2.h>
 #include <lv2/urid/urid.h>
 #include <lv2/atom/atom.h>
@@ -26,10 +27,8 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "../src/observablePattern.hpp"
 #include "../src/outputsOverlay.hpp"
 #include "../src/patternPanel.hpp"
-#include "../src/chords.hpp"
 #include "../src/luvieApp.hpp"
 #include "../src/timelineIO.hpp"
-#include "timeline_serial.h"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 
@@ -41,7 +40,6 @@ static std::string g_stateFilePath;
    ----------------------------------------------------------------------- */
 
 struct LuvieUI;
-static void sendTimeline(LuvieUI* ui);
 static std::string serializeStateToString(LuvieUI* ui);
 static void sendFullState(LuvieUI* ui);
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size);
@@ -59,7 +57,6 @@ struct LuvieUI {
     LV2_External_UI_Host*   extHost     = nullptr;
     LV2_URID_Map*           map         = nullptr;
     LV2_URID                atom_eventTransfer  = 0;
-    LV2_URID                luvie_timeline_urid = 0;
     LV2_URID                luvie_state_urid    = 0;
     LV2_URID                atom_Object         = 0;
     LV2_URID                atom_Blank          = 0;
@@ -93,11 +90,11 @@ struct LuvieUI {
         delete song;
     }
 
-    /* Try once to open JACK (control-only, no MIDI). Enables buttons on success,
-       leaves them disabled if JACK is not available. */
+    /* Try once to open JACK with MIDI enabled. Registers all current output ports on
+       success and enables transport-sync buttons. */
     void tryConnectJack() {
         auto* jt = new JackTransport();
-        if (jt->open("luvie_lv2", /*enableMidi=*/false)) {
+        if (jt->open("luvie_lv2", /*enableMidi=*/true)) {
             jackTransport = jt;
             jackTransport->setTimeline(song);
             jackTransport->onTransportEvent = [this]() {
@@ -106,6 +103,15 @@ struct LuvieUI {
                 }, this);
             };
             if (app.bottomPane) app.bottomPane->setControlTransport(jackTransport);
+            if (app.outputsOverlay) {
+                for (const auto& name : app.outputsOverlay->getOutputs())
+                    jackTransport->addMidiPort(name);
+                std::vector<JackTransport::InstrumentRouting> routings;
+                for (const auto& ci : app.outputsOverlay->getInstruments())
+                    routings.push_back({ci.name, ci.portName, ci.midiChannel,
+                                        ci.programNumber, ci.bankMsb, ci.bankLsb});
+                jackTransport->setInstruments(routings);
+            }
         } else {
             delete jt;
         }
@@ -116,123 +122,6 @@ struct LuvieUI {
    Timeline serialization + send
    ----------------------------------------------------------------------- */
 
-static void sendTimeline(LuvieUI* ui)
-{
-    if (!ui->writeFunc || !ui->song || !ui->app.patternPanel)
-        return;
-
-    const Timeline& tl        = ui->song->get();
-    const int rootPitch        = ui->app.patternPanel->rootPitch();
-    const int chordType        = ui->app.patternPanel->chordType();
-    const ChordDef& chord      = chordDefs[chordType];
-    const int chordSize        = chord.size;
-    const int rootSemitone     = (rootPitch + 9) % 12;
-    const int rootMidi0        = 12 + rootSemitone;
-
-    const uint32_t numTimeSigs = (uint32_t)tl.timeSigs.size();
-    const uint32_t numBpms     = (uint32_t)tl.bpms.size();
-    const uint32_t numPatterns = (uint32_t)tl.patterns.size();
-    const uint32_t numTracks   = (uint32_t)tl.tracks.size();
-
-    /* Pre-count enabled notes per pattern */
-    std::vector<uint32_t> noteCounts(numPatterns, 0);
-    for (uint32_t p = 0; p < numPatterns; p++)
-        for (const auto& n : tl.patterns[p].notes)
-            if (!n.disabled) noteCounts[p]++;
-
-    /* Calculate total binary size */
-    size_t dataSize = sizeof(TimelineHeader)
-                    + numTimeSigs * sizeof(DspTimeSig)
-                    + numBpms    * sizeof(DspBpmMarker);
-    for (uint32_t p = 0; p < numPatterns; p++)
-        dataSize += sizeof(SerialPatternHeader) + noteCounts[p] * sizeof(DspNote);
-    for (const auto& track : tl.tracks)
-        dataSize += sizeof(SerialTrackHeader) + track.patterns.size() * sizeof(DspPatternInstance);
-
-    /* Build buffer: LV2_Atom header followed by binary data */
-    const size_t totalSize = sizeof(LV2_Atom) + dataSize;
-    std::vector<uint8_t> buf(totalSize);
-
-    LV2_Atom* atom = reinterpret_cast<LV2_Atom*>(buf.data());
-    atom->type = ui->luvie_timeline_urid;
-    atom->size = (uint32_t)dataSize;
-
-    uint8_t* p = buf.data() + sizeof(LV2_Atom);
-
-    /* TimelineHeader */
-    TimelineHeader hdr = { numTimeSigs, numBpms, numPatterns, numTracks };
-    memcpy(p, &hdr, sizeof(hdr)); p += sizeof(hdr);
-
-    /* DspTimeSig[] */
-    for (const auto& ts : tl.timeSigs) {
-        DspTimeSig dts = { ts.bar, ts.top, ts.bottom };
-        memcpy(p, &dts, sizeof(dts)); p += sizeof(dts);
-    }
-
-    /* DspBpmMarker[] */
-    for (const auto& bm : tl.bpms) {
-        DspBpmMarker dbm = { bm.bar, bm.bpm };
-        memcpy(p, &dbm, sizeof(dbm)); p += sizeof(dbm);
-    }
-
-    /* Patterns */
-    for (uint32_t pi = 0; pi < numPatterns; pi++) {
-        const auto& pat = tl.patterns[pi];
-        SerialPatternHeader sph = { pat.id, pat.lengthBeats, noteCounts[pi] };
-        memcpy(p, &sph, sizeof(sph)); p += sizeof(sph);
-
-        for (const auto& n : pat.notes) {
-            if (n.disabled) continue;
-            const int ni     = (int)n.pitch;
-            const int degree = ni % chordSize;
-            const int octave = ni / chordSize;
-            const int midi   = std::clamp(
-                rootMidi0 + chord.intervals[degree] + octave * 12, 0, 127);
-            const float vel  = n.velocity > 0.0f ? n.velocity : 0.8f;
-            DspNote dn = { n.beat, n.length,
-                           (uint8_t)midi,
-                           (uint8_t)std::clamp((int)(vel * 127.0f + 0.5f), 1, 127),
-                           {0, 0} };
-            memcpy(p, &dn, sizeof(dn)); p += sizeof(dn);
-        }
-    }
-
-    /* Build instrument name → 0-indexed MIDI channel map */
-    std::map<std::string, uint8_t> instrChannelMap;
-    if (ui->app.outputsOverlay) {
-        for (const auto& ci : ui->app.outputsOverlay->getInstruments())
-            instrChannelMap[ci.name] = (uint8_t)std::clamp(ci.midiChannel - 1, 0, 15);
-    }
-
-    /* Tracks */
-    for (const auto& track : tl.tracks) {
-        uint8_t channel = 0;
-        for (const auto& pat : tl.patterns) {
-            if (pat.id == track.patternId && !pat.outputInstrumentName.empty()) {
-                auto it = instrChannelMap.find(pat.outputInstrumentName);
-                if (it != instrChannelMap.end()) channel = it->second;
-                break;
-            }
-        }
-        SerialTrackHeader sth = { track.id, channel, {0,0,0},
-                                  (uint32_t)track.patterns.size() };
-        memcpy(p, &sth, sizeof(sth)); p += sizeof(sth);
-
-        for (const auto& inst : track.patterns) {
-            DspPatternInstance dpi = {
-                inst.id, inst.patternId, inst.startBar,
-                inst.length, inst.startOffset
-            };
-            memcpy(p, &dpi, sizeof(dpi)); p += sizeof(dpi);
-        }
-    }
-
-    ui->writeFunc(ui->controller,
-                  0 /* PORT_CONTROL_IN */,
-                  (uint32_t)totalSize,
-                  ui->atom_eventTransfer,
-                  buf.data());
-}
 
 /* -----------------------------------------------------------------------
    Full JSON state serialization / deserialization
@@ -247,12 +136,15 @@ static std::string serializeStateToString(LuvieUI* ui)
     state.rootPitch = ui->app.patternPanel->rootPitch();
     state.chordType = ui->app.patternPanel->chordType();
     state.sharp     = ui->app.patternPanel->isSharp();
-    if (ui->app.outputsOverlay)
+    if (ui->app.outputsOverlay) {
+        for (const auto& name : ui->app.outputsOverlay->getOutputs())
+            state.jackOutputs.push_back({name});
         for (const auto& ci : ui->app.outputsOverlay->getInstruments())
             state.jackInstruments.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                              ci.isDrum, ci.fallbackNoteNames,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
                                              ci.gm1Instrument});
+    }
     return appStateToJsonString(state);
 }
 
@@ -291,16 +183,27 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
     ui->song->loadTimeline(state.timeline);
     if (ui->app.outputsOverlay) {
+        auto* overlay = ui->app.outputsOverlay;
+        if (ui->jackTransport)
+            for (const auto& name : overlay->getOutputs())
+                ui->jackTransport->removeMidiPort(name);
+        if (!state.jackOutputs.empty()) {
+            std::vector<std::string> names;
+            for (const auto& c : state.jackOutputs) names.push_back(c.portName);
+            overlay->setOutputs(names);
+        }
+        if (ui->jackTransport)
+            for (const auto& name : overlay->getOutputs())
+                ui->jackTransport->addMidiPort(name);
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
             instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument});
-        ui->app.outputsOverlay->setInstruments(instrs);
+        overlay->setInstruments(instrs);
         ui->app.pushInstruments();
     }
     ui->restoringState = false;
-    sendTimeline(ui);
     sendFullState(ui);
 }
 
@@ -378,7 +281,6 @@ static LV2UI_Handle instantiate(
     if (ui->map) {
         auto m = [&](const char* uri) { return ui->map->map(ui->map->handle, uri); };
         ui->atom_eventTransfer  = m(LV2_ATOM__eventTransfer);
-        ui->luvie_timeline_urid = m(LUVIE_TIMELINE_URI);
         ui->luvie_state_urid    = m(LUVIE_STATE_URI);
         ui->atom_Object         = m(LV2_ATOM__Object);
         ui->atom_Blank          = m(LV2_ATOM__Blank);
@@ -413,10 +315,7 @@ static LV2UI_Handle instantiate(
     ui->app.disableTransportButtons = true;
 
     ui->app.onExtraTimelineChange = [ui]() {
-        if (!ui->restoringState) {
-            sendTimeline(ui);
-            sendFullState(ui);
-        }
+        if (!ui->restoringState) sendFullState(ui);
     };
 
     ui->app.onExtraSeek = [ui]() {
@@ -425,22 +324,36 @@ static LV2UI_Handle instantiate(
     };
 
     ui->app.onExtraParamsChanged = [ui]() {
-        if (!ui->restoringState) {
-            sendTimeline(ui);
-            sendFullState(ui);
-        }
+        if (!ui->restoringState) sendFullState(ui);
     };
 
     /* ---- Build all shared UI ---- */
     ui->app.build(ui->window, ui->song, ui->pattern, ui->simpleTransport);
     ui->app.disableSaveMenu(/*save=*/true, /*saveAs=*/true);
 
-    /* ---- Wire DSP sends when instruments change ---- */
+    /* ---- Wire port management (same as standalone) ---- */
+    if (auto* overlay = ui->app.outputsOverlay) {
+        overlay->onPortAdded = [ui](const std::string& name) {
+            if (ui->jackTransport) ui->jackTransport->addMidiPort(name);
+        };
+        overlay->onPortRemoved = [ui](const std::string& name) {
+            if (ui->jackTransport) ui->jackTransport->removeMidiPort(name);
+        };
+        overlay->onPortRenamed = [ui](const std::string& oldName, const std::string& newName) {
+            if (ui->jackTransport) ui->jackTransport->renameMidiPort(oldName, newName);
+        };
+    }
+
+    /* ---- Wire DSP sends and JACK routings when instruments change ---- */
     ui->app.onInstrumentsChanged = [ui]() {
-        if (!ui->restoringState) {
-            sendTimeline(ui);
-            sendFullState(ui);
+        if (ui->jackTransport && ui->app.outputsOverlay) {
+            std::vector<JackTransport::InstrumentRouting> routings;
+            for (const auto& ci : ui->app.outputsOverlay->getInstruments())
+                routings.push_back({ci.name, ci.portName, ci.midiChannel,
+                                    ci.programNumber, ci.bankMsb, ci.bankLsb});
+            ui->jackTransport->setInstruments(routings);
         }
+        if (!ui->restoringState) sendFullState(ui);
     };
 
     /* ---- Restore from file if available ---- */
@@ -458,8 +371,6 @@ static LV2UI_Handle instantiate(
             fclose(f);
         }
     }
-
-    sendTimeline(ui);
 
     /* ---- Try to connect to JACK for transport control ---- */
     ui->tryConnectJack();
@@ -493,7 +404,7 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
                        const void* buffer)
 {
     LuvieUI* ui = reinterpret_cast<LuvieUI*>(handle);
-    if (port_index != 2)
+    if (port_index != PORT_NOTIFY_OUT)
         return;
 
     const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);

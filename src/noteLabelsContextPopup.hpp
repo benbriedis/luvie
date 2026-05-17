@@ -41,7 +41,7 @@ public:
             static_cast<NoteLabelsContextPopup*>(d)->doShowParamSubmenu();
         }, this);
 
-        removeBtn = new ModernButton(1, 1 + btnH, popW - 2, btnH, "Remove parameter");
+        removeBtn = new ModernButton(1, 1 + btnH, popW - 2, btnH, "Remove automation");
         removeBtn->color(popupBg);
         removeBtn->labelcolor(popupText);
         removeBtn->setHoverColor(hoverCol);
