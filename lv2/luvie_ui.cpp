@@ -13,11 +13,17 @@
 #include <vector>
 #include <algorithm>
 
+/* Force FLTK to use X11 (not Wayland) when running as an LV2 plugin inside
+   a Qt/Wayland host like Carla. FLTK looks up this symbol via dlsym() at
+   display-init time and skips Wayland if it is true. */
+extern "C" FL_EXPORT bool fl_disable_wayland = true;
+
 #include "../src/appWindow.hpp"
 #include "../src/transport.hpp"
 #include "../src/simpleTransport.hpp"
 #include "../src/jackTransport.hpp"
-#include "../src/observableTimeline.hpp"
+#include "../src/observableSong.hpp"
+#include "../src/observablePattern.hpp"
 #include "../src/patternPanel.hpp"
 #include "../src/chords.hpp"
 #include "../src/luvieApp.hpp"
@@ -67,7 +73,8 @@ struct LuvieUI {
 
     /* Owned heap objects */
     AppWindow*          window         = nullptr;
-    ObservableTimeline* songTimeline   = nullptr;
+    ObservableSong*     song           = nullptr;
+    ObservablePattern*  pattern        = nullptr;
     SimpleTransport*    simpleTransport= nullptr;
     JackTransport*      jackTransport  = nullptr;
 
@@ -83,7 +90,8 @@ struct LuvieUI {
         delete window;
         delete jackTransport;
         delete simpleTransport;
-        delete songTimeline;
+        delete pattern;
+        delete song;
     }
 
     /* Try once to open JACK (control-only, no MIDI). Enables buttons on success,
@@ -92,7 +100,7 @@ struct LuvieUI {
         auto* jt = new JackTransport();
         if (jt->open("luvie_lv2", /*enableMidi=*/false)) {
             jackTransport = jt;
-            jackTransport->setTimeline(songTimeline);
+            jackTransport->setTimeline(song);
             jackTransport->onTransportEvent = [this]() {
                 Fl::awake([](void* data) {
                     static_cast<LuvieUI*>(data)->app.bottomPane->syncPlayState();
@@ -111,10 +119,10 @@ struct LuvieUI {
 
 static void sendTimeline(LuvieUI* ui)
 {
-    if (!ui->writeFunc || !ui->songTimeline || !ui->app.patternPanel)
+    if (!ui->writeFunc || !ui->song || !ui->app.patternPanel)
         return;
 
-    const Timeline& tl        = ui->songTimeline->get();
+    const Timeline& tl        = ui->song->get();
     const int rootPitch        = ui->app.patternPanel->rootPitch();
     const int chordType        = ui->app.patternPanel->chordType();
     const ChordDef& chord      = chordDefs[chordType];
@@ -218,10 +226,10 @@ static void sendTimeline(LuvieUI* ui)
 
 static std::string serializeStateToString(LuvieUI* ui)
 {
-    if (!ui->songTimeline || !ui->app.patternPanel)
+    if (!ui->song || !ui->app.patternPanel)
         return {};
 
-    const Timeline& tl = ui->songTimeline->get();
+    const Timeline& tl = ui->song->get();
 
     json j;
     j["version"]            = 1;
@@ -322,7 +330,7 @@ static void sendFullState(LuvieUI* ui)
 
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
 {
-    if (!ui->songTimeline || !ui->app.patternPanel || size == 0) return;
+    if (!ui->song || !ui->app.patternPanel || size == 0) return;
 
     json j;
     try {
@@ -396,7 +404,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
         j.value("rootPitch", 0),
         j.value("chordType", 0),
         j.value("useSharp", true));
-    ui->songTimeline->loadTimeline(tl);
+    ui->song->loadTimeline(tl);
     ui->restoringState = false;
 
     /* Now send the correct state to the DSP */
@@ -500,13 +508,14 @@ static LV2UI_Handle instantiate(
     ui->window->end();
 
     /* ---- Timeline + transport ---- */
-    ui->songTimeline = new ObservableTimeline(120.0f, 4, 4);
+    ui->song    = new ObservableSong(120.0f, 4, 4);
+    ui->pattern = new ObservablePattern(ui->song);
     for (int i = 1; i <= 8; i++) {
-        int patId = ui->songTimeline->createPattern(LuvieApp::numPatternBeats);
-        ui->songTimeline->addTrack("Pattern " + std::to_string(i), patId);
+        int patId = ui->pattern->createPattern(LuvieApp::numPatternBeats);
+        ui->song->addTrack("Pattern " + std::to_string(i), patId);
     }
     ui->simpleTransport = new SimpleTransport;
-    ui->simpleTransport->setTimeline(ui->songTimeline);
+    ui->simpleTransport->setTimeline(ui->song);
 
     /* ---- LuvieApp callbacks ---- */
     ui->app.disableTransportButtons = true;
@@ -531,7 +540,7 @@ static LV2UI_Handle instantiate(
     };
 
     /* ---- Build all shared UI ---- */
-    ui->app.build(ui->window, ui->songTimeline, ui->simpleTransport);
+    ui->app.build(ui->window, ui->song, ui->pattern, ui->simpleTransport);
     ui->app.disableSaveMenu(/*save=*/true, /*saveAs=*/true);
 
     /* ---- Restore from file if available ---- */

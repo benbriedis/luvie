@@ -6,14 +6,14 @@ FLTK_CXXFLAGS := $(shell $(FLTK_CONFIG) --cxxflags)
 FLTK_LDFLAGS  := $(shell $(FLTK_CONFIG) --ldflags) $(shell $(FLTK_CONFIG) --libs)
 
 LV2_INC  = -I../deps/sources/lv2/include
-SRC_INC  = -I../src
+SRC_INC  = -I../src -I../src/modern
 SRC_LIB  = ../src/build/libluvie.a
 
 JACK_CFLAGS := $(shell pkg-config --cflags jack 2>/dev/null)
 JACK_LIBS   := $(shell pkg-config --libs   jack 2>/dev/null)
 
 CFLAGS   = -std=c11   -Wall -Wextra -fPIC -O2 $(LV2_INC)
-CXXFLAGS = -std=c++23 -Wall -Wextra -fPIC -O2 $(LV2_INC) $(SRC_INC) $(FLTK_CXXFLAGS) $(JACK_CFLAGS)
+CXXFLAGS = -std=c++23 -Wall -Wextra -fPIC -O2 -g $(LV2_INC) $(SRC_INC) $(FLTK_CXXFLAGS) $(JACK_CFLAGS)
 
 DSP_TARGET = luvie_dsp.so
 UI_TARGET  = luvie_ui.so

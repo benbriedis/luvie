@@ -17,3 +17,4 @@ In the pattern editor double click on the pattern name to edit.
 TODO some videos to walk through the S/W
    - write some script notes as I'm testing and writing some music
 
+To bridge between ALSA and Jack MIDI use:    a2jmidid -e

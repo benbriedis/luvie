@@ -96,7 +96,6 @@ Luvie (GUI) in window titlebar is odd.
 
 BUG? When changing chord the position of the notes change...
 
-Connect up to ALSA midi rather than Jack?
 
 
 Shrinking pattern editor horizontally - could reorangise things a bit before resorting to cropping in smaller windows.
@@ -294,3 +293,9 @@ Create a shortcut mechanism and menu...  (cf dividing by editor type)
       solo? mute?
       
 
+Connect up to ALSA midi rather than Jack?
+  - cf flag to use internal transport + 
+  -    flag to enable/add ALSA ports 
+       (maybe harder to identify but note that a2jmidid does OK. 
+			Or auto-add if ALSA present... 
+			not on Windows etc. Maybe not desirable within Ardour.)

@@ -371,10 +371,8 @@ void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
     if (!menuBar) return;
     auto setActive = [this](const char* path, bool active) {
         auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item(path));
-        fprintf(stderr, "[luvie] disableSaveMenu: find_item(%s) = %p, setting active=%d\n", path, (void*)item, (int)active);
         if (!item) return;
         if (active) item->activate(); else item->deactivate();
-        fprintf(stderr, "[luvie]   -> item->active() = %d\n", (int)item->active());
     };
     setActive("File/Save",    !save);
     setActive("File/Save As", !saveAs);
