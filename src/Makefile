@@ -45,20 +45,26 @@ $(BUILDDIR)/%.o: %.cpp
 
 -include $(DEPS)
 
-INSTALL_BIN  = $(HOME)/.local/bin
-INSTALL_APP  = $(HOME)/.local/share/applications
-DESKTOP_SRC  = ../luvie.desktop
+INSTALL_BIN   = $(HOME)/.local/bin
+INSTALL_APP   = $(HOME)/.local/share/applications
+INSTALL_ICONS = $(HOME)/.local/share/icons/hicolor/scalable/apps
+DESKTOP_SRC   = ../luvie.desktop
+ICON_SRC      = ../logo/logo.svg
 
 install: $(TARGET)
 	install -Dm755 $(TARGET) $(INSTALL_BIN)/luvie
 	install -Dm644 $(DESKTOP_SRC) $(INSTALL_APP)/luvie.desktop
+	install -Dm644 $(ICON_SRC) $(INSTALL_ICONS)/luvie.svg
 	@update-desktop-database $(INSTALL_APP) 2>/dev/null || true
+	@gtk-update-icon-cache --force --ignore-theme-index $(HOME)/.local/share/icons/hicolor 2>/dev/null || true
 	@echo "Installed: $(INSTALL_BIN)/luvie"
 	@echo "Installed: $(INSTALL_APP)/luvie.desktop"
+	@echo "Installed: $(INSTALL_ICONS)/luvie.svg"
 
 uninstall:
-	rm -f $(INSTALL_BIN)/luvie $(INSTALL_APP)/luvie.desktop
+	rm -f $(INSTALL_BIN)/luvie $(INSTALL_APP)/luvie.desktop $(INSTALL_ICONS)/luvie.svg
 	@update-desktop-database $(INSTALL_APP) 2>/dev/null || true
+	@gtk-update-icon-cache --force --ignore-theme-index $(HOME)/.local/share/icons/hicolor 2>/dev/null || true
 
 .PHONY: all rebuild clean install uninstall
 

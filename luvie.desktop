@@ -6,6 +6,7 @@ GenericName=MIDI Sequencer
 Comment=MIDI pattern sequencer and song editor
 Exec=luvie
 TryExec=luvie
+Icon=luvie
 Terminal=false
 StartupNotify=false
 Categories=AudioVideo;Audio;Sequencer;Midi;

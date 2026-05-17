@@ -69,6 +69,8 @@ Nice if we had an install script that installed everything locally (FLTK, JSON, 
 
 - Snap, Flatpak, AppImage? - research which is best for audio plugins (if any. NB LV2 plugin install might be more complex)
 
+- Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
+
 
 
 TODOs
@@ -270,7 +272,12 @@ TEST
 
 --------
 
-Application icon
+Logo - less 'red' and more 'pink'.
+	   probably what to thinken the base of the L (top side)
+       At the top of the heart in the middle at the point where the two arcs meet, probably want to extend the
+	   left arc a little way into the heart - using a stroke that cuts away the heart underneith.
+	   Probably want to drop the meeting point down a little bit and widen the heart to occupy the full 512.
+	   Consider a solid colour for the L... yellow, cyan, black
 
 Wider initial app (so we can fit in pattern editor controls at start)
 

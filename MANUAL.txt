@@ -17,4 +17,12 @@ In the pattern editor double click on the pattern name to edit.
 TODO some videos to walk through the S/W
    - write some script notes as I'm testing and writing some music
 
-To bridge between ALSA and Jack MIDI use:    a2jmidid -e
+Selecting instruments
+---------------------
+	Write some instructions about MSB/LSB and default program selection
+	  'Program number' does NOT need to be set (uses current instrument). ("none" /= 0)
+		NB my Yamaha Reface CS doesn't have banks or instruments at all.
+	Consider adding an (info) icon to the application to explain this stuff.
+
+
+To bridge between ALSA and Jack MIDI use:    a2jmidid -e  [I MAY build this in]
