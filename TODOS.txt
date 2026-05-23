@@ -306,3 +306,49 @@ Connect up to ALSA midi rather than Jack?
        (maybe harder to identify but note that a2jmidid does OK. 
 			Or auto-add if ALSA present... 
 			not on Windows etc. Maybe not desirable within Ardour.)
+
+
+//////////////////////////////////////
+
+FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
+
+
+BUG: noticed once - showing the Luvie plugin UI from the Carla icon - the GUI didn't
+     restore properly. Wrong cursor, couldn't do anything.
+
+ISSUE: too easy to accidently add a marker to a ruler
+
+MINOR BUG: clicking on Instrument selector highlights it as if it were a text field
+
+cf 
+--transport jack|internal
+--default-new-connections  jack|alsa/native
+
+Outputs/Instruments - Add a select for Jack|Alsa?  Or require all to be one or the other...
+
+"Alsa" options should only be included for platforms that support it.
+    Other platform would have their own "native" options, 
+    and could maybe almost use the "native" keyword instead
+    (might be OK if native defaulted to the most standard driver).
+
+BUG: loop mode notes don't sound unless song has played first?
+  
+
+MAJOR ISSUE: 
+   - In the "Song Editor" the parameter lanes need to modified so as to be specific to instruments.
+   - cf grouping patterns that use the same instrument by colour or something, and or allowing filtering or
+        collapsing by instrument or forcing them together so we can put automation for them as a group underneith?
+   - When adding the automation need to specify the instrument somehow... 
+      cf right clicking over a pattern - the given pattern determines the instrument.
+         Would want an indication to show which instrument has the automation:
+            eg "Instrument 1 OVER Pitch"
+         [COULD optionally have instrument listed over every pattern name]
+   * There is a decision point: group patterns of an instrument together
+     CON: over the length of a song its more convenient to group patterns by verse, chorus, etc
+   COULD allow multiple lanes per channel and MAYBE attach lanes to 'tracks' (optionally hide. 
+        Only show over the pattern portions.)
+        
+        
+
+Found a bug: In "Loop" mode notes sometimes stop playing
+
