@@ -44,6 +44,8 @@ public:
     bool isTrackPlaying(int trackId) const;
     void selectTrack(int index);
     int  trackIndexForId(int trackId) const;
+    int  trackIndexForLaneId(int laneId) const;
+    int  trackIdForLaneId(int laneId) const;
     void moveRow(int fromRowIdx, int toGapIdx);
 
     // Pattern lifecycle helpers (not note editing)

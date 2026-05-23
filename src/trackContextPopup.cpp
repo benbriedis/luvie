@@ -78,9 +78,15 @@ TrackContextPopup::TrackContextPopup()
 int TrackContextPopup::rowOrderIdxForTrackId(int trackId) const
 {
     if (!timeline) return -1;
-    const auto& ro = timeline->get().rowOrder;
-    for (int i = 0; i < (int)ro.size(); i++)
-        if (ro[i].isTrack && ro[i].id == trackId) return i;
+    const auto& tl = timeline->get();
+    // Find the last lane of the track, then locate that lane's RowRef
+    for (const auto& t : tl.tracks) {
+        if (t.id != trackId || t.lanes.empty()) continue;
+        int lastLaneId = t.lanes.back().id;
+        for (int i = (int)tl.rowOrder.size() - 1; i >= 0; i--)
+            if (tl.rowOrder[i].isTrack && tl.rowOrder[i].id == lastLaneId) return i;
+        break;
+    }
     return -1;
 }
 

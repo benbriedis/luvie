@@ -56,8 +56,9 @@ void TrackControls::draw()
                 const auto& ref = ro[i];
                 if (ref.isTrack) {
                     rowBg = colNormal;
+                    int tid = timeline->trackIdForLaneId(ref.id);
                     for (const auto& t : tl.tracks) {
-                        if (t.id != ref.id) continue;
+                        if (t.id != tid) continue;
                         solo    = t.solo;
                         mute    = t.mute;
                         isTrack = true;
@@ -111,7 +112,7 @@ int TrackControls::handle(int event)
         if (row < 0 || row >= (int)ro.size() || !ro[row].isTrack)
             return 1;
 
-        int trackId = ro[row].id;
+        int trackId = timeline->trackIdForLaneId(ro[row].id);
         bool isSolo = (localY % rowHeight) < rowHeight / 2;
 
         for (const auto& t : tl.tracks) {

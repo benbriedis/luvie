@@ -535,7 +535,7 @@ void SongGrid::openContextMenu(int idx)
     if (timeline) {
         const auto& ro = timeline->get().rowOrder;
         if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
-            trackIdx = timeline->trackIndexForId(ro[absRow].id);
+            trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
     }
     songPopup->open(&notes, idx, this,
         makeDeleteCallback(idx),
@@ -589,7 +589,7 @@ void SongGrid::onCommitMove(const StateDragMove& s)
     const auto& ro = timeline->get().rowOrder;
     int trackIdx = -1;
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
-        trackIdx = timeline->trackIndexForId(ro[absRow].id);
+        trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
     timeline->movePattern(id, trackIdx, notes[s.noteIdx].beat);
 }
 
@@ -628,7 +628,7 @@ void SongGrid::onNoteDoubleClick(int noteIdx)
     int absRow = (int)notes[noteIdx].pitch + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
-        int trackIdx = timeline->trackIndexForId(ro[absRow].id);
+        int trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
         if (trackIdx >= 0) onPatternDoubleClick(trackIdx);
     }
 }
@@ -654,7 +654,7 @@ void SongGrid::toggleNote()
         [=](const Note& n) { return (int)n.pitch == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
     const auto& ro = timeline->get().rowOrder;
     if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
-        int trackIdx = timeline->trackIndexForId(ro[absRow].id);
+        int trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
         if (trackIdx >= 0) {
             const auto& trk = timeline->get().tracks[trackIdx];
             int patId = trk.lanes.empty() ? 0 : trk.lanes[0].patternId;

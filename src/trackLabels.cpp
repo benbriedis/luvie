@@ -55,7 +55,8 @@ void TrackLabels::startEdit(int absRow)
     if (!timeline) return;
     const auto& ro = timeline->get().rowOrder;
     if (absRow < 0 || absRow >= (int)ro.size() || !ro[absRow].isTrack) return;
-    int trackId = ro[absRow].id;
+    int laneId  = ro[absRow].id;
+    int trackId = timeline->trackIdForLaneId(laneId);
     for (const auto& t : timeline->get().tracks) {
         if (t.id != trackId) continue;
         editingAbsRow = absRow;
@@ -79,11 +80,11 @@ void TrackLabels::checkDuplicate()
     if (!timeline || editingAbsRow < 0) return;
     const auto& ro = timeline->get().rowOrder;
     if (editingAbsRow >= (int)ro.size() || !ro[editingAbsRow].isTrack) return;
-    int editingId   = ro[editingAbsRow].id;
+    int editingTrackId = timeline->trackIdForLaneId(ro[editingAbsRow].id);
     std::string cur = input.value();
     bool dup = false;
     for (const auto& t : timeline->get().tracks)
-        if (t.id != editingId && t.label == cur) { dup = true; break; }
+        if (t.id != editingTrackId && t.label == cur) { dup = true; break; }
     input.textcolor(dup ? FL_RED : colText);
     input.redraw();
 }
@@ -99,11 +100,13 @@ void TrackLabels::commitEdit()
     if (timeline) {
         const auto& ro = timeline->get().rowOrder;
         if (absRow < (int)ro.size() && ro[absRow].isTrack) {
-            int trackId = ro[absRow].id;
-            bool dup = false;
-            for (const auto& t : timeline->get().tracks)
-                if (t.id != trackId && t.label == newLabel) { dup = true; break; }
-            timeline->renameTrack(trackId, dup ? originalLabel : newLabel);
+            int trackId = timeline->trackIdForLaneId(ro[absRow].id);
+            if (trackId >= 0) {
+                bool dup = false;
+                for (const auto& t : timeline->get().tracks)
+                    if (t.id != trackId && t.label == newLabel) { dup = true; break; }
+                timeline->renameTrack(trackId, dup ? originalLabel : newLabel);
+            }
         }
     }
     redraw();
@@ -125,7 +128,10 @@ void TrackLabels::draw()
     const auto& tl  = timeline->get();
     const auto& ro  = tl.rowOrder;
     int         sel = tl.selectedTrackIndex;
-    int selectedId  = (sel >= 0 && sel < (int)tl.tracks.size()) ? tl.tracks[sel].id : -1;
+    // selectedLaneId: the lane ID of the selected track's first lane (Phase 1: one lane per track)
+    int selectedLaneId = -1;
+    if (sel >= 0 && sel < (int)tl.tracks.size() && !tl.tracks[sel].lanes.empty())
+        selectedLaneId = tl.tracks[sel].lanes[0].id;
 
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
@@ -136,7 +142,8 @@ void TrackLabels::draw()
             const auto& ref = ro[i];
             bool isDragSrc = (dragging && i == dragRow);
             if (ref.isTrack) {
-                bool isSel = (ref.id == selectedId);
+                // ref.id is a Lane ID — find the owning Track
+                bool isSel = (ref.id == selectedLaneId);
                 Fl_Color bg = isSel ? colSelected : colNormal;
                 if (isDragSrc) bg = fl_color_average(bg, FL_WHITE, 0.75f);
                 fl_color(bg);
@@ -144,12 +151,10 @@ void TrackLabels::draw()
                 fl_color(colBorder);
                 fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
                 fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                for (const auto& t : tl.tracks)
-                    if (t.id == ref.id) {
-                        fl_draw(t.label.c_str(), x() + 4, ry, w() - 8, rowHeight,
-                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
-                        break;
-                    }
+                int tIdx = timeline->trackIndexForLaneId(ref.id);
+                if (tIdx >= 0)
+                    fl_draw(tl.tracks[tIdx].label.c_str(), x() + 4, ry, w() - 8, rowHeight,
+                            FL_ALIGN_LEFT | FL_ALIGN_CLIP);
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
                 fl_color(bg);
@@ -201,9 +206,12 @@ int TrackLabels::handle(int event)
             if (row >= 0 && row < (int)ro.size()) {
                 const auto& ref = ro[row];
                 if (ref.isTrack) {
-                    if (contextPopup && patternObs)
-                        contextPopup->open(ref.id, patternObs,
-                                           Fl::event_x_root(), Fl::event_y_root());
+                    if (contextPopup && patternObs) {
+                        int trackId = timeline->trackIdForLaneId(ref.id);
+                        if (trackId >= 0)
+                            contextPopup->open(trackId, patternObs,
+                                               Fl::event_x_root(), Fl::event_y_root());
+                    }
                 } else {
                     if (paramLanePopup && patternObs)
                         paramLanePopup->open(ref.id, patternObs,
@@ -262,7 +270,7 @@ int TrackLabels::handle(int event)
                 // Pure single click: select track
                 const auto& ro = timeline->get().rowOrder;
                 if (dragStartRow < (int)ro.size() && ro[dragStartRow].isTrack) {
-                    int trackIdx = timeline->trackIndexForId(ro[dragStartRow].id);
+                    int trackIdx = timeline->trackIndexForLaneId(ro[dragStartRow].id);
                     if (trackIdx >= 0) timeline->selectTrack(trackIdx);
                 }
             }
