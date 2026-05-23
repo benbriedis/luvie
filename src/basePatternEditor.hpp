@@ -18,9 +18,10 @@ protected:
     GridScrollPane*    paramScrollbar = nullptr;
     PatternParamLabels paramLabels;
     PatternParamGrid   paramGrid;
-    ObservablePattern* pattern           = nullptr;
-    int                lastSelectedTrack = -1;
-    int                lastPatId         = -1;
+    ObservablePattern* pattern             = nullptr;
+    int                lastSelectedTrack  = -1;
+    int                lastSelectedLaneId = -1;
+    int                lastPatId          = -1;
     int                colOffset         = 0;
     int                paramLaneOffset   = 0;
 

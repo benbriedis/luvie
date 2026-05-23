@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
     ObservablePattern patternObs(&songTimeline);
     {
         int patId = patternObs.createPattern(LuvieApp::numPatternBeats);
-        songTimeline.addTrack("Pattern 1", patId);
+        songTimeline.addTrack("T1", patId);
     }
 
     JackTransport  jackTransport;

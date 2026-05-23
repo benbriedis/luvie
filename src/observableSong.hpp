@@ -43,6 +43,10 @@ public:
     void setTrackMute(int trackId, bool mute);
     bool isTrackPlaying(int trackId) const;
     void selectTrack(int index);
+    void selectLane(int trackIndex, int laneId);
+    int  addLane(int trackId);
+    void removeLane(int trackId, int laneId);
+    void setStackedLanes(int trackId, bool stacked);
     int  trackIndexForId(int trackId) const;
     int  trackIndexForLaneId(int laneId) const;
     int  trackIdForLaneId(int laneId) const;
@@ -64,11 +68,11 @@ public:
     // Pattern instance management (instances identified by stable id)
     void addPattern(int trackIndex, float startBar, float length, float patternBeats = 0.0f);
     void removePattern(int instanceId);
-    void movePattern(int instanceId, int newTrackIndex, float newStartBar);
+    void movePattern(int instanceId, int newLaneId, float newStartBar);
     void resizePattern(int instanceId, float newLength);
     void resizePatternLeft(int instanceId, float newStartBar, float newLength, float newStartOffset);
     void setPatternStartOffset(int instanceId, float startOffset);
-    void placePattern(int trackIndex, int patternId, float startBar, float length);
+    void placePattern(int laneId, int patternId, float startBar, float length);
 
     // Song-level param lane management
     bool hasParamLane(const std::string& type) const;

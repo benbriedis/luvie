@@ -8,7 +8,7 @@
 #include <functional>
 
 class TrackContextPopup : public BasePopup {
-    static constexpr int popH  = 7 * 30 + 2;  // +2 for border
+    static constexpr int popH  = 10 * 30 + 2;  // +2 for border
 
 public:
     static constexpr int popW  = 150;
@@ -23,8 +23,12 @@ private:
     ModernButton*       copyBtn;
     ModernButton*       deleteBtn;
     ModernButton*       addParamBtn;
-    ObservablePattern* timeline      = nullptr;
+    ModernButton*       addLaneBtn;
+    ModernButton*       removeLaneBtn;
+    ModernButton*       stackLanesBtn;
+    ObservablePattern*  timeline      = nullptr;
     int                 targetTrackId = -1;
+    int                 targetLaneId  = -1;
 
     static constexpr int numPatternBeats = 8;
 
@@ -36,6 +40,9 @@ private:
     void doCopy();
     void doDelete();
     void doShowParamSubmenu();
+    void doAddLane();
+    void doRemoveLane();
+    void doToggleStackLanes();
 
 public:
     ParameterSubmenu*                    paramSubmenu = nullptr;
@@ -44,7 +51,7 @@ public:
 
     std::function<void(int trackIndex)>  onOpenPattern;
 
-    void open(int trackId, ObservablePattern* tl, int wx, int wy);
+    void open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy);
 };
 
 #endif

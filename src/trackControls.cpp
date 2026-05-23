@@ -3,10 +3,11 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 
-static constexpr Fl_Color colNormal  = 0x1F293700;
-static constexpr Fl_Color colParam   = 0x1A2B3A00;
-static constexpr Fl_Color colEmpty   = 0x17202A00;
-static constexpr Fl_Color colBorder  = 0x37415100;
+static constexpr Fl_Color colNormal   = 0x1F293700;
+static constexpr Fl_Color colParam    = 0x1A2B3A00;
+static constexpr Fl_Color colEmpty    = 0x17202A00;
+static constexpr Fl_Color colBorder   = 0x37415100;
+static constexpr Fl_Color colTrackDiv = 0x64748B00;
 static constexpr Fl_Color colBtnOff  = 0x29354800;
 static constexpr Fl_Color colSoloOn  = 0x22C55E00;
 static constexpr Fl_Color colMuteOn  = 0xEF444400;
@@ -59,9 +60,12 @@ void TrackControls::draw()
                     int tid = timeline->trackIdForLaneId(ref.id);
                     for (const auto& t : tl.tracks) {
                         if (t.id != tid) continue;
-                        solo    = t.solo;
-                        mute    = t.mute;
-                        isTrack = true;
+                        bool isFirstLane = (!t.lanes.empty() && t.lanes[0].id == ref.id);
+                        if (isFirstLane) {
+                            solo    = t.solo;
+                            mute    = t.mute;
+                            isTrack = true;
+                        }
                         break;
                     }
                 } else {
@@ -74,6 +78,12 @@ void TrackControls::draw()
         fl_rectf(x(), ry, w(), rowHeight);
         fl_color(colBorder);
         fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+
+        // isTrack == isFirstLane in this widget; draw track divider there
+        if (isTrack && ry > y()) {
+            fl_color(colTrackDiv);
+            fl_rectf(x(), ry - 1, w(), 2);
+        }
 
         if (!isTrack) continue;
 

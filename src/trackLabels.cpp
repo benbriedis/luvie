@@ -7,12 +7,13 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 
-static constexpr Fl_Color colNormal   = 0x1F293700;
-static constexpr Fl_Color colSelected = 0x3B82F600;
-static constexpr Fl_Color colEmpty    = 0x17202A00;
-static constexpr Fl_Color colParam    = 0x1A2B3A00;  // param lane label bg
-static constexpr Fl_Color colText     = FL_WHITE;
-static constexpr Fl_Color colBorder   = 0x37415100;
+static constexpr Fl_Color colNormal    = 0x1F293700;
+static constexpr Fl_Color colSelected  = 0x3B82F600;
+static constexpr Fl_Color colEmpty     = 0x17202A00;
+static constexpr Fl_Color colParam     = 0x1A2B3A00;  // param lane label bg
+static constexpr Fl_Color colText      = FL_WHITE;
+static constexpr Fl_Color colBorder    = 0x37415100;
+static constexpr Fl_Color colTrackDiv  = 0x64748B00;  // bright separator between tracks
 
 TrackLabels::TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight)
     : Fl_Group(x, y, w, numVisibleRows * rowHeight),
@@ -59,6 +60,7 @@ void TrackLabels::startEdit(int absRow)
     int trackId = timeline->trackIdForLaneId(laneId);
     for (const auto& t : timeline->get().tracks) {
         if (t.id != trackId) continue;
+        if (t.lanes.empty() || t.lanes[0].id != laneId) return;  // only rename on first lane
         editingAbsRow = absRow;
         originalLabel = t.label;
         int ry = y() + (absRow - rowOffset) * rowHeight;
@@ -127,11 +129,6 @@ void TrackLabels::draw()
 
     const auto& tl  = timeline->get();
     const auto& ro  = tl.rowOrder;
-    int         sel = tl.selectedTrackIndex;
-    // selectedLaneId: the lane ID of the selected track's first lane (Phase 1: one lane per track)
-    int selectedLaneId = -1;
-    if (sel >= 0 && sel < (int)tl.tracks.size() && !tl.tracks[sel].lanes.empty())
-        selectedLaneId = tl.tracks[sel].lanes[0].id;
 
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
@@ -143,7 +140,7 @@ void TrackLabels::draw()
             bool isDragSrc = (dragging && i == dragRow);
             if (ref.isTrack) {
                 // ref.id is a Lane ID — find the owning Track
-                bool isSel = (ref.id == selectedLaneId);
+                bool isSel = (ref.id == tl.selectedLaneId);
                 Fl_Color bg = isSel ? colSelected : colNormal;
                 if (isDragSrc) bg = fl_color_average(bg, FL_WHITE, 0.75f);
                 fl_color(bg);
@@ -152,9 +149,23 @@ void TrackLabels::draw()
                 fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
                 fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                 int tIdx = timeline->trackIndexForLaneId(ref.id);
-                if (tIdx >= 0)
-                    fl_draw(tl.tracks[tIdx].label.c_str(), x() + 4, ry, w() - 8, rowHeight,
+                if (tIdx >= 0) {
+                    const auto& track = tl.tracks[tIdx];
+                    bool isFirstLane  = (!track.lanes.empty() && track.lanes[0].id == ref.id);
+
+                    // Track boundary: strong 2-px divider at top of each track's first lane
+                    if (isFirstLane && ry > y()) {
+                        fl_color(colTrackDiv);
+                        fl_rectf(x(), ry - 1, w(), 2);
+                    }
+
+                    int laneNum = 1;
+                    for (int j = 0; j < (int)track.lanes.size(); j++)
+                        if (track.lanes[j].id == ref.id) { laneNum = j + 1; break; }
+                    std::string lbl = track.label + "P" + std::to_string(laneNum);
+                    fl_draw(lbl.c_str(), x() + 4, ry, w() - 8, rowHeight,
                             FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                }
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
                 fl_color(bg);
@@ -209,7 +220,7 @@ int TrackLabels::handle(int event)
                     if (contextPopup && patternObs) {
                         int trackId = timeline->trackIdForLaneId(ref.id);
                         if (trackId >= 0)
-                            contextPopup->open(trackId, patternObs,
+                            contextPopup->open(trackId, ref.id, patternObs,
                                                Fl::event_x_root(), Fl::event_y_root());
                     }
                 } else {
@@ -267,11 +278,12 @@ int TrackLabels::handle(int event)
                 dragRow  = -1;
                 dropRow  = -1;
             } else if (dragStartRow >= 0 && timeline) {
-                // Pure single click: select track
+                // Pure single click: select lane
                 const auto& ro = timeline->get().rowOrder;
                 if (dragStartRow < (int)ro.size() && ro[dragStartRow].isTrack) {
-                    int trackIdx = timeline->trackIndexForLaneId(ro[dragStartRow].id);
-                    if (trackIdx >= 0) timeline->selectTrack(trackIdx);
+                    int laneId   = ro[dragStartRow].id;
+                    int trackIdx = timeline->trackIndexForLaneId(laneId);
+                    if (trackIdx >= 0) timeline->selectLane(trackIdx, laneId);
                 }
             }
             dragStartRow = -1;

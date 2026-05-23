@@ -380,7 +380,12 @@ int LoopEditor::handle(int event)
         if (Fl::event_button() == FL_RIGHT_MOUSE && contextPopup && patternObs) {
             int trackId = (idx >= 0 && idx < (int)patternObs->get().tracks.size())
                           ? patternObs->get().tracks[idx].id : -1;
-            contextPopup->open(trackId, patternObs,
+            int laneId = -1;
+            if (idx >= 0 && idx < (int)patternObs->get().tracks.size()) {
+                const auto& t = patternObs->get().tracks[idx];
+                if (!t.lanes.empty()) laneId = t.lanes[0].id;
+            }
+            contextPopup->open(trackId, laneId, patternObs,
                                Fl::event_x_root(), Fl::event_y_root());
             return 1;
         }

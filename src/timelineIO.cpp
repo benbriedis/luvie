@@ -115,32 +115,56 @@ static PatternInstance instanceFromJson(const json& j) {
 
 // ── Track ─────────────────────────────────────────────────────────────────────
 
+static json laneToJson(const Lane& l) {
+    json jinsts = json::array();
+    for (const auto& inst : l.patterns) jinsts.push_back(instanceToJson(inst));
+    return {{"id", l.id}, {"patternId", l.patternId}, {"patterns", jinsts}};
+}
+
 static json trackToJson(const Track& t) {
-    // Serialize lanes[0] at track level for backward compatibility.
+    json jlanes = json::array();
+    for (const auto& l : t.lanes) jlanes.push_back(laneToJson(l));
+    // Keep flat lanes[0] fields for files that older loaders may read.
     json jinsts = json::array();
     if (!t.lanes.empty())
         for (const auto& inst : t.lanes[0].patterns) jinsts.push_back(instanceToJson(inst));
     return {
-        {"id",        t.id},
-        {"label",     t.label},
-        {"patternId", t.lanes.empty() ? 0 : t.lanes[0].patternId},
-        {"solo",      t.solo},
-        {"mute",      t.mute},
-        {"patterns",  jinsts},
+        {"id",           t.id},
+        {"label",        t.label},
+        {"patternId",    t.lanes.empty() ? 0 : t.lanes[0].patternId},
+        {"solo",         t.solo},
+        {"mute",         t.mute},
+        {"stackedLanes", t.stackedLanes},
+        {"patterns",     jinsts},
+        {"lanes",        jlanes},
     };
 }
 
 static Track trackFromJson(const json& j) {
     Track t;
-    t.id   = j.at("id");
-    t.label = j.at("label");
-    t.solo = j.value("solo", false);
-    t.mute = j.value("mute", false);
-    Lane lane;
-    lane.id        = 0;  // assigned by ObservableSong::loadTimeline
-    lane.patternId = j.value("patternId", 0);
-    for (const auto& jinst : j.value("patterns", json::array())) lane.patterns.push_back(instanceFromJson(jinst));
-    t.lanes.push_back(std::move(lane));
+    t.id           = j.at("id");
+    t.label        = j.at("label");
+    t.solo         = j.value("solo", false);
+    t.mute         = j.value("mute", false);
+    t.stackedLanes = j.value("stackedLanes", false);
+
+    if (j.contains("lanes") && j.at("lanes").is_array() && !j.at("lanes").empty()) {
+        for (const auto& jl : j.at("lanes")) {
+            Lane lane;
+            lane.id        = jl.value("id", 0);
+            lane.patternId = jl.value("patternId", 0);
+            for (const auto& jinst : jl.value("patterns", json::array()))
+                lane.patterns.push_back(instanceFromJson(jinst));
+            t.lanes.push_back(std::move(lane));
+        }
+    } else {
+        Lane lane;
+        lane.id        = 0;
+        lane.patternId = j.value("patternId", 0);
+        for (const auto& jinst : j.value("patterns", json::array()))
+            lane.patterns.push_back(instanceFromJson(jinst));
+        t.lanes.push_back(std::move(lane));
+    }
     return t;
 }
 
@@ -195,6 +219,7 @@ static json timelineToJson(const Timeline& tl) {
         {"paramLanes",         jparams},
         {"rowOrder",           jrows},
         {"selectedTrackIndex", tl.selectedTrackIndex},
+        {"selectedLaneId",     tl.selectedLaneId},
     };
 }
 
@@ -213,6 +238,7 @@ static Timeline timelineFromJson(const json& j) {
     for (const auto& jr : j.value("rowOrder", json::array()))
         tl.rowOrder.push_back({jr.at("isTrack").get<bool>(), jr.at("id").get<int>()});
     tl.selectedTrackIndex = j.value("selectedTrackIndex", -1);
+    tl.selectedLaneId     = j.value("selectedLaneId", -1);
     return tl;
 }
 

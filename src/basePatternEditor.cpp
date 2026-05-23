@@ -77,9 +77,8 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
 {
     labelsSetOnRightClick([this, popup]() {
         if (!popup || !pattern || lastSelectedTrack < 0) return;
-        const auto& tracks = pattern->get().tracks;
-        if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
+        if (lastSelectedTrack >= (int)pattern->get().tracks.size()) return;
+        int patId = pattern->get().patternIdForSelectedLane();
         popup->open(
             Fl::event_x_root(), Fl::event_y_root(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
@@ -92,9 +91,8 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
 {
     paramLabels.onRightClick = [this, popup](int laneId) {
         if (!popup || !pattern || lastSelectedTrack < 0) return;
-        const auto& tracks = pattern->get().tracks;
-        if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
+        if (lastSelectedTrack >= (int)pattern->get().tracks.size()) return;
+        int patId = pattern->get().patternIdForSelectedLane();
         std::function<void()> onRemove;
         if (laneId >= 0)
             onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
@@ -110,16 +108,18 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
 void BasePatternEditor::onTimelineChanged()
 {
     if (!pattern) return;
-    int sel = pattern->get().selectedTrackIndex;
-    bool trackChanged = (sel != lastSelectedTrack);
-    lastSelectedTrack = sel;
+    const auto& tl       = pattern->get();
+    int         sel      = tl.selectedTrackIndex;
+    int         selLane  = tl.selectedLaneId;
+    bool trackChanged = (sel != lastSelectedTrack) || (selLane != lastSelectedLaneId);
+    lastSelectedTrack  = sel;
+    lastSelectedLaneId = selLane;
 
-    const auto& tracks = pattern->get().tracks;
-    if (sel < 0 || sel >= (int)tracks.size()) {
+    if (sel < 0 || sel >= (int)tl.tracks.size()) {
         afterTimelineChanged(-1);
         return;
     }
-    int patId = tracks[sel].lanes.empty() ? 0 : tracks[sel].lanes[0].patternId;
+    int patId = tl.patternIdForSelectedLane();
     bool patChanged = (patId != lastPatId);
     lastPatId = patId;
 

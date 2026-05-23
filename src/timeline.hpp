@@ -81,8 +81,9 @@ struct Lane {
 struct Track {
 	int         id;
 	std::string label;
-	bool        solo  = false;
-	bool        mute  = false;
+	bool        solo         = false;
+	bool        mute         = false;
+	bool        stackedLanes = false;
 	std::vector<Lane> lanes;
 };
 
@@ -100,6 +101,16 @@ struct Timeline {
 	std::vector<ParamLane>     paramLanes;
 	std::vector<RowRef>        rowOrder;  // interleaved display order
 	int                        selectedTrackIndex = -1;
+	int                        selectedLaneId     = -1;
+
+	int patternIdForSelectedLane() const {
+		if (selectedTrackIndex < 0 || selectedTrackIndex >= (int)tracks.size()) return 0;
+		const auto& track = tracks[selectedTrackIndex];
+		if (track.lanes.empty()) return 0;
+		for (const auto& l : track.lanes)
+			if (l.id == selectedLaneId) return l.patternId;
+		return track.lanes[0].patternId;
+	}
 };
 
 #endif

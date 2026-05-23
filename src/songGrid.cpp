@@ -7,10 +7,11 @@
 #include <algorithm>
 #include <cmath>
 
-static constexpr Fl_Color kParamRowBg  = 0xF0F4FF00;
-static constexpr Fl_Color kParamLine   = 0x8888CC00;
+static constexpr Fl_Color kParamRowBg   = 0xF0F4FF00;
+static constexpr Fl_Color kParamLine    = 0x8888CC00;
 static constexpr Fl_Color kParamDotFill = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim  = 0x1111EE00;
+static constexpr Fl_Color kTrackDiv     = 0x64748B00;
 
 SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
@@ -22,6 +23,24 @@ void SongGrid::draw()
     if (!timeline) return;
 
     fl_push_clip(x(), y(), w(), h());
+
+    // Track divider lines — strong horizontal line at the top of each track's first lane
+    {
+        const auto& tl = timeline->get();
+        const auto& ro = tl.rowOrder;
+        int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+        for (int vr = 1; vr < numRows; vr++) {
+            int absRow = vr + rowOffset;
+            if (absRow < 0 || absRow >= (int)ro.size() || !ro[absRow].isTrack) continue;
+            int tIdx = timeline->trackIndexForLaneId(ro[absRow].id);
+            if (tIdx < 0) continue;
+            const auto& t = tl.tracks[tIdx];
+            if (t.lanes.empty() || t.lanes[0].id != ro[absRow].id) continue;
+            int lineY = y() + vr * rowHeight - 1;
+            fl_color(kTrackDiv);
+            fl_rectf(x(), lineY, gridRight, 2);
+        }
+    }
     const int tickH = 4;
     for (const auto& note : notes) {
         if (note.pitch < 0 || note.pitch >= numRows) continue;
@@ -587,10 +606,10 @@ void SongGrid::onCommitMove(const StateDragMove& s)
     int id     = notes[s.noteIdx].id;
     int absRow = (int)notes[s.noteIdx].pitch + rowOffset;
     const auto& ro = timeline->get().rowOrder;
-    int trackIdx = -1;
+    int laneId = -1;
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
-        trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
-    timeline->movePattern(id, trackIdx, notes[s.noteIdx].beat);
+        laneId = ro[absRow].id;
+    timeline->movePattern(id, laneId, notes[s.noteIdx].beat);
 }
 
 void SongGrid::onCommitResize(const StateDragResize& s)

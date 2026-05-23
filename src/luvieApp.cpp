@@ -35,10 +35,9 @@ void LuvieApp::ChangeNotifier::onTimelineChanged() {
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
     if (!app->patternEd || !app->drumEd || !app->pianorollEd || !app->song_) return;
     const auto& data = app->song_->get();
-    int sel = data.selectedTrackIndex;
     PatternType type = PatternType::STANDARD;
-    if (sel >= 0 && sel < (int)data.tracks.size()) {
-        int patId = data.tracks[sel].lanes.empty() ? 0 : data.tracks[sel].lanes[0].patternId;
+    {
+        int patId = data.patternIdForSelectedLane();
         for (const auto& p : data.patterns)
             if (p.id == patId) { type = p.type; break; }
     }
