@@ -28,7 +28,8 @@ void ActivePatternSet::sync(const ObservableSong& tl, float currentBar)
 	std::unordered_map<int, float> songResult;
 	for (const auto& track : data.tracks) {
 		if (track.mute || (anySolo && !track.solo)) continue;
-		for (const auto& inst : track.patterns) {
+		if (track.lanes.empty()) continue;
+		for (const auto& inst : track.lanes[0].patterns) {
 			if (currentBar < inst.startBar || currentBar >= inst.startBar + inst.length)
 				continue;
 			const Pattern* pat = nullptr;

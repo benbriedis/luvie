@@ -116,12 +116,14 @@ static PatternInstance instanceFromJson(const json& j) {
 // ── Track ─────────────────────────────────────────────────────────────────────
 
 static json trackToJson(const Track& t) {
+    // Serialize lanes[0] at track level for backward compatibility.
     json jinsts = json::array();
-    for (const auto& inst : t.patterns) jinsts.push_back(instanceToJson(inst));
+    if (!t.lanes.empty())
+        for (const auto& inst : t.lanes[0].patterns) jinsts.push_back(instanceToJson(inst));
     return {
         {"id",        t.id},
         {"label",     t.label},
-        {"patternId", t.patternId},
+        {"patternId", t.lanes.empty() ? 0 : t.lanes[0].patternId},
         {"solo",      t.solo},
         {"mute",      t.mute},
         {"patterns",  jinsts},
@@ -130,12 +132,15 @@ static json trackToJson(const Track& t) {
 
 static Track trackFromJson(const json& j) {
     Track t;
-    t.id        = j.at("id");
-    t.label     = j.at("label");
-    t.patternId = j.value("patternId", 0);
-    t.solo      = j.value("solo", false);
-    t.mute      = j.value("mute", false);
-    for (const auto& jinst : j.value("patterns", json::array())) t.patterns.push_back(instanceFromJson(jinst));
+    t.id   = j.at("id");
+    t.label = j.at("label");
+    t.solo = j.value("solo", false);
+    t.mute = j.value("mute", false);
+    Lane lane;
+    lane.id        = 0;  // assigned by ObservableSong::loadTimeline
+    lane.patternId = j.value("patternId", 0);
+    for (const auto& jinst : j.value("patterns", json::array())) lane.patterns.push_back(instanceFromJson(jinst));
+    t.lanes.push_back(std::move(lane));
     return t;
 }
 

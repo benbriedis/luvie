@@ -108,7 +108,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		if (pat->notes.empty() && pat->drumNotes.empty() && pat->paramLanes.empty()) continue;
 		for (const auto& track : tl.tracks)
-			if (track.patternId == patId) { label = track.label; break; }
+			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = track.label; break; }
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
@@ -198,7 +198,7 @@ int Playhead::barsToPixel(float bars) const
 		if (!obsTl) return 0;
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack >= (int)tracks.size()) return 0;
-		int patId = tracks[patternTrack].patternId;
+		int patId = tracks[patternTrack].lanes.empty() ? 0 : tracks[patternTrack].lanes[0].patternId;
 
 		// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
 		int top, bottom;
@@ -234,7 +234,7 @@ Fl_Color Playhead::currentHeadColor() const
 	if (patternTrack >= 0 && obsTl && aps) {
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack < (int)tracks.size()) {
-			int patId = tracks[patternTrack].patternId;
+			int patId = tracks[patternTrack].lanes.empty() ? 0 : tracks[patternTrack].lanes[0].patternId;
 			if (!aps->isPatternActive(patId))
 				return headColorDim;
 		}
@@ -290,7 +290,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 			if (p.id == patId) { pat = &p; break; }
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		for (const auto& track : tl.tracks)
-			if (track.patternId == patId) { label = track.label; break; }
+			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = track.label; break; }
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);

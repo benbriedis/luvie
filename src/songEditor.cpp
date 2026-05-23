@@ -135,8 +135,9 @@ int SongEditor::computeNumCols() const
     float maxEnd = 0.0f;
     const auto& data = timeline->get();
     for (const auto& track : data.tracks)
-        for (const auto& inst : track.patterns)
-            maxEnd = std::max(maxEnd, inst.startBar + inst.length);
+        for (const auto& lane : track.lanes)
+            for (const auto& inst : lane.patterns)
+                maxEnd = std::max(maxEnd, inst.startBar + inst.length);
     for (const auto& m : data.bpms)
         maxEnd = std::max(maxEnd, (float)m.bar);
     for (const auto& m : data.timeSigs)

@@ -38,7 +38,7 @@ void LuvieApp::EditorSwitcher::onTimelineChanged() {
     int sel = data.selectedTrackIndex;
     PatternType type = PatternType::STANDARD;
     if (sel >= 0 && sel < (int)data.tracks.size()) {
-        int patId = data.tracks[sel].patternId;
+        int patId = data.tracks[sel].lanes.empty() ? 0 : data.tracks[sel].lanes[0].patternId;
         for (const auto& p : data.patterns)
             if (p.id == patId) { type = p.type; break; }
     }

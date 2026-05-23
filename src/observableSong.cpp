@@ -41,10 +41,14 @@ void ObservableSong::loadTimeline(const Timeline& tl)
         for (const auto& dn : p.drumNotes)
             if (dn.id >= nextId) nextId = dn.id + 1;
     }
-    for (const auto& t : data.tracks) {
+    for (auto& t : data.tracks) {
         if (t.id >= nextId) nextId = t.id + 1;
-        for (const auto& inst : t.patterns)
-            if (inst.id >= nextId) nextId = inst.id + 1;
+        for (auto& lane : t.lanes) {
+            if (lane.id == 0) lane.id = nextId++;  // assign ID to lanes from old saves
+            else if (lane.id >= nextId) nextId = lane.id + 1;
+            for (const auto& inst : lane.patterns)
+                if (inst.id >= nextId) nextId = inst.id + 1;
+        }
     }
     for (const auto& lane : data.paramLanes) {
         if (lane.id >= nextId) nextId = lane.id + 1;
@@ -219,8 +223,10 @@ void ObservableSong::secondsToBarBeat(double secs, int& bar, int& beat) const
 
 int ObservableSong::addTrack(std::string label, int patternId, int atIndex)
 {
-    int id = nextId++;
-    data.tracks.push_back({id, std::move(label), patternId, {}});
+    int id     = nextId++;
+    int laneId = nextId++;
+    Lane lane{laneId, patternId, {}};
+    data.tracks.push_back({id, std::move(label), false, false, {std::move(lane)}});
     RowRef ref{true, id};
     if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
         data.rowOrder.insert(data.rowOrder.begin() + atIndex, ref);
@@ -303,8 +309,9 @@ int ObservableSong::nextTrackNumberForType(PatternType type) const
 {
     int count = 0;
     for (const auto& t : data.tracks) {
+        if (t.lanes.empty()) continue;
         for (const auto& p : data.patterns) {
-            if (p.id == t.patternId && p.type == type) { ++count; break; }
+            if (p.id == t.lanes[0].patternId && p.type == type) { ++count; break; }
         }
     }
     return count + 1;
@@ -316,7 +323,7 @@ void ObservableSong::removeTrackAndPattern(int trackId)
         [trackId](const Track& t) { return t.id == trackId; });
     if (it == data.tracks.end()) return;
 
-    int patId = it->patternId;
+    int patId = it->lanes.empty() ? 0 : it->lanes[0].patternId;
     data.tracks.erase(it);
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
@@ -324,7 +331,10 @@ void ObservableSong::removeTrackAndPattern(int trackId)
         data.rowOrder.end());
 
     bool stillUsed = std::any_of(data.tracks.begin(), data.tracks.end(),
-        [patId](const Track& t) { return t.patternId == patId; });
+        [patId](const Track& t) {
+            return std::any_of(t.lanes.begin(), t.lanes.end(),
+                [patId](const Lane& l) { return l.patternId == patId; });
+        });
     if (!stillUsed && patId > 0)
         data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
             [patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
@@ -337,22 +347,24 @@ void ObservableSong::removeTrackAndPattern(int trackId)
 const PatternInstance* ObservableSong::instanceById(int instanceId) const
 {
     for (const auto& track : data.tracks)
-        for (const auto& inst : track.patterns)
-            if (inst.id == instanceId)
-                return &inst;
+        for (const auto& lane : track.lanes)
+            for (const auto& inst : lane.patterns)
+                if (inst.id == instanceId)
+                    return &inst;
     return nullptr;
 }
 
 const Pattern* ObservableSong::patternForInstance(int instanceId) const
 {
     for (const auto& track : data.tracks)
-        for (const auto& inst : track.patterns)
-            if (inst.id == instanceId) {
-                for (const auto& pat : data.patterns)
-                    if (pat.id == inst.patternId)
-                        return &pat;
-                return nullptr;
-            }
+        for (const auto& lane : track.lanes)
+            for (const auto& inst : lane.patterns)
+                if (inst.id == instanceId) {
+                    for (const auto& pat : data.patterns)
+                        if (pat.id == inst.patternId)
+                            return &pat;
+                    return nullptr;
+                }
     return nullptr;
 }
 
@@ -374,34 +386,38 @@ void ObservableSong::renamePatternOutputInstrument(const std::string& oldName, c
 void ObservableSong::addPattern(int trackIndex, float startBar, float length, float patternBeats)
 {
     if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;
+    if (data.tracks[trackIndex].lanes.empty()) return;
     int patId = 0;
     if (patternBeats > 0.0f) {
         patId = nextId++;
         data.patterns.push_back({patId, patternBeats});
     }
-    data.tracks[trackIndex].patterns.push_back({nextId++, patId, startBar, length});
+    data.tracks[trackIndex].lanes[0].patterns.push_back({nextId++, patId, startBar, length});
     notify();
 }
 
 void ObservableSong::removePattern(int instanceId)
 {
     for (auto& track : data.tracks) {
-        auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
-            [instanceId](const PatternInstance& p) { return p.id == instanceId; });
-        if (it != track.patterns.end()) {
-            int patId = it->patternId;
-            track.patterns.erase(it);
-            if (patId > 0) {
-                bool stillUsed = false;
-                for (const auto& t : data.tracks)
-                    for (const auto& p : t.patterns)
-                        if (p.patternId == patId) { stillUsed = true; break; }
-                if (!stillUsed)
-                    data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
-                        [patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
+        for (auto& lane : track.lanes) {
+            auto it = std::find_if(lane.patterns.begin(), lane.patterns.end(),
+                [instanceId](const PatternInstance& p) { return p.id == instanceId; });
+            if (it != lane.patterns.end()) {
+                int patId = it->patternId;
+                lane.patterns.erase(it);
+                if (patId > 0) {
+                    bool stillUsed = false;
+                    for (const auto& t : data.tracks)
+                        for (const auto& l : t.lanes)
+                            for (const auto& p : l.patterns)
+                                if (p.patternId == patId) { stillUsed = true; break; }
+                    if (!stillUsed)
+                        data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
+                            [patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
+                }
+                notify();
+                return;
             }
-            notify();
-            return;
         }
     }
 }
@@ -409,16 +425,19 @@ void ObservableSong::removePattern(int instanceId)
 void ObservableSong::movePattern(int instanceId, int newTrackIndex, float newStartBar)
 {
     if (newTrackIndex < 0 || newTrackIndex >= (int)data.tracks.size()) return;
+    if (data.tracks[newTrackIndex].lanes.empty()) return;
     for (auto& track : data.tracks) {
-        auto it = std::find_if(track.patterns.begin(), track.patterns.end(),
-            [instanceId](const PatternInstance& p) { return p.id == instanceId; });
-        if (it != track.patterns.end()) {
-            PatternInstance inst = *it;
-            track.patterns.erase(it);
-            inst.startBar = newStartBar;
-            data.tracks[newTrackIndex].patterns.push_back(std::move(inst));
-            notify();
-            return;
+        for (auto& lane : track.lanes) {
+            auto it = std::find_if(lane.patterns.begin(), lane.patterns.end(),
+                [instanceId](const PatternInstance& p) { return p.id == instanceId; });
+            if (it != lane.patterns.end()) {
+                PatternInstance inst = *it;
+                lane.patterns.erase(it);
+                inst.startBar = newStartBar;
+                data.tracks[newTrackIndex].lanes[0].patterns.push_back(std::move(inst));
+                notify();
+                return;
+            }
         }
     }
 }
@@ -426,11 +445,13 @@ void ObservableSong::movePattern(int instanceId, int newTrackIndex, float newSta
 void ObservableSong::resizePattern(int patternId, float newLength)
 {
     for (auto& track : data.tracks) {
-        for (auto& p : track.patterns) {
-            if (p.id == patternId) {
-                p.length = newLength;
-                notify();
-                return;
+        for (auto& lane : track.lanes) {
+            for (auto& p : lane.patterns) {
+                if (p.id == patternId) {
+                    p.length = newLength;
+                    notify();
+                    return;
+                }
             }
         }
     }
@@ -439,27 +460,30 @@ void ObservableSong::resizePattern(int patternId, float newLength)
 void ObservableSong::resizePatternLeft(int patternId, float newStartBar, float newLength, float newStartOffset)
 {
     for (auto& track : data.tracks)
-        for (auto& p : track.patterns)
-            if (p.id == patternId) {
-                p.startBar    = newStartBar;
-                p.length      = newLength;
-                p.startOffset = newStartOffset;
-                notify();
-                return;
-            }
+        for (auto& lane : track.lanes)
+            for (auto& p : lane.patterns)
+                if (p.id == patternId) {
+                    p.startBar    = newStartBar;
+                    p.length      = newLength;
+                    p.startOffset = newStartOffset;
+                    notify();
+                    return;
+                }
 }
 
 void ObservableSong::setPatternStartOffset(int patternId, float startOffset)
 {
     for (auto& track : data.tracks)
-        for (auto& p : track.patterns)
-            if (p.id == patternId) { p.startOffset = startOffset; notify(); return; }
+        for (auto& lane : track.lanes)
+            for (auto& p : lane.patterns)
+                if (p.id == patternId) { p.startOffset = startOffset; notify(); return; }
 }
 
 void ObservableSong::placePattern(int trackIndex, int patternId, float startBar, float length)
 {
     if (trackIndex < 0 || trackIndex >= (int)data.tracks.size()) return;
-    data.tracks[trackIndex].patterns.push_back({nextId++, patternId, startBar, length});
+    if (data.tracks[trackIndex].lanes.empty()) return;
+    data.tracks[trackIndex].lanes[0].patterns.push_back({nextId++, patternId, startBar, length});
     notify();
 }
 
@@ -471,8 +495,9 @@ std::vector<Note> ObservableSong::buildNotes() const
         if (!ref.isTrack) continue;
         for (const auto& t : data.tracks)
             if (t.id == ref.id) {
-                for (const auto& p : t.patterns)
-                    notes.push_back({p.id, row, p.startBar, p.length});
+                if (!t.lanes.empty())
+                    for (const auto& p : t.lanes[0].patterns)
+                        notes.push_back({p.id, row, p.startBar, p.length});
                 break;
             }
     }

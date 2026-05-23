@@ -293,7 +293,7 @@ void PatternPanel::initTimeControls()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].patternId;
+        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
         int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
         self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den);
         if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
@@ -316,7 +316,7 @@ void PatternPanel::initTimeControls()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].patternId;
+        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
         int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
         int top = (int)ts.timeSigNum.value();
         for (const auto& p : tl.patterns) {
@@ -350,7 +350,7 @@ void PatternPanel::initTimeControls()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].patternId;
+        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
         int bars = std::max(1, (int)bs.barsInput.value());
         for (const auto& p : tl.patterns) {
             if (p.id != patId) continue;
@@ -385,7 +385,7 @@ void PatternPanel::initOutChoice()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].patternId;
+        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
         PatternType type = PatternType::STANDARD;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }
@@ -450,7 +450,7 @@ void PatternPanel::refreshOutChoice()
     const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { outChoice.value(0); return; }
-    int patId = tl.tracks[sel].patternId;
+    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
 
     PatternType type = PatternType::STANDARD;
     std::string currentInstrument;
@@ -488,7 +488,7 @@ void PatternPanel::refreshBars()
     const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { bi.value(2); return; }
-    int patId = tl.tracks[sel].patternId;
+    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
         bi.value(std::max(1, (int)std::round(p.lengthBeats / (float)p.timeSigTop)));
@@ -507,7 +507,7 @@ void PatternPanel::refreshTimeSig()
     if (sel < 0 || sel >= (int)tl.tracks.size()) {
         ts.timeSigNum.value(4); ts.timeSigDen.value(2); return;
     }
-    int patId = tl.tracks[sel].patternId;
+    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
         ts.timeSigNum.value(p.timeSigTop);
@@ -586,7 +586,7 @@ void PatternPanel::onTimelineChanged()
     int sel = tl.selectedTrackIndex;
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
         patternName.copy_label(tl.tracks[sel].label.c_str());
-        int patId = tl.tracks[sel].patternId;
+        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
         PatternType type = PatternType::STANDARD;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }

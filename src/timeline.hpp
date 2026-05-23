@@ -70,13 +70,20 @@ struct PatternInstance {
 	float startOffset = 0.0f;  // beat offset into the pattern to start playing from
 };
 
+// A single row of pattern instances within a Track (instrument).
+// Phase 1: each Track has exactly one Lane.
+struct Lane {
+	int id;
+	int patternId = 0;   // the pattern displayed in the pattern editor for this lane
+	std::vector<PatternInstance> patterns;
+};
+
 struct Track {
 	int         id;
 	std::string label;
-	int         patternId = 0;   // the pattern displayed in the pattern editor for this track
-	bool        solo      = false;
-	bool        mute      = false;
-	std::vector<PatternInstance> patterns;
+	bool        solo  = false;
+	bool        mute  = false;
+	std::vector<Lane> lanes;
 };
 
 // One entry per visible row; determines display order of tracks and param lanes.

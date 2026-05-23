@@ -50,7 +50,7 @@ void PatternEditor::setNoteParams(int root, int chord, bool sharp)
     if (pattern && lastSelectedTrack >= 0) {
         const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack < (int)tracks.size())
-            patId = tracks[lastSelectedTrack].patternId;
+            patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
     }
 
     if (pattern && patId > 0 && chordDefs[oldChordType].size != chordDefs[chord].size)
@@ -109,7 +109,7 @@ void PatternEditor::focusPattern()
     if (pattern && lastSelectedTrack >= 0) {
         const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack < (int)tracks.size())
-            patId = tracks[lastSelectedTrack].patternId;
+            patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
     }
     setRowOffset(computeDefaultOffset(patId));
 }

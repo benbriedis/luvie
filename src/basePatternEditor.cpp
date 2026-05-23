@@ -79,7 +79,7 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
         if (!popup || !pattern || lastSelectedTrack < 0) return;
         const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].patternId;
+        int patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
         popup->open(
             Fl::event_x_root(), Fl::event_y_root(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
@@ -94,7 +94,7 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
         if (!popup || !pattern || lastSelectedTrack < 0) return;
         const auto& tracks = pattern->get().tracks;
         if (lastSelectedTrack >= (int)tracks.size()) return;
-        int patId = tracks[lastSelectedTrack].patternId;
+        int patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
         std::function<void()> onRemove;
         if (laneId >= 0)
             onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
@@ -119,7 +119,7 @@ void BasePatternEditor::onTimelineChanged()
         afterTimelineChanged(-1);
         return;
     }
-    int patId = tracks[sel].patternId;
+    int patId = tracks[sel].lanes.empty() ? 0 : tracks[sel].lanes[0].patternId;
     bool patChanged = (patId != lastPatId);
     lastPatId = patId;
 

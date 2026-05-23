@@ -478,8 +478,9 @@ void SongGrid::rebuildNotes()
                 timeline->timeSigAt(0, top, bottom);
                 scale = (float)top;
             }
-            for (auto& p : tracks[trackFilter].patterns)
-                notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
+            if (!tracks[trackFilter].lanes.empty())
+                for (const auto& p : tracks[trackFilter].lanes[0].patterns)
+                    notes.push_back({p.id, 0, p.startBar * scale, p.length * scale});
         }
         clampSelection();
         return;
@@ -655,7 +656,8 @@ void SongGrid::toggleNote()
     if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
         int trackIdx = timeline->trackIndexForId(ro[absRow].id);
         if (trackIdx >= 0) {
-            int patId = timeline->get().tracks[trackIdx].patternId;
+            const auto& trk = timeline->get().tracks[trackIdx];
+            int patId = trk.lanes.empty() ? 0 : trk.lanes[0].patternId;
             if (patId > 0)
                 timeline->placePattern(trackIdx, patId, col, 1.0f);
         }

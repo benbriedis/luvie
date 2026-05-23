@@ -216,7 +216,7 @@ void DrumPatternEditor::focusPattern()
     if (!pattern || lastSelectedTrack < 0) { setRowOffset(24); return; }
     const auto& tracks = pattern->get().tracks;
     if (lastSelectedTrack >= (int)tracks.size()) { setRowOffset(24); return; }
-    int patId = tracks[lastSelectedTrack].patternId;
+    int patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
     auto notes = pattern->buildDrumPatternNotes(patId);
     if (notes.empty()) { setRowOffset(24); return; }
     int lowest = 127;
@@ -238,7 +238,7 @@ std::string DrumPatternEditor::currentInstrumentName() const
     int sel = pattern->get().selectedTrackIndex;
     const auto& tracks = pattern->get().tracks;
     if (sel < 0 || sel >= (int)tracks.size()) return {};
-    int patId = tracks[sel].patternId;
+    int patId = tracks[sel].lanes.empty() ? 0 : tracks[sel].lanes[0].patternId;
     for (const auto& p : pattern->get().patterns)
         if (p.id == patId) return p.outputInstrumentName;
     return {};
@@ -303,7 +303,7 @@ void DrumPatternEditor::applyCurrentDrumMap()
     int sel = pattern->get().selectedTrackIndex;
     const auto& tracks = pattern->get().tracks;
     if (sel < 0 || sel >= (int)tracks.size()) { drumLabels.setDrumMap({}); drumLabels.setFallbackNoteNames(false); return; }
-    int patId = tracks[sel].patternId;
+    int patId = tracks[sel].lanes.empty() ? 0 : tracks[sel].lanes[0].patternId;
     for (const auto& p : pattern->get().patterns) {
         if (p.id == patId) {
             auto mit = allDrumMaps.find(p.outputInstrumentName);

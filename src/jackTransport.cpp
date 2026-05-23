@@ -227,11 +227,12 @@ void JackTransport::rebuildSnapshot()
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
-            if (!track.mute && (!anySolo || track.solo) && actives.count(track.patternId)) {
-                float anchorBar = actives.at(track.patternId);
+            int lanePatId = track.lanes.empty() ? 0 : track.lanes[0].patternId;
+            if (!track.mute && (!anySolo || track.solo) && actives.count(lanePatId)) {
+                float anchorBar = actives.at(lanePatId);
                 const Pattern* pat = nullptr;
                 for (const auto& p : tl.patterns)
-                    if (p.id == track.patternId) { pat = &p; break; }
+                    if (p.id == lanePatId) { pat = &p; break; }
                 if (pat && pat->lengthBeats > 0.0f) {
                     InstanceSnap is;
                     is.startBar     = anchorBar;
@@ -276,7 +277,8 @@ void JackTransport::rebuildSnapshot()
                 ++trackIdx;
                 continue;
             }
-            for (const PatternInstance& inst : track.patterns) {
+            if (track.lanes.empty()) { newSnap.tracks.push_back(std::move(ts)); ++trackIdx; continue; }
+            for (const PatternInstance& inst : track.lanes[0].patterns) {
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;
 

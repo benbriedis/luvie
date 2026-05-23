@@ -147,7 +147,7 @@ void TrackContextPopup::doCopy()
     PatternType srcType = PatternType::STANDARD;
     for (const auto& t : timeline->get().tracks) {
         if (t.id != targetTrackId) continue;
-        srcPatId = t.patternId;
+        srcPatId = t.lanes.empty() ? -1 : t.lanes[0].patternId;
         for (const auto& p : timeline->get().patterns)
             if (p.id == srcPatId) { srcType = p.type; break; }
         break;

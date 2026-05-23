@@ -206,7 +206,7 @@ bool LoopEditor::isEnabled(int trackIdx) const
     if (!timeline || !aps) return false;
     const auto& tracks = timeline->get().tracks;
     if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return false;
-    return aps->isPatternActive(tracks[trackIdx].patternId);
+    return aps->isPatternActive(tracks[trackIdx].lanes.empty() ? 0 : tracks[trackIdx].lanes[0].patternId);
 }
 
 float LoopEditor::beatProgress(int trackIdx) const
@@ -215,7 +215,7 @@ float LoopEditor::beatProgress(int trackIdx) const
     const auto& tl = timeline->get();
     if (trackIdx < 0 || trackIdx >= (int)tl.tracks.size()) return 0.0f;
 
-    int patId = tl.tracks[trackIdx].patternId;
+    int patId = tl.tracks[trackIdx].lanes.empty() ? 0 : tl.tracks[trackIdx].lanes[0].patternId;
     const Pattern* pat = nullptr;
     for (const auto& p : tl.patterns)
         if (p.id == patId) { pat = &p; break; }
@@ -296,7 +296,7 @@ void LoopEditor::draw()
             btnRect(i, bx, by, bw, bh);
             if (by >= y() + gridAreaH()) break;
 
-            bool isToggled = aps && aps->isPatternActive(tracks[i].patternId);
+            bool isToggled = aps && aps->isPatternActive(tracks[i].lanes.empty() ? 0 : tracks[i].lanes[0].patternId);
             bool isHovered = i == hoveredIdx;
 
             Fl_Color bg = isToggled ? (isHovered ? btnActiveHover : btnActiveBg)
@@ -350,7 +350,7 @@ int LoopEditor::handle(int event)
             if (timeline && aps) {
                 const auto& tracks = timeline->get().tracks;
                 if (idx < (int)tracks.size()) {
-                    int   patId = tracks[idx].patternId;
+                    int   patId = tracks[idx].lanes.empty() ? 0 : tracks[idx].lanes[0].patternId;
                     float bar   = transport ? transport->position() : 0.0f;
                     if (aps->isPatternActive(patId)) {
                         aps->deactivate(patId);

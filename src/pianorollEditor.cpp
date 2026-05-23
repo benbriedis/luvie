@@ -95,7 +95,7 @@ void PianorollEditor::focusPattern()
     if (!pattern || lastSelectedTrack < 0) { setRowOffset(48); return; }
     const auto& tracks = pattern->get().tracks;
     if (lastSelectedTrack >= (int)tracks.size()) { setRowOffset(48); return; }
-    int patId = tracks[lastSelectedTrack].patternId;
+    int patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
     auto notes = pattern->buildPatternNotes(patId);
     if (notes.empty()) { setRowOffset(48); return; }
     int lowest = 127;
