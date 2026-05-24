@@ -369,6 +369,7 @@ int ObservableSong::addLane(int trackId)
         newPat.lengthBeats         = beats;
         newPat.type                = ptype;
         newPat.outputInstrumentName = output;
+        newPat.name                = "Pat " + std::to_string(t.lanes.size() + 1);
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
@@ -385,6 +386,56 @@ int ObservableSong::addLane(int trackId)
         return laneId;
     }
     return -1;
+}
+
+int ObservableSong::addPianorollLane(int trackId)
+{
+    for (auto& t : data.tracks) {
+        if (t.id != trackId) continue;
+
+        float       beats  = 8.0f;
+        std::string output = defaultOutputInstrument;
+        if (!t.lanes.empty()) {
+            for (const auto& p : data.patterns)
+                if (p.id == t.lanes[0].patternId) {
+                    beats  = p.lengthBeats;
+                    output = p.outputInstrumentName;
+                    break;
+                }
+        }
+
+        std::set<int> existingLaneIds;
+        for (const auto& l : t.lanes) existingLaneIds.insert(l.id);
+
+        int patId = nextId++;
+        Pattern newPat;
+        newPat.id                  = patId;
+        newPat.lengthBeats         = beats;
+        newPat.type                = PatternType::PIANOROLL;
+        newPat.outputInstrumentName = output;
+        newPat.name                = "Pat " + std::to_string(t.lanes.size() + 1);
+        data.patterns.push_back(std::move(newPat));
+
+        int laneId = nextId++;
+        t.lanes.push_back(Lane{laneId, patId, {}});
+
+        if (!t.stackedLanes) {
+            int insertAt = (int)data.rowOrder.size();
+            for (int i = (int)data.rowOrder.size() - 1; i >= 0; i--)
+                if (data.rowOrder[i].isTrack && existingLaneIds.count(data.rowOrder[i].id))
+                    { insertAt = i + 1; break; }
+            data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{true, laneId});
+        }
+        notify();
+        return laneId;
+    }
+    return -1;
+}
+
+void ObservableSong::setPatternName(int patId, std::string name)
+{
+    for (auto& p : data.patterns)
+        if (p.id == patId) { p.name = std::move(name); notify(); return; }
 }
 
 void ObservableSong::setStackedLanes(int trackId, bool stacked)

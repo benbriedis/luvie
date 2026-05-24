@@ -233,6 +233,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
     og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);
+    ctxPop->onShowInstruments = [this]() {
+        if (!outputsOverlay) return;
+        outputsOverlay->show();
+        if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
+            item->set();
+    };
     og2->setParamLaneContextPopup(plcPop);
     og2->onEndReached = [this]() { bottomPane->notifyEndReached(); };
     og2->onSeek = [this]() {
@@ -354,6 +360,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         };
         outputsOverlay->onInstrumentRenamed = [this](const std::string& old, const std::string& nw) {
             song_->renamePatternOutputInstrument(old, nw);
+            // Keep track labels in sync with instrument names
+            for (const auto& t : song_->get().tracks)
+                if (t.label == old) { song_->renameTrack(t.id, nw); break; }
         };
         outputsOverlay->isInstrumentInUse = [this](const std::string& name) {
             for (const auto& p : song_->get().patterns)
@@ -384,6 +393,19 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     song_->addObserver(&changeNotifier_);
 
     // ---- Initial state ----
+    // Seed the overlay with a default instrument on a fresh (empty) session
+    // so there's always at least one instrument+track pair.
+    if (outputsOverlay->getInstruments().empty()) {
+        OutputsOverlay::InstrumentInfo def;
+        def.id            = 0;
+        def.name          = "Instrument 1";
+        def.midiChannel   = 1;
+        def.programNumber = -1;
+        def.bankMsb       = -1;
+        def.bankLsb       = -1;
+        def.gm1Instrument = -1;
+        outputsOverlay->setInstruments({def});
+    }
     pushInstruments();
     song_->selectTrack(0);
 }
@@ -412,8 +434,10 @@ void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
 }
 
 void LuvieApp::pushInstruments() {
-    if (!outputsOverlay) return;
+    if (!outputsOverlay || !song_) return;
     const auto& instrs = outputsOverlay->getInstruments();
+
+    // Update default instrument names for newly created patterns
     song_->defaultOutputInstrument = "";
     song_->defaultDrumOutputInstrument = "";
     for (const auto& ci : instrs) {
@@ -422,6 +446,36 @@ void LuvieApp::pushInstruments() {
         if (ci.isDrum && song_->defaultDrumOutputInstrument.empty())
             song_->defaultDrumOutputInstrument = ci.name;
     }
+
+    // Sync tracks 1:1 with instruments (only when overlay has instruments)
+    if (!instrs.empty()) {
+        // Remove tracks whose label no longer matches any instrument
+        std::vector<int> toRemove;
+        for (const auto& t : song_->get().tracks) {
+            bool found = false;
+            for (const auto& ci : instrs)
+                if (ci.name == t.label) { found = true; break; }
+            if (!found) toRemove.push_back(t.id);
+        }
+        for (int id : toRemove)
+            song_->removeTrackAndPattern(id);
+
+        // Add a track for each instrument that doesn't have one yet
+        for (const auto& ci : instrs) {
+            bool found = false;
+            for (const auto& t : song_->get().tracks)
+                if (t.label == ci.name) { found = true; break; }
+            if (!found && pattern_) {
+                int patId = ci.isDrum
+                    ? pattern_->createDrumPattern(numPatternBeats)
+                    : pattern_->createPattern(numPatternBeats);
+                song_->setPatternName(patId, "Pat 1");
+                pattern_->setPatternOutputInstrument(patId, ci.name);
+                song_->addTrack(ci.name, patId);
+            }
+        }
+    }
+
     if (patternPanel) {
         std::vector<std::string> stdNames, drumNames;
         for (const auto& ci : instrs)

@@ -8,7 +8,7 @@
 #include <functional>
 
 class TrackContextPopup : public BasePopup {
-    static constexpr int popH  = 10 * 30 + 2;  // +2 for border
+    static constexpr int popH  = 7 * 30 + 2;  // +2 for border
 
 public:
     static constexpr int popW  = 150;
@@ -17,30 +17,22 @@ public:
 private:
 
     ModernButton*       openPatternBtn;
-    ModernButton*       addBtn;
-    ModernButton*       addDrumBtn;
-    ModernButton*       addPianorollBtn;
-    ModernButton*       copyBtn;
-    ModernButton*       deleteBtn;
+    ModernButton*       showInstrumentsBtn;
     ModernButton*       addParamBtn;
     ModernButton*       addLaneBtn;
+    ModernButton*       addPianorollLaneBtn;
     ModernButton*       removeLaneBtn;
     ModernButton*       stackLanesBtn;
     ObservablePattern*  timeline      = nullptr;
     int                 targetTrackId = -1;
     int                 targetLaneId  = -1;
 
-    static constexpr int numPatternBeats = 8;
-
     int  rowOrderIdxForTrackId(int trackId) const;
     void doOpenPattern();
-    void doAdd();
-    void doAddDrum();
-    void doAddPianoroll();
-    void doCopy();
-    void doDelete();
+    void doShowInstruments();
     void doShowParamSubmenu();
     void doAddLane();
+    void doAddPianorollLane();
     void doRemoveLane();
     void doToggleStackLanes();
 
@@ -50,6 +42,7 @@ public:
     TrackContextPopup();
 
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
+    std::function<void()>                           onShowInstruments;
 
     void open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy);
 };

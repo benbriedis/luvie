@@ -9,11 +9,10 @@
 #include "appWindow.hpp"
 
 class ParamLaneContextPopup : public BasePopup {
-    static constexpr int btnH            = 30;
-    static constexpr int numBtns         = 5;
-    static constexpr int popH            = numBtns * btnH + 2;
-    static constexpr int numPatternBeats = 8;
-    static constexpr Fl_Color hoverCol   = 0xDDEEFF00;
+    static constexpr int btnH          = 30;
+    static constexpr int numBtns       = 2;
+    static constexpr int popH          = numBtns * btnH + 2;
+    static constexpr Fl_Color hoverCol = 0xDDEEFF00;
 
     ObservablePattern* timeline = nullptr;
     int                 laneId   = -1;
@@ -28,44 +27,9 @@ class ParamLaneContextPopup : public BasePopup {
         return btn;
     }
 
-    int rowOrderIdxForLane() const {
-        if (!timeline) return -1;
-        const auto& ro = timeline->get().rowOrder;
-        for (int i = 0; i < (int)ro.size(); i++)
-            if (!ro[i].isTrack && ro[i].id == laneId) return i;
-        return -1;
-    }
-
-    void doAdd() {
-        hide();
-        if (!timeline) return;
-        int n     = timeline->song()->nextTrackNumberForType(PatternType::STANDARD);
-        int patId = timeline->createPattern(numPatternBeats);
-        timeline->song()->addTrack("Pattern " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
-        if (auto* win = window()) win->redraw();
-    }
-
-    void doAddDrum() {
-        hide();
-        if (!timeline) return;
-        int n     = timeline->song()->nextTrackNumberForType(PatternType::DRUM);
-        int patId = timeline->createDrumPattern(numPatternBeats);
-        timeline->song()->addTrack("Drum " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
-        if (auto* win = window()) win->redraw();
-    }
-
-    void doAddPianoroll() {
-        hide();
-        if (!timeline) return;
-        int n     = timeline->song()->nextTrackNumberForType(PatternType::PIANOROLL);
-        int patId = timeline->createPianorollPattern(numPatternBeats);
-        timeline->song()->addTrack("Pianoroll " + std::to_string(n), patId, rowOrderIdxForLane() + 1);
-        if (auto* win = window()) win->redraw();
-    }
-
     void doShowParamSubmenu() {
         if (!paramSubmenu) return;
-        paramSubmenu->showFor(this, y() + 1 + 3*btnH, timeline->song());
+        paramSubmenu->showFor(this, y() + 1 + 0*btnH, timeline->song());
     }
 
     void doRemove() {
@@ -84,21 +48,9 @@ public:
         color(popupBg);
         box(FL_BORDER_BOX);
 
-        auto* addBtn          = makeItem(1,           popW, "Add Pattern");
-        auto* addDrumBtn      = makeItem(1 + btnH,    popW, "Add Drum Pattern");
-        auto* addPianorollBtn = makeItem(1 + 2*btnH,  popW, "Add Pianoroll Pattern");
-        auto* addParamBtn     = makeItem(1 + 3*btnH,  popW, "Add automation \xe2\x96\xb6");
-        auto* removeBtn       = makeItem(1 + 4*btnH,  popW, "Remove automation");
+        auto* addParamBtn = makeItem(1,         popW, "Add automation \xe2\x96\xb6");
+        auto* removeBtn   = makeItem(1 + btnH,  popW, "Remove automation");
 
-        addBtn->callback([](Fl_Widget*, void* d) {
-            static_cast<ParamLaneContextPopup*>(d)->doAdd();
-        }, this);
-        addDrumBtn->callback([](Fl_Widget*, void* d) {
-            static_cast<ParamLaneContextPopup*>(d)->doAddDrum();
-        }, this);
-        addPianorollBtn->callback([](Fl_Widget*, void* d) {
-            static_cast<ParamLaneContextPopup*>(d)->doAddPianoroll();
-        }, this);
         addParamBtn->callback([](Fl_Widget*, void* d) {
             static_cast<ParamLaneContextPopup*>(d)->doShowParamSubmenu();
         }, this);
@@ -109,10 +61,7 @@ public:
         auto hideSubmenuFn = [this]() {
             if (paramSubmenu) paramSubmenu->hide();
         };
-        addBtn->onEnter          = hideSubmenuFn;
-        addDrumBtn->onEnter      = hideSubmenuFn;
-        addPianorollBtn->onEnter = hideSubmenuFn;
-        removeBtn->onEnter       = hideSubmenuFn;
+        removeBtn->onEnter = hideSubmenuFn;
 
         paramSubmenu = new ParameterSubmenu();
         paramSubmenu->onSelect = [this](const char* type) {

@@ -53,11 +53,14 @@ int main(int argc, char **argv) {
     window.end();
 
     ObservableSong songTimeline(120.0f, 4, 4);
-    songTimeline.defaultOutputInstrument = "Instrument 1";
     ObservablePattern patternObs(&songTimeline);
     {
+        // Create an initial track matching the default instrument name.
+        // pushInstruments() (called inside app.build()) will sync this track
+        // with the overlay's "Instrument 1" entry and set defaultOutputInstrument.
         int patId = patternObs.createPattern(LuvieApp::numPatternBeats);
-        songTimeline.addTrack("T1", patId);
+        songTimeline.setPatternName(patId, "Pat 1");
+        songTimeline.addTrack("Instrument 1", patId);
     }
 
     JackTransport  jackTransport;

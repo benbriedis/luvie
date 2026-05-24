@@ -130,6 +130,16 @@ void TrackLabels::draw()
     const auto& tl  = timeline->get();
     const auto& ro  = tl.rowOrder;
 
+    // Helper: get pattern display name for a given patternId and fallback lane number
+    auto patName = [&](int patId, int laneNum) -> std::string {
+        for (const auto& p : tl.patterns)
+            if (p.id == patId)
+                return p.name.empty() ? ("Pat " + std::to_string(laneNum)) : p.name;
+        return "Pat " + std::to_string(laneNum);
+    };
+
+    static constexpr int instrHeaderH = 14;  // thin instrument-name strip for unstacked multi-lane tracks
+
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         if (i == editingAbsRow) continue;  // input widget draws itself
@@ -147,11 +157,12 @@ void TrackLabels::draw()
                 fl_rectf(x(), ry, w(), rowHeight);
                 fl_color(colBorder);
                 fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
-                fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                 int tIdx = timeline->trackIndexForLaneId(ref.id);
                 if (tIdx >= 0) {
                     const auto& track = tl.tracks[tIdx];
                     bool isFirstLane  = (!track.lanes.empty() && track.lanes[0].id == ref.id);
+                    bool isMultiLane  = (int)track.lanes.size() > 1;
+                    bool isUnstacked  = !track.stackedLanes;
 
                     // Track boundary: strong 2-px divider at top of each track's first lane
                     if (isFirstLane && ry > y()) {
@@ -162,9 +173,40 @@ void TrackLabels::draw()
                     int laneNum = 1;
                     for (int j = 0; j < (int)track.lanes.size(); j++)
                         if (track.lanes[j].id == ref.id) { laneNum = j + 1; break; }
-                    std::string lbl = track.label + "P" + std::to_string(laneNum);
-                    fl_draw(lbl.c_str(), x() + 4, ry, w() - 8, rowHeight,
-                            FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+
+                    if (isMultiLane && isUnstacked && isFirstLane) {
+                        // ── Unstacked multi-lane, first lane ──
+                        // Thin coloured header strip: instrument name
+                        fl_color(colTrackDiv);
+                        fl_rectf(x(), ry, w(), instrHeaderH);
+                        fl_font(FL_HELVETICA, 9);
+                        fl_color(colNormal);
+                        fl_draw(track.label.c_str(), x() + 4, ry, w() - 8, instrHeaderH,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                        // Pattern name in the remaining row area below the strip
+                        fl_font(FL_HELVETICA, 11);
+                        fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
+                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum).c_str(),
+                                x() + 4, ry + instrHeaderH, w() - 8, rowHeight - instrHeaderH,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                    } else if (isMultiLane && isUnstacked && !isFirstLane) {
+                        // ── Unstacked multi-lane, subsequent lanes ── just pattern name
+                        fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
+                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum).c_str(),
+                                x() + 4, ry, w() - 8, rowHeight,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                    } else {
+                        // ── Single-lane or stacked: instrument name (small) + pattern name ──
+                        fl_font(FL_HELVETICA, 9);
+                        fl_color(fl_color_average(colText, bg, 0.55f));
+                        fl_draw(track.label.c_str(), x() + 4, ry, w() - 8, rowHeight / 2,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_BOTTOM);
+                        fl_font(FL_HELVETICA, 11);
+                        fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
+                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum).c_str(),
+                                x() + 4, ry + rowHeight / 2, w() - 8, rowHeight / 2,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_TOP);
+                    }
                 }
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
@@ -236,14 +278,8 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
-            if (Fl::event_clicks() == 1) {
-                // Double-click: start edit immediately, no drag
-                startEdit(row);
-                dragStartRow = -1;
-                return 1;
-            }
-
             // Single click: record potential drag start; commit on release
+            // (double-click editing disabled — track labels mirror instrument names)
             dragStartRow = row;
             dragStartY   = Fl::event_y();
             dragging     = false;

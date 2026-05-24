@@ -71,6 +71,7 @@ static json patternToJson(const Pattern& p) {
         {"drumSolo",          jdrumSolo},
         {"drumMute",          jdrumMute},
         {"outputInstrumentName", p.outputInstrumentName},
+        {"name",              p.name},
         {"timeSigTop",        p.timeSigTop},
         {"timeSigBottom",     p.timeSigBottom},
     };
@@ -82,6 +83,7 @@ static Pattern patternFromJson(const json& j) {
     p.lengthBeats       = j.at("lengthBeats");
     p.type              = (PatternType)j.value("type", 0);
     p.outputInstrumentName = j.value("outputInstrumentName", j.value("outputChannelName", ""));
+    p.name              = j.value("name", "");
     p.timeSigTop        = j.value("timeSigTop",    4);
     p.timeSigBottom     = j.value("timeSigBottom", 4);
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));

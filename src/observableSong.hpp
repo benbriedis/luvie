@@ -45,6 +45,7 @@ public:
     void selectTrack(int index);
     void selectLane(int trackIndex, int laneId);
     int  addLane(int trackId);
+    int  addPianorollLane(int trackId);
     void removeLane(int trackId, int laneId);
     void setStackedLanes(int trackId, bool stacked);
     int  trackIndexForId(int trackId) const;
@@ -64,6 +65,9 @@ public:
 
     // Rename all pattern output instrument assignments across the whole song.
     void renamePatternOutputInstrument(const std::string& oldName, const std::string& newName);
+
+    // Set the display name of a pattern (scoped within its track, e.g. "Pat 1").
+    void setPatternName(int patId, std::string name);
 
     // Pattern instance management (instances identified by stable id)
     void addPattern(int trackIndex, float startBar, float length, float patternBeats = 0.0f);
