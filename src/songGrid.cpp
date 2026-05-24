@@ -551,15 +551,18 @@ void SongGrid::openContextMenu(int idx)
     if (!songPopup) { Grid::openContextMenu(idx); return; }
     int absRow   = (int)notes[idx].pitch + rowOffset;
     int trackIdx = -1;
+    int laneId   = -1;
     if (timeline) {
         const auto& ro = timeline->get().rowOrder;
-        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
-            trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
+        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
+            laneId   = ro[absRow].id;
+            trackIdx = timeline->trackIndexForLaneId(laneId);
+        }
     }
     songPopup->open(&notes, idx, this,
         makeDeleteCallback(idx),
         (onOpenPattern && trackIdx >= 0)
-            ? std::function<void()>([this, trackIdx]() { onOpenPattern(trackIdx); })
+            ? std::function<void()>([this, trackIdx, laneId]() { onOpenPattern(trackIdx, laneId); })
             : nullptr);
 }
 
@@ -647,8 +650,9 @@ void SongGrid::onNoteDoubleClick(int noteIdx)
     int absRow = (int)notes[noteIdx].pitch + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
-        int trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
-        if (trackIdx >= 0) onPatternDoubleClick(trackIdx);
+        int laneId   = ro[absRow].id;
+        int trackIdx = timeline->trackIndexForLaneId(laneId);
+        if (trackIdx >= 0) onPatternDoubleClick(trackIdx, laneId);
     }
 }
 
@@ -673,12 +677,12 @@ void SongGrid::toggleNote()
         [=](const Note& n) { return (int)n.pitch == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
     const auto& ro = timeline->get().rowOrder;
     if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
-        int trackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
-        if (trackIdx >= 0) {
-            const auto& trk = timeline->get().tracks[trackIdx];
-            int patId = trk.lanes.empty() ? 0 : trk.lanes[0].patternId;
-            if (patId > 0)
-                timeline->placePattern(trackIdx, patId, col, 1.0f);
-        }
+        int laneId = ro[absRow].id;
+        int patId  = 0;
+        for (const auto& t : timeline->get().tracks)
+            for (const auto& l : t.lanes)
+                if (l.id == laneId) { patId = l.patternId; break; }
+        if (patId > 0)
+            timeline->placePattern(laneId, patId, col, 1.0f);
     }
 }

@@ -50,8 +50,8 @@ public:
     SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
     ~SongGrid();
 
-    std::function<void(int trackIndex)> onPatternDoubleClick;
-    std::function<void(int trackIndex)> onOpenPattern;
+    std::function<void(int trackIndex, int laneId)> onPatternDoubleClick;
+    std::function<void(int trackIndex, int laneId)> onOpenPattern;
 
     void setSongPopup(SongPopup* p)         { songPopup = p; }
     void setParamDotPopup(ParamDotPopup* p) { paramDotPopup = p; }

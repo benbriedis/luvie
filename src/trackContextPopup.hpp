@@ -49,7 +49,7 @@ public:
 
     TrackContextPopup();
 
-    std::function<void(int trackIndex)>  onOpenPattern;
+    std::function<void(int trackIndex, int laneId)> onOpenPattern;
 
     void open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy);
 };

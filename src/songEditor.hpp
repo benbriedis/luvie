@@ -45,8 +45,8 @@ public:
                float snap, Popup& popup);
     ~SongEditor();
 
-    std::function<void(int trackIndex)>            onPatternDoubleClick;
-    std::function<void(int trackIndex)>            onOpenPattern;
+    std::function<void(int trackIndex, int laneId)> onPatternDoubleClick;
+    std::function<void(int trackIndex, int laneId)> onOpenPattern;
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
     std::function<void(int numCols)>               onNumColsChanged;
 

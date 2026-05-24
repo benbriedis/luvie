@@ -147,7 +147,7 @@ void TrackContextPopup::doOpenPattern()
     hide();
     if (onOpenPattern && timeline) {
         int trackIdx = timeline->song()->trackIndexForId(targetTrackId);
-        if (trackIdx >= 0) onOpenPattern(trackIdx);
+        if (trackIdx >= 0) onOpenPattern(trackIdx, targetLaneId);
     }
 }
 

@@ -93,8 +93,8 @@ void SongEditor::setTransport(ITransport* t, ObservableSong* tl)
     playhead.setTransport(t, tl);
     playhead.onEndReached = [this]() { if (onEndReached) onEndReached(); };
     playhead.onTick       = [this]() { followPlayhead(); };
-    songGrid.onPatternDoubleClick = [this](int i) { if (onPatternDoubleClick) onPatternDoubleClick(i); };
-    songGrid.onOpenPattern        = [this](int i) { if (onOpenPattern) onOpenPattern(i); };
+    songGrid.onPatternDoubleClick = [this](int i, int laneId) { if (onPatternDoubleClick) onPatternDoubleClick(i, laneId); };
+    songGrid.onOpenPattern        = [this](int i, int laneId) { if (onOpenPattern) onOpenPattern(i, laneId); };
     songGrid.setTimeline(tl);
     trackLabels.setTimeline(tl);
     trackControls.setTimeline(tl);

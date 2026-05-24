@@ -45,10 +45,11 @@ void TrackControls::draw()
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         int ry = y() + (i - rowOffset) * rowHeight;
 
-        bool isTrack = false;
-        bool solo    = false;
-        bool mute    = false;
-        Fl_Color rowBg = colEmpty;
+        bool isTrack     = false;
+        bool isFirstLane = false;
+        bool solo        = false;
+        bool mute        = false;
+        Fl_Color rowBg   = colEmpty;
 
         if (timeline) {
             const auto& tl = timeline->get();
@@ -60,12 +61,10 @@ void TrackControls::draw()
                     int tid = timeline->trackIdForLaneId(ref.id);
                     for (const auto& t : tl.tracks) {
                         if (t.id != tid) continue;
-                        bool isFirstLane = (!t.lanes.empty() && t.lanes[0].id == ref.id);
-                        if (isFirstLane) {
-                            solo    = t.solo;
-                            mute    = t.mute;
-                            isTrack = true;
-                        }
+                        isFirstLane = (!t.lanes.empty() && t.lanes[0].id == ref.id);
+                        solo        = t.solo;
+                        mute        = t.mute;
+                        isTrack     = true;
                         break;
                     }
                 } else {
@@ -79,8 +78,8 @@ void TrackControls::draw()
         fl_color(colBorder);
         fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
 
-        // isTrack == isFirstLane in this widget; draw track divider there
-        if (isTrack && ry > y()) {
+        // Draw track divider only at the top of the first lane row.
+        if (isFirstLane && ry > y()) {
             fl_color(colTrackDiv);
             fl_rectf(x(), ry - 1, w(), 2);
         }

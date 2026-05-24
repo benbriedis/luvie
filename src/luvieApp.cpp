@@ -239,8 +239,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         bottomPane->notifySeek();
         if (onExtraSeek) onExtraSeek();
     };
-    auto openPatternTab = [this, song, tab2](int trackIndex) {
-        song->selectTrack(trackIndex);
+    auto openPatternTab = [this, song, tab2](int trackIndex, int laneId) {
+        song->selectLane(trackIndex, laneId);
         tabs->value(tab2);
         tabs->redraw();
     };

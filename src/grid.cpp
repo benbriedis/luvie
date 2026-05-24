@@ -94,6 +94,7 @@ int Grid::handle(int event)
                 float grabY   = h->grabY;
                 if (Fl::event_clicks() == 1) {
                     onNoteDoubleClick(noteIdx);
+                    creationForbidden = true;  // prevent FL_RELEASE from calling toggleNote
                 } else {
                     Point orig = {(int)notes[noteIdx].pitch, notes[noteIdx].beat};
                     onBeginDrag(noteIdx);
