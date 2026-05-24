@@ -352,3 +352,56 @@ MAJOR ISSUE:
 
 Found a bug: In "Loop" mode notes sometimes stop playing
 
+-------------------------------------------
+
+
+
+
+TODO Alsa connection
+TODO standalone transport
+
+TODO names as they appear in pattern editor dont include the entire name
+
+TODO one track per instrument.
+     Maybe change UI terminology to "Instrument" from "Track" (but keep in code)
+     
+- Change track names to 'Piano' etc.
+- Replace 'Add track' with 'Add instrument' and popup up instrument overlay
+
+- Abstract out Context Menu?     
+
+Solo & Mute options
+1. Leave as is
+2. Just place on top track
+3. Deal with patterns separately
+
+Double-clicking on pattern instances is weird...
+   eg create then click opens pattern
+   very slow double clicks seem to work 
+
+  There were also two items from the original design that haven't been implemented yet and weren't explicitly phased:
+
+  1. ParamLanes scoped to Track — currently paramLanes still live at Timeline root (song-global). The original design had them move inside each Track. The context popup's "Add
+  automation" option still adds a song-level param lane; it was meant to eventually add a track-scoped one.
+  2. midiChannel on Track — the plan mentioned Track.midiChannel for explicit MIDI routing, but this was never added to the struct.
+
+
+In Unstacked mode add a thin row containing the instrument name
+
+
+Cannot edit name of pattern on instrument in situ in Song editor
+
+Default name for pianoroll: 'pianoroll'
+Default name for drums: 'Drums'
+
+LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
+ 
+Pattern editor - remove the marquee gaps. Add scrollbars. Constant width and heights. remove P1, P2, etc labels.
+   Allow reordering.
+ 
+BUG: Song Editor - reordering a row containing the instrument label is weird when there are multiple patterns.
+ 
+NOTE:  Song Editor - could allow an instrument without a pattern
+
+ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
+
