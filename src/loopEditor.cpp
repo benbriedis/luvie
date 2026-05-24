@@ -147,6 +147,9 @@ static constexpr Fl_Color btnHoverBg     = 0x4B556300;
 static constexpr Fl_Color btnActiveBg    = 0x3B82F600;
 static constexpr Fl_Color btnActiveHover = 0x5B92FF00;
 static constexpr Fl_Color btnBorder      = 0xCBD5E100;
+static constexpr Fl_Color headerBg       = 0x1E293B00;
+static constexpr Fl_Color headerText     = 0xCBD5E100;
+static constexpr Fl_Color emptyCell      = 0x1E293B00;
 
 // ======================================================
 // LoopEditor
@@ -157,7 +160,21 @@ LoopEditor::LoopEditor(int x, int y, int w, int h)
 {
     box(FL_NO_BOX);
     panel = new LoopPanel(x, y + h - panelH, w, panelH);
+
+    axisToggleBtn = new ModernButton(0, 0, toggleBtnW, toggleBtnH, "Flip");
+    axisToggleBtn->color(0x37415100);
+    axisToggleBtn->labelcolor(headerText);
+    axisToggleBtn->setBorderColor(btnBorder);
+    axisToggleBtn->setBorderWidth(1);
+    axisToggleBtn->callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<LoopEditor*>(d);
+        self->tracksAsColumns = !self->tracksAsColumns;
+        self->positionToggleBtn();
+        self->redraw();
+    }, this);
+
     end();
+    positionToggleBtn();
 }
 
 LoopEditor::~LoopEditor()
@@ -201,21 +218,128 @@ void LoopEditor::timerCb(void* data)
     Fl::repeat_timeout(interval, timerCb, data);
 }
 
-bool LoopEditor::isEnabled(int trackIdx) const
+// ======================================================
+// Grid helpers
+// ======================================================
+
+int LoopEditor::maxLanes() const
+{
+    if (!timeline) return 1;
+    const auto& tracks = timeline->get().tracks;
+    int mx = 1;
+    for (const auto& t : tracks)
+        mx = std::max(mx, (int)t.lanes.size());
+    return mx;
+}
+
+int LoopEditor::numCols() const
+{
+    if (!timeline) return 1;
+    return tracksAsColumns
+        ? (int)timeline->get().tracks.size()
+        : maxLanes();
+}
+
+int LoopEditor::numRows() const
+{
+    if (!timeline) return 1;
+    return tracksAsColumns
+        ? maxLanes()
+        : (int)timeline->get().tracks.size();
+}
+
+int LoopEditor::topStripH() const
+{
+    // Mode A: track names are column headers → always show
+    // Mode B: "P1/P2" labels are column headers → only if multiple pattern slots
+    return tracksAsColumns ? trackHeaderH : (maxLanes() > 1 ? patLabelH : 0);
+}
+
+int LoopEditor::leftStripW() const
+{
+    // Mode A: "P1/P2" labels on left → only if multiple pattern slots
+    // Mode B: track names on left → always show
+    return tracksAsColumns ? (maxLanes() > 1 ? patLabelW : 0) : trackHeaderW;
+}
+
+void LoopEditor::btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const
+{
+    int nc = numCols();
+    int nr = numRows();
+    int lsw = leftStripW();
+    int tsh = topStripH();
+
+    int gx = x() + padX + lsw;
+    int gy = y() + padY + tsh;
+
+    int availW = w() - 2 * padX - lsw;
+    int availH = gridAreaH() - 2 * padY - tsh;
+
+    bw = nc > 0 ? (availW - (nc - 1) * btnGap) / nc : availW;
+    int rawH = nr > 0 ? (availH - (nr - 1) * btnGap) / nr : availH;
+    bh = std::max(40, std::min(btnH, rawH));
+
+    bx = gx + col * (bw + btnGap);
+    by = gy + row * (bh + btnGap);
+}
+
+bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx) const
+{
+    if (!timeline) return false;
+    const auto& tracks = timeline->get().tracks;
+    int nc = numCols();
+    int nr = numRows();
+    for (int col = 0; col < nc; col++) {
+        for (int row = 0; row < nr; row++) {
+            int bx, by, bw, bh;
+            btnRect(col, row, bx, by, bw, bh);
+            if (by + bh > y() + gridAreaH()) continue;
+            if (mx < bx || mx >= bx + bw) continue;
+            if (my < by || my >= by + bh) continue;
+            // Convert (col, row) → (trackIdx, laneIdx)
+            int ti = tracksAsColumns ? col : row;
+            int li = tracksAsColumns ? row : col;
+            if (ti >= (int)tracks.size()) return false;
+            if (li >= (int)tracks[ti].lanes.size()) return false;
+            trackIdx = ti;
+            laneIdx  = li;
+            return true;
+        }
+    }
+    return false;
+}
+
+void LoopEditor::positionToggleBtn()
+{
+    if (!axisToggleBtn) return;
+    int tsh = topStripH();
+    int ty  = y() + padY + (tsh > 0 ? (tsh - toggleBtnH) / 2 : 0);
+    int tx  = x() + w() - padX - toggleBtnW;
+    axisToggleBtn->resize(tx, ty, toggleBtnW, toggleBtnH);
+}
+
+// ======================================================
+// State queries
+// ======================================================
+
+bool LoopEditor::isEnabled(int trackIdx, int laneIdx) const
 {
     if (!timeline || !aps) return false;
     const auto& tracks = timeline->get().tracks;
     if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return false;
-    return aps->isPatternActive(tracks[trackIdx].lanes.empty() ? 0 : tracks[trackIdx].lanes[0].patternId);
+    if (laneIdx < 0 || laneIdx >= (int)tracks[trackIdx].lanes.size()) return false;
+    return aps->isPatternActive(tracks[trackIdx].lanes[laneIdx].patternId);
 }
 
-float LoopEditor::beatProgress(int trackIdx) const
+float LoopEditor::beatProgress(int trackIdx, int laneIdx) const
 {
     if (!transport || !timeline || !aps) return 0.0f;
     const auto& tl = timeline->get();
     if (trackIdx < 0 || trackIdx >= (int)tl.tracks.size()) return 0.0f;
+    const auto& track = tl.tracks[trackIdx];
+    if (laneIdx < 0 || laneIdx >= (int)track.lanes.size()) return 0.0f;
 
-    int patId = tl.tracks[trackIdx].lanes.empty() ? 0 : tl.tracks[trackIdx].lanes[0].patternId;
+    int patId = track.lanes[laneIdx].patternId;
     const Pattern* pat = nullptr;
     for (const auto& p : tl.patterns)
         if (p.id == patId) { pat = &p; break; }
@@ -248,6 +372,7 @@ void LoopEditor::setContextPopup(TrackContextPopup* popup)
 
 void LoopEditor::onTimelineChanged()
 {
+    positionToggleBtn();
     redraw();
 }
 
@@ -256,74 +381,151 @@ void LoopEditor::onActivePatternsChanged()
     redraw();
 }
 
-void LoopEditor::btnRect(int idx, int& bx, int& by, int& bw, int& bh) const
-{
-    int available = w() - 2 * padX;
-    bw = (available - (cols - 1) * btnGap) / cols;
-    bh = btnH;
-    bx = x() + padX + (idx % cols) * (bw + btnGap);
-    by = y() + padY + (idx / cols) * (btnH + btnGap);
-}
-
-int LoopEditor::trackAt(int mx, int my) const
-{
-    if (!timeline) return -1;
-    int n = (int)timeline->get().tracks.size();
-    for (int i = 0; i < n; i++) {
-        int bx, by, bw, bh;
-        btnRect(i, bx, by, bw, bh);
-        if (by >= y() + gridAreaH()) break;
-        if (mx >= bx && mx < bx + bw && my >= by && my < by + bh) return i;
-    }
-    return -1;
-}
+// ======================================================
+// Draw
+// ======================================================
 
 void LoopEditor::draw()
 {
     // Grid area background
-    fl_color(FL_WHITE);
+    fl_color(0x0F172A00);  // dark navy
     fl_rectf(x(), y(), w(), gridAreaH());
 
     fl_push_clip(x(), y(), w(), gridAreaH());
 
     if (timeline) {
-        const auto& tracks = timeline->get().tracks;
-        int n = (int)tracks.size();
+        const auto& tl     = timeline->get();
+        const auto& tracks = tl.tracks;
+        int nc   = numCols();
+        int nr   = numRows();
+        int lsw  = leftStripW();
+        int tsh  = topStripH();
 
-        fl_font(FL_HELVETICA_BOLD, 14);
-        for (int i = 0; i < n; i++) {
-            int bx, by, bw, bh;
-            btnRect(i, bx, by, bw, bh);
-            if (by >= y() + gridAreaH()) break;
+        // ---- Column headers (top strip) ----
+        if (tsh > 0) {
+            fl_color(headerBg);
+            fl_rectf(x() + padX + lsw, y() + padY, w() - 2 * padX - lsw - toggleBtnW - 4, tsh);
 
-            bool isToggled = aps && aps->isPatternActive(tracks[i].lanes.empty() ? 0 : tracks[i].lanes[0].patternId);
-            bool isHovered = i == hoveredIdx;
+            fl_font(FL_HELVETICA_BOLD, 11);
+            fl_color(headerText);
 
-            Fl_Color bg = isToggled ? (isHovered ? btnActiveHover : btnActiveBg)
-                                    : (isHovered ? btnHoverBg     : btnInactiveBg);
-            fl_color(bg);
-            fl_rectf(bx, by, bw, bh);
+            for (int col = 0; col < nc; col++) {
+                int bx, by, bw, bh;
+                btnRect(col, 0, bx, by, bw, bh);
+                int hx = bx, hy = y() + padY, hw = bw, hh = tsh;
 
-            fl_color(btnBorder);
-            fl_rect(bx, by, bw, bh);
+                const char* label = nullptr;
+                char buf[16];
+                if (tracksAsColumns) {
+                    // track name
+                    int ti = col;
+                    if (ti < (int)tracks.size())
+                        label = tracks[ti].label.c_str();
+                } else {
+                    // "P1", "P2", etc.
+                    std::snprintf(buf, sizeof(buf), "P%d", col + 1);
+                    label = buf;
+                }
+                if (label)
+                    fl_draw(label, hx, hy, hw, hh, FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+            }
+        }
 
-            fl_color(FL_WHITE);
-            fl_draw(tracks[i].label.c_str(), bx + 4, by, bw - 8, bh,
-                    FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+        // ---- Row labels (left strip) ----
+        if (lsw > 0) {
+            fl_color(headerBg);
+            fl_rectf(x() + padX, y() + padY + tsh, lsw - 2, gridAreaH() - 2 * padY - tsh);
 
-            // Playhead line – always running, regardless of toggle state
-            float progress = beatProgress(i);
-            int   lineX    = bx + (int)(progress * (bw - 1));
-            fl_color(isToggled ? 0xEF444400 : FL_WHITE);
-            fl_line_style(FL_SOLID, 2);
-            fl_line(lineX, by + 4, lineX, by + bh - 4);
-            fl_line_style(0);
+            fl_font(FL_HELVETICA_BOLD, 11);
+            fl_color(headerText);
+
+            for (int row = 0; row < nr; row++) {
+                int bx, by, bw, bh;
+                btnRect(0, row, bx, by, bw, bh);
+                int lx = x() + padX, ly = by, lw = lsw - 2, lh = bh;
+
+                const char* label = nullptr;
+                char buf[16];
+                if (tracksAsColumns) {
+                    // "P1", "P2", etc.
+                    std::snprintf(buf, sizeof(buf), "P%d", row + 1);
+                    label = buf;
+                } else {
+                    // track name
+                    int ti = row;
+                    if (ti < (int)tracks.size())
+                        label = tracks[ti].label.c_str();
+                }
+                if (label)
+                    fl_draw(label, lx, ly, lw, lh, FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+            }
+        }
+
+        // ---- Grid cells ----
+        fl_font(FL_HELVETICA_BOLD, 13);
+
+        for (int col = 0; col < nc; col++) {
+            for (int row = 0; row < nr; row++) {
+                int bx, by, bw, bh;
+                btnRect(col, row, bx, by, bw, bh);
+                if (by + bh > y() + gridAreaH()) continue;
+
+                int ti = tracksAsColumns ? col : row;
+                int li = tracksAsColumns ? row : col;
+
+                // Empty cell — track has no lane at this index
+                if (ti >= (int)tracks.size() || li >= (int)tracks[ti].lanes.size()) {
+                    fl_color(emptyCell);
+                    fl_rectf(bx, by, bw, bh);
+                    fl_color(btnBorder);
+                    fl_line_style(FL_DASH, 1);
+                    fl_rect(bx, by, bw, bh);
+                    fl_line_style(0);
+                    continue;
+                }
+
+                int patId    = tracks[ti].lanes[li].patternId;
+                bool isOn    = aps && aps->isPatternActive(patId);
+                bool isHov   = (col == hoveredCol && row == hoveredRow);
+
+                Fl_Color bg = isOn ? (isHov ? btnActiveHover : btnActiveBg)
+                                   : (isHov ? btnHoverBg     : btnInactiveBg);
+                fl_color(bg);
+                fl_rectf(bx, by, bw, bh);
+
+                fl_color(btnBorder);
+                fl_line_style(FL_SOLID, 1);
+                fl_rect(bx, by, bw, bh);
+                fl_line_style(0);
+
+                // Pattern name
+                const char* patName = nullptr;
+                for (const auto& p : tl.patterns)
+                    if (p.id == patId) { patName = p.name.c_str(); break; }
+                if (patName) {
+                    fl_color(FL_WHITE);
+                    fl_draw(patName, bx + 4, by, bw - 8, bh,
+                            FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+                }
+
+                // Playhead line — always running, regardless of toggle state
+                float progress = beatProgress(ti, li);
+                int   lineX    = bx + (int)(progress * (bw - 1));
+                fl_color(isOn ? 0xEF444400 : 0xFFFFFF40);
+                fl_line_style(FL_SOLID, 2);
+                fl_line(lineX, by + 4, lineX, by + bh - 4);
+                fl_line_style(0);
+            }
         }
     }
 
     fl_pop_clip();
     draw_children();
 }
+
+// ======================================================
+// Handle
+// ======================================================
 
 int LoopEditor::handle(int event)
 {
@@ -335,22 +537,35 @@ int LoopEditor::handle(int event)
     case FL_ENTER:
         return 1;
     case FL_MOVE: {
-        int idx = trackAt(mx, my);
-        if (idx != hoveredIdx) { hoveredIdx = idx; redraw(); }
+        int ti = -1, li = -1;
+        int newCol = -1, newRow = -1;
+        if (cellAt(mx, my, ti, li)) {
+            newCol = tracksAsColumns ? ti : li;
+            newRow = tracksAsColumns ? li : ti;
+        }
+        if (newCol != hoveredCol || newRow != hoveredRow) {
+            hoveredCol = newCol;
+            hoveredRow = newRow;
+            redraw();
+        }
         return 1;
     }
     case FL_LEAVE:
-        if (hoveredIdx != -1) { hoveredIdx = -1; redraw(); }
+        if (hoveredCol != -1 || hoveredRow != -1) {
+            hoveredCol = hoveredRow = -1;
+            redraw();
+        }
         return 1;
     case FL_PUSH: {
-        int idx = trackAt(mx, my);
-        if (idx < 0) return 0;
+        int trackIdx = -1, laneIdx = -1;
+        if (!cellAt(mx, my, trackIdx, laneIdx)) return 0;
         take_focus();
+
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             if (timeline && aps) {
                 const auto& tracks = timeline->get().tracks;
-                if (idx < (int)tracks.size()) {
-                    int   patId = tracks[idx].lanes.empty() ? 0 : tracks[idx].lanes[0].patternId;
+                if (trackIdx < (int)tracks.size() && laneIdx < (int)tracks[trackIdx].lanes.size()) {
+                    int   patId = tracks[trackIdx].lanes[laneIdx].patternId;
                     float bar   = transport ? transport->position() : 0.0f;
                     if (aps->isPatternActive(patId)) {
                         aps->deactivate(patId);
@@ -378,13 +593,11 @@ int LoopEditor::handle(int event)
             return 1;
         }
         if (Fl::event_button() == FL_RIGHT_MOUSE && contextPopup && patternObs) {
-            int trackId = (idx >= 0 && idx < (int)patternObs->get().tracks.size())
-                          ? patternObs->get().tracks[idx].id : -1;
-            int laneId = -1;
-            if (idx >= 0 && idx < (int)patternObs->get().tracks.size()) {
-                const auto& t = patternObs->get().tracks[idx];
-                if (!t.lanes.empty()) laneId = t.lanes[0].id;
-            }
+            const auto& tracks = patternObs->get().tracks;
+            int trackId = trackIdx < (int)tracks.size() ? tracks[trackIdx].id : -1;
+            int laneId  = -1;
+            if (trackIdx < (int)tracks.size() && laneIdx < (int)tracks[trackIdx].lanes.size())
+                laneId = tracks[trackIdx].lanes[laneIdx].id;
             contextPopup->open(trackId, laneId, patternObs,
                                Fl::event_x_root(), Fl::event_y_root());
             return 1;
@@ -396,8 +609,13 @@ int LoopEditor::handle(int event)
     }
 }
 
+// ======================================================
+// Resize
+// ======================================================
+
 void LoopEditor::resize(int x, int y, int w, int h)
 {
     Fl_Group::resize(x, y, w, h);
     if (panel) panel->resize(x, y + h - panelH, w, panelH);
+    positionToggleBtn();
 }
