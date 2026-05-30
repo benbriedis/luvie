@@ -29,7 +29,6 @@ TrackContextPopup::TrackContextPopup()
     addLaneBtn          = makeItem(1 + 3*btnH, popW, "Add Pattern");
     addPianorollLaneBtn = makeItem(1 + 4*btnH, popW, "Add Pianoroll");
     removeLaneBtn       = makeItem(1 + 5*btnH, popW, "Remove Pattern");
-    stackLanesBtn       = makeItem(1 + 6*btnH, popW, "Stack Patterns");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doOpenPattern();
@@ -49,9 +48,6 @@ TrackContextPopup::TrackContextPopup()
     removeLaneBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doRemoveLane();
     }, this);
-    stackLanesBtn->callback([](Fl_Widget*, void* d) {
-        static_cast<TrackContextPopup*>(d)->doToggleStackLanes();
-    }, this);
 
     // Hovering any non-submenu button hides the parameter submenu.
     auto hideSubmenuFn = [this]() {
@@ -62,7 +58,6 @@ TrackContextPopup::TrackContextPopup()
     addLaneBtn->onEnter          = hideSubmenuFn;
     addPianorollLaneBtn->onEnter = hideSubmenuFn;
     removeLaneBtn->onEnter       = hideSubmenuFn;
-    stackLanesBtn->onEnter       = hideSubmenuFn;
 
     paramSubmenu = new ParameterSubmenu();
     paramSubmenu->onSelect = [this](const char* type) {
@@ -101,16 +96,12 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
     // Configure lane/stack buttons based on track state
     bool canRemoveLane  = false;
     bool canOpenPattern = false;
-    bool isStacked      = false;
-    bool hasMultiLane   = false;
     bool isDrumTrack    = false;
     if (tl) {
         for (const auto& t : tl->get().tracks) {
             if (t.id != trackId) continue;
-            hasMultiLane  = (int)t.lanes.size() > 1;
-            isStacked     = t.stackedLanes;
-            canRemoveLane = !isStacked && !t.lanes.empty();
-            canOpenPattern = !t.lanes.empty();
+            canRemoveLane  = !t.stackedLanes && !t.lanes.empty();
+            canOpenPattern = !t.lanes.empty() && !t.stackedLanes;
             // Determine track type from first lane's pattern
             if (!t.lanes.empty()) {
                 int patId = t.lanes[0].patternId;
@@ -120,11 +111,9 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
             break;
         }
     }
-    canOpenPattern ? openPatternBtn->activate()      : openPatternBtn->deactivate();
-    canRemoveLane  ? removeLaneBtn->activate()      : removeLaneBtn->deactivate();
-    hasMultiLane   ? stackLanesBtn->activate()      : stackLanesBtn->deactivate();
-    isDrumTrack   ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
-    stackLanesBtn->label(isStacked ? "Unstack Patterns" : "Stack Patterns");
+    canOpenPattern ? openPatternBtn->activate()        : openPatternBtn->deactivate();
+    canRemoveLane  ? removeLaneBtn->activate()         : removeLaneBtn->deactivate();
+    isDrumTrack    ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
 
     position(wx, wy);
     if (auto* aw = dynamic_cast<AppWindow*>(window()))
@@ -179,13 +168,3 @@ void TrackContextPopup::doRemoveLane()
     if (auto* win = window()) win->redraw();
 }
 
-void TrackContextPopup::doToggleStackLanes()
-{
-    hide();
-    if (!timeline) return;
-    bool cur = false;
-    for (const auto& t : timeline->get().tracks)
-        if (t.id == targetTrackId) { cur = t.stackedLanes; break; }
-    timeline->song()->setStackedLanes(targetTrackId, !cur);
-    if (auto* win = window()) win->redraw();
-}

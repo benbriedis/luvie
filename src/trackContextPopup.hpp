@@ -8,7 +8,7 @@
 #include <functional>
 
 class TrackContextPopup : public BasePopup {
-    static constexpr int popH  = 7 * 30 + 2;  // +2 for border
+    static constexpr int popH  = 6 * 30 + 2;  // +2 for border
 
 public:
     static constexpr int popW  = 150;
@@ -22,7 +22,6 @@ private:
     ModernButton*       addLaneBtn;
     ModernButton*       addPianorollLaneBtn;
     ModernButton*       removeLaneBtn;
-    ModernButton*       stackLanesBtn;
     ObservablePattern*  timeline      = nullptr;
     int                 targetTrackId = -1;
     int                 targetLaneId  = -1;
@@ -34,7 +33,6 @@ private:
     void doAddLane();
     void doAddPianorollLane();
     void doRemoveLane();
-    void doToggleStackLanes();
 
 public:
     ParameterSubmenu*                    paramSubmenu = nullptr;
