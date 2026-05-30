@@ -629,12 +629,28 @@ int SongGrid::overlappingCell(int noteIdx) const
     const Note& a      = notes[noteIdx];
     float       aStart = a.beat, aEnd = a.beat + a.length;
     int         aLane  = timeline->laneIdForInstance(a.id);
+
+    // In unstacked mode each visual row is exactly one lane, so any overlap is
+    // forbidden. In stacked mode different lanes share a row, so only same-lane
+    // overlaps are forbidden.
+    int absRow = (int)a.row + rowOffset;
+    bool destUnstacked = false;
+    const auto& ro = timeline->get().rowOrder;
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
+        int destTrackIdx = timeline->trackIndexForLaneId(ro[absRow].id);
+        if (destTrackIdx >= 0) {
+            const auto& tracks = timeline->get().tracks;
+            destUnstacked = !tracks[destTrackIdx].stackedLanes;
+        }
+    }
+
     for (const auto [i, b] : std::views::enumerate(notes)) {
         if (i == noteIdx || b.row != a.row) continue;
         float bStart = b.beat, bEnd = b.beat + b.length;
         float firstEnd    = aStart <= bStart ? aEnd   : bEnd;
         float secondStart = aStart <= bStart ? bStart : aStart;
         if (firstEnd > secondStart) {
+            if (destUnstacked) return i;
             int bLane = timeline->laneIdForInstance(b.id);
             if (aLane < 0 || bLane < 0 || aLane == bLane)
                 return i;
