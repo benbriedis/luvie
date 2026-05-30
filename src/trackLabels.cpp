@@ -300,16 +300,7 @@ void TrackLabels::draw()
                                 x() + 4, ry, w() - 8, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
                     } else {
-                        // ── Single-lane or stacked: instrument name (small) + pattern name ──
-                        fl_font(FL_HELVETICA, 9);
-                        fl_color(fl_color_average(colText, bg, 0.55f));
-                        fl_draw(track.label.c_str(), x() + 4, ry, w() - 8, rh / 2,
-                                FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_BOTTOM);
-                        fl_font(FL_HELVETICA, 11);
-                        fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
-                                x() + 4, ry + rh / 2, w() - 8, rh / 2,
-                                FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_TOP);
+                        // Stacked lane rows: no label (instrument name is in header row)
                     }
                 }
             } else {
