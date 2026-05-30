@@ -3,16 +3,18 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 
-static constexpr Fl_Color colNormal   = 0x1F293700;
-static constexpr Fl_Color colParam    = 0x1A2B3A00;
-static constexpr Fl_Color colEmpty    = 0x17202A00;
-static constexpr Fl_Color colBorder   = 0x37415100;
-static constexpr Fl_Color colTrackDiv = 0x64748B00;
-static constexpr Fl_Color colBtnOff  = 0x29354800;
-static constexpr Fl_Color colSoloOn  = 0x22C55E00;
-static constexpr Fl_Color colMuteOn  = 0xEF444400;
-static constexpr Fl_Color colTextOn  = FL_WHITE;
-static constexpr Fl_Color colTextOff = 0x64748B00;
+static constexpr Fl_Color colNormal      = 0x1F293700;
+static constexpr Fl_Color colParam       = 0x1A2B3A00;
+static constexpr Fl_Color colEmpty       = 0x17202A00;
+static constexpr Fl_Color colBorder      = 0x37415100;
+static constexpr Fl_Color colTrackDiv    = 0x64748B00;
+static constexpr Fl_Color colInstrHeader = 0x64748B00;
+static constexpr Fl_Color colBtnOff     = 0x29354800;
+static constexpr Fl_Color colSoloOn     = 0x22C55E00;
+static constexpr Fl_Color colMuteOn     = 0xEF444400;
+static constexpr Fl_Color colTextOn     = FL_WHITE;
+static constexpr Fl_Color colTextOff    = 0x64748B00;
+static constexpr int      instrNameRowH = 24;
 
 TrackControls::TrackControls(int x, int y, int w, int numVisibleRows, int rowHeight)
     : Fl_Widget(x, y, w, numVisibleRows * rowHeight),
@@ -37,26 +39,57 @@ void TrackControls::setRowOffset(int offset)
     redraw();
 }
 
+static int rowHFor(const Timeline* tl, int absRow, int rowHeight) {
+    if (!tl) return rowHeight;
+    const auto& ro = tl->rowOrder;
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader)
+        return instrNameRowH;
+    return rowHeight;
+}
+
+static int rowYInPanel(const Timeline* tl, int rowOffset, int absRow, int rowHeight) {
+    int py = 0;
+    for (int i = rowOffset; i < absRow; i++)
+        py += rowHFor(tl, i, rowHeight);
+    return py;
+}
+
+static int absRowAtPanelY(const Timeline* tl, int rowOffset, int numVisibleRows, int py, int rowHeight) {
+    int cumY = 0;
+    for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
+        int rh = rowHFor(tl, i, rowHeight);
+        if (py < cumY + rh) return i;
+        cumY += rh;
+    }
+    return rowOffset + numVisibleRows;
+}
+
 void TrackControls::draw()
 {
     int btnH = rowHeight / 2;
     int pad  = 1;
+    const Timeline* tl_ = timeline ? &timeline->get() : nullptr;
 
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
-        int ry = y() + (i - rowOffset) * rowHeight;
+        int rh = rowHFor(tl_, i, rowHeight);
+        int ry = y() + rowYInPanel(tl_, rowOffset, i, rowHeight);
 
-        bool isTrack     = false;
-        bool isFirstLane = false;
-        bool solo        = false;
-        bool mute        = false;
-        Fl_Color rowBg   = colEmpty;
+        bool isInstrHeader = false;
+        bool isTrack       = false;
+        bool isFirstLane   = false;
+        bool solo          = false;
+        bool mute          = false;
+        Fl_Color rowBg     = colEmpty;
 
         if (timeline) {
             const auto& tl = timeline->get();
             const auto& ro = tl.rowOrder;
             if (i >= 0 && i < (int)ro.size()) {
                 const auto& ref = ro[i];
-                if (ref.isTrack) {
+                if (ref.isInstrumentHeader) {
+                    rowBg        = colInstrHeader;
+                    isInstrHeader = true;
+                } else if (ref.isTrack) {
                     rowBg = colNormal;
                     int tid = timeline->trackIdForLaneId(ref.id);
                     for (const auto& t : tl.tracks) {
@@ -74,14 +107,31 @@ void TrackControls::draw()
         }
 
         fl_color(rowBg);
-        fl_rectf(x(), ry, w(), rowHeight);
+        fl_rectf(x(), ry, w(), rh);
         fl_color(colBorder);
-        fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+        fl_line(x(), ry + rh - 1, x() + w() - 1, ry + rh - 1);
 
-        // Draw track divider only at the top of the first lane row.
-        if (isFirstLane && ry > y()) {
-            fl_color(colTrackDiv);
-            fl_rectf(x(), ry - 1, w(), 2);
+        // Draw track divider at the top of instrument header rows or first-lane of single/stacked tracks
+        if (ry > y()) {
+            bool drawDiv = isInstrHeader;
+            if (!drawDiv && isFirstLane && isTrack) {
+                // Only for single-lane/stacked — multi-lane unstacked has the header row
+                if (timeline) {
+                    const auto& tl = timeline->get();
+                    const auto& ro = tl.rowOrder;
+                    if (i >= 0 && i < (int)ro.size() && ro[i].isTrack) {
+                        int tIdx = timeline->trackIndexForLaneId(ro[i].id);
+                        if (tIdx >= 0) {
+                            const auto& t = tl.tracks[tIdx];
+                            drawDiv = t.stackedLanes;
+                        }
+                    }
+                }
+            }
+            if (drawDiv) {
+                fl_color(colTrackDiv);
+                fl_rectf(x(), ry - 1, w(), 2);
+            }
         }
 
         if (!isTrack) continue;
@@ -115,14 +165,17 @@ int TrackControls::handle(int event)
 
     if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE && timeline) {
         int localY = Fl::event_y() - y();
-        int row    = localY / rowHeight + rowOffset;
+        const Timeline* tl_ = &timeline->get();
+        int row    = absRowAtPanelY(tl_, rowOffset, numVisibleRows, localY, rowHeight);
         const auto& tl = timeline->get();
         const auto& ro = tl.rowOrder;
         if (row < 0 || row >= (int)ro.size() || !ro[row].isTrack)
             return 1;
 
+        int rowPY   = rowYInPanel(tl_, rowOffset, row, rowHeight);
+        int rowH_   = rowHFor(tl_, row, rowHeight);
         int trackId = timeline->trackIdForLaneId(ro[row].id);
-        bool isSolo = (localY % rowHeight) < rowHeight / 2;
+        bool isSolo = (localY - rowPY) < rowH_ / 2;
 
         for (const auto& t : tl.tracks) {
             if (t.id != trackId) continue;

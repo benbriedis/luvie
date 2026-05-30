@@ -36,13 +36,13 @@ void Grid::draw()
         Fl_Color rc = rowBgColor(r);
         if (rc != bgColor) {
             fl_color(rc);
-            fl_rectf(x(), y() + r * rowHeight, gridRight, rowHeight);
+            fl_rectf(x(), y() + rowY(r), gridRight, rowH(r));
         }
     }
 
     for (int i = 0; i < numRows + 1; i++) {
         fl_color(rowLineColor(i));
-        fl_line(x(), y() + i * rowHeight, x() + gridRight, y() + i * rowHeight);
+        fl_line(x(), y() + rowY(i), x() + gridRight, y() + rowY(i));
     }
 
     int endCol = colOffset + w() / colWidth + 2;
@@ -54,21 +54,22 @@ void Grid::draw()
 
     for (const Note& note : notes) {
         int x0    = x() + (int)((note.beat - colOffset) * colWidth);
-        int y0    = y() + (int)(note.row * rowHeight);
+        int y0    = y() + rowY((int)note.row);
+        int rh    = rowH((int)note.row);
         int width = (int)(note.length * colWidth);
         if (x0 + width < x() || x0 > x() + w()) continue;
         Fl_Color fill = 0x5555EE00;
         Fl_Color bar  = 0x1111EE00;
-        fl_rectf(x0, y0 + 1, width, rowHeight - 1, fill);
+        fl_rectf(x0, y0 + 1, width, rh - 1, fill);
         const int barWidth = 5;
         fl_color(bar);
         fl_line_style(FL_SOLID, barWidth);
-        fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rowHeight - 1);
+        fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rh - 1);
         fl_line_style(0);
     }
 
     if (playhead)
-        playhead->drawLine(x() - colOffset * colWidth, y(), numRows * rowHeight);
+        playhead->drawLine(x() - colOffset * colWidth, y(), rowY(numRows));
 
     fl_pop_clip();
 }
@@ -108,7 +109,7 @@ int Grid::handle(int event)
             } else {
                 // Idle — check whether note creation is allowed at click position
                 int   ex       = Fl::event_x() - x();
-                int   row      = (Fl::event_y() - y()) / rowHeight;
+                int   row      = rowAtPixelY(Fl::event_y() - y());
                 float col      = (float)(ex / colWidth) + colOffset;
                 int   gridRight = std::min(w(), (numCols - colOffset) * colWidth);
                 creationForbidden = ex >= gridRight;
@@ -182,10 +183,8 @@ void Grid::moving(StateDragMove& s)
     if (note->beat < 0.0f) note->beat = 0.0f;
     if (note->beat + note->length > numCols) note->beat = numCols - note->length;
     if (snap > 0.0f) note->beat = std::round(note->beat / snap) * snap;
-    float ey    = Fl::event_y() - y();
-    note->row  = (ey - s.grabY + rowHeight / 2.0f) / (float)rowHeight;
-    if (note->row < 0)        note->row = 0;
-    if (note->row >= numRows) note->row = numRows - 1;
+    float ey   = Fl::event_y() - y();
+    note->row  = (float)std::clamp(rowAtPixelY(std::max(0, (int)(ey - s.grabY))), 0, numRows - 1);
     s.overlapping = overlappingCell(s.noteIdx) >= 0;
     if (!s.overlapping) s.lastValid = {(int)note->row, note->beat};
     if (s.overlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
@@ -224,7 +223,7 @@ void Grid::findNoteForCursor()
     const int resizeZone = 5;
     float ex  = Fl::event_x() - x();
     int   ey  = Fl::event_y() - y();
-    int   row = ey / rowHeight;
+    int   row = rowAtPixelY(ey);
 
     int  resizeIdx  = -1;
     Side resizeSide = Side::Left;
@@ -239,7 +238,7 @@ void Grid::findNoteForCursor()
         } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
-            state = StateHoverMove{(int)i, ex - leftEdge, ey - (int)n.row * rowHeight};
+            state = StateHoverMove{(int)i, ex - leftEdge, (float)(ey - rowY((int)n.row))};
             window()->cursor(contextMenuCursorImage(), 0, 0);
             redraw();
             return;
@@ -260,7 +259,7 @@ void Grid::toggleNote()
 {
     int   ex  = Fl::event_x() - x();
     int   ey  = Fl::event_y() - y();
-    int   row = ey / rowHeight;
+    int   row = rowAtPixelY(ey);
     float col = (float)(ex / colWidth) + colOffset;
 
     int size = notes.size();

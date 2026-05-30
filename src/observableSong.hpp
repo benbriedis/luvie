@@ -52,6 +52,7 @@ public:
     int  trackIndexForLaneId(int laneId) const;
     int  trackIdForLaneId(int laneId) const;
     void moveRow(int fromRowIdx, int toGapIdx);
+    void rebuildInstrumentHeaders();
 
     // Pattern lifecycle helpers (not note editing)
     int nextTrackNumberForType(PatternType type) const;

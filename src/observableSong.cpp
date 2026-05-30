@@ -74,7 +74,30 @@ void ObservableSong::loadTimeline(const Timeline& tl)
         if (idx >= 0 && idx < (int)data.tracks.size() && !data.tracks[idx].lanes.empty())
             data.selectedLaneId = data.tracks[idx].lanes[0].id;
     }
+    rebuildInstrumentHeaders();
     notify();
+}
+
+void ObservableSong::rebuildInstrumentHeaders()
+{
+    // Remove all existing instrument header rows
+    data.rowOrder.erase(
+        std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+            [](const RowRef& r) { return r.isInstrumentHeader; }),
+        data.rowOrder.end());
+
+    // Insert a header row before the first lane of each unstacked track
+    for (const auto& t : data.tracks) {
+        if (t.stackedLanes || t.lanes.empty()) continue;
+        int firstLaneId = t.lanes[0].id;
+        for (int i = 0; i < (int)data.rowOrder.size(); i++) {
+            if (data.rowOrder[i].isTrack && data.rowOrder[i].id == firstLaneId) {
+                RowRef hdr{false, t.id, true};
+                data.rowOrder.insert(data.rowOrder.begin() + i, hdr);
+                break;
+            }
+        }
+    }
 }
 
 void ObservableSong::sortBpms()
@@ -255,6 +278,7 @@ int ObservableSong::addTrack(std::string label, int patternId, int atIndex)
         data.rowOrder.insert(data.rowOrder.begin() + atIndex, ref);
     else
         data.rowOrder.push_back(ref);
+    rebuildInstrumentHeaders();
     notify();
     return id;
 }
@@ -287,12 +311,14 @@ void ObservableSong::moveRow(int from, int toGap)
     auto& ro = data.rowOrder;
     int n = (int)ro.size();
     if (from < 0 || from >= n) return;
+    if (ro[from].isInstrumentHeader) return;  // don't drag header rows directly
     if (toGap < 0 || toGap > n) return;
     if (toGap == from || toGap == from + 1) return;
     RowRef ref = ro[from];
     ro.erase(ro.begin() + from);
     int insertAt = (toGap > from) ? toGap - 1 : toGap;
     ro.insert(ro.begin() + insertAt, ref);
+    rebuildInstrumentHeaders();
     notify();
 }
 
@@ -381,6 +407,7 @@ int ObservableSong::addLane(int trackId)
                     { insertAt = i + 1; break; }
             data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{true, laneId});
         }
+        rebuildInstrumentHeaders();
         notify();
         return laneId;
     }
@@ -424,6 +451,7 @@ int ObservableSong::addPianorollLane(int trackId)
                     { insertAt = i + 1; break; }
             data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{true, laneId});
         }
+        rebuildInstrumentHeaders();
         notify();
         return laneId;
     }
@@ -471,6 +499,7 @@ void ObservableSong::setStackedLanes(int trackId, bool stacked)
             for (int j = 1; j < (int)t.lanes.size(); j++)
                 data.rowOrder.insert(data.rowOrder.begin() + insertAt + (j - 1), RowRef{true, t.lanes[j].id});
         }
+        rebuildInstrumentHeaders();
         notify();
         return;
     }
@@ -512,6 +541,7 @@ void ObservableSong::removeLane(int trackId, int laneId)
             for (int i = 0; i < (int)data.tracks.size(); i++)
                 if (data.tracks[i].id == trackId) { data.selectedTrackIndex = i; break; }
         }
+        rebuildInstrumentHeaders();
         notify();
         return;
     }
@@ -530,7 +560,10 @@ void ObservableSong::removeTrack(int trackId)
         data.tracks.end());
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
-            [&laneIds](const RowRef& r) { return r.isTrack && laneIds.count(r.id); }),
+            [&laneIds, trackId](const RowRef& r) {
+                return (r.isTrack && laneIds.count(r.id)) ||
+                       (r.isInstrumentHeader && r.id == trackId);
+            }),
         data.rowOrder.end());
     if (laneIds.count(data.selectedLaneId)) {
         int idx = data.selectedTrackIndex;
@@ -568,7 +601,10 @@ void ObservableSong::removeTrackAndPattern(int trackId)
     data.tracks.erase(it);
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
-            [&laneIds](const RowRef& r) { return r.isTrack && laneIds.count(r.id); }),
+            [&laneIds, trackId](const RowRef& r) {
+                return (r.isTrack && laneIds.count(r.id)) ||
+                       (r.isInstrumentHeader && r.id == trackId);
+            }),
         data.rowOrder.end());
 
     bool stillUsed = std::any_of(data.tracks.begin(), data.tracks.end(),

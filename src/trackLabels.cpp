@@ -7,14 +7,15 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 
-static constexpr Fl_Color colNormal    = 0x1F293700;
-static constexpr Fl_Color colSelected  = 0x3B82F600;
-static constexpr Fl_Color colEmpty     = 0x17202A00;
-static constexpr Fl_Color colParam     = 0x1A2B3A00;  // param lane label bg
-static constexpr Fl_Color colText      = FL_WHITE;
-static constexpr Fl_Color colBorder    = 0x37415100;
-static constexpr Fl_Color colTrackDiv  = 0x64748B00;  // bright separator between tracks
-static constexpr int      instrHeaderH = 14;           // thin instrument-name strip for unstacked multi-lane tracks
+static constexpr Fl_Color colNormal      = 0x1F293700;
+static constexpr Fl_Color colSelected    = 0x3B82F600;
+static constexpr Fl_Color colEmpty       = 0x17202A00;
+static constexpr Fl_Color colParam       = 0x1A2B3A00;  // param lane label bg
+static constexpr Fl_Color colText        = FL_WHITE;
+static constexpr Fl_Color colBorder      = 0x37415100;
+static constexpr Fl_Color colTrackDiv    = 0x64748B00;  // bright separator between tracks
+static constexpr Fl_Color colInstrHeader = 0x64748B00;  // dedicated instrument name row bg
+static constexpr int      instrNameRowH  = 24;           // height of instrument header rows
 
 TrackLabels::TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight)
     : Fl_Group(x, y, w, numVisibleRows * rowHeight),
@@ -46,6 +47,34 @@ void TrackLabels::setTimeline(ObservableSong* tl)
     redraw();
 }
 
+int TrackLabels::rowHFor(int absRow) const
+{
+    if (!timeline) return rowHeight;
+    const auto& ro = timeline->get().rowOrder;
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader)
+        return instrNameRowH;
+    return rowHeight;
+}
+
+int TrackLabels::rowYInPanel(int absRow) const
+{
+    int py = 0;
+    for (int i = rowOffset; i < absRow; i++)
+        py += rowHFor(i);
+    return py;
+}
+
+int TrackLabels::absRowAtPanelY(int py) const
+{
+    int cumY = 0;
+    for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
+        int rh = rowHFor(i);
+        if (py < cumY + rh) return i;
+        cumY += rh;
+    }
+    return rowOffset + numVisibleRows;
+}
+
 void TrackLabels::setRowOffset(int offset)
 {
     rowOffset = offset;
@@ -64,8 +93,8 @@ void TrackLabels::startEdit(int absRow)
         if (t.lanes.empty() || t.lanes[0].id != laneId) return;  // only rename on first lane
         editingAbsRow = absRow;
         originalLabel = t.label;
-        int ry = y() + (absRow - rowOffset) * rowHeight;
-        input.resize(x(), ry, w(), rowHeight);
+        int ry = y() + rowYInPanel(absRow);
+        input.resize(x(), ry, w(), rowHFor(absRow));
         input.value(originalLabel.c_str());
         input.textcolor(colText);
         input.show();
@@ -118,20 +147,20 @@ void TrackLabels::startPatternEdit(int absRow)
     editingAbsRow = absRow;
     editingPatId  = patId;
 
-    int ry = y() + (absRow - rowOffset) * rowHeight;
-    bool isMultiLane = (int)track.lanes.size() > 1;
-    bool isFirstLane = (!track.lanes.empty() && track.lanes[0].id == laneId);
+    int ry  = y() + rowYInPanel(absRow);
+    int rh  = rowHFor(absRow);
+    bool isMultiLane  = (int)track.lanes.size() > 1;
+    bool isUnstacked  = !track.stackedLanes;
 
     int inputY, inputH;
-    if (isMultiLane && isFirstLane) {
-        inputY = ry + instrHeaderH;
-        inputH = rowHeight - instrHeaderH;
-    } else if (!isMultiLane) {
-        inputY = ry + rowHeight / 2;
-        inputH = rowHeight / 2;
+    if (!isUnstacked) {
+        // Stacked: pattern name occupies bottom half
+        inputY = ry + rh / 2;
+        inputH = rh / 2;
     } else {
+        // Unstacked: full row for pattern name (instrument name is in header row)
         inputY = ry;
-        inputH = rowHeight;
+        inputH = rh;
     }
 
     input.resize(x(), inputY, w(), inputH);
@@ -203,29 +232,50 @@ void TrackLabels::draw()
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         if (i == editingAbsRow && editingPatId < 0) continue;  // track-label input draws the whole row itself
-        int ry = y() + (i - rowOffset) * rowHeight;
+        int rh = rowHFor(i);
+        int ry = y() + rowYInPanel(i);
 
         if (i >= 0 && i < (int)ro.size()) {
             const auto& ref = ro[i];
             bool isDragSrc = (dragging && i == dragRow);
-            if (ref.isTrack) {
+
+            if (ref.isInstrumentHeader) {
+                // ── Dedicated instrument name header row ──
+                fl_color(isDragSrc ? fl_color_average(colInstrHeader, FL_WHITE, 0.75f) : colInstrHeader);
+                fl_rectf(x(), ry, w(), rh);
+                // Strong divider at top (between tracks)
+                if (ry > y()) {
+                    fl_color(colTrackDiv);
+                    fl_rectf(x(), ry - 1, w(), 2);
+                }
+                // Find the track name by track ID
+                for (const auto& t : tl.tracks) {
+                    if (t.id == ref.id) {
+                        fl_font(FL_HELVETICA_BOLD, 9);
+                        fl_color(colNormal);
+                        fl_draw(t.label.c_str(), x() + 4, ry, w() - 8, rh,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
+                        break;
+                    }
+                }
+            } else if (ref.isTrack) {
                 // ref.id is a Lane ID — find the owning Track
                 bool isSel = (ref.id == tl.selectedLaneId);
                 Fl_Color bg = isSel ? colSelected : colNormal;
                 if (isDragSrc) bg = fl_color_average(bg, FL_WHITE, 0.75f);
                 fl_color(bg);
-                fl_rectf(x(), ry, w(), rowHeight);
+                fl_rectf(x(), ry, w(), rh);
                 fl_color(colBorder);
-                fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+                fl_line(x(), ry + rh - 1, x() + w() - 1, ry + rh - 1);
                 int tIdx = timeline->trackIndexForLaneId(ref.id);
                 if (tIdx >= 0) {
                     const auto& track = tl.tracks[tIdx];
-                    bool isFirstLane  = (!track.lanes.empty() && track.lanes[0].id == ref.id);
-                    bool isMultiLane  = (int)track.lanes.size() > 1;
-                    bool isUnstacked  = !track.stackedLanes;
+                    bool isFirstLane = (!track.lanes.empty() && track.lanes[0].id == ref.id);
+                    bool isMultiLane = (int)track.lanes.size() > 1;
+                    bool isUnstacked = !track.stackedLanes;
 
-                    // Track boundary: strong 2-px divider at top of each track's first lane
-                    if (isFirstLane && ry > y()) {
+                    // Track boundary divider for stacked tracks only (unstacked tracks use header row)
+                    if (isFirstLane && ry > y() && !isUnstacked) {
                         fl_color(colTrackDiv);
                         fl_rectf(x(), ry - 1, w(), 2);
                     }
@@ -234,66 +284,52 @@ void TrackLabels::draw()
                     for (int j = 0; j < (int)track.lanes.size(); j++)
                         if (track.lanes[j].id == ref.id) { laneNum = j + 1; break; }
 
-                    if (isMultiLane && isUnstacked && isFirstLane) {
-                        // ── Unstacked multi-lane, first lane ──
-                        // Thin coloured header strip: instrument name
-                        fl_color(colTrackDiv);
-                        fl_rectf(x(), ry, w(), instrHeaderH);
-                        fl_font(FL_HELVETICA, 9);
-                        fl_color(colNormal);
-                        fl_draw(track.label.c_str(), x() + 4, ry, w() - 8, instrHeaderH,
-                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
-                        // Pattern name in the remaining row area below the strip
+                    if (isUnstacked) {
+                        // ── Unstacked lane: just pattern name (instrument name is in header row) ──
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                         fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
-                                x() + 4, ry + instrHeaderH, w() - 8, rowHeight - instrHeaderH,
-                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
-                    } else if (isMultiLane && isUnstacked && !isFirstLane) {
-                        // ── Unstacked multi-lane, subsequent lanes ── just pattern name
-                        fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
-                                x() + 4, ry, w() - 8, rowHeight,
+                                x() + 4, ry, w() - 8, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
                     } else {
                         // ── Single-lane or stacked: instrument name (small) + pattern name ──
                         fl_font(FL_HELVETICA, 9);
                         fl_color(fl_color_average(colText, bg, 0.55f));
-                        fl_draw(track.label.c_str(), x() + 4, ry, w() - 8, rowHeight / 2,
+                        fl_draw(track.label.c_str(), x() + 4, ry, w() - 8, rh / 2,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_BOTTOM);
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                         fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
-                                x() + 4, ry + rowHeight / 2, w() - 8, rowHeight / 2,
+                                x() + 4, ry + rh / 2, w() - 8, rh / 2,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_TOP);
                     }
                 }
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
                 fl_color(bg);
-                fl_rectf(x(), ry, w(), rowHeight);
+                fl_rectf(x(), ry, w(), rh);
                 fl_color(colBorder);
-                fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+                fl_line(x(), ry + rh - 1, x() + w() - 1, ry + rh - 1);
                 fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                 for (const auto& lane : tl.paramLanes)
                     if (lane.id == ref.id) {
-                        fl_draw(lane.type.c_str(), x() + 4, ry, w() - 8, rowHeight,
+                        fl_draw(lane.type.c_str(), x() + 4, ry, w() - 8, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
                         break;
                     }
             }
         } else {
             fl_color(colEmpty);
-            fl_rectf(x(), ry, w(), rowHeight);
+            fl_rectf(x(), ry, w(), rh);
             fl_color(colBorder);
-            fl_line(x(), ry + rowHeight - 1, x() + w() - 1, ry + rowHeight - 1);
+            fl_line(x(), ry + rh - 1, x() + w() - 1, ry + rh - 1);
         }
     }
 
     // Drop indicator line
     if (dragging && dropRow >= 0) {
-        int lineVR = dropRow - rowOffset;
-        int lineY  = std::clamp(y() + lineVR * rowHeight, y(), y() + numVisibleRows * rowHeight);
+        int lineY = y() + rowYInPanel(dropRow);
+        lineY = std::clamp(lineY, y(), y() + h());
         fl_color(0x00BFFFFF);  // cyan
         fl_line_style(FL_SOLID, 2);
         fl_line(x(), lineY, x() + w() - 1, lineY);
@@ -312,13 +348,19 @@ int TrackLabels::handle(int event)
 
     if (event == FL_PUSH) {
         if (!timeline) return 1;
-        int row = (Fl::event_y() - y()) / rowHeight + rowOffset;
+        int row = absRowAtPanelY(Fl::event_y() - y());
         const auto& ro = timeline->get().rowOrder;
 
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (row >= 0 && row < (int)ro.size()) {
                 const auto& ref = ro[row];
-                if (ref.isTrack) {
+                if (ref.isInstrumentHeader) {
+                    // Right-click instrument header → show track context menu
+                    if (contextPopup && patternObs) {
+                        contextPopup->open(ref.id, -1, patternObs,
+                                           Fl::event_x_root(), Fl::event_y_root());
+                    }
+                } else if (ref.isTrack) {
                     if (contextPopup && patternObs) {
                         int trackId = timeline->trackIdForLaneId(ref.id);
                         if (trackId >= 0)
@@ -338,10 +380,15 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
+            // Skip double-click pattern edit on instrument header rows
             if (Fl::event_clicks() > 0) {
-                startPatternEdit(row);
+                if (row < (int)ro.size() && !ro[row].isInstrumentHeader)
+                    startPatternEdit(row);
                 return 1;
             }
+
+            // Don't start drags from instrument header rows
+            if (row < (int)ro.size() && ro[row].isInstrumentHeader) return 1;
 
             dragStartRow = row;
             dragStartY   = Fl::event_y();
@@ -360,8 +407,17 @@ int TrackLabels::handle(int event)
         }
         if (dragging && timeline) {
             const auto& ro = timeline->get().rowOrder;
+            // Compute the drop gap from pixel Y using variable row heights
             int mouseRelY = Fl::event_y() - y();
-            int gap = (mouseRelY + rowHeight / 2) / rowHeight + rowOffset;
+            int cumY = 0;
+            int gap = rowOffset;
+            for (int i = rowOffset; i < rowOffset + numVisibleRows && i < (int)ro.size(); i++) {
+                int rh = rowHFor(i);
+                int midY = cumY + rh / 2;
+                if (mouseRelY <= midY) break;
+                cumY += rh;
+                gap = i + 1;
+            }
             dropRow = std::clamp(gap, 0, (int)ro.size());
             redraw();
         }
@@ -377,7 +433,7 @@ int TrackLabels::handle(int event)
                 dragRow  = -1;
                 dropRow  = -1;
             } else if (dragStartRow >= 0 && timeline) {
-                // Pure single click: select lane
+                // Pure single click: select lane (skip instrument header rows)
                 const auto& ro = timeline->get().rowOrder;
                 if (dragStartRow < (int)ro.size() && ro[dragStartRow].isTrack) {
                     int laneId   = ro[dragStartRow].id;

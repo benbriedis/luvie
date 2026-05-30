@@ -10,6 +10,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SongGrid : public Grid, public ITimelineObserver {
+    static constexpr int instrNameRowH = 24;
+
+    bool isInstrHeaderVR(int vr) const;
     ObservableSong* timeline          = nullptr;
     SongPopup*          songPopup         = nullptr;
     ParamDotPopup*      paramDotPopup     = nullptr;
@@ -32,6 +35,13 @@ class SongGrid : public Grid, public ITimelineObserver {
     int  handleParamEvent(int event);
     int  visualRowForLaneId(int laneId) const;   // visual (relative) row, or -1
     int  laneIdxForAbsRow(int absRow) const;     // index into localParamLanes, or -1
+
+    int rowY(int r) const override;
+    int rowH(int r) const override;
+    int rowAtPixelY(int py) const override;
+
+public:
+    int totalPixelH() const;
 
 protected:
     void draw() override;

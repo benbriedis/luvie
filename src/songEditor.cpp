@@ -154,10 +154,11 @@ void SongEditor::updateScrollBounds()
         if (onNumColsChanged) onNumColsChanged(newNumCols);
     }
     if (!timeline || !scrollbar) return;
-    int total = (int)timeline->get().rowOrder.size();
+    int total    = (int)timeline->get().rowOrder.size();
     int visRows  = std::min(total, numVisibleRows);
-    int rh       = songGrid.rowHeight;
-    int gridH    = std::max(visRows * rh, 1);
+    // Compute gridH using variable row heights; temporarily set numRows so totalPixelH() is correct
+    songGrid.numRows = visRows;
+    int gridH    = std::max(songGrid.totalPixelH(), 1);
     int maxOff   = std::max(0, total - numVisibleRows);
     rowOffset    = std::clamp(rowOffset, 0, maxOff);
 

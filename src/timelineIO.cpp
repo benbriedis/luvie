@@ -211,7 +211,9 @@ static json timelineToJson(const Timeline& tl) {
     for (const auto& lane : tl.paramLanes) jparams.push_back(paramLaneToJson(lane));
 
     json jrows = json::array();
-    for (const auto& r : tl.rowOrder) jrows.push_back({{"isTrack", r.isTrack}, {"id", r.id}});
+    for (const auto& r : tl.rowOrder)
+        if (!r.isInstrumentHeader)
+            jrows.push_back({{"isTrack", r.isTrack}, {"id", r.id}});
 
     return {
         {"bpms",               jbpms},

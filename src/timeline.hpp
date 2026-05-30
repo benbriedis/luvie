@@ -90,8 +90,9 @@ struct Track {
 
 // One entry per visible row; determines display order of tracks and param lanes.
 struct RowRef {
-	bool isTrack;  // true = Track, false = ParamLane
-	int  id;
+	bool isTrack;                    // true = Track lane, false = ParamLane or header
+	int  id;                         // Lane ID (isTrack), ParamLane ID (!isTrack), or Track ID (isInstrumentHeader)
+	bool isInstrumentHeader = false; // dedicated name row for unstacked multi-lane tracks
 };
 
 struct Timeline {

@@ -66,6 +66,11 @@ protected:
     virtual void resizing(StateDragResize& s);
     void clampSelection();
 
+    // Virtual row geometry — override in subclasses for variable-height rows
+    virtual int rowY(int r) const         { return r * rowHeight; }
+    virtual int rowH(int r) const         { (void)r; return rowHeight; }
+    virtual int rowAtPixelY(int py) const { return rowHeight > 0 ? py / rowHeight : 0; }
+
     // Virtual extension hooks
     virtual Fl_Color columnColor(int col)      const { (void)col;      return 0x00EE0000; }
     virtual Fl_Color rowLineColor(int lineIdx) const { (void)lineIdx;  return 0xEE888800; }

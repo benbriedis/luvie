@@ -8,15 +8,55 @@
 #include <cmath>
 #include <ranges>
 
-static constexpr Fl_Color kParamRowBg   = 0xF0F4FF00;
-static constexpr Fl_Color kParamLine    = 0x8888CC00;
-static constexpr Fl_Color kParamDotFill = 0x5555EE00;
-static constexpr Fl_Color kParamDotRim  = 0x1111EE00;
-static constexpr Fl_Color kTrackDiv     = 0x64748B00;
+static constexpr Fl_Color kParamRowBg      = 0xF0F4FF00;
+static constexpr Fl_Color kParamLine       = 0x8888CC00;
+static constexpr Fl_Color kParamDotFill    = 0x5555EE00;
+static constexpr Fl_Color kParamDotRim     = 0x1111EE00;
+static constexpr Fl_Color kTrackDiv        = 0x64748B00;
+static constexpr Fl_Color kInstrHeaderBg   = 0x64748B00;  // same slate-blue as dividers
 
 SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
+
+bool SongGrid::isInstrHeaderVR(int vr) const
+{
+    if (!timeline) return false;
+    int absRow = vr + rowOffset;
+    const auto& ro = timeline->get().rowOrder;
+    return absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader;
+}
+
+int SongGrid::rowY(int r) const
+{
+    int py = 0;
+    for (int i = 0; i < r; i++)
+        py += isInstrHeaderVR(i) ? instrNameRowH : rowHeight;
+    return py;
+}
+
+int SongGrid::rowH(int r) const
+{
+    return isInstrHeaderVR(r) ? instrNameRowH : rowHeight;
+}
+
+int SongGrid::rowAtPixelY(int py) const
+{
+    int cumY = 0;
+    for (int r = 0; r < numRows; r++) {
+        int rh = rowH(r);
+        if (py < cumY + rh) return r;
+        cumY += rh;
+    }
+    return numRows;
+}
+
+int SongGrid::totalPixelH() const
+{
+    int h = 0;
+    for (int r = 0; r < numRows; r++) h += rowH(r);
+    return h;
+}
 
 void SongGrid::draw()
 {
@@ -25,19 +65,27 @@ void SongGrid::draw()
 
     fl_push_clip(x(), y(), w(), h());
 
-    // Track divider lines — strong horizontal line at the top of each track's first lane
+    // Track divider lines — strong horizontal line above each track's first row
     {
         const auto& tl = timeline->get();
         const auto& ro = tl.rowOrder;
         int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
         for (int vr = 1; vr < numRows; vr++) {
             int absRow = vr + rowOffset;
-            if (absRow < 0 || absRow >= (int)ro.size() || !ro[absRow].isTrack) continue;
-            int tIdx = timeline->trackIndexForLaneId(ro[absRow].id);
-            if (tIdx < 0) continue;
-            const auto& t = tl.tracks[tIdx];
-            if (t.lanes.empty() || t.lanes[0].id != ro[absRow].id) continue;
-            int lineY = y() + vr * rowHeight - 1;
+            if (absRow < 0 || absRow >= (int)ro.size()) continue;
+            bool drawDiv = false;
+            if (ro[absRow].isInstrumentHeader) {
+                drawDiv = true;
+            } else if (ro[absRow].isTrack) {
+                int tIdx = timeline->trackIndexForLaneId(ro[absRow].id);
+                if (tIdx < 0) continue;
+                const auto& t = tl.tracks[tIdx];
+                if (t.lanes.empty() || t.lanes[0].id != ro[absRow].id) continue;
+                // Only draw divider for stacked tracks (header handles unstacked)
+                drawDiv = t.stackedLanes;
+            }
+            if (!drawDiv) continue;
+            int lineY = y() + rowY(vr) - 1;
             fl_color(kTrackDiv);
             fl_rectf(x(), lineY, gridRight, 2);
         }
@@ -45,7 +93,8 @@ void SongGrid::draw()
     const int tickH = 4;
     for (const auto& note : notes) {
         if (note.row < 0 || note.row >= numRows) continue;
-        int y0  = y() + (int)(note.row * rowHeight);
+        int y0  = y() + rowY((int)note.row);
+        int rh  = rowH((int)note.row);
         int top = 4, bottom = 4;
         timeline->timeSigAt((int)note.beat, top, bottom);
 
@@ -75,8 +124,8 @@ void SongGrid::draw()
         fl_color(FL_WHITE);
         for (float tickBar = firstTick; tickBar < instanceEnd; ) {
             int tickX = x() + (int)((tickBar - colOffset) * colWidth);
-            fl_rectf(tickX, y0 + 1,                     2, tickH);
-            fl_rectf(tickX, y0 + rowHeight - 1 - tickH, 2, tickH);
+            fl_rectf(tickX, y0 + 1,           2, tickH);
+            fl_rectf(tickX, y0 + rh - 1 - tickH, 2, tickH);
             if (intervalBars <= 0.0f) break;
             tickBar += intervalBars;
         }
@@ -88,7 +137,7 @@ void SongGrid::draw()
         for (int li = 0; li < (int)localParamLanes.size(); li++) {
             int vr = visualRowForLaneId(localParamLanes[li].id);
             if (vr < 0 || vr >= numRows) continue;
-            drawParamRow(li, y() + vr * rowHeight, gridRight);
+            drawParamRow(li, y() + rowY(vr), gridRight);
         }
     }
 
@@ -145,11 +194,13 @@ int SongGrid::laneIdxForAbsRow(int absRow) const
 
 Fl_Color SongGrid::rowBgColor(int visualRow) const
 {
-    if (localParamLanes.empty() || !timeline) return bgColor;
+    if (!timeline) return bgColor;
     int absRow = visualRow + rowOffset;
     const auto& ro = timeline->get().rowOrder;
-    if (absRow >= 0 && absRow < (int)ro.size() && !ro[absRow].isTrack)
-        return kParamRowBg;
+    if (absRow >= 0 && absRow < (int)ro.size()) {
+        if (ro[absRow].isInstrumentHeader) return kInstrHeaderBg;
+        if (!ro[absRow].isTrack)           return kParamRowBg;
+    }
     return bgColor;
 }
 
@@ -223,9 +274,9 @@ int SongGrid::findParamPointAtCursor(int laneIdx) const
     const int totalRange = rowHeight - 1 - 2 * dotR;
     const int hitR      = dotR + 4;
 
-    int rowY = y() + vr * rowHeight;
-    int ex   = Fl::event_x();
-    int ey   = Fl::event_y();
+    int pRowY = y() + SongGrid::rowY(vr);
+    int ex    = Fl::event_x();
+    int ey    = Fl::event_y();
 
     int   bestIdx  = -1;
     float bestDist = (float)(hitR + 1);
@@ -234,7 +285,7 @@ int SongGrid::findParamPointAtCursor(int laneIdx) const
         const auto& pt = localParamLanes[laneIdx].points[i];
         int dotX = x() + (int)((pt.beat - colOffset) * colWidth);
         const int mv = laneMaxValue(localParamLanes[laneIdx].type);
-        int dotY = rowY + dotR + (totalRange > 0 ? (int)((mv - pt.value) * totalRange / (float)mv) : 0);
+        int dotY = pRowY + dotR + (totalRange > 0 ? (int)((mv - pt.value) * totalRange / (float)mv) : 0);
         float dx = (float)(ex - dotX);
         float dy = (float)(ey - dotY);
         float dist = std::sqrt(dx * dx + dy * dy);
@@ -274,7 +325,7 @@ int SongGrid::handleParamEvent(int event)
     const int hitR       = dotR + 4;
 
     int ey      = Fl::event_y() - y();
-    int vr      = ey / rowHeight;
+    int vr      = rowAtPixelY(ey);
     int laneIdx = laneIdxForAbsRow(vr + rowOffset);
 
     // Helper: check if any real dot overlaps the virtual dot position (left edge)
@@ -288,11 +339,11 @@ int SongGrid::handleParamEvent(int event)
 
     // Helper: absolute y of virtual dot for a given lane
     auto virtualDotY = [&](int li, int predIdx) {
-        int laneVR = visualRowForLaneId(localParamLanes[li].id);
-        int rowY   = y() + (laneVR >= 0 ? laneVR : 0) * rowHeight;
-        int value  = localParamLanes[li].points[predIdx].value;
-        int mv     = laneMaxValue(localParamLanes[li].type);
-        return rowY + dotR + (totalRange > 0 ? (int)((mv - value) * totalRange / (float)mv) : 0);
+        int laneVR  = visualRowForLaneId(localParamLanes[li].id);
+        int pRowY   = y() + (laneVR >= 0 ? SongGrid::rowY(laneVR) : 0);
+        int value   = localParamLanes[li].points[predIdx].value;
+        int mv      = laneMaxValue(localParamLanes[li].type);
+        return pRowY + dotR + (totalRange > 0 ? (int)((mv - value) * totalRange / (float)mv) : 0);
     };
 
     switch (event) {
@@ -350,7 +401,7 @@ int SongGrid::handleParamEvent(int event)
                 float beat  = (float)ex / colWidth + colOffset;
                 if (snap > 0.0f) beat = std::round(beat / snap) * snap;
                 beat = std::max(0.0f, beat);
-                int eyInRow = ey - vr * rowHeight;
+                int eyInRow = ey - SongGrid::rowY(vr);
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
                 int value   = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
                 paramState  = ParamPendingCreate{laneIdx, beat, std::clamp(value, 0, maxVal)};
@@ -363,7 +414,7 @@ int SongGrid::handleParamEvent(int event)
         if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
             int maxVal  = laneMaxValue(localParamLanes[d->laneIdx].type);
             int laneVR  = visualRowForLaneId(localParamLanes[d->laneIdx].id);
-            int eyInRow = ey - laneVR * rowHeight;
+            int eyInRow = ey - (laneVR >= 0 ? SongGrid::rowY(laneVR) : 0);
             int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
             int newVal  = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
             newVal = std::clamp(newVal, 0, maxVal);
@@ -395,7 +446,7 @@ int SongGrid::handleParamEvent(int event)
 
             int maxVal   = laneMaxValue(localParamLanes[d->laneIdx].type);
             int laneVR   = visualRowForLaneId(localParamLanes[d->laneIdx].id);
-            int eyInRow  = ey - laneVR * rowHeight;
+            int eyInRow  = ey - (laneVR >= 0 ? SongGrid::rowY(laneVR) : 0);
             int mapped   = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
             int newValue = totalRange > 0 ? maxVal - (int)(mapped * (float)maxVal / totalRange) : maxVal / 2;
             newValue     = std::clamp(newValue, 0, maxVal);
@@ -671,7 +722,7 @@ int SongGrid::handle(int event)
     // Route to param handler when cursor is over a param lane row
     if (!localParamLanes.empty() && timeline) {
         int ey  = Fl::event_y() - y();
-        int vr  = ey / rowHeight;
+        int vr  = rowAtPixelY(ey);
         if (laneIdxForAbsRow(vr + rowOffset) >= 0)
             return handleParamEvent(event);
     }
@@ -696,11 +747,18 @@ void SongGrid::toggleNote()
     if (trackFilter >= 0) return;
     int   ex        = Fl::event_x() - x();
     int   ey        = Fl::event_y() - y();
-    int   visualRow = ey / rowHeight;
+    int   visualRow = rowAtPixelY(ey);
     int   absRow    = visualRow + rowOffset;
     float col       = (float)(ex / colWidth) + colOffset;
 
     if (!timeline) { Grid::toggleNote(); return; }
+
+    // Block interaction on instrument header rows
+    {
+        const auto& ro = timeline->get().rowOrder;
+        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader)
+            return;
+    }
 
     for (auto& n : notes) {
         if ((int)n.row == visualRow && n.beat == col) {

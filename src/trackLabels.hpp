@@ -34,6 +34,10 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     void cancelEdit();
     void checkDuplicate();
 
+    int rowHFor(int absRow) const;
+    int rowYInPanel(int absRow) const;  // cumulative pixel Y from widget top to row absRow
+    int absRowAtPanelY(int py) const;   // absRow from pixel Y within widget
+
 public:
     void commitEdit();
 
