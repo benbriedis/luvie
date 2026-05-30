@@ -158,7 +158,7 @@ void TrackLabels::commitEdit()
     input.hide();
     if (timeline) {
         if (patId >= 0) {
-            timeline->setPatternName(patId, newLabel.empty() ? originalLabel : newLabel);
+            timeline->setPatternName(patId, newLabel);
         } else {
             const auto& ro = timeline->get().rowOrder;
             if (absRow < (int)ro.size() && ro[absRow].isTrack) {
@@ -192,12 +192,12 @@ void TrackLabels::draw()
     const auto& tl  = timeline->get();
     const auto& ro  = tl.rowOrder;
 
-    // Helper: get pattern display name for a given patternId and fallback lane number
-    auto patName = [&](int patId, int laneNum) -> std::string {
+    // Helper: get pattern display name; falls back to "InstrumentName N" when name is unset
+    auto patName = [&](int patId, int laneNum, const std::string& trackLabel) -> std::string {
         for (const auto& p : tl.patterns)
             if (p.id == patId)
-                return p.name.empty() ? ("Pat " + std::to_string(laneNum)) : p.name;
-        return "Pat " + std::to_string(laneNum);
+                return p.name.empty() ? (trackLabel + " " + std::to_string(laneNum)) : p.name;
+        return trackLabel + " " + std::to_string(laneNum);
     };
 
     fl_font(FL_HELVETICA, 11);
@@ -246,13 +246,13 @@ void TrackLabels::draw()
                         // Pattern name in the remaining row area below the strip
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum).c_str(),
+                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
                                 x() + 4, ry + instrHeaderH, w() - 8, rowHeight - instrHeaderH,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
                     } else if (isMultiLane && isUnstacked && !isFirstLane) {
                         // ── Unstacked multi-lane, subsequent lanes ── just pattern name
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum).c_str(),
+                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
                                 x() + 4, ry, w() - 8, rowHeight,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
                     } else {
@@ -263,7 +263,7 @@ void TrackLabels::draw()
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_BOTTOM);
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum).c_str(),
+                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
                                 x() + 4, ry + rowHeight / 2, w() - 8, rowHeight / 2,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_TOP);
                     }

@@ -369,7 +369,6 @@ int ObservableSong::addLane(int trackId)
         newPat.lengthBeats         = beats;
         newPat.type                = ptype;
         newPat.outputInstrumentName = output;
-        newPat.name                = "Pat " + std::to_string(t.lanes.size() + 1);
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
@@ -413,7 +412,6 @@ int ObservableSong::addPianorollLane(int trackId)
         newPat.lengthBeats         = beats;
         newPat.type                = PatternType::PIANOROLL;
         newPat.outputInstrumentName = output;
-        newPat.name                = "Pat " + std::to_string(t.lanes.size() + 1);
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;

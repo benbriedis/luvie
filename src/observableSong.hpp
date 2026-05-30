@@ -67,7 +67,7 @@ public:
     // Rename all pattern output instrument assignments across the whole song.
     void renamePatternOutputInstrument(const std::string& oldName, const std::string& newName);
 
-    // Set the display name of a pattern (scoped within its track, e.g. "Pat 1").
+    // Set the display name of a pattern; empty = auto ("InstrumentName N").
     void setPatternName(int patId, std::string name);
 
     // Pattern instance management (instances identified by stable id)

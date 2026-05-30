@@ -58,7 +58,7 @@ struct Pattern {
 	std::set<int>          drumMute;   // MIDI notes to silence
 	std::vector<ParamLane> paramLanes;
 	std::string outputInstrumentName;  // empty = no routing assigned
-	std::string name;                  // display name, scoped within track (e.g. "Pat 1")
+	std::string name;                  // display name; empty = auto ("InstrumentName N")
 	int timeSigTop    = 4;
 	int timeSigBottom = 4;
 };

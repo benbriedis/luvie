@@ -469,7 +469,6 @@ void LuvieApp::pushInstruments() {
                 int patId = ci.isDrum
                     ? pattern_->createDrumPattern(numPatternBeats)
                     : pattern_->createPattern(numPatternBeats);
-                song_->setPatternName(patId, "Pat 1");
                 pattern_->setPatternOutputInstrument(patId, ci.name);
                 song_->addTrack(ci.name, patId);
             }

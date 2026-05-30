@@ -585,11 +585,13 @@ void PatternPanel::onTimelineChanged()
     const auto& tl  = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
-        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+        const auto& selTrack = tl.tracks[sel];
+        int patId = selTrack.lanes.empty() ? 0 : selTrack.lanes[0].patternId;
         PatternType type = PatternType::STANDARD;
         std::string pName;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; pName = p.name; break; }
+        if (pName.empty()) pName = selTrack.label + " 1";
         patternName.copy_label(pName.c_str());
         switch (type) {
         case PatternType::DRUM:      configureDrumRow();      break;
@@ -645,7 +647,7 @@ void PatternPanel::commitEdit()
     std::string newLabel = input.value();
     input.hide();
     if (pattern)
-        pattern->song()->setPatternName(id, newLabel.empty() ? originalLabel : newLabel);
+        pattern->song()->setPatternName(id, newLabel);
     redraw();
 }
 

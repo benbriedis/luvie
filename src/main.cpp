@@ -59,7 +59,6 @@ int main(int argc, char **argv) {
         // pushInstruments() (called inside app.build()) will sync this track
         // with the overlay's "Instrument 1" entry and set defaultOutputInstrument.
         int patId = patternObs.createPattern(LuvieApp::numPatternBeats);
-        songTimeline.setPatternName(patId, "Pat 1");
         songTimeline.addTrack("Instrument 1", patId);
     }
 
