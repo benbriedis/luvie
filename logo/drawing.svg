@@ -8,7 +8,7 @@
    fill="none"
    version="1.1"
    id="svg134"
-   sodipodi:docname="drawing2.svg"
+   sodipodi:docname="drawing.svg"
    inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -69,9 +69,4 @@
      fill="#000000"
      id="path132"
      style="fill-opacity:1;fill:url(#radialGradient459)" />
-  <path
-     style="fill:#00ffff;stroke:#000000;stroke-width:0.02px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     d="M 6.6769,4.9709 6.6605,10.1397 10.0871,10.0794 10.0473,9.0626 7.9067,9.0712 7.896,4.9562 Z"
-     id="path584"
-     sodipodi:nodetypes="ccccccc" />
 </svg>

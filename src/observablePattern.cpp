@@ -205,6 +205,7 @@ int ObservablePattern::createPattern(float lengthBeats)
     Pattern p;
     p.id = id;
     p.lengthBeats = lengthBeats;
+    p.name = "Pattern " + std::to_string(song_->nextPatternNumber++);
     p.outputInstrumentName = song_->defaultOutputInstrument;
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(p);
@@ -218,6 +219,7 @@ int ObservablePattern::createDrumPattern(float lengthBeats)
     Pattern p;
     p.id = id;
     p.lengthBeats = lengthBeats;
+    p.name = "Pattern " + std::to_string(song_->nextPatternNumber++);
     p.type = PatternType::DRUM;
     p.outputInstrumentName = song_->defaultDrumOutputInstrument.empty()
         ? song_->defaultOutputInstrument : song_->defaultDrumOutputInstrument;
@@ -233,6 +235,7 @@ int ObservablePattern::createPianorollPattern(float lengthBeats)
     Pattern p;
     p.id = id;
     p.lengthBeats = lengthBeats;
+    p.name = "Pattern " + std::to_string(song_->nextPatternNumber++);
     p.type = PatternType::PIANOROLL;
     p.outputInstrumentName = song_->defaultOutputInstrument;
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);

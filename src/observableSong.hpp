@@ -105,6 +105,7 @@ private:
     Timeline data;
     std::vector<ITimelineObserver*> observers;
     int nextId = 1;
+    int nextPatternNumber = 1;
 
     void notify();
     void sortBpms();

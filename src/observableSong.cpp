@@ -48,6 +48,7 @@ void ObservableSong::loadTimeline(const Timeline& tl)
         }
     }
     nextId = 1;
+    nextPatternNumber = (int)data.patterns.size() + 1;
     for (const auto& p : data.patterns) {
         if (p.id >= nextId) nextId = p.id + 1;
         for (const auto& n : p.notes)
@@ -551,6 +552,7 @@ int ObservableSong::addLane(int trackId)
         Pattern newPat;
         newPat.id                  = patId;
         newPat.lengthBeats         = beats;
+        newPat.name                = "Pattern " + std::to_string(nextPatternNumber++);
         newPat.type                = ptype;
         newPat.outputInstrumentName = output;
         data.patterns.push_back(std::move(newPat));
@@ -602,6 +604,7 @@ int ObservableSong::addPianorollLane(int trackId)
         Pattern newPat;
         newPat.id                  = patId;
         newPat.lengthBeats         = beats;
+        newPat.name                = "Pattern " + std::to_string(nextPatternNumber++);
         newPat.type                = PatternType::PIANOROLL;
         newPat.outputInstrumentName = output;
         data.patterns.push_back(std::move(newPat));
@@ -631,6 +634,10 @@ int ObservableSong::addPianorollLane(int trackId)
 
 void ObservableSong::setPatternName(int patId, std::string name)
 {
+    auto first = name.find_first_not_of(" \t\r\n");
+    auto last  = name.find_last_not_of(" \t\r\n");
+    if (first == std::string::npos) return;
+    name = name.substr(first, last - first + 1);
     for (auto& p : data.patterns)
         if (p.id == patId) { p.name = std::move(name); notify(); return; }
 }
