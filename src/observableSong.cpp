@@ -604,6 +604,16 @@ const PatternInstance* ObservableSong::instanceById(int instanceId) const
     return nullptr;
 }
 
+int ObservableSong::laneIdForInstance(int instanceId) const
+{
+    for (const auto& track : data.tracks)
+        for (const auto& lane : track.lanes)
+            for (const auto& inst : lane.patterns)
+                if (inst.id == instanceId)
+                    return lane.id;
+    return -1;
+}
+
 const Pattern* ObservableSong::patternForInstance(int instanceId) const
 {
     for (const auto& track : data.tracks)

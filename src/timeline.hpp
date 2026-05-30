@@ -16,7 +16,7 @@ struct DrumNote {
 
 struct Note {
 	int   id;
-	int   pitch;           // abs_row in current chord encoding; when disabled: stores octave only
+	int   row;             // abs_row in current chord encoding; when disabled: stores octave only
 	float beat;
 	float length;
 	float velocity       = 0.0f;

@@ -38,6 +38,7 @@ protected:
     Fl_Color rowBgColor(int visualRow) const override;
     void moving(StateDragMove& s) override;
     void resizing(StateDragResize& s) override;
+    int  overlappingCell(int noteIdx) const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     void openContextMenu(int idx) override;
     void onBeginDrag(int noteIdx) override;

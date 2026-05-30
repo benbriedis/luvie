@@ -94,7 +94,7 @@ int PatternEditor::computeDefaultOffset(int patId) const
     } else {
         int lowest = INT_MAX;
         for (const auto& n : allNotes)
-            if (!n.disabled) lowest = std::min(lowest, (int)n.pitch);
+            if (!n.disabled) lowest = std::min(lowest, (int)n.row);
         if (lowest == INT_MAX) lowest = 0;
         int octave     = lowest / cs;
         int degree     = lowest % cs;

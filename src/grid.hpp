@@ -61,7 +61,7 @@ protected:
     void draw() override;
     int  handle(int event) override;
     void findNoteForCursor();
-    int  overlappingNote(int noteIdx) const;
+    virtual int  overlappingCell(int noteIdx) const;
     virtual void moving(StateDragMove& s);
     virtual void resizing(StateDragResize& s);
     void clampSelection();

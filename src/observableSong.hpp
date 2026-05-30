@@ -58,6 +58,7 @@ public:
     void removeTrackAndPattern(int trackId);
     const Pattern*         patternForInstance(int instanceId) const;
     const PatternInstance* instanceById(int instanceId) const;
+    int                    laneIdForInstance(int instanceId) const;
 
     // Default instrument names assigned to newly created patterns.
     std::string defaultOutputInstrument;

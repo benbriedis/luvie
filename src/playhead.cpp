@@ -126,8 +126,8 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
-				std::string name = pitchName ? pitchName(note.pitch)
-				                             : std::to_string(note.pitch);
+				std::string name = pitchName ? pitchName(note.row)
+				                             : std::to_string(note.row);
 				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 			}
@@ -308,7 +308,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
-				std::string name = pitchName ? pitchName(note.pitch) : std::to_string(note.pitch);
+				std::string name = pitchName ? pitchName(note.row) : std::to_string(note.row);
 				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 			}

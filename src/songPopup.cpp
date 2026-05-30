@@ -53,7 +53,7 @@ void SongPopup::open(std::vector<Note>* notes, int noteIdx, Grid* grid,
 	const Note& cell = (*notes)[noteIdx];
 	Point2 anchor = {
 		(int)(grid->x() + (cell.beat - grid->getColOffset()) * grid->colWidth),
-		(int)(grid->y() + cell.pitch * grid->rowHeight)
+		(int)(grid->y() + cell.row * grid->rowHeight)
 	};
 	Fl_Window* win = grid->window();
 	Point2 pos = calcPopupPos({win->w(), win->h()}, anchor, grid->rowHeight, w(), h());

@@ -6,6 +6,7 @@
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 
 static constexpr Fl_Color kParamRowBg   = 0xF0F4FF00;
 static constexpr Fl_Color kParamLine    = 0x8888CC00;
@@ -43,8 +44,8 @@ void SongGrid::draw()
     }
     const int tickH = 4;
     for (const auto& note : notes) {
-        if (note.pitch < 0 || note.pitch >= numRows) continue;
-        int y0  = y() + (int)(note.pitch * rowHeight);
+        if (note.row < 0 || note.row >= numRows) continue;
+        int y0  = y() + (int)(note.row * rowHeight);
         int top = 4, bottom = 4;
         timeline->timeSigAt((int)note.beat, top, bottom);
 
@@ -507,9 +508,9 @@ void SongGrid::rebuildNotes()
     std::vector<Note> all = timeline->buildNotes();
     notes.clear();
     for (auto n : all) {
-        int visual = (int)n.pitch - rowOffset;
+        int visual = (int)n.row - rowOffset;
         if (visual >= 0 && visual < numRows) {
-            n.pitch = (float)visual;
+            n.row = (float)visual;
             notes.push_back(n);
         }
     }
@@ -549,7 +550,7 @@ std::function<void()> SongGrid::makeDeleteCallback(int noteIdx)
 void SongGrid::openContextMenu(int idx)
 {
     if (!songPopup) { Grid::openContextMenu(idx); return; }
-    int absRow   = (int)notes[idx].pitch + rowOffset;
+    int absRow   = (int)notes[idx].row + rowOffset;
     int trackIdx = -1;
     int laneId   = -1;
     if (timeline) {
@@ -564,6 +565,26 @@ void SongGrid::openContextMenu(int idx)
         (onOpenPattern && trackIdx >= 0)
             ? std::function<void()>([this, trackIdx, laneId]() { onOpenPattern(trackIdx, laneId); })
             : nullptr);
+}
+
+int SongGrid::overlappingCell(int noteIdx) const
+{
+    if (!timeline) return Grid::overlappingCell(noteIdx);
+    const Note& a      = notes[noteIdx];
+    float       aStart = a.beat, aEnd = a.beat + a.length;
+    int         aLane  = timeline->laneIdForInstance(a.id);
+    for (const auto [i, b] : std::views::enumerate(notes)) {
+        if (i == noteIdx || b.row != a.row) continue;
+        float bStart = b.beat, bEnd = b.beat + b.length;
+        float firstEnd    = aStart <= bStart ? aEnd   : bEnd;
+        float secondStart = aStart <= bStart ? bStart : aStart;
+        if (firstEnd > secondStart) {
+            int bLane = timeline->laneIdForInstance(b.id);
+            if (aLane < 0 || bLane < 0 || aLane == bLane)
+                return i;
+        }
+    }
+    return -1;
 }
 
 void SongGrid::onBeginDrag(int noteIdx)
@@ -607,11 +628,21 @@ void SongGrid::onCommitMove(const StateDragMove& s)
 {
     if (!timeline) return;
     int id     = notes[s.noteIdx].id;
-    int absRow = (int)notes[s.noteIdx].pitch + rowOffset;
+    int absRow = (int)notes[s.noteIdx].row + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     int laneId = -1;
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
         laneId = ro[absRow].id;
+
+    // In stacked mode every lane maps to the same row, so ro[absRow].id is
+    // always the first lane. Preserve the instance's original lane when the
+    // move stays within the same track.
+    int origLane  = timeline->laneIdForInstance(id);
+    int origTrack = origLane >= 0 ? timeline->trackIndexForLaneId(origLane) : -1;
+    int destTrack = laneId   >= 0 ? timeline->trackIndexForLaneId(laneId)   : -1;
+    if (origTrack >= 0 && origTrack == destTrack)
+        laneId = origLane;
+
     timeline->movePattern(id, laneId, notes[s.noteIdx].beat);
 }
 
@@ -647,7 +678,7 @@ int SongGrid::handle(int event)
 void SongGrid::onNoteDoubleClick(int noteIdx)
 {
     if (!onPatternDoubleClick || !timeline) return;
-    int absRow = (int)notes[noteIdx].pitch + rowOffset;
+    int absRow = (int)notes[noteIdx].row + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
         int laneId   = ro[absRow].id;
@@ -668,13 +699,13 @@ void SongGrid::toggleNote()
     if (!timeline) { Grid::toggleNote(); return; }
 
     for (auto& n : notes) {
-        if ((int)n.pitch == visualRow && n.beat == col) {
+        if ((int)n.row == visualRow && n.beat == col) {
             timeline->removePattern(n.id);
             return;
         }
     }
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return (int)n.pitch == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
+        [=](const Note& n) { return (int)n.row == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
     const auto& ro = timeline->get().rowOrder;
     if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
         int laneId = ro[absRow].id;

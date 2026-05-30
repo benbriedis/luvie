@@ -68,7 +68,7 @@ void ObservablePattern::moveNote(int noteId, float newStart, float newPitch)
         for (auto& n : pat.notes) {
             if (n.id == noteId) {
                 n.beat  = newStart;
-                n.pitch = (int)newPitch;
+                n.row = (int)newPitch;
                 song_->notify();
                 return;
             }
@@ -118,19 +118,19 @@ void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
         for (auto& note : pat.notes) {
             if (note.disabled) {
                 if (note.disabledDegree >= 0 && note.disabledDegree < newSize) {
-                    note.pitch    = note.pitch * newSize + note.disabledDegree;
+                    note.row    = note.row * newSize + note.disabledDegree;
                     note.disabled = false;
                     note.disabledDegree = -1;
                 }
             } else {
-                int degree = note.pitch % oldSize;
-                int octave = note.pitch / oldSize;
+                int degree = note.row % oldSize;
+                int octave = note.row / oldSize;
                 if (degree < newSize) {
-                    note.pitch = octave * newSize + degree;
+                    note.row = octave * newSize + degree;
                 } else {
                     note.disabled       = true;
                     note.disabledDegree = degree;
-                    note.pitch          = octave;
+                    note.row          = octave;
                 }
             }
         }

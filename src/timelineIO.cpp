@@ -10,7 +10,7 @@ using json = nlohmann::json;
 static json noteToJson(const Note& n) {
     return {
         {"id",             n.id},
-        {"pitch",          n.pitch},
+        {"row",            n.row},
         {"beat",           n.beat},
         {"length",         n.length},
         {"velocity",       n.velocity},
@@ -22,7 +22,7 @@ static json noteToJson(const Note& n) {
 static Note noteFromJson(const json& j) {
     Note n;
     n.id             = j.at("id");
-    n.pitch          = j.at("pitch");
+    n.row            = j.at("row");
     n.beat           = j.at("beat");
     n.length         = j.at("length");
     n.velocity       = j.value("velocity", 0.0f);

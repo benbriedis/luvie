@@ -174,7 +174,7 @@ void JackTransport::rebuildSnapshot()
         } else {
             for (const Note& note : pat->notes) {
                 if (note.disabled) continue;
-                int n    = note.pitch;
+                int n    = note.row;
                 int midi = rootMidi0
                          + chordDefs[chordType].intervals[n % chordSize]
                          + (n / chordSize) * 12;

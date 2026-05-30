@@ -54,7 +54,7 @@ void Grid::draw()
 
     for (const Note& note : notes) {
         int x0    = x() + (int)((note.beat - colOffset) * colWidth);
-        int y0    = y() + (int)(note.pitch * rowHeight);
+        int y0    = y() + (int)(note.row * rowHeight);
         int width = (int)(note.length * colWidth);
         if (x0 + width < x() || x0 > x() + w()) continue;
         Fl_Color fill = 0x5555EE00;
@@ -96,7 +96,7 @@ int Grid::handle(int event)
                     onNoteDoubleClick(noteIdx);
                     creationForbidden = true;  // prevent FL_RELEASE from calling toggleNote
                 } else {
-                    Point orig = {(int)notes[noteIdx].pitch, notes[noteIdx].beat};
+                    Point orig = {(int)notes[noteIdx].row, notes[noteIdx].beat};
                     onBeginDrag(noteIdx);
                     state = StateDragMove{noteIdx, grabX, grabY, orig, orig, false};
                 }
@@ -114,10 +114,10 @@ int Grid::handle(int event)
                 creationForbidden = ex >= gridRight;
                 if (!creationForbidden) {
                     bool wouldRemove = std::any_of(notes.begin(), notes.end(),
-                        [=](const Note& n) { return n.pitch == row && n.beat == col; });
+                        [=](const Note& n) { return n.row == row && n.beat == col; });
                     if (!wouldRemove) {
                         creationForbidden = std::any_of(notes.begin(), notes.end(),
-                            [=](const Note& n) { return n.pitch == row && col < n.beat + n.length && col + 1.0f > n.beat; });
+                            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + 1.0f > n.beat; });
                         if (creationForbidden)
                             window()->cursor(forbiddenCursorImage(), 11, 11);
                     }
@@ -138,7 +138,7 @@ int Grid::handle(int event)
                 Point lastValid      = s->lastValid;
                 StateDragMove drag   = *s;
                 if (wasOverlapping) {
-                    notes[noteIdx].pitch = lastValid.row;
+                    notes[noteIdx].row = lastValid.row;
                     notes[noteIdx].beat  = lastValid.col;
                     redraw();
                 }
@@ -183,11 +183,11 @@ void Grid::moving(StateDragMove& s)
     if (note->beat + note->length > numCols) note->beat = numCols - note->length;
     if (snap > 0.0f) note->beat = std::round(note->beat / snap) * snap;
     float ey    = Fl::event_y() - y();
-    note->pitch  = (ey - s.grabY + rowHeight / 2.0f) / (float)rowHeight;
-    if (note->pitch < 0)        note->pitch = 0;
-    if (note->pitch >= numRows) note->pitch = numRows - 1;
-    s.overlapping = overlappingNote(s.noteIdx) >= 0;
-    if (!s.overlapping) s.lastValid = {(int)note->pitch, note->beat};
+    note->row  = (ey - s.grabY + rowHeight / 2.0f) / (float)rowHeight;
+    if (note->row < 0)        note->row = 0;
+    if (note->row >= numRows) note->row = numRows - 1;
+    s.overlapping = overlappingCell(s.noteIdx) >= 0;
+    if (!s.overlapping) s.lastValid = {(int)note->row, note->beat};
     if (s.overlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
     else               window()->cursor(FL_CURSOR_HAND);
     redraw();
@@ -202,7 +202,7 @@ void Grid::resizing(StateDragResize& s)
         float endCol = note->beat + note->length;
         note->beat    = ex / (float)colWidth + colOffset;
         if (snap) note->beat = std::round(note->beat / snap) * snap;
-        int   neighbour = overlappingNote(s.noteIdx);
+        int   neighbour = overlappingCell(s.noteIdx);
         float min       = neighbour < 0 ? 0.0f : notes[neighbour].beat + notes[neighbour].length;
         if (note->beat < min) note->beat = min;
         note->length = endCol - note->beat;
@@ -211,7 +211,7 @@ void Grid::resizing(StateDragResize& s)
         note->length  = ex / (float)colWidth + colOffset - note->beat;
         float endCol  = note->beat + note->length;
         if (snap) { endCol = std::round(endCol / snap) * snap; note->length = endCol - note->beat; }
-        int   neighbour = overlappingNote(s.noteIdx);
+        int   neighbour = overlappingCell(s.noteIdx);
         float max       = neighbour < 0 ? (float)numCols : notes[neighbour].beat;
         if (note->beat + note->length > max) note->length = max - note->beat;
         if (note->length < minLength) note->length = minLength;
@@ -230,7 +230,7 @@ void Grid::findNoteForCursor()
     Side resizeSide = Side::Left;
 
     for (const auto [i, n] : std::views::enumerate(notes)) {
-        if ((int)n.pitch != row) continue;
+        if ((int)n.row != row) continue;
         float leftEdge  = (n.beat - colOffset) * colWidth;
         float rightEdge = (n.beat + n.length - colOffset) * colWidth;
 
@@ -239,7 +239,7 @@ void Grid::findNoteForCursor()
         } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
-            state = StateHoverMove{(int)i, ex - leftEdge, ey - (int)n.pitch * rowHeight};
+            state = StateHoverMove{(int)i, ex - leftEdge, ey - (int)n.row * rowHeight};
             window()->cursor(contextMenuCursorImage(), 0, 0);
             redraw();
             return;
@@ -265,22 +265,22 @@ void Grid::toggleNote()
 
     int size = notes.size();
     notes.erase(std::remove_if(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.pitch == row && n.beat == col; }), notes.end());
+        [=](const Note& n) { return n.row == row && n.beat == col; }), notes.end());
     if ((int)notes.size() == size) {
         bool clear = std::none_of(notes.begin(), notes.end(),
-            [=](const Note& n) { return n.pitch == row && col < n.beat + n.length && col + 1.0f > n.beat; });
+            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + 1.0f > n.beat; });
         if (clear)
             notes.push_back({0, row, col, 1.0});
     }
     redraw();
 }
 
-int Grid::overlappingNote(int noteIdx) const
+int Grid::overlappingCell(int noteIdx) const
 {
     Note  a      = notes[noteIdx];
     float aStart = a.beat, aEnd = a.beat + a.length;
     for (const auto [i, b] : std::views::enumerate(notes)) {
-        if (i == noteIdx || b.pitch != a.pitch) continue;
+        if (i == noteIdx || b.row != a.row) continue;
         float bStart      = b.beat, bEnd = b.beat + b.length;
         float firstEnd    = aStart <= bStart ? aEnd : bEnd;
         float secondStart = aStart <= bStart ? bStart : aStart;

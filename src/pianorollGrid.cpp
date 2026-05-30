@@ -28,9 +28,9 @@ void PianorollGrid::rebuildNotes()
 
     auto patNotes = pattern->buildPatternNotes(patternId);
     for (auto n : patNotes) {
-        int visual = (rowOffset + numRows - 1) - n.pitch;
+        int visual = (rowOffset + numRows - 1) - n.row;
         if (visual < 0 || visual >= numRows) continue;
-        n.pitch = visual;
+        n.row = visual;
         notes.push_back(n);
     }
 
@@ -60,7 +60,7 @@ void PianorollGrid::toggleNote()
     }
 
     for (auto& n : notes) {
-        if (n.pitch == visual_row && n.beat == col) {
+        if (n.row == visual_row && n.beat == col) {
             pattern->removeNote(n.id);
             return;
         }
@@ -70,7 +70,7 @@ void PianorollGrid::toggleNote()
     if (midiNote < 0 || midiNote >= totalRows) return;
 
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.pitch == visual_row
+        [=](const Note& n) { return n.row == visual_row
                                   && col < n.beat + n.length
                                   && col + 1.0f > n.beat; });
     if (clear)
@@ -88,7 +88,7 @@ void PianorollGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern) return;
     int id       = notes[s.noteIdx].id;
-    int midiNote = rowOffset + numRows - 1 - (int)notes[s.noteIdx].pitch;
+    int midiNote = rowOffset + numRows - 1 - (int)notes[s.noteIdx].row;
     pattern->moveNote(id, notes[s.noteIdx].beat, (float)midiNote);
 }
 

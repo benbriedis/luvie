@@ -99,7 +99,7 @@ void PianorollEditor::focusPattern()
     auto notes = pattern->buildPatternNotes(patId);
     if (notes.empty()) { setRowOffset(48); return; }
     int lowest = 127;
-    for (const auto& n : notes) lowest = std::min(lowest, n.pitch);
+    for (const auto& n : notes) lowest = std::min(lowest, n.row);
     setRowOffset(std::max(0, lowest - 1));
 }
 

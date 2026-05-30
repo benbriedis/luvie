@@ -64,20 +64,20 @@ void PatternGrid::rebuildNotes()
     for (auto n : patNotes) {
         int virtualPos;
         if (n.disabled) {
-            int octave = n.pitch;
+            int octave = n.row;
             auto it = std::find(disabledDegrees.begin(), disabledDegrees.end(), n.disabledDegree);
             if (it == disabledDegrees.end()) continue;
             int ddIdx = (int)std::distance(disabledDegrees.begin(), it);
             virtualPos = octave * groupSize + chordSize + ddIdx;
             occupiedDisabledVPos.insert(virtualPos);
         } else {
-            int octave = n.pitch / chordSize;
-            int degree = n.pitch % chordSize;
+            int octave = n.row / chordSize;
+            int degree = n.row % chordSize;
             virtualPos = octave * groupSize + degree;
         }
         int visual = (rowOffset + numRows - 1) - virtualPos;
         if (visual >= 0 && visual < numRows) {
-            n.pitch = visual;
+            n.row = visual;
             notes.push_back(n);
         }
     }
@@ -112,7 +112,7 @@ void PatternGrid::toggleNote()
 
     // Remove a note if one is at exactly this position
     for (auto& n : notes) {
-        if (n.pitch == visual_row && n.beat == col) {
+        if (n.row == visual_row && n.beat == col) {
             pattern->removeNote(n.id);
             return;
         }
@@ -124,7 +124,7 @@ void PatternGrid::toggleNote()
     if (abs_row < 0) return;
 
     bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.pitch == visual_row
+        [=](const Note& n) { return n.row == visual_row
                                   && col < n.beat + n.length
                                   && col + 1.0f > n.beat; });
     if (clear)
@@ -142,7 +142,7 @@ void PatternGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern || notes[s.noteIdx].disabled) return;
     int id         = notes[s.noteIdx].id;
-    int virtualPos = rowOffset + numRows - 1 - (int)notes[s.noteIdx].pitch;
+    int virtualPos = rowOffset + numRows - 1 - (int)notes[s.noteIdx].row;
     int abs_row    = virtualToAbsRow(virtualPos);
     if (abs_row < 0) return;
     pattern->moveNote(id, notes[s.noteIdx].beat, (float)abs_row);
@@ -197,7 +197,7 @@ void PatternGrid::rapidTryCreate(int visualRow, int absCol)
     float col = float(absCol);
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) {
-            return (int)n.pitch == visualRow
+            return (int)n.row == visualRow
                 && col < n.beat + n.length
                 && col + 1.0f > n.beat;
         });
@@ -254,7 +254,7 @@ int PatternGrid::handle(int event)
                 bool removed = false;
                 if (pattern && patternId >= 0) {
                     for (const auto& n : notes) {
-                        if ((int)n.pitch == row && n.beat == col) {
+                        if ((int)n.row == row && n.beat == col) {
                             pattern->removeNote(n.id);
                             removed = true;
                             break;
@@ -321,7 +321,7 @@ Fl_Color PatternGrid::rowLineColor(int i) const
 Fl_Color PatternGrid::rowBgColor(int row) const
 {
     for (const auto& n : notes)
-        if (n.disabled && (int)n.pitch == row) return 0xCCCCCC00;
+        if (n.disabled && (int)n.row == row) return 0xCCCCCC00;
     return bgColor;
 }
 
