@@ -2,6 +2,7 @@
 #include "paramLaneTypes.hpp"
 #include <algorithm>
 #include <set>
+#include <unordered_map>
 #include <cmath>
 
 ObservableSong::ObservableSong(float initBpm, int initTop, int initBottom)
@@ -314,10 +315,67 @@ void ObservableSong::moveRow(int from, int toGap)
     if (ro[from].isInstrumentHeader) return;  // don't drag header rows directly
     if (toGap < 0 || toGap > n) return;
     if (toGap == from || toGap == from + 1) return;
+
     RowRef ref = ro[from];
+
+    // Record which track owns this lane before we touch rowOrder
+    int srcTrackId = -1;
+    if (ref.isTrack) {
+        for (const auto& t : data.tracks)
+            for (const auto& l : t.lanes)
+                if (l.id == ref.id) { srcTrackId = t.id; break; }
+    }
+
     ro.erase(ro.begin() + from);
     int insertAt = (toGap > from) ? toGap - 1 : toGap;
     ro.insert(ro.begin() + insertAt, ref);
+
+    // When a lane row is dropped under a different track, transfer lane ownership
+    if (ref.isTrack && srcTrackId >= 0) {
+        // Find destination track by scanning for the nearest neighbouring lane
+        int destTrackId = -1;
+        for (int i = insertAt - 1; i >= 0 && destTrackId < 0; i--)
+            if (ro[i].isTrack)
+                for (const auto& t : data.tracks)
+                    for (const auto& l : t.lanes)
+                        if (l.id == ro[i].id) { destTrackId = t.id; break; }
+        for (int i = insertAt + 1; i < (int)ro.size() && destTrackId < 0; i++)
+            if (ro[i].isTrack)
+                for (const auto& t : data.tracks)
+                    for (const auto& l : t.lanes)
+                        if (l.id == ro[i].id) { destTrackId = t.id; break; }
+
+        if (destTrackId >= 0 && destTrackId != srcTrackId) {
+            for (auto& src : data.tracks) {
+                if (src.id != srcTrackId) continue;
+                if (src.lanes.size() <= 1) break;
+                auto it = std::find_if(src.lanes.begin(), src.lanes.end(),
+                    [&ref](const Lane& l) { return l.id == ref.id; });
+                if (it == src.lanes.end()) break;
+                Lane lane = std::move(*it);
+                src.lanes.erase(it);
+                for (auto& dst : data.tracks)
+                    if (dst.id == destTrackId) { dst.lanes.push_back(std::move(lane)); break; }
+                break;
+            }
+        }
+
+        // Sync the affected track's lanes[] order to match the new rowOrder sequence.
+        // This keeps laneNum (derived from lanes[] index) consistent with visual position,
+        // so unnamed lanes display as "Track 1", "Track 2", etc. in their new order.
+        int syncId = (destTrackId >= 0 && destTrackId != srcTrackId) ? destTrackId : srcTrackId;
+        for (auto& t : data.tracks) {
+            if (t.id != syncId) continue;
+            std::unordered_map<int, Lane> byId;
+            for (auto& l : t.lanes) byId[l.id] = std::move(l);
+            t.lanes.clear();
+            for (const auto& r : ro)
+                if (r.isTrack && byId.count(r.id))
+                    t.lanes.push_back(std::move(byId[r.id]));
+            break;
+        }
+    }
+
     rebuildInstrumentHeaders();
     notify();
 }
