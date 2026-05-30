@@ -54,7 +54,7 @@ int TrackLabels::rowHFor(int absRow) const
 {
     if (!timeline) return rowHeight;
     const auto& ro = timeline->get().rowOrder;
-    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader)
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Header)
         return instrNameRowH;
     return rowHeight;
 }
@@ -88,7 +88,7 @@ void TrackLabels::startEdit(int absRow)
 {
     if (!timeline) return;
     const auto& ro = timeline->get().rowOrder;
-    if (absRow < 0 || absRow >= (int)ro.size() || !ro[absRow].isTrack) return;
+    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].kind != RowKind::Lane) return;
     int laneId  = ro[absRow].id;
     int trackId = timeline->trackIdForLaneId(laneId);
     for (const auto& t : timeline->get().tracks) {
@@ -114,7 +114,7 @@ void TrackLabels::checkDuplicate()
 {
     if (!timeline || editingAbsRow < 0) return;
     const auto& ro = timeline->get().rowOrder;
-    if (editingAbsRow >= (int)ro.size() || !ro[editingAbsRow].isTrack) return;
+    if (editingAbsRow >= (int)ro.size() || ro[editingAbsRow].kind != RowKind::Lane) return;
     int editingTrackId = timeline->trackIdForLaneId(ro[editingAbsRow].id);
     std::string cur = input.value();
     bool dup = false;
@@ -129,7 +129,7 @@ void TrackLabels::startPatternEdit(int absRow)
     if (!timeline) return;
     const auto& tl = timeline->get();
     const auto& ro = tl.rowOrder;
-    if (absRow < 0 || absRow >= (int)ro.size() || !ro[absRow].isTrack) return;
+    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].kind != RowKind::Lane) return;
 
     int laneId = ro[absRow].id;
     int tIdx   = timeline->trackIndexForLaneId(laneId);
@@ -193,7 +193,7 @@ void TrackLabels::commitEdit()
             timeline->setPatternName(patId, newLabel);
         } else {
             const auto& ro = timeline->get().rowOrder;
-            if (absRow < (int)ro.size() && ro[absRow].isTrack) {
+            if (absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
                 int trackId = timeline->trackIdForLaneId(ro[absRow].id);
                 if (trackId >= 0) {
                     bool dup = false;
@@ -242,13 +242,13 @@ void TrackLabels::draw()
             const auto& ref = ro[i];
             bool isDragSrc;
             if (dragging && isTrackDrag && dragTrackId >= 0) {
-                isDragSrc = (ref.isInstrumentHeader && ref.id == dragTrackId) ||
-                            (ref.isTrack && timeline->trackIdForLaneId(ref.id) == dragTrackId);
+                isDragSrc = (ref.kind == RowKind::Header && ref.id == dragTrackId) ||
+                            (ref.kind == RowKind::Lane && timeline->trackIdForLaneId(ref.id) == dragTrackId);
             } else {
                 isDragSrc = dragging && i == dragRow;
             }
 
-            if (ref.isInstrumentHeader) {
+            if (ref.kind == RowKind::Header) {
                 // ── Dedicated instrument name header row ──
                 fl_color(isDragSrc ? fl_color_average(colInstrHeader, FL_WHITE, 0.75f) : colInstrHeader);
                 fl_rectf(x(), ry, w(), rh);
@@ -273,7 +273,7 @@ void TrackLabels::draw()
                         break;
                     }
                 }
-            } else if (ref.isTrack) {
+            } else if (ref.kind == RowKind::Lane) {
                 // ref.id is a Lane ID — find the owning Track
                 bool isSel = (ref.id == tl.selectedLaneId);
                 Fl_Color bg = isSel ? colSelected : colNormal;
@@ -367,13 +367,13 @@ int TrackLabels::handle(int event)
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (row >= 0 && row < (int)ro.size()) {
                 const auto& ref = ro[row];
-                if (ref.isInstrumentHeader) {
+                if (ref.kind == RowKind::Header) {
                     // Right-click instrument header → show track context menu
                     if (contextPopup && patternObs) {
                         contextPopup->open(ref.id, -1, patternObs,
                                            Fl::event_x_root(), Fl::event_y_root());
                     }
-                } else if (ref.isTrack) {
+                } else if (ref.kind == RowKind::Lane) {
                     if (contextPopup && patternObs) {
                         int trackId = timeline->trackIdForLaneId(ref.id);
                         if (trackId >= 0)
@@ -395,12 +395,12 @@ int TrackLabels::handle(int event)
 
             // Skip double-click pattern edit on instrument header rows
             if (Fl::event_clicks() > 0) {
-                if (row < (int)ro.size() && !ro[row].isInstrumentHeader)
+                if (row < (int)ro.size() && ro[row].kind != RowKind::Header)
                     startPatternEdit(row);
                 return 1;
             }
 
-            if (row < (int)ro.size() && ro[row].isInstrumentHeader) {
+            if (row < (int)ro.size() && ro[row].kind == RowKind::Header) {
                 // Click on collapse icon → collapse to stacked
                 if (Fl::event_x() < x() + iconAreaW) {
                     timeline->setStackedLanes(ro[row].id, true);
@@ -419,7 +419,7 @@ int TrackLabels::handle(int event)
             }
 
             // Click on expand icon in stacked first-lane row → expand to unstacked
-            if (Fl::event_x() < x() + iconAreaW && row < (int)ro.size() && ro[row].isTrack) {
+            if (Fl::event_x() < x() + iconAreaW && row < (int)ro.size() && ro[row].kind == RowKind::Lane) {
                 int tIdx = timeline->trackIndexForLaneId(ro[row].id);
                 if (tIdx >= 0) {
                     const auto& t = timeline->get().tracks[tIdx];
@@ -459,8 +459,8 @@ int TrackLabels::handle(int event)
                 for (int i = rowOffset; i < rowOffset + numVisibleRows && i < (int)ro.size(); i++) {
                     const auto& r = ro[i];
                     int tid = -1;
-                    if (r.isInstrumentHeader) tid = r.id;
-                    else if (r.isTrack) tid = timeline->trackIdForLaneId(r.id);
+                    if (r.kind == RowKind::Header) tid = r.id;
+                    else if (r.kind == RowKind::Lane) tid = timeline->trackIdForLaneId(r.id);
                     if (tid >= 0 && !seen.count(tid)) {
                         seen.insert(tid);
                         bounds.push_back({tid, rowYInPanel(i), 0});
@@ -485,8 +485,8 @@ int TrackLabels::handle(int event)
                         if (t.id == dropTrackId)
                             for (const auto& l : t.lanes) dropLaneIds.insert(l.id);
                     for (int i = 0; i < (int)ro.size(); i++) {
-                        if (ro[i].isInstrumentHeader && ro[i].id == dropTrackId) { dropRow = i; break; }
-                        if (ro[i].isTrack && dropLaneIds.count(ro[i].id)) { dropRow = i; break; }
+                        if (ro[i].kind == RowKind::Header && ro[i].id == dropTrackId) { dropRow = i; break; }
+                        if (ro[i].kind == RowKind::Lane && dropLaneIds.count(ro[i].id)) { dropRow = i; break; }
                     }
                 }
             } else {
@@ -524,7 +524,7 @@ int TrackLabels::handle(int event)
             } else if (dragStartRow >= 0 && timeline) {
                 // Pure single click: select lane (skip instrument header rows)
                 const auto& ro = timeline->get().rowOrder;
-                if (dragStartRow < (int)ro.size() && ro[dragStartRow].isTrack) {
+                if (dragStartRow < (int)ro.size() && ro[dragStartRow].kind == RowKind::Lane) {
                     int laneId   = ro[dragStartRow].id;
                     int trackIdx = timeline->trackIndexForLaneId(laneId);
                     if (trackIdx >= 0) timeline->selectLane(trackIdx, laneId);

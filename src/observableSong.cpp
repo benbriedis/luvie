@@ -38,13 +38,13 @@ void ObservableSong::loadTimeline(const Timeline& tl)
         bool needsRebuild = data.rowOrder.empty();
         if (!needsRebuild)
             for (const auto& r : data.rowOrder)
-                if (r.isTrack && !laneIds.count(r.id)) { needsRebuild = true; break; }
+                if (r.kind == RowKind::Lane && !laneIds.count(r.id)) { needsRebuild = true; break; }
         if (needsRebuild) {
             data.rowOrder.clear();
             for (const auto& t : data.tracks)
                 for (const auto& l : t.lanes)
-                    data.rowOrder.push_back({true, l.id});
-            for (const auto& l : data.paramLanes) data.rowOrder.push_back({false, l.id});
+                    data.rowOrder.push_back({RowKind::Lane, l.id});
+            for (const auto& l : data.paramLanes) data.rowOrder.push_back({RowKind::Param, l.id});
         }
     }
     nextId = 1;
@@ -96,7 +96,7 @@ void ObservableSong::rebuildInstrumentHeaders()
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
             [&nonEmptyUnstackedIds, &nonEmptyStackedIds](const RowRef& r) {
-                return r.isInstrumentHeader &&
+                return r.kind == RowKind::Header &&
                        (nonEmptyUnstackedIds.count(r.id) || nonEmptyStackedIds.count(r.id));
             }),
         data.rowOrder.end());
@@ -105,8 +105,8 @@ void ObservableSong::rebuildInstrumentHeaders()
         if (t.stackedLanes || t.lanes.empty()) continue;
         int firstLaneId = t.lanes[0].id;
         for (int i = 0; i < (int)data.rowOrder.size(); i++) {
-            if (data.rowOrder[i].isTrack && data.rowOrder[i].id == firstLaneId) {
-                data.rowOrder.insert(data.rowOrder.begin() + i, RowRef{false, t.id, true});
+            if (data.rowOrder[i].kind == RowKind::Lane && data.rowOrder[i].id == firstLaneId) {
+                data.rowOrder.insert(data.rowOrder.begin() + i, RowRef{RowKind::Header, t.id});
                 break;
             }
         }
@@ -286,7 +286,7 @@ int ObservableSong::addTrack(std::string label, int patternId, int atIndex)
     newTrack.label = std::move(label);
     newTrack.lanes.push_back(std::move(lane));
     data.tracks.push_back(std::move(newTrack));
-    RowRef ref{true, laneId};  // row keyed to Lane ID, not Track ID
+    RowRef ref{RowKind::Lane, laneId};
     if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
         data.rowOrder.insert(data.rowOrder.begin() + atIndex, ref);
     else
@@ -324,7 +324,7 @@ void ObservableSong::moveRow(int from, int toGap)
     auto& ro = data.rowOrder;
     int n = (int)ro.size();
     if (from < 0 || from >= n) return;
-    if (ro[from].isInstrumentHeader) return;  // don't drag header rows directly
+    if (ro[from].kind == RowKind::Header) return;  // don't drag header rows directly
     if (toGap < 0 || toGap > n) return;
     if (toGap == from || toGap == from + 1) return;
 
@@ -332,7 +332,7 @@ void ObservableSong::moveRow(int from, int toGap)
 
     // Record which track owns this lane before we touch rowOrder
     int srcTrackId = -1;
-    if (ref.isTrack) {
+    if (ref.kind == RowKind::Lane) {
         for (const auto& t : data.tracks)
             for (const auto& l : t.lanes)
                 if (l.id == ref.id) { srcTrackId = t.id; break; }
@@ -343,22 +343,22 @@ void ObservableSong::moveRow(int from, int toGap)
     ro.insert(ro.begin() + insertAt, ref);
 
     // When a lane row is dropped under a different track, transfer lane ownership
-    if (ref.isTrack && srcTrackId >= 0) {
+    if (ref.kind == RowKind::Lane && srcTrackId >= 0) {
         // Find destination track: scan backward, treating instrument headers as hard boundaries.
         // Without this, the scan would silently cross a header and steal the previous track's ID.
         int destTrackId = -1;
         for (int i = insertAt - 1; i >= 0 && destTrackId < 0; i--) {
-            if (ro[i].isTrack) {
+            if (ro[i].kind == RowKind::Lane) {
                 for (const auto& t : data.tracks)
                     for (const auto& l : t.lanes)
                         if (l.id == ro[i].id) { destTrackId = t.id; break; }
-            } else if (ro[i].isInstrumentHeader) {
+            } else if (ro[i].kind == RowKind::Header) {
                 destTrackId = ro[i].id;  // landed immediately after this track's header
                 break;
             }
         }
         for (int i = insertAt + 1; i < (int)ro.size() && destTrackId < 0; i++)
-            if (ro[i].isTrack)
+            if (ro[i].kind == RowKind::Lane)
                 for (const auto& t : data.tracks)
                     for (const auto& l : t.lanes)
                         if (l.id == ro[i].id) { destTrackId = t.id; break; }
@@ -389,7 +389,7 @@ void ObservableSong::moveRow(int from, int toGap)
             for (auto& l : t.lanes) byId[l.id] = std::move(l);
             t.lanes.clear();
             for (const auto& r : ro)
-                if (r.isTrack && byId.count(r.id))
+                if (r.kind == RowKind::Lane && byId.count(r.id))
                     t.lanes.push_back(std::move(byId[r.id]));
             break;
         }
@@ -415,8 +415,8 @@ void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
     // Split rowOrder into the track's block and everything else
     std::vector<RowRef> block, rest;
     for (const auto& r : ro) {
-        bool mine = (r.isInstrumentHeader && r.id == trackId) ||
-                    (r.isTrack && moveLaneIds.count(r.id));
+        bool mine = (r.kind == RowKind::Header && r.id == trackId) ||
+                    (r.kind == RowKind::Lane   && moveLaneIds.count(r.id));
         (mine ? block : rest).push_back(r);
     }
     if (block.empty()) return;
@@ -429,8 +429,8 @@ void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
             if (t.id == insertBeforeTrackId)
                 for (const auto& l : t.lanes) targetLaneIds.insert(l.id);
         for (int i = 0; i < (int)rest.size(); i++) {
-            if ((rest[i].isInstrumentHeader && rest[i].id == insertBeforeTrackId) ||
-                (rest[i].isTrack && targetLaneIds.count(rest[i].id))) {
+            if ((rest[i].kind == RowKind::Header && rest[i].id == insertBeforeTrackId) ||
+                (rest[i].kind == RowKind::Lane   && targetLaneIds.count(rest[i].id))) {
                 insertAt = i;
                 break;
             }
@@ -456,9 +456,9 @@ void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
     std::set<int> seen;
     for (const auto& r : ro) {
         int tid = -1;
-        if (r.isInstrumentHeader) {
+        if (r.kind == RowKind::Header) {
             tid = r.id;
-        } else if (r.isTrack) {
+        } else if (r.kind == RowKind::Lane) {
             for (const auto& [id, t] : byId)
                 for (const auto& l : t.lanes)
                     if (l.id == r.id) { tid = id; break; }
@@ -563,14 +563,14 @@ int ObservableSong::addLane(int trackId)
             if (existingLaneIds.empty()) {
                 // Track was empty — insert after its header row to keep it in place
                 for (int i = 0; i < (int)data.rowOrder.size(); i++)
-                    if (data.rowOrder[i].isInstrumentHeader && data.rowOrder[i].id == trackId)
+                    if (data.rowOrder[i].kind == RowKind::Header && data.rowOrder[i].id == trackId)
                         { insertAt = i + 1; break; }
             } else {
                 for (int i = (int)data.rowOrder.size() - 1; i >= 0; i--)
-                    if (data.rowOrder[i].isTrack && existingLaneIds.count(data.rowOrder[i].id))
+                    if (data.rowOrder[i].kind == RowKind::Lane && existingLaneIds.count(data.rowOrder[i].id))
                         { insertAt = i + 1; break; }
             }
-            data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{true, laneId});
+            data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{RowKind::Lane, laneId});
         }
         rebuildInstrumentHeaders();
         notify();
@@ -613,14 +613,14 @@ int ObservableSong::addPianorollLane(int trackId)
             int insertAt = (int)data.rowOrder.size();
             if (existingLaneIds.empty()) {
                 for (int i = 0; i < (int)data.rowOrder.size(); i++)
-                    if (data.rowOrder[i].isInstrumentHeader && data.rowOrder[i].id == trackId)
+                    if (data.rowOrder[i].kind == RowKind::Header && data.rowOrder[i].id == trackId)
                         { insertAt = i + 1; break; }
             } else {
                 for (int i = (int)data.rowOrder.size() - 1; i >= 0; i--)
-                    if (data.rowOrder[i].isTrack && existingLaneIds.count(data.rowOrder[i].id))
+                    if (data.rowOrder[i].kind == RowKind::Lane && existingLaneIds.count(data.rowOrder[i].id))
                         { insertAt = i + 1; break; }
             }
-            data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{true, laneId});
+            data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{RowKind::Lane, laneId});
         }
         rebuildInstrumentHeaders();
         notify();
@@ -649,7 +649,7 @@ void ObservableSong::setStackedLanes(int trackId, bool stacked)
                 collapsedIds.insert(t.lanes[j].id);
             data.rowOrder.erase(
                 std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
-                    [&collapsedIds](const RowRef& r) { return r.isTrack && collapsedIds.count(r.id); }),
+                    [&collapsedIds](const RowRef& r) { return r.kind == RowKind::Lane && collapsedIds.count(r.id); }),
                 data.rowOrder.end());
             // Reset selectedLaneId to first lane so a row is highlighted
             if (!t.lanes.empty()) {
@@ -664,11 +664,11 @@ void ObservableSong::setStackedLanes(int trackId, bool stacked)
             if (!t.lanes.empty()) {
                 int firstId = t.lanes[0].id;
                 for (int i = 0; i < (int)data.rowOrder.size(); i++)
-                    if (data.rowOrder[i].isTrack && data.rowOrder[i].id == firstId)
+                    if (data.rowOrder[i].kind == RowKind::Lane && data.rowOrder[i].id == firstId)
                         { insertAt = i + 1; break; }
             }
             for (int j = 1; j < (int)t.lanes.size(); j++)
-                data.rowOrder.insert(data.rowOrder.begin() + insertAt + (j - 1), RowRef{true, t.lanes[j].id});
+                data.rowOrder.insert(data.rowOrder.begin() + insertAt + (j - 1), RowRef{RowKind::Lane, t.lanes[j].id});
         }
         rebuildInstrumentHeaders();
         notify();
@@ -693,7 +693,7 @@ void ObservableSong::removeLane(int trackId, int laneId)
             t.lanes.end());
         data.rowOrder.erase(
             std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
-                [laneId](const RowRef& r) { return r.isTrack && r.id == laneId; }),
+                [laneId](const RowRef& r) { return r.kind == RowKind::Lane && r.id == laneId; }),
             data.rowOrder.end());
 
         if (patId > 0) {
@@ -737,8 +737,8 @@ void ObservableSong::removeTrack(int trackId)
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
             [&laneIds, trackId](const RowRef& r) {
-                return (r.isTrack && laneIds.count(r.id)) ||
-                       (r.isInstrumentHeader && r.id == trackId);
+                return (r.kind == RowKind::Lane   && laneIds.count(r.id)) ||
+                       (r.kind == RowKind::Header && r.id == trackId);
             }),
         data.rowOrder.end());
     if (laneIds.count(data.selectedLaneId)) {
@@ -778,8 +778,8 @@ void ObservableSong::removeTrackAndPattern(int trackId)
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
             [&laneIds, trackId](const RowRef& r) {
-                return (r.isTrack && laneIds.count(r.id)) ||
-                       (r.isInstrumentHeader && r.id == trackId);
+                return (r.kind == RowKind::Lane   && laneIds.count(r.id)) ||
+                       (r.kind == RowKind::Header && r.id == trackId);
             }),
         data.rowOrder.end());
 
@@ -968,7 +968,7 @@ std::vector<Note> ObservableSong::buildNotes() const
     std::vector<Note> notes;
     for (int row = 0; row < (int)data.rowOrder.size(); row++) {
         const auto& ref = data.rowOrder[row];
-        if (!ref.isTrack) continue;
+        if (ref.kind != RowKind::Lane) continue;
         for (const auto& t : data.tracks) {
             for (const auto& lane : t.lanes) {
                 if (lane.id != ref.id) continue;
@@ -1005,7 +1005,7 @@ int ObservableSong::addParamLane(const std::string& type, int atIndex)
     lane.type = type;
     lane.points.push_back({nextId++, 0.0f, laneDefaultValue(type), true});
     data.paramLanes.push_back(std::move(lane));
-    RowRef ref{false, laneId};
+    RowRef ref{RowKind::Param, laneId};
     if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
         data.rowOrder.insert(data.rowOrder.begin() + atIndex, ref);
     else
@@ -1022,7 +1022,7 @@ void ObservableSong::removeParamLane(int laneId)
         data.paramLanes.end());
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
-            [laneId](const RowRef& r) { return !r.isTrack && r.id == laneId; }),
+            [laneId](const RowRef& r) { return r.kind == RowKind::Param && r.id == laneId; }),
         data.rowOrder.end());
     notify();
 }

@@ -184,9 +184,12 @@ void Grid::moving(StateDragMove& s)
     if (note->beat + note->length > numCols) note->beat = numCols - note->length;
     if (snap > 0.0f) note->beat = std::round(note->beat / snap) * snap;
     float ey   = Fl::event_y() - y();
-    note->row  = (float)std::clamp(rowAtPixelY(std::max(0, (int)(ey - s.grabY))), 0, numRows - 1);
-    s.overlapping = overlappingCell(s.noteIdx) >= 0;
-    if (!s.overlapping) s.lastValid = {(int)note->row, note->beat};
+    int newRow = std::clamp(rowAtPixelY(std::max(0, (int)(ey - s.grabY))), 0, numRows - 1);
+    if (!isRowBlocked(newRow)) {
+        note->row     = (float)newRow;
+        s.overlapping = overlappingCell(s.noteIdx) >= 0;
+        if (!s.overlapping) s.lastValid = {(int)note->row, note->beat};
+    }
     if (s.overlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
     else               window()->cursor(FL_CURSOR_HAND);
     redraw();

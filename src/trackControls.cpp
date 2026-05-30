@@ -42,7 +42,7 @@ void TrackControls::setRowOffset(int offset)
 static int rowHFor(const Timeline* tl, int absRow, int rowHeight) {
     if (!tl) return rowHeight;
     const auto& ro = tl->rowOrder;
-    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader)
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Header)
         return instrNameRowH;
     return rowHeight;
 }
@@ -86,10 +86,10 @@ void TrackControls::draw()
             const auto& ro = tl.rowOrder;
             if (i >= 0 && i < (int)ro.size()) {
                 const auto& ref = ro[i];
-                if (ref.isInstrumentHeader) {
+                if (ref.kind == RowKind::Header) {
                     rowBg        = colInstrHeader;
                     isInstrHeader = true;
-                } else if (ref.isTrack) {
+                } else if (ref.kind == RowKind::Lane) {
                     rowBg = colNormal;
                     int tid = timeline->trackIdForLaneId(ref.id);
                     for (const auto& t : tl.tracks) {
@@ -119,7 +119,7 @@ void TrackControls::draw()
                 if (timeline) {
                     const auto& tl = timeline->get();
                     const auto& ro = tl.rowOrder;
-                    if (i >= 0 && i < (int)ro.size() && ro[i].isTrack) {
+                    if (i >= 0 && i < (int)ro.size() && ro[i].kind == RowKind::Lane) {
                         int tIdx = timeline->trackIndexForLaneId(ro[i].id);
                         if (tIdx >= 0) {
                             const auto& t = tl.tracks[tIdx];
@@ -169,7 +169,7 @@ int TrackControls::handle(int event)
         int row    = absRowAtPanelY(tl_, rowOffset, numVisibleRows, localY, rowHeight);
         const auto& tl = timeline->get();
         const auto& ro = tl.rowOrder;
-        if (row < 0 || row >= (int)ro.size() || !ro[row].isTrack)
+        if (row < 0 || row >= (int)ro.size() || ro[row].kind != RowKind::Lane)
             return 1;
 
         int rowPY   = rowYInPanel(tl_, rowOffset, row, rowHeight);

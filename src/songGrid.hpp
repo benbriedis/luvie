@@ -45,6 +45,7 @@ public:
 
 protected:
     void draw() override;
+    bool     isRowBlocked(int visualRow) const override;
     Fl_Color rowBgColor(int visualRow) const override;
     void moving(StateDragMove& s) override;
     void resizing(StateDragResize& s) override;

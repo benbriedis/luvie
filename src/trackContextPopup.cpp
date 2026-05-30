@@ -85,7 +85,7 @@ int TrackContextPopup::rowOrderIdxForTrackId(int trackId) const
         for (int li = (int)t.lanes.size() - 1; li >= 0; li--) {
             int laneId = t.lanes[li].id;
             for (int i = (int)tl.rowOrder.size() - 1; i >= 0; i--)
-                if (tl.rowOrder[i].isTrack && tl.rowOrder[i].id == laneId) return i;
+                if (tl.rowOrder[i].kind == RowKind::Lane && tl.rowOrder[i].id == laneId) return i;
         }
         break;
     }

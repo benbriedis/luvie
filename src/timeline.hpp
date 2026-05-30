@@ -88,11 +88,16 @@ struct Track {
 	std::vector<Lane> lanes;
 };
 
-// One entry per visible row; determines display order of tracks and param lanes.
+// Discriminates the three kinds of visible row in the song grid.
+enum class RowKind { Lane, Header, Param };
+
+// One entry per visible row; determines display order.
+// Lane  → id is a Lane ID (holds pattern instances)
+// Header→ id is a Track ID (instrument name row, holds no instances)
+// Param → id is a ParamLane ID (automation lane)
 struct RowRef {
-	bool isTrack;                    // true = Track lane, false = ParamLane or header
-	int  id;                         // Lane ID (isTrack), ParamLane ID (!isTrack), or Track ID (isInstrumentHeader)
-	bool isInstrumentHeader = false; // dedicated name row for unstacked multi-lane tracks
+	RowKind kind;
+	int     id;
 };
 
 struct Timeline {

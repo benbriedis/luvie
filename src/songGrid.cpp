@@ -24,7 +24,7 @@ bool SongGrid::isInstrHeaderVR(int vr) const
     if (!timeline) return false;
     int absRow = vr + rowOffset;
     const auto& ro = timeline->get().rowOrder;
-    return absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader;
+    return absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Header;
 }
 
 int SongGrid::rowY(int r) const
@@ -74,9 +74,9 @@ void SongGrid::draw()
             int absRow = vr + rowOffset;
             if (absRow < 0 || absRow >= (int)ro.size()) continue;
             bool drawDiv = false;
-            if (ro[absRow].isInstrumentHeader) {
+            if (ro[absRow].kind == RowKind::Header) {
                 drawDiv = true;
-            } else if (ro[absRow].isTrack) {
+            } else if (ro[absRow].kind == RowKind::Lane) {
                 int tIdx = timeline->trackIndexForLaneId(ro[absRow].id);
                 if (tIdx < 0) continue;
                 const auto& t = tl.tracks[tIdx];
@@ -176,7 +176,7 @@ int SongGrid::visualRowForLaneId(int laneId) const
     if (!timeline) return -1;
     const auto& ro = timeline->get().rowOrder;
     for (int i = 0; i < (int)ro.size(); i++)
-        if (!ro[i].isTrack && ro[i].id == laneId)
+        if (ro[i].kind == RowKind::Param && ro[i].id == laneId)
             return i - rowOffset;
     return -1;
 }
@@ -185,11 +185,16 @@ int SongGrid::laneIdxForAbsRow(int absRow) const
 {
     if (!timeline) return -1;
     const auto& ro = timeline->get().rowOrder;
-    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].isTrack) return -1;
+    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].kind != RowKind::Param) return -1;
     int id = ro[absRow].id;
     for (int i = 0; i < (int)localParamLanes.size(); i++)
         if (localParamLanes[i].id == id) return i;
     return -1;
+}
+
+bool SongGrid::isRowBlocked(int visualRow) const
+{
+    return isInstrHeaderVR(visualRow);
 }
 
 Fl_Color SongGrid::rowBgColor(int visualRow) const
@@ -198,8 +203,8 @@ Fl_Color SongGrid::rowBgColor(int visualRow) const
     int absRow = visualRow + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     if (absRow >= 0 && absRow < (int)ro.size()) {
-        if (ro[absRow].isInstrumentHeader) return kInstrHeaderBg;
-        if (!ro[absRow].isTrack)           return kParamRowBg;
+        if (ro[absRow].kind == RowKind::Header) return kInstrHeaderBg;
+        if (ro[absRow].kind == RowKind::Param)  return kParamRowBg;
     }
     return bgColor;
 }
@@ -606,7 +611,7 @@ void SongGrid::openContextMenu(int idx)
     int laneId   = -1;
     if (timeline) {
         const auto& ro = timeline->get().rowOrder;
-        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
+        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
             laneId   = ro[absRow].id;
             trackIdx = timeline->trackIndexForLaneId(laneId);
         }
@@ -682,7 +687,7 @@ void SongGrid::onCommitMove(const StateDragMove& s)
     int absRow = (int)notes[s.noteIdx].row + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     int laneId = -1;
-    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack)
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane)
         laneId = ro[absRow].id;
 
     // In stacked mode every lane maps to the same row, so ro[absRow].id is
@@ -735,7 +740,7 @@ void SongGrid::onNoteDoubleClick(int noteIdx)
     if (!onPatternDoubleClick || !timeline) return;
     int absRow = (int)notes[noteIdx].row + rowOffset;
     const auto& ro = timeline->get().rowOrder;
-    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
         int laneId   = ro[absRow].id;
         int trackIdx = timeline->trackIndexForLaneId(laneId);
         if (trackIdx >= 0) onPatternDoubleClick(trackIdx, laneId);
@@ -756,7 +761,7 @@ void SongGrid::toggleNote()
     // Block interaction on instrument header rows
     {
         const auto& ro = timeline->get().rowOrder;
-        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isInstrumentHeader)
+        if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Header)
             return;
     }
 
@@ -769,7 +774,7 @@ void SongGrid::toggleNote()
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) { return (int)n.row == visualRow && col < n.beat + n.length && col + 1.0f > n.beat; });
     const auto& ro = timeline->get().rowOrder;
-    if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].isTrack) {
+    if (clear && absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
         int laneId = ro[absRow].id;
         int patId  = 0;
         for (const auto& t : timeline->get().tracks)
