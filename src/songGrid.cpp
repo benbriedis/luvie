@@ -636,12 +636,16 @@ void SongGrid::onCommitMove(const StateDragMove& s)
 
     // In stacked mode every lane maps to the same row, so ro[absRow].id is
     // always the first lane. Preserve the instance's original lane when the
-    // move stays within the same track.
+    // move stays within the same track in stacked mode; in unstacked mode
+    // ro[absRow].id is already the correct destination lane.
     int origLane  = timeline->laneIdForInstance(id);
     int origTrack = origLane >= 0 ? timeline->trackIndexForLaneId(origLane) : -1;
     int destTrack = laneId   >= 0 ? timeline->trackIndexForLaneId(laneId)   : -1;
-    if (origTrack >= 0 && origTrack == destTrack)
-        laneId = origLane;
+    if (origTrack >= 0 && origTrack == destTrack) {
+        const auto& tracks = timeline->get().tracks;
+        if (origTrack < (int)tracks.size() && tracks[origTrack].stackedLanes)
+            laneId = origLane;
+    }
 
     timeline->movePattern(id, laneId, notes[s.noteIdx].beat);
 }

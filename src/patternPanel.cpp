@@ -585,11 +585,12 @@ void PatternPanel::onTimelineChanged()
     const auto& tl  = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
-        patternName.copy_label(tl.tracks[sel].label.c_str());
         int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
         PatternType type = PatternType::STANDARD;
+        std::string pName;
         for (const auto& p : tl.patterns)
-            if (p.id == patId) { type = p.type; break; }
+            if (p.id == patId) { type = p.type; pName = p.name; break; }
+        patternName.copy_label(pName.c_str());
         switch (type) {
         case PatternType::DRUM:      configureDrumRow();      break;
         case PatternType::PIANOROLL: configurePianorollRow(); break;
@@ -612,8 +613,12 @@ void PatternPanel::startEdit()
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) return;
 
-    editingTrackId = tl.tracks[sel].id;
-    originalLabel  = tl.tracks[sel].label;
+    int patId = tl.tracks[sel].lanes.empty() ? -1 : tl.tracks[sel].lanes[0].patternId;
+    if (patId < 0) return;
+    editingPatId = patId;
+    originalLabel.clear();
+    for (const auto& p : tl.patterns)
+        if (p.id == patId) { originalLabel = p.name; break; }
     input.resize(patternName.x(), patternName.y(), patternName.w(), patternName.h());
     input.value(originalLabel.c_str());
     input.textcolor(panelText);
@@ -627,38 +632,27 @@ void PatternPanel::startEdit()
 
 void PatternPanel::checkDuplicate()
 {
-    if (!pattern) return;
-    const auto& tracks = pattern->get().tracks;
-    std::string current = input.value();
-    bool dup = false;
-    for (const auto& t : tracks)
-        if (t.id != editingTrackId && t.label == current) { dup = true; break; }
-    input.textcolor(dup ? FL_RED : panelText);
+    input.textcolor(panelText);
     input.redraw();
 }
 
 void PatternPanel::commitEdit()
 {
-    if (editingTrackId < 0) return;
-    int id        = editingTrackId;
-    editingTrackId = -1;
+    if (editingPatId < 0) return;
+    int id       = editingPatId;
+    editingPatId = -1;
     InlineEditDispatch::uninstall();
     std::string newLabel = input.value();
     input.hide();
-    if (pattern) {
-        const auto& tracks = pattern->get().tracks;
-        bool dup = false;
-        for (const auto& t : tracks)
-            if (t.id != id && t.label == newLabel) { dup = true; break; }
-        pattern->song()->renameTrack(id, dup ? originalLabel : newLabel);
-    }
+    if (pattern)
+        pattern->song()->setPatternName(id, newLabel.empty() ? originalLabel : newLabel);
     redraw();
 }
 
 void PatternPanel::cancelEdit()
 {
-    if (editingTrackId < 0) return;
-    editingTrackId = -1;
+    if (editingPatId < 0) return;
+    editingPatId = -1;
     InlineEditDispatch::uninstall();
     input.hide();
     redraw();
@@ -668,7 +662,7 @@ void PatternPanel::resize(int x, int y, int w, int h)
 {
     Fl_Widget::resize(x, y, w, h);
     controlRow.resize(x, y, w, h);
-    if (editingTrackId >= 0)
+    if (editingPatId >= 0)
         input.resize(patternName.x(), patternName.y(), patternName.w(), patternName.h());
 }
 
@@ -695,7 +689,7 @@ int PatternPanel::handle(int event)
         }
     }
 
-    if (event == FL_KEYDOWN && Fl::event_key() == FL_Escape && editingTrackId >= 0) {
+    if (event == FL_KEYDOWN && Fl::event_key() == FL_Escape && editingPatId >= 0) {
         cancelEdit();
         return 1;
     }

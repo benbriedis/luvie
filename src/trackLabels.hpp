@@ -19,6 +19,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     int                  rowOffset         = 0;
     InlineInput          input;
     int                  editingAbsRow = -1;
+    int                  editingPatId  = -1;  // >= 0 when editing a pattern name (not track label)
     std::string          originalLabel;
 
     int  dragStartRow = -1;
@@ -29,6 +30,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     static constexpr int dragThreshold = 4;
 
     void startEdit(int absRow);
+    void startPatternEdit(int absRow);
     void cancelEdit();
     void checkDuplicate();
 

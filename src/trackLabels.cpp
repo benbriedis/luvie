@@ -14,6 +14,7 @@ static constexpr Fl_Color colParam     = 0x1A2B3A00;  // param lane label bg
 static constexpr Fl_Color colText      = FL_WHITE;
 static constexpr Fl_Color colBorder    = 0x37415100;
 static constexpr Fl_Color colTrackDiv  = 0x64748B00;  // bright separator between tracks
+static constexpr int      instrHeaderH = 14;           // thin instrument-name strip for unstacked multi-lane tracks
 
 TrackLabels::TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight)
     : Fl_Group(x, y, w, numVisibleRows * rowHeight),
@@ -91,23 +92,83 @@ void TrackLabels::checkDuplicate()
     input.redraw();
 }
 
+void TrackLabels::startPatternEdit(int absRow)
+{
+    if (!timeline) return;
+    const auto& tl = timeline->get();
+    const auto& ro = tl.rowOrder;
+    if (absRow < 0 || absRow >= (int)ro.size() || !ro[absRow].isTrack) return;
+
+    int laneId = ro[absRow].id;
+    int tIdx   = timeline->trackIndexForLaneId(laneId);
+    if (tIdx < 0) return;
+    const auto& track = tl.tracks[tIdx];
+    if (track.stackedLanes) return;
+
+    int laneNum = 0, patId = -1;
+    for (int j = 0; j < (int)track.lanes.size(); j++) {
+        if (track.lanes[j].id == laneId) { laneNum = j + 1; patId = track.lanes[j].patternId; break; }
+    }
+    if (patId < 0) return;
+
+    originalLabel.clear();
+    for (const auto& p : tl.patterns)
+        if (p.id == patId) { originalLabel = p.name; break; }
+
+    editingAbsRow = absRow;
+    editingPatId  = patId;
+
+    int ry = y() + (absRow - rowOffset) * rowHeight;
+    bool isMultiLane = (int)track.lanes.size() > 1;
+    bool isFirstLane = (!track.lanes.empty() && track.lanes[0].id == laneId);
+
+    int inputY, inputH;
+    if (isMultiLane && isFirstLane) {
+        inputY = ry + instrHeaderH;
+        inputH = rowHeight - instrHeaderH;
+    } else if (!isMultiLane) {
+        inputY = ry + rowHeight / 2;
+        inputH = rowHeight / 2;
+    } else {
+        inputY = ry;
+        inputH = rowHeight;
+    }
+
+    input.resize(x(), inputY, w(), inputH);
+    input.value(originalLabel.c_str());
+    input.color(colSelected);
+    input.textcolor(colText);
+    input.show();
+    input.take_focus();
+    input.position(input.size(), 0);
+    input.onChange([]() {});
+    InlineEditDispatch::install(this, [this]() { commitEdit(); });
+    redraw();
+}
+
 void TrackLabels::commitEdit()
 {
     if (editingAbsRow < 0) return;
     int absRow    = editingAbsRow;
+    int patId     = editingPatId;
     editingAbsRow = -1;
+    editingPatId  = -1;
     InlineEditDispatch::uninstall();
     std::string newLabel = input.value();
     input.hide();
     if (timeline) {
-        const auto& ro = timeline->get().rowOrder;
-        if (absRow < (int)ro.size() && ro[absRow].isTrack) {
-            int trackId = timeline->trackIdForLaneId(ro[absRow].id);
-            if (trackId >= 0) {
-                bool dup = false;
-                for (const auto& t : timeline->get().tracks)
-                    if (t.id != trackId && t.label == newLabel) { dup = true; break; }
-                timeline->renameTrack(trackId, dup ? originalLabel : newLabel);
+        if (patId >= 0) {
+            timeline->setPatternName(patId, newLabel.empty() ? originalLabel : newLabel);
+        } else {
+            const auto& ro = timeline->get().rowOrder;
+            if (absRow < (int)ro.size() && ro[absRow].isTrack) {
+                int trackId = timeline->trackIdForLaneId(ro[absRow].id);
+                if (trackId >= 0) {
+                    bool dup = false;
+                    for (const auto& t : timeline->get().tracks)
+                        if (t.id != trackId && t.label == newLabel) { dup = true; break; }
+                    timeline->renameTrack(trackId, dup ? originalLabel : newLabel);
+                }
             }
         }
     }
@@ -118,6 +179,7 @@ void TrackLabels::cancelEdit()
 {
     if (editingAbsRow < 0) return;
     editingAbsRow = -1;
+    editingPatId  = -1;
     InlineEditDispatch::uninstall();
     input.hide();
     redraw();
@@ -138,11 +200,9 @@ void TrackLabels::draw()
         return "Pat " + std::to_string(laneNum);
     };
 
-    static constexpr int instrHeaderH = 14;  // thin instrument-name strip for unstacked multi-lane tracks
-
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
-        if (i == editingAbsRow) continue;  // input widget draws itself
+        if (i == editingAbsRow && editingPatId < 0) continue;  // track-label input draws the whole row itself
         int ry = y() + (i - rowOffset) * rowHeight;
 
         if (i >= 0 && i < (int)ro.size()) {
@@ -278,8 +338,11 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
-            // Single click: record potential drag start; commit on release
-            // (double-click editing disabled — track labels mirror instrument names)
+            if (Fl::event_clicks() > 0) {
+                startPatternEdit(row);
+                return 1;
+            }
+
             dragStartRow = row;
             dragStartY   = Fl::event_y();
             dragging     = false;

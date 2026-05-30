@@ -151,7 +151,7 @@ public:
 class PatternPanel : public Fl_Group, public ITimelineObserver {
 
     ObservablePattern* pattern      = nullptr;
-    int                 editingTrackId = -1;
+    int                 editingPatId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
     std::vector<std::string> stdInstrumentNames_;
