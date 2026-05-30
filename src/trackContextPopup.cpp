@@ -100,6 +100,7 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
 
     // Configure lane/stack buttons based on track state
     bool canRemoveLane  = false;
+    bool canOpenPattern = false;
     bool isStacked      = false;
     bool hasMultiLane   = false;
     bool isDrumTrack    = false;
@@ -108,7 +109,8 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
             if (t.id != trackId) continue;
             hasMultiLane  = (int)t.lanes.size() > 1;
             isStacked     = t.stackedLanes;
-            canRemoveLane = hasMultiLane && !isStacked;
+            canRemoveLane = !isStacked && !t.lanes.empty();
+            canOpenPattern = !t.lanes.empty();
             // Determine track type from first lane's pattern
             if (!t.lanes.empty()) {
                 int patId = t.lanes[0].patternId;
@@ -118,8 +120,9 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
             break;
         }
     }
-    canRemoveLane ? removeLaneBtn->activate()       : removeLaneBtn->deactivate();
-    hasMultiLane  ? stackLanesBtn->activate()       : stackLanesBtn->deactivate();
+    canOpenPattern ? openPatternBtn->activate()      : openPatternBtn->deactivate();
+    canRemoveLane  ? removeLaneBtn->activate()      : removeLaneBtn->deactivate();
+    hasMultiLane   ? stackLanesBtn->activate()      : stackLanesBtn->deactivate();
     isDrumTrack   ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
     stackLanesBtn->label(isStacked ? "Unstack Patterns" : "Stack Patterns");
 
