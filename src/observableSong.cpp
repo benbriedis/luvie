@@ -338,13 +338,19 @@ void ObservableSong::moveRow(int from, int toGap)
 
     // When a lane row is dropped under a different track, transfer lane ownership
     if (ref.isTrack && srcTrackId >= 0) {
-        // Find destination track by scanning for the nearest neighbouring lane
+        // Find destination track: scan backward, treating instrument headers as hard boundaries.
+        // Without this, the scan would silently cross a header and steal the previous track's ID.
         int destTrackId = -1;
-        for (int i = insertAt - 1; i >= 0 && destTrackId < 0; i--)
-            if (ro[i].isTrack)
+        for (int i = insertAt - 1; i >= 0 && destTrackId < 0; i--) {
+            if (ro[i].isTrack) {
                 for (const auto& t : data.tracks)
                     for (const auto& l : t.lanes)
                         if (l.id == ro[i].id) { destTrackId = t.id; break; }
+            } else if (ro[i].isInstrumentHeader) {
+                destTrackId = ro[i].id;  // landed immediately after this track's header
+                break;
+            }
+        }
         for (int i = insertAt + 1; i < (int)ro.size() && destTrackId < 0; i++)
             if (ro[i].isTrack)
                 for (const auto& t : data.tracks)
