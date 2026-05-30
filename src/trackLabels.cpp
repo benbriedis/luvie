@@ -18,6 +18,7 @@ static constexpr Fl_Color colBorder      = 0x37415100;
 static constexpr Fl_Color colTrackDiv    = 0x64748B00;  // bright separator between tracks
 static constexpr Fl_Color colInstrHeader = 0x64748B00;  // dedicated instrument name row bg
 static constexpr int      instrNameRowH  = 24;           // height of instrument header rows
+static constexpr int      iconAreaW      = 16;           // width reserved for expand/collapse arrow
 
 TrackLabels::TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight)
     : Fl_Group(x, y, w, numVisibleRows * rowHeight),
@@ -256,12 +257,18 @@ void TrackLabels::draw()
                     fl_color(colTrackDiv);
                     fl_rectf(x(), ry - 1, w(), 2);
                 }
+                // Down-arrow collapse icon
+                {
+                    fl_color(colNormal);
+                    int ax = x() + 3, ay = ry + rh / 2 - 3;
+                    fl_polygon(ax, ay, ax + 8, ay, ax + 4, ay + 6);
+                }
                 // Find the track name by track ID
                 for (const auto& t : tl.tracks) {
                     if (t.id == ref.id) {
                         fl_font(FL_HELVETICA_BOLD, 9);
                         fl_color(colNormal);
-                        fl_draw(t.label.c_str(), x() + 4, ry, w() - 8, rh,
+                        fl_draw(t.label.c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                         break;
                     }
@@ -299,8 +306,15 @@ void TrackLabels::draw()
                         fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
                                 x() + 4, ry, w() - 8, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
-                    } else {
-                        // Stacked lane rows: no label (instrument name is in header row)
+                    } else if (isFirstLane) {
+                        // ── Stacked first lane: right-arrow expand icon + track label ──
+                        Fl_Color arrowCol = isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText;
+                        fl_color(arrowCol);
+                        int ax = x() + 4, ay = ry + rh / 2 - 4;
+                        fl_polygon(ax, ay, ax, ay + 8, ax + 6, ay + 4);
+                        fl_font(FL_HELVETICA_BOLD, 9);
+                        fl_draw(track.label.c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
+                                FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                     }
                 }
             } else {
@@ -387,6 +401,11 @@ int TrackLabels::handle(int event)
             }
 
             if (row < (int)ro.size() && ro[row].isInstrumentHeader) {
+                // Click on collapse icon → collapse to stacked
+                if (Fl::event_x() < x() + iconAreaW) {
+                    timeline->setStackedLanes(ro[row].id, true);
+                    return 1;
+                }
                 // Dragging from an instrument header moves the whole track
                 dragStartRow = row;
                 dragStartY   = Fl::event_y();
@@ -397,6 +416,18 @@ int TrackLabels::handle(int event)
                 dragTrackId  = ro[row].id;
                 dropTrackId  = -1;
                 return 1;
+            }
+
+            // Click on expand icon in stacked first-lane row → expand to unstacked
+            if (Fl::event_x() < x() + iconAreaW && row < (int)ro.size() && ro[row].isTrack) {
+                int tIdx = timeline->trackIndexForLaneId(ro[row].id);
+                if (tIdx >= 0) {
+                    const auto& t = timeline->get().tracks[tIdx];
+                    if (t.stackedLanes && !t.lanes.empty() && t.lanes[0].id == ro[row].id) {
+                        timeline->setStackedLanes(t.id, false);
+                        return 1;
+                    }
+                }
             }
 
             dragStartRow = row;

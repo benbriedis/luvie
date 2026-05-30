@@ -81,17 +81,23 @@ void ObservableSong::loadTimeline(const Timeline& tl)
 
 void ObservableSong::rebuildInstrumentHeaders()
 {
-    // Only reposition headers for non-empty unstacked tracks (anchored before their first lane).
+    // Reposition headers for non-empty unstacked tracks (anchored before their first lane).
+    // Remove headers for non-empty stacked tracks (single combined row, no separate header).
     // Headers for empty tracks stay where they are — they were placed when the last lane left.
     std::set<int> nonEmptyUnstackedIds;
-    for (const auto& t : data.tracks)
-        if (!t.stackedLanes && !t.lanes.empty())
-            nonEmptyUnstackedIds.insert(t.id);
+    std::set<int> nonEmptyStackedIds;
+    for (const auto& t : data.tracks) {
+        if (!t.lanes.empty()) {
+            if (!t.stackedLanes) nonEmptyUnstackedIds.insert(t.id);
+            else                 nonEmptyStackedIds.insert(t.id);
+        }
+    }
 
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
-            [&nonEmptyUnstackedIds](const RowRef& r) {
-                return r.isInstrumentHeader && nonEmptyUnstackedIds.count(r.id);
+            [&nonEmptyUnstackedIds, &nonEmptyStackedIds](const RowRef& r) {
+                return r.isInstrumentHeader &&
+                       (nonEmptyUnstackedIds.count(r.id) || nonEmptyStackedIds.count(r.id));
             }),
         data.rowOrder.end());
 
