@@ -388,6 +388,86 @@ void ObservableSong::moveRow(int from, int toGap)
     notify();
 }
 
+void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
+{
+    if (trackId == insertBeforeTrackId) return;
+
+    auto& ro = data.rowOrder;
+
+    // Collect lane IDs belonging to the track being moved
+    std::set<int> moveLaneIds;
+    for (const auto& t : data.tracks)
+        if (t.id == trackId)
+            for (const auto& l : t.lanes) moveLaneIds.insert(l.id);
+
+    // Split rowOrder into the track's block and everything else
+    std::vector<RowRef> block, rest;
+    for (const auto& r : ro) {
+        bool mine = (r.isInstrumentHeader && r.id == trackId) ||
+                    (r.isTrack && moveLaneIds.count(r.id));
+        (mine ? block : rest).push_back(r);
+    }
+    if (block.empty()) return;
+
+    // Find the insertion point in `rest` (before insertBeforeTrackId's first row)
+    int insertAt = (int)rest.size();  // default: append at end
+    if (insertBeforeTrackId >= 0) {
+        std::set<int> targetLaneIds;
+        for (const auto& t : data.tracks)
+            if (t.id == insertBeforeTrackId)
+                for (const auto& l : t.lanes) targetLaneIds.insert(l.id);
+        for (int i = 0; i < (int)rest.size(); i++) {
+            if ((rest[i].isInstrumentHeader && rest[i].id == insertBeforeTrackId) ||
+                (rest[i].isTrack && targetLaneIds.count(rest[i].id))) {
+                insertAt = i;
+                break;
+            }
+        }
+    }
+
+    // Rebuild rowOrder with the block at the new position
+    ro.clear();
+    for (int i = 0; i <= (int)rest.size(); i++) {
+        if (i == insertAt)
+            for (const auto& r : block) ro.push_back(r);
+        if (i < (int)rest.size())
+            ro.push_back(rest[i]);
+    }
+
+    // Reorder data.tracks to match the new rowOrder sequence
+    int selectedTrackId = (data.selectedTrackIndex >= 0 && data.selectedTrackIndex < (int)data.tracks.size())
+        ? data.tracks[data.selectedTrackIndex].id : -1;
+
+    std::unordered_map<int, Track> byId;
+    for (auto& t : data.tracks) byId[t.id] = std::move(t);
+    data.tracks.clear();
+    std::set<int> seen;
+    for (const auto& r : ro) {
+        int tid = -1;
+        if (r.isInstrumentHeader) {
+            tid = r.id;
+        } else if (r.isTrack) {
+            for (const auto& [id, t] : byId)
+                for (const auto& l : t.lanes)
+                    if (l.id == r.id) { tid = id; break; }
+        }
+        if (tid >= 0 && !seen.count(tid)) {
+            seen.insert(tid);
+            if (byId.count(tid)) data.tracks.push_back(std::move(byId[tid]));
+        }
+    }
+    for (auto& [id, t] : byId)
+        if (!seen.count(id)) data.tracks.push_back(std::move(t));
+
+    // Restore selectedTrackIndex
+    data.selectedTrackIndex = -1;
+    for (int i = 0; i < (int)data.tracks.size(); i++)
+        if (data.tracks[i].id == selectedTrackId) { data.selectedTrackIndex = i; break; }
+
+    rebuildInstrumentHeaders();
+    notify();
+}
+
 void ObservableSong::renameTrack(int trackId, std::string newLabel)
 {
     for (auto& t : data.tracks)

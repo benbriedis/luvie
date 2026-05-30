@@ -6,6 +6,8 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
+#include <set>
+#include <vector>
 
 static constexpr Fl_Color colNormal      = 0x1F293700;
 static constexpr Fl_Color colSelected    = 0x3B82F600;
@@ -237,7 +239,13 @@ void TrackLabels::draw()
 
         if (i >= 0 && i < (int)ro.size()) {
             const auto& ref = ro[i];
-            bool isDragSrc = (dragging && i == dragRow);
+            bool isDragSrc;
+            if (dragging && isTrackDrag && dragTrackId >= 0) {
+                isDragSrc = (ref.isInstrumentHeader && ref.id == dragTrackId) ||
+                            (ref.isTrack && timeline->trackIdForLaneId(ref.id) == dragTrackId);
+            } else {
+                isDragSrc = dragging && i == dragRow;
+            }
 
             if (ref.isInstrumentHeader) {
                 // ── Dedicated instrument name header row ──
@@ -326,8 +334,8 @@ void TrackLabels::draw()
         }
     }
 
-    // Drop indicator line
-    if (dragging && dropRow >= 0) {
+    // Drop indicator line (suppressed when track-dragging over itself)
+    if (dragging && dropRow >= 0 && !(isTrackDrag && dropTrackId == dragTrackId)) {
         int lineY = y() + rowYInPanel(dropRow);
         lineY = std::clamp(lineY, y(), y() + h());
         fl_color(0x00BFFFFF);  // cyan
@@ -387,14 +395,27 @@ int TrackLabels::handle(int event)
                 return 1;
             }
 
-            // Don't start drags from instrument header rows
-            if (row < (int)ro.size() && ro[row].isInstrumentHeader) return 1;
+            if (row < (int)ro.size() && ro[row].isInstrumentHeader) {
+                // Dragging from an instrument header moves the whole track
+                dragStartRow = row;
+                dragStartY   = Fl::event_y();
+                dragging     = false;
+                dragRow      = -1;
+                dropRow      = -1;
+                isTrackDrag  = true;
+                dragTrackId  = ro[row].id;
+                dropTrackId  = -1;
+                return 1;
+            }
 
             dragStartRow = row;
             dragStartY   = Fl::event_y();
             dragging     = false;
             dragRow      = -1;
             dropRow      = -1;
+            isTrackDrag  = false;
+            dragTrackId  = -1;
+            dropTrackId  = -1;
             return 1;
         }
     }
@@ -407,18 +428,57 @@ int TrackLabels::handle(int event)
         }
         if (dragging && timeline) {
             const auto& ro = timeline->get().rowOrder;
-            // Compute the drop gap from pixel Y using variable row heights
             int mouseRelY = Fl::event_y() - y();
-            int cumY = 0;
-            int gap = rowOffset;
-            for (int i = rowOffset; i < rowOffset + numVisibleRows && i < (int)ro.size(); i++) {
-                int rh = rowHFor(i);
-                int midY = cumY + rh / 2;
-                if (mouseRelY <= midY) break;
-                cumY += rh;
-                gap = i + 1;
+            if (isTrackDrag) {
+                // Build visible track blocks and snap drop to track boundaries
+                struct TBound { int trackId; int startY; int endY; };
+                std::vector<TBound> bounds;
+                std::set<int> seen;
+                for (int i = rowOffset; i < rowOffset + numVisibleRows && i < (int)ro.size(); i++) {
+                    const auto& r = ro[i];
+                    int tid = -1;
+                    if (r.isInstrumentHeader) tid = r.id;
+                    else if (r.isTrack) tid = timeline->trackIdForLaneId(r.id);
+                    if (tid >= 0 && !seen.count(tid)) {
+                        seen.insert(tid);
+                        bounds.push_back({tid, rowYInPanel(i), 0});
+                    }
+                }
+                for (int k = 0; k < (int)bounds.size(); k++)
+                    bounds[k].endY = (k + 1 < (int)bounds.size()) ? bounds[k+1].startY : h();
+
+                dropTrackId = -1;
+                for (const auto& b : bounds) {
+                    if (mouseRelY < (b.startY + b.endY) / 2) {
+                        dropTrackId = b.trackId;
+                        break;
+                    }
+                }
+
+                // Find the rowOrder index for the drop indicator line
+                dropRow = (int)ro.size();
+                if (dropTrackId >= 0) {
+                    std::set<int> dropLaneIds;
+                    for (const auto& t : timeline->get().tracks)
+                        if (t.id == dropTrackId)
+                            for (const auto& l : t.lanes) dropLaneIds.insert(l.id);
+                    for (int i = 0; i < (int)ro.size(); i++) {
+                        if (ro[i].isInstrumentHeader && ro[i].id == dropTrackId) { dropRow = i; break; }
+                        if (ro[i].isTrack && dropLaneIds.count(ro[i].id)) { dropRow = i; break; }
+                    }
+                }
+            } else {
+                int cumY = 0;
+                int gap = rowOffset;
+                for (int i = rowOffset; i < rowOffset + numVisibleRows && i < (int)ro.size(); i++) {
+                    int rh = rowHFor(i);
+                    int midY = cumY + rh / 2;
+                    if (mouseRelY <= midY) break;
+                    cumY += rh;
+                    gap = i + 1;
+                }
+                dropRow = std::clamp(gap, 0, (int)ro.size());
             }
-            dropRow = std::clamp(gap, 0, (int)ro.size());
             redraw();
         }
         return 1;
@@ -427,11 +487,18 @@ int TrackLabels::handle(int event)
     if (event == FL_RELEASE) {
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             if (dragging) {
-                if (timeline && dragRow >= 0 && dropRow >= 0)
-                    timeline->moveRow(dragRow, dropRow);
-                dragging = false;
-                dragRow  = -1;
-                dropRow  = -1;
+                if (timeline && dragRow >= 0 && dropRow >= 0) {
+                    if (isTrackDrag)
+                        timeline->moveTrack(dragTrackId, dropTrackId);
+                    else
+                        timeline->moveRow(dragRow, dropRow);
+                }
+                dragging     = false;
+                dragRow      = -1;
+                dropRow      = -1;
+                isTrackDrag  = false;
+                dragTrackId  = -1;
+                dropTrackId  = -1;
             } else if (dragStartRow >= 0 && timeline) {
                 // Pure single click: select lane (skip instrument header rows)
                 const auto& ro = timeline->get().rowOrder;
@@ -442,6 +509,9 @@ int TrackLabels::handle(int event)
                 }
             }
             dragStartRow = -1;
+            isTrackDrag  = false;
+            dragTrackId  = -1;
+            dropTrackId  = -1;
             return 1;
         }
     }

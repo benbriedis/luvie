@@ -27,6 +27,9 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     bool dragging     = false;
     int  dragRow      = -1;
     int  dropRow      = -1;
+    bool isTrackDrag  = false;  // true when dragging an instrument header (whole track)
+    int  dragTrackId  = -1;
+    int  dropTrackId  = -1;     // track to insert before; -1 = append at end
     static constexpr int dragThreshold = 4;
 
     void startEdit(int absRow);
