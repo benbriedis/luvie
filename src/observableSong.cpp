@@ -558,7 +558,7 @@ int ObservableSong::addLane(int trackId)
         int laneId = nextId++;
         t.lanes.push_back(Lane{laneId, patId, {}});
 
-        if (!t.stackedLanes) {
+        if (!t.stackedLanes || existingLaneIds.empty()) {
             int insertAt = (int)data.rowOrder.size();
             if (existingLaneIds.empty()) {
                 // Track was empty — insert after its header row to keep it in place
@@ -609,7 +609,7 @@ int ObservableSong::addPianorollLane(int trackId)
         int laneId = nextId++;
         t.lanes.push_back(Lane{laneId, patId, {}});
 
-        if (!t.stackedLanes) {
+        if (!t.stackedLanes || existingLaneIds.empty()) {
             int insertAt = (int)data.rowOrder.size();
             if (existingLaneIds.empty()) {
                 for (int i = 0; i < (int)data.rowOrder.size(); i++)
@@ -640,6 +640,7 @@ void ObservableSong::setStackedLanes(int trackId, bool stacked)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
         if (t.stackedLanes == stacked) return;
+        if (stacked && t.lanes.empty()) return;
         t.stackedLanes = stacked;
 
         if (stacked) {
@@ -707,6 +708,9 @@ void ObservableSong::removeLane(int trackId, int laneId)
                         [patId](const Pattern& p) { return p.id == patId; }),
                     data.patterns.end());
         }
+
+        if (t.lanes.empty())
+            t.stackedLanes = false;
 
         if (data.selectedLaneId == laneId) {
             if (!t.lanes.empty()) {
