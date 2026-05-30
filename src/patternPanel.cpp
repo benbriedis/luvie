@@ -586,12 +586,11 @@ void PatternPanel::onTimelineChanged()
     int sel = tl.selectedTrackIndex;
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
         const auto& selTrack = tl.tracks[sel];
-        int patId = selTrack.lanes.empty() ? 0 : selTrack.lanes[0].patternId;
+        int patId = tl.patternIdForSelectedLane();
         PatternType type = PatternType::STANDARD;
         std::string pName;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; pName = p.name; break; }
-        if (pName.empty()) pName = selTrack.label + " 1";
         patternName.copy_label(pName.c_str());
         switch (type) {
         case PatternType::DRUM:      configureDrumRow();      break;

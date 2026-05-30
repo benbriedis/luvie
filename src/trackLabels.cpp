@@ -224,12 +224,10 @@ void TrackLabels::draw()
     const auto& tl  = timeline->get();
     const auto& ro  = tl.rowOrder;
 
-    // Helper: get pattern display name; falls back to "InstrumentName N" when name is unset
-    auto patName = [&](int patId, int laneNum, const std::string& trackLabel) -> std::string {
+    auto patName = [&](int patId) -> std::string {
         for (const auto& p : tl.patterns)
-            if (p.id == patId)
-                return p.name.empty() ? (trackLabel + " " + std::to_string(laneNum)) : p.name;
-        return trackLabel + " " + std::to_string(laneNum);
+            if (p.id == patId) return p.name;
+        return {};
     };
 
     fl_font(FL_HELVETICA, 11);
@@ -303,7 +301,7 @@ void TrackLabels::draw()
                         // ── Unstacked lane: just pattern name (instrument name is in header row) ──
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId, laneNum, track.label).c_str(),
+                        fl_draw(patName(track.lanes[laneNum-1].patternId).c_str(),
                                 x() + 4, ry, w() - 8, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
                     } else if (isFirstLane) {
