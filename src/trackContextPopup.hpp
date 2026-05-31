@@ -1,18 +1,14 @@
 #ifndef TRACK_CONTEXT_POPUP_HPP
 #define TRACK_CONTEXT_POPUP_HPP
 
-#include "basePopup.hpp"
-#include "modernButton.hpp"
+#include "modern/contextMenuPopup.hpp"
 #include "observablePattern.hpp"
 #include "parameterSubmenu.hpp"
 #include <functional>
 
-class TrackContextPopup : public BasePopup {
-    static constexpr int popH  = 6 * 30 + 2;  // +2 for border
-
+class TrackContextPopup : public ContextMenuPopup {
 public:
     static constexpr int popW  = 150;
-    static constexpr int btnH  = 30;
 
 private:
 

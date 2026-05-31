@@ -1,34 +1,16 @@
 #include "trackContextPopup.hpp"
-#include "appWindow.hpp"
-#include "popupStyle.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 
-static constexpr Fl_Color hoverCol = 0xDDEEFF00;
-
-static ModernButton* makeItem(int y, int w, const char* label)
-{
-    auto* btn = new ModernButton(1, y, w - 2, TrackContextPopup::btnH, label);
-    btn->color(popupBg);
-    btn->labelcolor(popupText);
-    btn->setHoverColor(hoverCol);
-    btn->setBorderWidth(0);
-    btn->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-    return btn;
-}
-
 TrackContextPopup::TrackContextPopup()
-    : BasePopup(0, 0, popW, popH)
+    : ContextMenuPopup(popW, 6)
 {
-    color(popupBg);
-    box(FL_BORDER_BOX);
-
-    openPatternBtn      = makeItem(1,          popW, "Open Pattern");
-    showInstrumentsBtn  = makeItem(1 + btnH,   popW, "Show Instruments");
-    addParamBtn         = makeItem(1 + 2*btnH, popW, "Add automation \xe2\x96\xb6");
-    addLaneBtn          = makeItem(1 + 3*btnH, popW, "Add Pattern");
-    addPianorollLaneBtn = makeItem(1 + 4*btnH, popW, "Add Pianoroll");
-    removeLaneBtn       = makeItem(1 + 5*btnH, popW, "Remove Pattern");
+    openPatternBtn      = addItem(0, "Open Pattern");
+    showInstrumentsBtn  = addItem(1, "Show Instruments");
+    addParamBtn         = addItem(2, "Add automation \xe2\x96\xb6");
+    addLaneBtn          = addItem(3, "Add Pattern");
+    addPianorollLaneBtn = addItem(4, "Add Pianoroll");
+    removeLaneBtn       = addItem(5, "Remove Pattern");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doOpenPattern();
@@ -115,12 +97,7 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
     canRemoveLane  ? removeLaneBtn->activate()         : removeLaneBtn->deactivate();
     isDrumTrack    ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
 
-    position(wx, wy);
-    if (auto* aw = dynamic_cast<AppWindow*>(window()))
-        aw->openPopup(this);
-    else
-        show();
-    redraw();
+    openAt(wx, wy);
 }
 
 void TrackContextPopup::doOpenPattern()
