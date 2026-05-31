@@ -3,7 +3,7 @@
 #include <FL/fl_draw.H>
 
 TrackContextPopup::TrackContextPopup()
-    : ContextMenuPopup(popW, 6)
+    : ContextMenuPopup(popW, 6*30+2)
 {
     openPatternBtn      = addItem(0, "Open Pattern");
     showInstrumentsBtn  = addItem(1, "Show Instruments");

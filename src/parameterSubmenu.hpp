@@ -23,11 +23,10 @@ class ParameterSubmenu : public ContextMenuPopup {
 public:
     static constexpr int itemH = btnH;
     static constexpr int popW  = 160;
-    static constexpr int popH  = numItems * itemH + 2;
 
     std::function<void(const char*)> onSelect;
 
-    ParameterSubmenu() : ContextMenuPopup(popW, numItems) {
+    ParameterSubmenu() : ContextMenuPopup(popW, numItems*30+2) {
         for (int i = 0; i < numItems; ++i) {
             itemData[i] = {this, i};
             items[i] = addItem(i, typeNames[i]);
@@ -60,7 +59,7 @@ public:
         int subY = btnY;
         if (auto* win = parent->window()) {
             if (subX > win->x() + win->w() - popW) subX = parent->x() - popW;
-            int maxY = win->y() + win->h() - popH;
+            int maxY = win->y() + win->h() - h();
             if (subY > maxY) subY = maxY;
         }
         position(subX, subY);

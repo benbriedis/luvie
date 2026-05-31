@@ -1,25 +1,18 @@
 #include "markerPopup.hpp"
-#include "appWindow.hpp"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
-#include <FL/fl_draw.H>
-#include "popupStyle.hpp"
 
-// Layout constants (shared by both kinds)
 static constexpr int popupW  = 160;
 static constexpr int popupH  = 70;
 static constexpr int pad     = 8;
-static constexpr int row1Y   = pad;        // y of input row
+static constexpr int row1Y   = pad;
 static constexpr int row1H   = 22;
-static constexpr int row2Y   = pad + row1H + pad;  // y of button row  (8+22+8=38)
+static constexpr int row2Y   = pad + row1H + pad;
 static constexpr int row2H   = 24;
-// total h = row2Y + row2H + pad = 38+24+8 = 70 ✓
 
 MarkerPopup::MarkerPopup(Kind k)
-	: BasePopup(0, 0, popupW, popupH), kind(k)
+	: InputEditorPopup(popupW, popupH), kind(k)
 {
-	color(popupBg);
-	box(FL_BORDER_BOX);
 
 	auto styleInput = [](Fl_Value_Input* inp) {
 		inp->box(FL_FLAT_BOX);
@@ -70,15 +63,12 @@ MarkerPopup::MarkerPopup(Kind k)
 
 void MarkerPopup::doDelete()
 {
-	committed = true;
 	if (onDeleteCb) onDeleteCb();
-	hide();
-	if (auto* win = window()) win->redraw();
+	commit();
 }
 
 void MarkerPopup::doOk()
 {
-	committed = true;
 	if (kind == TEMPO) {
 		if (onOkTempo) onOkTempo(input1->value());
 	} else {
@@ -86,57 +76,32 @@ void MarkerPopup::doOk()
 		int den = (denomChoice->value() >= 0) ? denoms[denomChoice->value()] : 4;
 		if (onOkTimeSig) onOkTimeSig((int)input1->value(), den);
 	}
-	hide();
-	if (auto* win = window()) win->redraw();
-}
-
-void MarkerPopup::hide()
-{
-	if (!committed && visible()) {
-		doOk();
-		return;
-	}
-	Fl_Window::hide();
+	commit();
 }
 
 int MarkerPopup::handle(int event)
 {
 	if (event == FL_KEYDOWN && Fl::event_key() == FL_Enter) {
-		Fl_Widget* f = Fl::focus();
-		if (f == input1) {
-			doOk();
-			return 1;
-		}
-		if (f == deleteBtn) { doDelete(); return 1; }
-		doOk();
-		return 1;
+		if (Fl::focus() == deleteBtn) { doDelete(); return 1; }
 	}
-	return BasePopup::handle(event);
+	return InputEditorPopup::handle(event);
 }
 
 void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,
                              std::function<void(double)> onOk,
                              std::function<void()> onDelete)
 {
-	committed  = false;
 	input1->value(bpm);
 	fixed ? deleteBtn->deactivate() : deleteBtn->activate();
 	onOkTempo  = std::move(onOk);
 	onDeleteCb = std::move(onDelete);
-	position(wx, wy);
-	if (auto* aw = dynamic_cast<AppWindow*>(window()))
-		aw->openPopup(this);
-	else
-		show();
-	redraw();
-	input1->take_focus();
+	openEditor(wx, wy, input1);
 }
 
 void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
                                std::function<void(int, int)> onOk,
                                std::function<void()> onDelete)
 {
-	committed = false;
 	input1->value(num);
 	static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
 	int idx = 2; // default to 4
@@ -145,11 +110,5 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
 	fixed ? deleteBtn->deactivate() : deleteBtn->activate();
 	onOkTimeSig = std::move(onOk);
 	onDeleteCb  = std::move(onDelete);
-	position(wx, wy);
-	if (auto* aw = dynamic_cast<AppWindow*>(window()))
-		aw->openPopup(this);
-	else
-		show();
-	redraw();
-	input1->take_focus();
+	openEditor(wx, wy, input1);
 }

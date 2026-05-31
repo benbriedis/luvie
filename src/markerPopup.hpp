@@ -4,10 +4,10 @@
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
-#include "basePopup.hpp"
+#include "modern/inputEditorPopup.hpp"
 #include <functional>
 
-class MarkerPopup : public BasePopup {
+class MarkerPopup : public InputEditorPopup {
 public:
 	enum Kind { TEMPO, TIME_SIG };
 
@@ -21,13 +21,11 @@ public:
 	                 std::function<void(int, int)> onOk,
 	                 std::function<void()>          onDelete);
 
-	int  handle(int event) override;
-	void hide() override;
+	int handle(int event) override;
 
 private:
-	void doOk();
+	void doOk() override;
 	void doDelete();
-	bool committed = false;
 	Kind            kind;
 	Fl_Value_Input* input1      = nullptr;
 	ModernChoice*   denomChoice = nullptr;

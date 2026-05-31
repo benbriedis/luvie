@@ -3,10 +3,10 @@
 
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
-#include "basePopup.hpp"
+#include "modern/inputEditorPopup.hpp"
 #include <functional>
 
-class ParamDotPopup : public BasePopup {
+class ParamDotPopup : public InputEditorPopup {
 public:
     ParamDotPopup();
 
@@ -14,14 +14,10 @@ public:
               std::function<void(int)> onOk,
               std::function<void()>    onDelete);
 
-    int  handle(int event) override;
-    void hide() override;
-
 private:
-    void doOk();
+    void doOk() override;
     void doDelete();
 
-    bool            committed = false;
     Fl_Value_Input* input     = nullptr;
     ModernButton*   deleteBtn = nullptr;
 

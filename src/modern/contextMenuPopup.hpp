@@ -6,8 +6,22 @@
 #include "../popupStyle.hpp"
 #include "../appWindow.hpp"
 
-// Base class for simple button-list context menus.
-// Provides styled item creation and standard show/position logic.
+struct Size   { int width; int height; };
+struct Point2 { int x;     int y;      };
+
+inline Point2 calcPopupPos(Size available, Point2 anchor, int anchorH, int popW, int popH) {
+    const int vpad = 4, hpad = 10;
+    int x = anchor.x;
+    if (x + popW > available.width - hpad)  x = available.width - popW - hpad;
+    if (x < hpad) x = hpad;
+    int y = anchor.y + anchorH + vpad;
+    if (y + popH > available.height - vpad) y = anchor.y - popH - vpad;
+    if (y < vpad) y = vpad;
+    return {x, y};
+}
+
+// Base class for all context menu and editor popup windows.
+// Provides colour/box setup, item creation, positioning, and show logic.
 class ContextMenuPopup : public BasePopup {
 protected:
     static constexpr int      btnH     = 30;
@@ -33,9 +47,14 @@ protected:
         redraw();
     }
 
+    void openAt(Size available, Point2 anchor, int anchorH) {
+        auto pos = calcPopupPos(available, anchor, anchorH, w(), h());
+        openAt(pos.x, pos.y);
+    }
+
 public:
-    ContextMenuPopup(int width, int numItems)
-        : BasePopup(0, 0, width, numItems * btnH + 2), popW(width)
+    ContextMenuPopup(int width, int height)
+        : BasePopup(0, 0, width, height), popW(width)
     {
         color(popupBg);
         box(FL_BORDER_BOX);

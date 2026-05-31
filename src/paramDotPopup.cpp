@@ -1,7 +1,4 @@
 #include "paramDotPopup.hpp"
-#include "appWindow.hpp"
-#include "popupStyle.hpp"
-#include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 
 static constexpr int popupW = 140;
@@ -13,10 +10,8 @@ static constexpr int row2Y  = pad + row1H + pad;
 static constexpr int row2H  = 24;
 
 ParamDotPopup::ParamDotPopup()
-    : BasePopup(0, 0, popupW, popupH)
+    : InputEditorPopup(popupW, popupH)
 {
-    color(popupBg);
-    box(FL_BORDER_BOX);
 
     auto* lbl = new Fl_Box(pad, row1Y, 26, row1H, "Val");
     lbl->labelcolor(popupText);
@@ -44,52 +39,24 @@ ParamDotPopup::ParamDotPopup()
 
 void ParamDotPopup::doOk()
 {
-    committed = true;
     if (onOkCb) onOkCb((int)input->value());
-    hide();
-    if (auto* win = window()) win->redraw();
+    commit();
 }
 
 void ParamDotPopup::doDelete()
 {
-    committed = true;
     if (onDeleteCb) onDeleteCb();
-    hide();
-    if (auto* win = window()) win->redraw();
-}
-
-void ParamDotPopup::hide()
-{
-    if (!committed && visible()) {
-        doOk();
-        return;
-    }
-    Fl_Window::hide();
-}
-
-int ParamDotPopup::handle(int event)
-{
-    if (event == FL_KEYDOWN) {
-        if (Fl::event_key() == FL_Enter) { doOk(); return 1; }
-    }
-    return BasePopup::handle(event);
+    commit();
 }
 
 void ParamDotPopup::open(int wx, int wy, int value, bool isAnchor, int maxVal,
                          std::function<void(int)> onOk,
                          std::function<void()>    onDelete)
 {
-    committed  = false;
     input->range(0, maxVal);
     input->value(value);
     isAnchor ? deleteBtn->deactivate() : deleteBtn->activate();
     onOkCb     = std::move(onOk);
     onDeleteCb = std::move(onDelete);
-    position(wx, wy);
-    if (auto* aw = dynamic_cast<AppWindow*>(window()))
-        aw->openPopup(this);
-    else
-        show();
-    redraw();
-    input->take_focus();
+    openEditor(wx, wy, input);
 }

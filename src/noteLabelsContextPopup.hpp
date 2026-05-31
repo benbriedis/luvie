@@ -20,7 +20,7 @@ public:
 
     ParameterSubmenu* paramSubmenu = nullptr;
 
-    NoteLabelsContextPopup() : ContextMenuPopup(popW, 2) {
+    NoteLabelsContextPopup() : ContextMenuPopup(popW, 2*30+2) {
         auto* addBtn = addItem(0, "Add automation \xe2\x96\xb6");
         removeBtn    = addItem(1, "Remove automation");
 

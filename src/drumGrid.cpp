@@ -155,7 +155,7 @@ int DrumGrid::handle(int evt)
                 int dotX = x() + (int)((n.beat - colOffset) * colWidth);
                 int dotY = y() + vr * rowHeight + rowHeight / 2;
                 int id   = n.id;
-                popup.openAt(dotX, dotY, this, rowHeight,
+                popup.openForDot(dotX, dotY, this, rowHeight,
                     [this, id]() { if (pattern) pattern->removeDrumNote(id); });
             }
             return 1;
