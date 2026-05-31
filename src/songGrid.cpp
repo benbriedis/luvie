@@ -131,6 +131,32 @@ void SongGrid::draw()
         }
     }
 
+    // Pattern instance names — small white text at top-left of each block
+    {
+        int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+        fl_font(FL_HELVETICA, 10);
+        for (const auto& note : notes) {
+            if (note.row < 0 || note.row >= numRows) continue;
+            const Pattern* pat = timeline->patternForInstance(note.id);
+            if (!pat || pat->name.empty()) continue;
+
+            int x0    = x() + (int)((note.beat - colOffset) * colWidth);
+            int y0    = y() + rowY((int)note.row);
+            int rh    = rowH((int)note.row);
+            int width = (int)(note.length * colWidth);
+
+            int clipX = std::max(x(), x0);
+            int clipW = std::min(x0 + width, x() + gridRight) - clipX;
+            if (clipW <= 4) continue;
+
+            fl_push_clip(clipX, y0 + 1, clipW, rh - 2);
+            fl_color(FL_WHITE);
+            fl_draw(pat->name.c_str(), x0 + 7, y0 + 2, width - 9, rh - 4,
+                    FL_ALIGN_TOP | FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
+            fl_pop_clip();
+        }
+    }
+
     // Param lane dots and rubber bands
     if (!localParamLanes.empty()) {
         int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
