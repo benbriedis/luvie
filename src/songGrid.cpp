@@ -14,6 +14,9 @@ static constexpr Fl_Color kParamDotFill    = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim     = 0x1111EE00;
 static constexpr Fl_Color kTrackDiv        = 0x64748B00;
 static constexpr Fl_Color kInstrHeaderBg   = 0x64748B00;  // same slate-blue as dividers
+static constexpr Fl_Color kBlockFill       = 0x5555EE00;
+static constexpr Fl_Color kBlockBar        = 0x1111EE00;
+static constexpr float    kStackOpacity    = 0.6f;
 
 SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
@@ -64,6 +67,62 @@ void SongGrid::draw()
     if (!timeline) return;
 
     fl_push_clip(x(), y(), w(), h());
+
+    // Stacked-mode block overdraw: simulate opacity compositing
+    // K=1 opacity (single layer): 1-(1-α)^1 = α
+    // K=2 opacity (two overlapping layers): 1-(1-α)^2
+    if (!stackedNoteIds.empty()) {
+        int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+        const Fl_Color k1Fill = fl_color_average(kBlockFill, bgColor, kStackOpacity);
+        const Fl_Color k2Fill = fl_color_average(kBlockFill, bgColor, 1.0f - (1.0f - kStackOpacity) * (1.0f - kStackOpacity));
+        const Fl_Color k1Bar  = fl_color_average(kBlockBar,  bgColor, kStackOpacity);
+        const int barWidth = 5;
+
+        // Pass 1: overwrite stacked fills with K=1 opacity color
+        for (const auto& note : notes) {
+            if (note.row < 0 || note.row >= numRows) continue;
+            if (!stackedNoteIds.count(note.id)) continue;
+            int x0    = x() + (int)((note.beat - colOffset) * colWidth);
+            int y0    = y() + rowY((int)note.row);
+            int rh    = rowH((int)note.row);
+            int width = (int)(note.length * colWidth);
+            if (x0 + width < x() || x0 > x() + gridRight) continue;
+            fl_rectf(x0, y0 + 1, width, rh - 1, k1Fill);
+        }
+
+        // Pass 2: overwrite pairwise overlap rectangles with K=2 opacity color
+        const int n = (int)notes.size();
+        for (int i = 0; i < n; i++) {
+            if (!stackedNoteIds.count(notes[i].id)) continue;
+            for (int j = i + 1; j < n; j++) {
+                if (!stackedNoteIds.count(notes[j].id)) continue;
+                if (notes[i].row != notes[j].row) continue;
+                float oStart = std::max(notes[i].beat, notes[j].beat);
+                float oEnd   = std::min(notes[i].beat + notes[i].length, notes[j].beat + notes[j].length);
+                if (oEnd <= oStart) continue;
+                int ox0 = x() + (int)((oStart - colOffset) * colWidth);
+                int ow  = (int)((oEnd - oStart) * colWidth);
+                int y0  = y() + rowY((int)notes[i].row);
+                int rh  = rowH((int)notes[i].row);
+                if (ox0 + ow < x() || ox0 > x() + gridRight || ow <= 0) continue;
+                fl_rectf(ox0, y0 + 1, ow, rh - 1, k2Fill);
+            }
+        }
+
+        // Pass 3: redraw stacked bars on top
+        for (const auto& note : notes) {
+            if (note.row < 0 || note.row >= numRows) continue;
+            if (!stackedNoteIds.count(note.id)) continue;
+            int x0 = x() + (int)((note.beat - colOffset) * colWidth);
+            int y0 = y() + rowY((int)note.row);
+            int rh = rowH((int)note.row);
+            if (x0 > x() + gridRight || x0 + 20 < x()) continue;
+            fl_color(k1Bar);
+            fl_line_style(FL_SOLID, barWidth);
+            fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rh - 1);
+            fl_line_style(0);
+        }
+    }
 
     // Track divider lines — strong horizontal line above each track's first row
     {
@@ -234,6 +293,7 @@ Fl_Color SongGrid::rowBgColor(int visualRow) const
     }
     return bgColor;
 }
+
 
 void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
 {
@@ -570,6 +630,7 @@ int SongGrid::handleParamEvent(int event)
 void SongGrid::rebuildNotes()
 {
     if (!timeline) return;
+    stackedNoteIds.clear();
     if (trackFilter >= 0) {
         const auto& tracks = timeline->get().tracks;
         notes.clear();
@@ -586,6 +647,12 @@ void SongGrid::rebuildNotes()
         }
         clampSelection();
         return;
+    }
+    for (const auto& t : timeline->get().tracks) {
+        if (!t.stackedLanes) continue;
+        for (const auto& l : t.lanes)
+            for (const auto& p : l.patterns)
+                stackedNoteIds.insert(p.id);
     }
     std::vector<Note> all = timeline->buildNotes();
     notes.clear();

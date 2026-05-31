@@ -83,6 +83,7 @@ protected:
     virtual void onCommitResize(const StateDragResize& s) { (void)s; }
     virtual void onNoteDoubleClick(int noteIdx)         { (void)noteIdx; }
     virtual void toggleNote();
+    virtual void drawNoteBlock(const Note& note, int x0, int y0, int width, int rh);
 
 public:
     Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);

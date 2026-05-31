@@ -58,14 +58,7 @@ void Grid::draw()
         int rh    = rowH((int)note.row);
         int width = (int)(note.length * colWidth);
         if (x0 + width < x() || x0 > x() + w()) continue;
-        Fl_Color fill = 0x5555EE00;
-        Fl_Color bar  = 0x1111EE00;
-        fl_rectf(x0, y0 + 1, width, rh - 1, fill);
-        const int barWidth = 5;
-        fl_color(bar);
-        fl_line_style(FL_SOLID, barWidth);
-        fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rh - 1);
-        fl_line_style(0);
+        drawNoteBlock(note, x0, y0, width, rh);
     }
 
     if (playhead)
@@ -304,4 +297,16 @@ void Grid::clampSelection()
     else if (auto* s = std::get_if<StateHoverResize>(&state)) { if (oob(s->noteIdx)) state = StateIdle{}; }
     else if (auto* s = std::get_if<StateDragMove>   (&state)) { if (oob(s->noteIdx)) state = StateIdle{}; }
     else if (auto* s = std::get_if<StateDragResize> (&state)) { if (oob(s->noteIdx)) state = StateIdle{}; }
+}
+
+void Grid::drawNoteBlock(const Note& /*note*/, int x0, int y0, int width, int rh)
+{
+    static constexpr Fl_Color fill = 0x5555EE00;
+    static constexpr Fl_Color bar  = 0x1111EE00;
+    fl_rectf(x0, y0 + 1, width, rh - 1, fill);
+    const int barWidth = 5;
+    fl_color(bar);
+    fl_line_style(FL_SOLID, barWidth);
+    fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rh - 1);
+    fl_line_style(0);
 }

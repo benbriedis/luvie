@@ -8,7 +8,7 @@
    fill="none"
    version="1.1"
    id="svg134"
-   sodipodi:docname="drawing5.svg"
+   sodipodi:docname="drawing4.svg"
    inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -21,11 +21,11 @@
        inkscape:collect="always"
        id="linearGradient457">
       <stop
-         style="stop-color:#ca94a4;stop-opacity:1;"
+         style="stop-color:#f60747;stop-opacity:1;"
          offset="0"
          id="stop453" />
       <stop
-         style="stop-color:#b93458;stop-opacity:1;"
+         style="stop-color:#e2abb9;stop-opacity:1;"
          offset="1"
          id="stop455" />
     </linearGradient>
@@ -67,8 +67,8 @@
      style="fill:url(#radialGradient459);fill-opacity:1;stroke-width:1.06142"
      inkscape:highlight-color="#ff007a" />
   <path
-     style="fill:#000000;stroke:#ffffff;stroke-width:0.04;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
-     d="M 6.5239089,4.2669864 6.5062629,9.828626 10.193292,9.763746 10.150462,8.6696665 7.8471718,8.6789165 7.8356588,4.2511676 Z"
+     style="fill:#00ffff;stroke:#000000;stroke-width:0.02152px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     d="M 6.6283089,4.3786864 6.6106629,9.940326 10.297692,9.875446 10.254862,8.7813665 7.9515718,8.7906165 7.9400588,4.3628676 Z"
      id="path584"
      sodipodi:nodetypes="ccccccc" />
 </svg>

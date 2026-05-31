@@ -6,6 +6,7 @@
 #include "patternInstanceContextPopup.hpp"
 #include "paramDotPopup.hpp"
 #include "paramLaneTypes.hpp"
+#include <unordered_set>
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,9 @@ class SongGrid : public Grid, public ITimelineObserver {
     int                 dragBeatsPerBar   = 4;
     int                 rowOffset         = 0;
 
-    std::vector<ParamLaneLocal> localParamLanes;
-    ParamState                  paramState;
+    std::vector<ParamLaneLocal>  localParamLanes;
+    ParamState                   paramState;
+    std::unordered_set<int>      stackedNoteIds;
 
     void rebuildNotes();
     void rebuildParamLanes();
