@@ -9,7 +9,7 @@
 
 SongEditor::SongEditor(int x, int y, int visibleW,
                        int numRows, int numCols, int rowHeight, int colWidth,
-                       float snap, Popup& popup)
+                       float snap, NoteContextPopup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
       trackControls(x + labelW, y + rulerH, controlsW, numRows, rowHeight),

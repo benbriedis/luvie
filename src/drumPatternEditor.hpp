@@ -3,7 +3,7 @@
 
 #include "basePatternEditor.hpp"
 #include "drumGrid.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "inlineInput.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
@@ -103,7 +103,7 @@ class DrumPatternEditor : public BasePatternEditor {
 
 public:
     DrumPatternEditor(int x, int y, int visibleW, int numRows, int numCols,
-                      int rowHeight, int colWidth, float snap, Popup& popup);
+                      int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~DrumPatternEditor();
 
     std::function<void(const std::string& chanName, int midiNote, const std::string& label)> onDrumLabelChanged;

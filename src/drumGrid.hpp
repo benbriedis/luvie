@@ -2,7 +2,7 @@
 #define DRUM_GRID_HPP
 
 #include "observablePattern.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include <FL/Fl_Box.H>
 #include <vector>
 #include <variant>
@@ -33,7 +33,7 @@ class DrumGrid : public Fl_Box, public ITimelineObserver {
     int                 colOffset = 0;
     float               snap;
 
-    Popup&     popup;
+    NoteContextPopup&     popup;
     DrumState  state;
 
     // Local copy of notes in view — temporarily modified during drag
@@ -62,7 +62,7 @@ public:
 
     Playhead* playhead = nullptr;
 
-    DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
+    DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     void setPlayhead(Playhead* p) { playhead = p; }
     ~DrumGrid();
 

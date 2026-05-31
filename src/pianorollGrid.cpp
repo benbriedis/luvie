@@ -4,7 +4,7 @@
 #include <FL/Fl.H>
 #include <algorithm>
 
-PianorollGrid::PianorollGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
+PianorollGrid::PianorollGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 

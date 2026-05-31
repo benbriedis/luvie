@@ -15,7 +15,7 @@ static constexpr Fl_Color kParamDotRim     = 0x1111EE00;
 static constexpr Fl_Color kTrackDiv        = 0x64748B00;
 static constexpr Fl_Color kInstrHeaderBg   = 0x64748B00;  // same slate-blue as dividers
 
-SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
+SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 

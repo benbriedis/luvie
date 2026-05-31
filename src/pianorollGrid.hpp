@@ -23,7 +23,7 @@ protected:
 public:
     static constexpr int totalRows = 128;
 
-    PianorollGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
+    PianorollGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PianorollGrid();
 
     void setPattern(ObservablePattern* tl, int patId);

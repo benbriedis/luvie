@@ -1,7 +1,7 @@
 #ifndef GRID_HPP
 #define GRID_HPP
 
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "timeline.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
@@ -44,7 +44,7 @@ public:
 
 protected:
     float             snap;
-    Popup&            popup;
+    NoteContextPopup&            popup;
     std::vector<Note> notes;
 
     GridState state;
@@ -85,7 +85,7 @@ protected:
     virtual void toggleNote();
 
 public:
-    Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
+    Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
 
     void setPlayhead(Playhead* p) { playhead  = p; }
     void setColOffset(int off)    { colOffset = off; redraw(); }

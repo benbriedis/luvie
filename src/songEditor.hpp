@@ -3,10 +3,10 @@
 
 #include "editor.hpp"
 #include "songGrid.hpp"
-#include "songPopup.hpp"
+#include "patternInstanceContextPopup.hpp"
 #include "trackLabels.hpp"
 #include "trackControls.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "itransport.hpp"
 #include "observableSong.hpp"
 #include "gridScrollPane.hpp"
@@ -42,7 +42,7 @@ class SongEditor : public Editor, public ITimelineObserver {
 public:
     SongEditor(int x, int y, int visibleW,
                int numRows, int numCols, int rowHeight, int colWidth,
-               float snap, Popup& popup);
+               float snap, NoteContextPopup& popup);
     ~SongEditor();
 
     std::function<void(int trackIndex, int laneId)> onPatternDoubleClick;
@@ -50,7 +50,7 @@ public:
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
     std::function<void(int numCols)>               onNumColsChanged;
 
-    void setSongPopup(SongPopup* p)         { songGrid.setSongPopup(p); }
+    void setSongPopup(PatternInstanceContextPopup* p)         { songGrid.setSongPopup(p); }
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }
 
     void setTransport(ITransport* t, ObservableSong* tl);

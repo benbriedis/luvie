@@ -3,10 +3,10 @@
 
 #include <FL/Fl_Menu_Button.H>
 
-class Popup : public Fl_Menu_Button {
+class NoteContextPopup : public Fl_Menu_Button {
 
 public:
-	Popup(int width,int height);
+	NoteContextPopup(int width,int height);
 };
 
 #endif

@@ -1,8 +1,8 @@
-#include "songPopup.hpp"
+#include "patternInstanceContextPopup.hpp"
 #include "appWindow.hpp"
 #include "modernButton.hpp"
 #include "popupStyle.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "grid.hpp"
 #include <FL/Fl_Window.H>
 
@@ -14,7 +14,7 @@ static constexpr int kBtnW = 130;
 static constexpr int kPopW = kBtnX + kBtnW + kPad + 1; // 152
 static constexpr int kPopH = 1 + kPad + kBtnH + kGap + kBtnH + kPad + 1; // 92
 
-SongPopup::SongPopup() : BasePopup(0, 0, kPopW, kPopH)
+PatternInstanceContextPopup::PatternInstanceContextPopup() : BasePopup(0, 0, kPopW, kPopH)
 {
 	color(popupBg);
 	box(FL_BORDER_BOX);
@@ -30,21 +30,21 @@ SongPopup::SongPopup() : BasePopup(0, 0, kPopW, kPopH)
 	end();
 
 	openPatternBtn->callback([](Fl_Widget*, void* me) {
-		auto* self = (SongPopup*)me;
+		auto* self = (PatternInstanceContextPopup*)me;
 		if (self->onOpenPatternFn) self->onOpenPatternFn();
 		self->hide();
 		if (auto* win = self->window()) win->redraw();
 	}, this);
 
 	deleteBtn->callback([](Fl_Widget*, void* me) {
-		auto* self = (SongPopup*)me;
+		auto* self = (PatternInstanceContextPopup*)me;
 		if (self->onDeleteFn) self->onDeleteFn();
 		self->hide();
 		if (auto* win = self->window()) win->redraw();
 	}, this);
 }
 
-void SongPopup::open(std::vector<Note>* notes, int noteIdx, Grid* grid,
+void PatternInstanceContextPopup::open(std::vector<Note>* notes, int noteIdx, Grid* grid,
                      std::function<void()> onDelete, std::function<void()> onOpenPattern)
 {
 	onDeleteFn      = std::move(onDelete);

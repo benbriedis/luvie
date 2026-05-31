@@ -1,4 +1,4 @@
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "FL/Fl_Menu_Button.H"
 #include <iostream>
 
@@ -26,7 +26,7 @@ Fl_Menu_Item menutable[] = {
 };
 
 
-Popup::Popup(int width,int height) : 
+NoteContextPopup::NoteContextPopup(int width,int height) : 
 	Fl_Menu_Button(-1,-1,0,0)
 {
 	menu(menutable);

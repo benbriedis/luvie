@@ -3,7 +3,7 @@
 
 #include "basePatternEditor.hpp"
 #include "pianorollGrid.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
 
@@ -55,7 +55,7 @@ public:
     void focusPattern() override;
     void setSnap(float s) override { grid.setSnap(s); BasePatternEditor::setSnap(s); }
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
-                    int rowHeight, int colWidth, float snap, Popup& popup);
+                    int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PianorollEditor();
 };
 

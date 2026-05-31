@@ -1,4 +1,4 @@
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "appWindow.hpp"
 #include "modernButton.hpp"
 #include "popupStyle.hpp"
@@ -10,7 +10,7 @@
 #include "grid.hpp"
 #include <algorithm>
 
-Popup::Popup() : BasePopup(0,0,0,0)
+NoteContextPopup::NoteContextPopup() : BasePopup(0,0,0,0)
 {
 	color(popupBg);
 	box(FL_BORDER_BOX);
@@ -49,7 +49,7 @@ Popup::Popup() : BasePopup(0,0,0,0)
 	end();
 
 	deleteItem->callback([](Fl_Widget*, void* me) {
-		Popup* self = (Popup*)me;
+		NoteContextPopup* self = (NoteContextPopup*)me;
 		if (self->onDeleteFn)
 			self->onDeleteFn();
 		else
@@ -59,7 +59,7 @@ Popup::Popup() : BasePopup(0,0,0,0)
 	}, this);
 }
 
-void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
+void NoteContextPopup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
                  std::function<void()> onDelete)
 {
 	selected   = mySelected;
@@ -86,7 +86,7 @@ void Popup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
 		show();
 }
 
-void Popup::openAt(int dotX, int dotY, Fl_Widget* w, int rowH, std::function<void()> onDelete)
+void NoteContextPopup::openAt(int dotX, int dotY, Fl_Widget* w, int rowH, std::function<void()> onDelete)
 {
 	onDeleteFn = std::move(onDelete);
 	notes = nullptr;
@@ -118,7 +118,7 @@ Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW,
 	return Point2{x, y};
 }
 
-Point2 Popup::popupPosition(Size size, Point2 pos)
+Point2 NoteContextPopup::popupPosition(Size size, Point2 pos)
 {
 	const float verticalPadding = 4.0;
 	const float sidePadding     = 10.0;

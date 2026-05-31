@@ -6,7 +6,7 @@
 #include <set>
 
 PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
-                             int rowHeight, int colWidth, float snap, Popup& popup)
+                             int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW),
       noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup)

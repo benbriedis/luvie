@@ -4,7 +4,7 @@
 #include "basePatternEditor.hpp"
 #include "patternGrid.hpp"
 #include "noteLabels.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include <vector>
 
 class PatternEditor : public BasePatternEditor {
@@ -40,7 +40,7 @@ class PatternEditor : public BasePatternEditor {
 
 public:
     PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
-                  int rowHeight, int colWidth, float snap, Popup& popup);
+                  int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PatternEditor();
 
     void setNoteParams(int rootPitch, int chordType, bool useSharp);

@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <set>
 
-PatternGrid::PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
+PatternGrid::PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 

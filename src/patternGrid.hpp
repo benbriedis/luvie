@@ -53,7 +53,7 @@ public:
     // Fired on every rebuild; args: (disabledDegrees, groupSize, occupiedDisabledVirtualPositions)
     std::function<void(const std::vector<int>&, int, const std::set<int>&)> onDisabledDegreesChanged;
 
-    PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
+    PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PatternGrid();
 
     void setPattern(ObservablePattern* tl, int patId);

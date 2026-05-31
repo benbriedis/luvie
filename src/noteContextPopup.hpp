@@ -1,5 +1,5 @@
-#ifndef POPUP_HPP
-#define POPUP_HPP
+#ifndef NOTE_CONTEXT_POPUP_HPP
+#define NOTE_CONTEXT_POPUP_HPP
 
 #include "timeline.hpp"
 #include "basePopup.hpp"
@@ -13,9 +13,9 @@ struct Point2 { int x;     int y;      };
 
 Point2 calcPopupPos(Size available, Point2 anchor, int anchorHeight, int popupW, int popupH);
 
-class Popup : public BasePopup {
+class NoteContextPopup : public BasePopup {
 public:
-	Popup();
+	NoteContextPopup();
 
 	void open(int selected, std::vector<Note>* notes, Grid* grid,
 	          std::function<void()> onDelete = nullptr);

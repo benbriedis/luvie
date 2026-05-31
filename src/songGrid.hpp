@@ -3,7 +3,7 @@
 
 #include "grid.hpp"
 #include "observableSong.hpp"
-#include "songPopup.hpp"
+#include "patternInstanceContextPopup.hpp"
 #include "paramDotPopup.hpp"
 #include "paramLaneTypes.hpp"
 
@@ -14,7 +14,7 @@ class SongGrid : public Grid, public ITimelineObserver {
 
     bool isInstrHeaderVR(int vr) const;
     ObservableSong* timeline          = nullptr;
-    SongPopup*          songPopup         = nullptr;
+    PatternInstanceContextPopup*          songPopup         = nullptr;
     ParamDotPopup*      paramDotPopup     = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;
@@ -59,13 +59,13 @@ protected:
     void toggleNote() override;
 
 public:
-    SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup);
+    SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~SongGrid();
 
     std::function<void(int trackIndex, int laneId)> onPatternDoubleClick;
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
 
-    void setSongPopup(SongPopup* p)         { songPopup = p; }
+    void setSongPopup(PatternInstanceContextPopup* p)         { songPopup = p; }
     void setParamDotPopup(ParamDotPopup* p) { paramDotPopup = p; }
 
     int handle(int event) override;

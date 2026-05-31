@@ -3,7 +3,7 @@
 #include "editor.hpp"
 #include <FL/Fl.H>
 #include "FL/Enumerations.H"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include <ranges>
 #include <algorithm>
 #include <cmath>
@@ -16,7 +16,7 @@
 
 using std::vector;
 
-Grid::Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup) :
+Grid::Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup) :
     numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
     Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight, nullptr)
 {}

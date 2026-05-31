@@ -63,7 +63,7 @@ int PianorollLabels::handle(int event)
 // ---------------------------------------------------------------------------
 
 PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
-                                 int rowHeight, int colWidth, float snap, Popup& popup)
+                                 int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW),
       labels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       grid(numRows, numCols, rowHeight, colWidth, snap, popup)

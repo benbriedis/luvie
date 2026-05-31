@@ -1,5 +1,5 @@
 #include "markerRuler.hpp"
-#include "popup.hpp"
+#include "noteContextPopup.hpp"
 #include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>

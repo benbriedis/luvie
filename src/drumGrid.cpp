@@ -14,7 +14,7 @@ static constexpr Fl_Color kBeatCol = 0x00EE0000;
 static constexpr Fl_Color kDotFill = 0x5555EE00;
 static constexpr Fl_Color kDotRim  = 0x1111EE00;
 
-DrumGrid::DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, Popup& popup)
+DrumGrid::DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight),
       snap(snap), popup(popup),
       numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth)

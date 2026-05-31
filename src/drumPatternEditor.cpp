@@ -164,7 +164,7 @@ int DrumRowControls::handle(int event)
 // ---------------------------------------------------------------------------
 
 DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, int numCols,
-                                     int rowHeight, int colWidth, float snap, Popup& popup)
+                                     int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW + controlsW),
       drumLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
       drumRowControls(x + scrollbarW + labelsW, y + rulerH, controlsW, numRows, rowHeight),

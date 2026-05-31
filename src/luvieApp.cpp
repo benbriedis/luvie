@@ -8,8 +8,8 @@
 #include "appWindow.hpp"
 #include "songEditor.hpp"
 #include "patternEditor.hpp"
-#include "popup.hpp"
-#include "songPopup.hpp"
+#include "noteContextPopup.hpp"
+#include "patternInstanceContextPopup.hpp"
 #include "modernTabs.hpp"
 #include "transport.hpp"
 #include "markerPopup.hpp"
@@ -135,9 +135,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(menuBar);
 
     // ---- Popups (created before any group so they stay unparented until explicit add) ----
-    auto* p1      = new Popup{};
-    auto* p2      = new Popup{};
-    auto* sp      = new SongPopup{};
+    auto* p1      = new NoteContextPopup{};
+    auto* p2      = new NoteContextPopup{};
+    auto* sp      = new PatternInstanceContextPopup{};
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;

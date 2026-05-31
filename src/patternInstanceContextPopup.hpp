@@ -1,5 +1,5 @@
-#ifndef SONG_POPUP_HPP
-#define SONG_POPUP_HPP
+#ifndef PATTERN_INSTANCE_CONTEXT_POPUP_HPP
+#define PATTERN_INSTANCE_CONTEXT_POPUP_HPP
 
 #include "basePopup.hpp"
 #include "timeline.hpp"
@@ -9,9 +9,9 @@
 class Grid;
 class ModernButton;
 
-class SongPopup : public BasePopup {
+class PatternInstanceContextPopup : public BasePopup {
 public:
-	SongPopup();
+	PatternInstanceContextPopup();
 
 	void open(std::vector<Note>* notes, int noteIdx, Grid* grid,
 	          std::function<void()> onDelete,

@@ -19,7 +19,7 @@ class PianorollEditor;
 class PatternPanel;
 class LoopEditor;
 class Transport;
-class Popup;
+class NoteContextPopup;
 class MarkerPopup;
 class TrackContextPopup;
 class OutputsOverlay;
