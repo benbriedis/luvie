@@ -237,6 +237,24 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+void OutputsOverlay::show() {
+    if (instrObs_) {
+        const auto& tlInstrs = instrObs_->get().instruments;
+        for (int i = 0; i < (int)instruments_.size(); i++) {
+            for (const auto& tl : tlInstrs) {
+                if (tl.id != instruments_[i].id) continue;
+                instruments_[i].name = tl.name;
+                if (i < (int)instrRows_.size() && instrRows_[i].nameInput) {
+                    instrRows_[i].nameInput->value(tl.name.c_str());
+                    instrRows_[i].committedName = tl.name;
+                }
+                break;
+            }
+        }
+    }
+    BasePopup::show();
+}
+
 void OutputsOverlay::hide() {
     syncFromInputs();
     // Port rename safety net (for inputs that didn't fire unfocus before hide)

@@ -67,8 +67,8 @@
      style="fill:url(#radialGradient459);fill-opacity:1;stroke-width:1.06142"
      inkscape:highlight-color="#ff007a" />
   <path
-     style="fill:#0b34cc;stroke:#f0feff;stroke-width:0.14;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1"
-     d="m 6.230461,4.4066312 -0.018793,5.9773718 3.902468,-0.0023 -0.02131,-1.3969195 -2.3069559,-0.01585 0.010238,-4.5791521 z"
+     style="fill:#0b34cc;fill-opacity:1;stroke:#f0feff;stroke-width:0.152161;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="M 6.014643,3.9781402 6.049117,10.47472 10.425263,10.47222 10.402103,8.6946603 7.8947587,8.6813343 7.9058857,3.9598275 Z"
      id="path584"
      sodipodi:nodetypes="ccccccc" />
 </svg>

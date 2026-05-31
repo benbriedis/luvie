@@ -84,25 +84,39 @@ void TrackLabels::setRowOffset(int offset)
     redraw();
 }
 
-void TrackLabels::startEdit(int absRow)
+void TrackLabels::startInstrumentEdit(int absRow)
 {
     if (!timeline) return;
     const auto& ro = timeline->get().rowOrder;
-    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].kind != RowKind::Lane) return;
-    int laneId  = ro[absRow].id;
-    int trackId = timeline->trackIdForLaneId(laneId);
+    if (absRow < 0 || absRow >= (int)ro.size()) return;
+    const auto& ref = ro[absRow];
+
+    int trackId = -1;
+    if (ref.kind == RowKind::Header) {
+        trackId = ref.id;
+    } else if (ref.kind == RowKind::Lane) {
+        int tIdx = timeline->trackIndexForLaneId(ref.id);
+        if (tIdx >= 0) {
+            const auto& track = timeline->get().tracks[tIdx];
+            if (track.stackedLanes && !track.lanes.empty() && track.lanes[0].id == ref.id)
+                trackId = track.id;
+        }
+    }
+    if (trackId < 0) return;
+
     for (const auto& t : timeline->get().tracks) {
         if (t.id != trackId) continue;
-        if (t.lanes.empty() || t.lanes[0].id != laneId) return;  // only rename on first lane
         editingAbsRow = absRow;
+        editingPatId  = -1;
         originalLabel = timeline->get().instrumentName(t.instrumentId);
         int ry = y() + rowYInPanel(absRow);
         input.resize(x(), ry, w(), rowHFor(absRow));
         input.value(originalLabel.c_str());
+        input.color(colSelected);
         input.textcolor(colText);
         input.show();
         input.take_focus();
-        input.position(input.size(), 0);  // select all
+        input.position(input.size(), 0);
         input.onChange([this]() { checkDuplicate(); });
         InlineEditDispatch::install(this, [this]() { commitEdit(); });
         redraw();
@@ -114,12 +128,20 @@ void TrackLabels::checkDuplicate()
 {
     if (!timeline || editingAbsRow < 0) return;
     const auto& ro = timeline->get().rowOrder;
-    if (editingAbsRow >= (int)ro.size() || ro[editingAbsRow].kind != RowKind::Lane) return;
-    int editingTrackId = timeline->trackIdForLaneId(ro[editingAbsRow].id);
+    if (editingAbsRow >= (int)ro.size()) return;
+    const auto& ref = ro[editingAbsRow];
+
+    int trackId = -1;
+    if (ref.kind == RowKind::Header)
+        trackId = ref.id;
+    else if (ref.kind == RowKind::Lane)
+        trackId = timeline->trackIdForLaneId(ref.id);
+    if (trackId < 0) return;
+
     std::string cur = input.value();
     int editingInstrId = 0;
     for (const auto& t : timeline->get().tracks)
-        if (t.id == editingTrackId) { editingInstrId = t.instrumentId; break; }
+        if (t.id == trackId) { editingInstrId = t.instrumentId; break; }
     bool dup = false;
     for (const auto& instr : timeline->get().instruments)
         if (instr.id != editingInstrId && instr.name == cur) { dup = true; break; }
@@ -196,17 +218,22 @@ void TrackLabels::commitEdit()
             timeline->setPatternName(patId, newLabel);
         } else {
             const auto& ro = timeline->get().rowOrder;
-            if (absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
-                int trackId = timeline->trackIdForLaneId(ro[absRow].id);
-                if (trackId >= 0) {
-                    int instrId = 0;
-                    for (const auto& t : timeline->get().tracks)
-                        if (t.id == trackId) { instrId = t.instrumentId; break; }
-                    bool dup = false;
-                    for (const auto& instr : timeline->get().instruments)
-                        if (instr.id != instrId && instr.name == newLabel) { dup = true; break; }
-                    timeline->renameInstrument(instrId, dup ? originalLabel : newLabel);
-                }
+            int trackId = -1;
+            if (absRow < (int)ro.size()) {
+                const auto& ref = ro[absRow];
+                if (ref.kind == RowKind::Lane)
+                    trackId = timeline->trackIdForLaneId(ref.id);
+                else if (ref.kind == RowKind::Header)
+                    trackId = ref.id;
+            }
+            if (trackId >= 0) {
+                int instrId = 0;
+                for (const auto& t : timeline->get().tracks)
+                    if (t.id == trackId) { instrId = t.instrumentId; break; }
+                bool dup = false;
+                for (const auto& instr : timeline->get().instruments)
+                    if (instr.id != instrId && instr.name == newLabel) { dup = true; break; }
+                timeline->renameInstrument(instrId, dup ? originalLabel : newLabel);
             }
         }
     }
@@ -397,10 +424,23 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
-            // Skip double-click pattern edit on instrument header rows
             if (Fl::event_clicks() > 0) {
-                if (row < (int)ro.size() && ro[row].kind != RowKind::Header)
-                    startPatternEdit(row);
+                if (row < (int)ro.size()) {
+                    const auto& ref = ro[row];
+                    if (ref.kind == RowKind::Header) {
+                        startInstrumentEdit(row);
+                    } else if (ref.kind == RowKind::Lane) {
+                        int tIdx = timeline->trackIndexForLaneId(ref.id);
+                        bool stackedFirst = tIdx >= 0 && [&]() {
+                            const auto& track = timeline->get().tracks[tIdx];
+                            return track.stackedLanes && !track.lanes.empty() && track.lanes[0].id == ref.id;
+                        }();
+                        if (stackedFirst)
+                            startInstrumentEdit(row);
+                        else
+                            startPatternEdit(row);
+                    }
+                }
                 return 1;
             }
 

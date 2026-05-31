@@ -32,7 +32,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     int  dropTrackId  = -1;     // track to insert before; -1 = append at end
     static constexpr int dragThreshold = 4;
 
-    void startEdit(int absRow);
+    void startInstrumentEdit(int absRow);
     void startPatternEdit(int absRow);
     void cancelEdit();
     void checkDuplicate();

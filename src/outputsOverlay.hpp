@@ -125,6 +125,7 @@ class OutputsOverlay : public BasePopup {
 
 public:
     OutputsOverlay(int x, int y, int w, int h);
+    void show() override;
     void hide() override;
 
     // Port API (unchanged)
