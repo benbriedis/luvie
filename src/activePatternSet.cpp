@@ -28,18 +28,19 @@ void ActivePatternSet::sync(const ObservableSong& tl, float currentBar)
 	std::unordered_map<int, float> songResult;
 	for (const auto& track : data.tracks) {
 		if (track.mute || (anySolo && !track.solo)) continue;
-		if (track.lanes.empty()) continue;
-		for (const auto& inst : track.lanes[0].patterns) {
-			if (currentBar < inst.startBar || currentBar >= inst.startBar + inst.length)
-				continue;
-			const Pattern* pat = nullptr;
-			for (const auto& p : data.patterns)
-				if (p.id == inst.patternId) { pat = &p; break; }
-			if (!pat || pat->lengthBeats <= 0.0f) break;
-			int top, bottom;
-			tl.timeSigAt((int)inst.startBar, top, bottom);
-			songResult[inst.patternId] = inst.startBar - inst.startOffset / (float)top;
-			break;  // at most one active instance per track
+		for (const auto& lane : track.lanes) {
+			for (const auto& inst : lane.patterns) {
+				if (currentBar < inst.startBar || currentBar >= inst.startBar + inst.length)
+					continue;
+				const Pattern* pat = nullptr;
+				for (const auto& p : data.patterns)
+					if (p.id == inst.patternId) { pat = &p; break; }
+				if (!pat || pat->lengthBeats <= 0.0f) break;
+				int top, bottom;
+				tl.timeSigAt((int)inst.startBar, top, bottom);
+				songResult[inst.patternId] = inst.startBar - inst.startOffset / (float)top;
+				break;  // at most one active instance per lane
+			}
 		}
 	}
 
