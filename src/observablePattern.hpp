@@ -46,7 +46,7 @@ public:
     // Pattern properties
     void setPatternTimeSig(int patId, int top, int bottom);
     void setPatternLength(int patId, float lengthBeats);
-    void setPatternOutputInstrument(int patId, const std::string& instrumentName);
+    void setPatternInstrument(int patId, int instrumentId);
 
     // Pattern-level param lanes
     bool hasPatternParamLane(int patId, const std::string& type) const;

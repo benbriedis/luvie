@@ -95,7 +95,7 @@ void TrackLabels::startEdit(int absRow)
         if (t.id != trackId) continue;
         if (t.lanes.empty() || t.lanes[0].id != laneId) return;  // only rename on first lane
         editingAbsRow = absRow;
-        originalLabel = t.label;
+        originalLabel = timeline->get().instrumentName(t.instrumentId);
         int ry = y() + rowYInPanel(absRow);
         input.resize(x(), ry, w(), rowHFor(absRow));
         input.value(originalLabel.c_str());
@@ -117,9 +117,12 @@ void TrackLabels::checkDuplicate()
     if (editingAbsRow >= (int)ro.size() || ro[editingAbsRow].kind != RowKind::Lane) return;
     int editingTrackId = timeline->trackIdForLaneId(ro[editingAbsRow].id);
     std::string cur = input.value();
-    bool dup = false;
+    int editingInstrId = 0;
     for (const auto& t : timeline->get().tracks)
-        if (t.id != editingTrackId && t.label == cur) { dup = true; break; }
+        if (t.id == editingTrackId) { editingInstrId = t.instrumentId; break; }
+    bool dup = false;
+    for (const auto& instr : timeline->get().instruments)
+        if (instr.id != editingInstrId && instr.name == cur) { dup = true; break; }
     input.textcolor(dup ? FL_RED : colText);
     input.redraw();
 }
@@ -196,10 +199,13 @@ void TrackLabels::commitEdit()
             if (absRow < (int)ro.size() && ro[absRow].kind == RowKind::Lane) {
                 int trackId = timeline->trackIdForLaneId(ro[absRow].id);
                 if (trackId >= 0) {
-                    bool dup = false;
+                    int instrId = 0;
                     for (const auto& t : timeline->get().tracks)
-                        if (t.id != trackId && t.label == newLabel) { dup = true; break; }
-                    timeline->renameTrack(trackId, dup ? originalLabel : newLabel);
+                        if (t.id == trackId) { instrId = t.instrumentId; break; }
+                    bool dup = false;
+                    for (const auto& instr : timeline->get().instruments)
+                        if (instr.id != instrId && instr.name == newLabel) { dup = true; break; }
+                    timeline->renameInstrument(instrId, dup ? originalLabel : newLabel);
                 }
             }
         }
@@ -266,7 +272,7 @@ void TrackLabels::draw()
                     if (t.id == ref.id) {
                         fl_font(FL_HELVETICA_BOLD, 9);
                         fl_color(colNormal);
-                        fl_draw(t.label.c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
+                        fl_draw(tl.instrumentName(t.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                         break;
                     }
@@ -311,7 +317,7 @@ void TrackLabels::draw()
                         int ax = x() + 4, ay = ry + rh / 2 - 4;
                         fl_polygon(ax, ay, ax, ay + 8, ax + 6, ay + 4);
                         fl_font(FL_HELVETICA_BOLD, 9);
-                        fl_draw(track.label.c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
+                        fl_draw(tl.instrumentName(track.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                     }
                 }

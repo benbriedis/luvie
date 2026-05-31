@@ -5,6 +5,12 @@
 #include <string>
 #include <vector>
 
+struct Instrument {
+    int         id;
+    std::string name;
+    bool        isDrum = false;
+};
+
 enum class PatternType { STANDARD = 0, DRUM = 1, PIANOROLL = 2 };
 
 struct DrumNote {
@@ -57,7 +63,7 @@ struct Pattern {
 	std::set<int>          drumSolo;   // MIDI notes to solo (empty = all play)
 	std::set<int>          drumMute;   // MIDI notes to silence
 	std::vector<ParamLane> paramLanes;
-	std::string outputInstrumentName;  // empty = no routing assigned
+	int  instrumentId = 0;             // 0 = no routing assigned
 	std::string name;                  // display name; empty = auto ("InstrumentName N")
 	int timeSigTop    = 4;
 	int timeSigBottom = 4;
@@ -80,11 +86,11 @@ struct Lane {
 };
 
 struct Track {
-	int         id;
-	std::string label;
-	bool        solo         = false;
-	bool        mute         = false;
-	bool        stackedLanes = false;
+	int  id;
+	int  instrumentId    = 0;
+	bool solo            = false;
+	bool mute            = false;
+	bool stackedLanes    = false;
 	std::vector<Lane> lanes;
 };
 
@@ -105,10 +111,17 @@ struct Timeline {
 	std::vector<TimeSigMarker> timeSigs;
 	std::vector<Pattern>       patterns;  // pattern definitions
 	std::vector<Track>         tracks;
+	std::vector<Instrument>    instruments;
 	std::vector<ParamLane>     paramLanes;
 	std::vector<RowRef>        rowOrder;  // interleaved display order
 	int                        selectedTrackIndex = -1;
 	int                        selectedLaneId     = -1;
+
+	std::string instrumentName(int id) const {
+		for (const auto& i : instruments)
+			if (i.id == id) return i.name;
+		return {};
+	}
 
 	int patternIdForSelectedLane() const {
 		if (selectedTrackIndex < 0 || selectedTrackIndex >= (int)tracks.size()) return 0;

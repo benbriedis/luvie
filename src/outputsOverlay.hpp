@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+class ObservableInstrument;
+
 class ModernButton;
 class Fl_Box;
 class Fl_Input;
@@ -18,7 +20,7 @@ class OutputsOverlay : public BasePopup {
     ModernButton* addDrumInstrBtn = nullptr;
 
     int nextPortId_ = 1;
-    int nextInstrId_ = 1;
+    ObservableInstrument* instrObs_ = nullptr;
 
     // ── Port data ──────────────────────────────────────────────────────────────
     struct Output {
@@ -145,7 +147,8 @@ public:
     };
     void setInstruments(const std::vector<InstrumentInfo>& instrs);
     std::vector<InstrumentInfo> getInstruments() const;
-    void updateInstrumentDrumMap(const std::string& instrName, int midiNote, const std::string& label);
+    void updateInstrumentDrumMap(int instrId, int midiNote, const std::string& label);
+    void setObservableInstrument(ObservableInstrument* instr);
 
     std::function<void(const std::string& name)>                                onPortAdded;
     std::function<void(const std::string& name)>                                onPortRemoved;
@@ -153,12 +156,11 @@ public:
 
     // Fired whenever the instruments list or any instrument's fields change.
     std::function<void()> onInstrumentsChanged;
-    std::function<void(const std::string& oldName, const std::string& newName)> onInstrumentRenamed;
     // Fired when program number or bank fields change for an instrument.
     std::function<void(const std::string& instrName)> onProgramChanged;
 
-    // Optional: return true if the named instrument is currently used by a pattern.
-    std::function<bool(const std::string& name)> isInstrumentInUse;
+    // Optional: return true if the instrument ID is currently used by a pattern.
+    std::function<bool(int instrId)> isInstrumentInUse;
     void refreshInstrumentButtons();
     std::function<void()> onClose;
 };

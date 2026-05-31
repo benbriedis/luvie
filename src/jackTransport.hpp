@@ -36,10 +36,10 @@ public:
     void setActivePatterns(ActivePatternSet* aps);
     void setNoteParams(int rootPitch, int chordType);
 
-    // Instrument routing: maps instrument name → (portName, 1-based MIDI channel).
+    // Instrument routing: maps instrument ID → (portName, 1-based MIDI channel).
     // Call from UI thread whenever the instruments list changes.
     struct InstrumentRouting {
-        std::string instrumentName;
+        int         instrumentId;
         std::string portName;
         int         midiChannel;   // 1-based
         int         programNumber = -1;  // -1 = not set; 0-127 = MIDI program
@@ -96,7 +96,7 @@ private:
     int                              rootPitch    = 0;
     int                              chordType    = 0;
     bool                             loopMode     = false;
-    std::map<std::string, InstrumentRouting> instrumentMap_; // instrumentName → routing
+    std::map<int, InstrumentRouting> instrumentMap_; // instrumentId → routing
 
     // ── Timeline snapshot for RT use ─────────────────────────────────────────
     struct TimeSegment {

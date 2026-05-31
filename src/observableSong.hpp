@@ -7,9 +7,11 @@
 #include <vector>
 
 class ObservablePattern;
+class ObservableInstrument;
 
 class ObservableSong {
     friend class ObservablePattern;
+    friend class ObservableInstrument;
 public:
     ObservableSong(float initBpm, int initTop, int initBottom);
 
@@ -35,10 +37,14 @@ public:
     float  secondsToBar(double secs) const;
     void   secondsToBarBeat(double secs, int& bar, int& beat) const;
 
+    // Instrument management
+    int  addInstrument(std::string name, bool isDrum = false);
+    void renameInstrument(int instrId, std::string name);
+    void removeInstrument(int instrId);
+
     // Track management
-    int  addTrack(std::string label = "", int patternId = 0, int atIndex = -1);
+    int  addTrack(int instrumentId = 0, int patternId = 0, int atIndex = -1);
     void removeTrack(int trackId);
-    void renameTrack(int trackId, std::string newLabel);
     void setTrackSolo(int trackId, bool solo);
     void setTrackMute(int trackId, bool mute);
     bool isTrackPlaying(int trackId) const;
@@ -62,12 +68,9 @@ public:
     const PatternInstance* instanceById(int instanceId) const;
     int                    laneIdForInstance(int instanceId) const;
 
-    // Default instrument names assigned to newly created patterns.
-    std::string defaultOutputInstrument;
-    std::string defaultDrumOutputInstrument;
-
-    // Rename all pattern output instrument assignments across the whole song.
-    void renamePatternOutputInstrument(const std::string& oldName, const std::string& newName);
+    // Default instrument IDs assigned to newly created patterns (0 = none).
+    int defaultInstrumentId     = 0;
+    int defaultDrumInstrumentId = 0;
 
     // Set the display name of a pattern; empty = auto ("InstrumentName N").
     void setPatternName(int patId, std::string name);

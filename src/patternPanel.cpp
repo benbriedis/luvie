@@ -1,4 +1,5 @@
 #include "patternPanel.hpp"
+#include "observableInstrument.hpp"
 #include "chords.hpp"
 #include "panelStyle.hpp"
 #include "inlineEditDispatch.hpp"
@@ -381,7 +382,7 @@ void PatternPanel::initOutChoice()
     outChoice.value(0);
     outChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        if (!self->pattern) return;
+        if (!self->pattern || !self->instr_) return;
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
@@ -389,11 +390,13 @@ void PatternPanel::initOutChoice()
         PatternType type = PatternType::STANDARD;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }
-        const auto& names = (type == PatternType::DRUM)
-            ? self->drumInstrumentNames_ : self->stdInstrumentNames_;
+        // Build the filtered instrument list (same filtering as refreshOutChoice)
+        std::vector<int> ids;
+        for (const auto& i : tl.instruments)
+            if (i.isDrum == (type == PatternType::DRUM)) ids.push_back(i.id);
         int idx = self->outChoice.value();
-        std::string name = (idx >= 0 && idx < (int)names.size()) ? names[idx] : "";
-        self->pattern->setPatternOutputInstrument(patId, name);
+        int instrId = (idx >= 0 && idx < (int)ids.size()) ? ids[idx] : 0;
+        self->instr_->setPatternInstrument(patId, instrId);
     }, this);
 }
 
@@ -436,38 +439,44 @@ void PatternPanel::setParams(int root, int chord, bool sharp)
     redraw();
 }
 
-void PatternPanel::setInstruments(const std::vector<std::string>& stdNames,
-                                  const std::vector<std::string>& drumNames)
+void PatternPanel::setInstruments(ObservableInstrument* instr)
 {
-    stdInstrumentNames_  = stdNames;
-    drumInstrumentNames_ = drumNames;
+    swapObserver(instr_, instr, this);
     refreshOutChoice();
 }
 
 void PatternPanel::refreshOutChoice()
 {
-    if (!pattern) { outChoice.value(0); return; }
+    if (!pattern || !instr_) { outChoice.value(0); return; }
     const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { outChoice.value(0); return; }
     int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
 
-    PatternType type = PatternType::STANDARD;
-    std::string currentInstrument;
+    PatternType type        = PatternType::STANDARD;
+    int         currentId   = 0;
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
-        type              = p.type;
-        currentInstrument = p.outputInstrumentName;
+        type      = p.type;
+        currentId = p.instrumentId;
         break;
     }
 
-    const auto& names = (type == PatternType::DRUM) ? drumInstrumentNames_ : stdInstrumentNames_;
+    // Build the filtered instrument list (only same type as pattern)
+    bool isDrum = (type == PatternType::DRUM);
+    std::vector<int>         ids;
+    std::vector<std::string> names;
+    for (const auto& i : tl.instruments) {
+        if (i.isDrum != isDrum) continue;
+        ids.push_back(i.id);
+        names.push_back(i.name);
+    }
 
     outChoice.clear();
     for (const auto& n : names) outChoice.add(n.c_str());
 
-    for (int i = 0; i < (int)names.size(); i++) {
-        if (names[i] == currentInstrument) {
+    for (int i = 0; i < (int)ids.size(); i++) {
+        if (ids[i] == currentId) {
             outChoice.value(i);
             outChoice.redraw();
             return;
@@ -476,8 +485,8 @@ void PatternPanel::refreshOutChoice()
 
     // Current instrument not in the type-filtered list — assign first available.
     outChoice.value(0);
-    if (!names.empty())
-        pattern->setPatternOutputInstrument(patId, names[0]);
+    if (!ids.empty())
+        instr_->setPatternInstrument(patId, ids[0]);
     outChoice.redraw();
 }
 

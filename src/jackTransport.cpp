@@ -70,7 +70,7 @@ void JackTransport::setInstruments(const std::vector<InstrumentRouting>& routing
 {
     instrumentMap_.clear();
     for (const auto& r : routings)
-        instrumentMap_[r.instrumentName] = r;
+        instrumentMap_[r.instrumentId] = r;
     rebuildSnapshot();
 }
 
@@ -155,8 +155,8 @@ void JackTransport::rebuildSnapshot()
     auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx) {
         is.portName    = "";
         is.midiChannel = trackIdx % 16;
-        if (!pat->outputInstrumentName.empty()) {
-            auto it = instrumentMap_.find(pat->outputInstrumentName);
+        if (pat->instrumentId != 0) {
+            auto it = instrumentMap_.find(pat->instrumentId);
             if (it != instrumentMap_.end()) {
                 is.portName    = it->second.portName;
                 is.midiChannel = it->second.midiChannel - 1;

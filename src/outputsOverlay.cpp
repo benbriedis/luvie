@@ -1,4 +1,5 @@
 #include "outputsOverlay.hpp"
+#include "observableInstrument.hpp"
 #include "midnamParser.hpp"
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
@@ -195,7 +196,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         const std::string portName = self->outputs_.empty()
             ? "" : self->outputs_[0].portName;
         const std::string name = self->nextNumberedInstrName(false);
-        self->instruments_.push_back({self->nextInstrId_++, name, portName, 1, {}, false});
+        int id = self->instrObs_ ? self->instrObs_->add(name, false) : 0;
+        self->instruments_.push_back({id, name, portName, 1, {}, false});
         self->rebuildInstrumentRows();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
@@ -211,7 +213,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         const std::string portName = self->outputs_.empty()
             ? "" : self->outputs_[0].portName;
         const std::string name = self->nextNumberedInstrName(true);
-        self->instruments_.push_back({self->nextInstrId_++, name, portName, 1, {}, true});
+        int id = self->instrObs_ ? self->instrObs_->add(name, true) : 0;
+        self->instruments_.push_back({id, name, portName, 10, {}, true});
         self->rebuildInstrumentRows();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
@@ -228,8 +231,6 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
     end();
 
     outputs_.push_back({nextPortId_++, "midi_out_1"});
-    instruments_.push_back({nextInstrId_++, "Instrument 1", "midi_out_1",  1, {}, false});
-    instruments_.push_back({nextInstrId_++, "Drums 1",      "midi_out_1", 10, {}, true});
     rebuildRows();
     hide();
 }
@@ -256,7 +257,7 @@ void OutputsOverlay::hide() {
         if (!newName.empty() && newName != oldInstrName) {
             newName = uniqueInstrName(newName, i);
             instruments_[i].name = newName;
-            if (onInstrumentRenamed) onInstrumentRenamed(oldInstrName, newName);
+            if (instrObs_) instrObs_->rename(instruments_[i].id, newName);
             instrChanged = true;
         }
     }
@@ -291,10 +292,15 @@ std::vector<std::string> OutputsOverlay::getOutputs() const {
 void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
     instruments_.clear();
     for (const auto& ci : instrs)
-        instruments_.push_back({nextInstrId_++, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+        instruments_.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                 ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
                                 ci.gm1Instrument});
     rebuildInstrumentRows();
+}
+
+void OutputsOverlay::setObservableInstrument(ObservableInstrument* instr)
+{
+    instrObs_ = instr;
 }
 
 std::vector<OutputsOverlay::InstrumentInfo> OutputsOverlay::getInstruments() const {
@@ -306,10 +312,10 @@ std::vector<OutputsOverlay::InstrumentInfo> OutputsOverlay::getInstruments() con
     return result;
 }
 
-void OutputsOverlay::updateInstrumentDrumMap(const std::string& instrName, int midiNote, const std::string& label)
+void OutputsOverlay::updateInstrumentDrumMap(int instrId, int midiNote, const std::string& label)
 {
     for (auto& instr : instruments_) {
-        if (instr.name == instrName) {
+        if (instr.id == instrId) {
             if (label.empty())
                 instr.drumMap.erase(midiNote);
             else
@@ -512,7 +518,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         {
             int typeCount = 0;
             for (const auto& instr : instruments_) if (instr.isDrum == drum) ++typeCount;
-            bool inUse = isInstrumentInUse && isInstrumentInUse(instruments_[i].name);
+            bool inUse = isInstrumentInUse && isInstrumentInUse(instruments_[i].id);
             if (typeCount <= 1 || inUse) del->deactivate();
         }
 
@@ -811,7 +817,7 @@ void OutputsOverlay::instrNameCb(Fl_Widget* w, void* d) {
         static_cast<Fl_Input*>(w)->value(newName.c_str());
         self->instrRows_[i].committedName = newName;
         self->instruments_[i].name = newName;
-        if (self->onInstrumentRenamed) self->onInstrumentRenamed(oldName, newName);
+        if (self->instrObs_) self->instrObs_->rename(self->instruments_[i].id, newName);
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }
@@ -822,7 +828,7 @@ void OutputsOverlay::refreshInstrumentButtons() {
     for (const auto& instr : instruments_) instr.isDrum ? ++drumCount : ++stdCount;
     for (int i = 0; i < (int)instrRows_.size() && i < (int)instruments_.size(); i++) {
         if (!instrRows_[i].deleteBtn) continue;
-        bool inUse = isInstrumentInUse && isInstrumentInUse(instruments_[i].name);
+        bool inUse = isInstrumentInUse && isInstrumentInUse(instruments_[i].id);
         int typeCount = instruments_[i].isDrum ? drumCount : stdCount;
         if (typeCount <= 1 || inUse) instrRows_[i].deleteBtn->deactivate();
         else                         instrRows_[i].deleteBtn->activate();
@@ -834,12 +840,14 @@ void OutputsOverlay::instrDeleteCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<OutputsOverlay*>(d);
     for (int i = 0; i < (int)self->instrRows_.size(); i++) {
         if (w != self->instrRows_[i].deleteBtn) continue;
-        if (self->isInstrumentInUse && self->isInstrumentInUse(self->instruments_[i].name)) return;
+        if (self->isInstrumentInUse && self->isInstrumentInUse(self->instruments_[i].id)) return;
         bool isDrum = self->instruments_[i].isDrum;
         int typeCount = 0;
         for (const auto& instr : self->instruments_) if (instr.isDrum == isDrum) ++typeCount;
         if (typeCount <= 1) return;
+        int delId = self->instruments_[i].id;
         self->instruments_.erase(self->instruments_.begin() + i);
+        if (self->instrObs_) self->instrObs_->remove(delId);
         self->rebuildInstrumentRows();
         self->rebuildPortChoices();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();

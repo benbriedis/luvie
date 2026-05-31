@@ -62,10 +62,10 @@ class DrumPatternEditor : public BasePatternEditor {
     InlineInput     drumLabelInput;
     int             editingMidiNote = -1;
 
-    std::map<std::string, std::map<int, std::string>> allDrumMaps;
-    std::map<std::string, bool>                       allFallbackModes;
+    std::map<int, std::map<int, std::string>> allDrumMaps;
+    std::map<int, bool>                       allFallbackModes;
 
-    std::string currentInstrumentName() const;
+    int currentInstrumentId() const;
     void applyCurrentDrumMap();
     void startDrumLabelEdit(int midiNote, int rowY, int rowH);
     void commitDrumLabelEdit();
@@ -106,12 +106,12 @@ public:
                       int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~DrumPatternEditor();
 
-    std::function<void(const std::string& chanName, int midiNote, const std::string& label)> onDrumLabelChanged;
+    std::function<void(int instrId, int midiNote, const std::string& label)> onDrumLabelChanged;
 
     void focusPattern() override;
     void setSnap(float s) override { drumGrid.setSnap(s); BasePatternEditor::setSnap(s); }
-    void setAllDrumMaps(const std::map<std::string, std::map<int, std::string>>& maps,
-                        const std::map<std::string, bool>& fallbacks);
+    void setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps,
+                        const std::map<int, bool>& fallbacks);
     void resize(int x, int y, int w, int h) override;
 };
 

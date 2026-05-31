@@ -49,6 +49,8 @@ void ObservableSong::loadTimeline(const Timeline& tl)
     }
     nextId = 1;
     nextPatternNumber = (int)data.patterns.size() + 1;
+    for (const auto& instr : data.instruments)
+        if (instr.id >= nextId) nextId = instr.id + 1;
     for (const auto& p : data.patterns) {
         if (p.id >= nextId) nextId = p.id + 1;
         for (const auto& n : p.notes)
@@ -275,16 +277,42 @@ void ObservableSong::secondsToBarBeat(double secs, int& bar, int& beat) const
 }
 
 // ---------------------------------------------------------------------------
+// Instrument management
+
+int ObservableSong::addInstrument(std::string name, bool isDrum)
+{
+    int id = nextId++;
+    data.instruments.push_back({id, std::move(name), isDrum});
+    notify();
+    return id;
+}
+
+void ObservableSong::renameInstrument(int instrId, std::string name)
+{
+    for (auto& i : data.instruments)
+        if (i.id == instrId) { i.name = std::move(name); notify(); return; }
+}
+
+void ObservableSong::removeInstrument(int instrId)
+{
+    data.instruments.erase(
+        std::remove_if(data.instruments.begin(), data.instruments.end(),
+            [instrId](const Instrument& i) { return i.id == instrId; }),
+        data.instruments.end());
+    notify();
+}
+
+// ---------------------------------------------------------------------------
 // Track management
 
-int ObservableSong::addTrack(std::string label, int patternId, int atIndex)
+int ObservableSong::addTrack(int instrumentId, int patternId, int atIndex)
 {
     int id     = nextId++;
     int laneId = nextId++;
     Lane lane{laneId, patternId, {}};
     Track newTrack;
-    newTrack.id    = id;
-    newTrack.label = std::move(label);
+    newTrack.id           = id;
+    newTrack.instrumentId = instrumentId;
     newTrack.lanes.push_back(std::move(lane));
     data.tracks.push_back(std::move(newTrack));
     RowRef ref{RowKind::Lane, laneId};
@@ -481,12 +509,6 @@ void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
     notify();
 }
 
-void ObservableSong::renameTrack(int trackId, std::string newLabel)
-{
-    for (auto& t : data.tracks)
-        if (t.id == trackId) { t.label = std::move(newLabel); notify(); return; }
-}
-
 void ObservableSong::setTrackSolo(int trackId, bool s)
 {
     for (auto& t : data.tracks)
@@ -534,13 +556,13 @@ int ObservableSong::addLane(int trackId)
 
         PatternType ptype  = PatternType::STANDARD;
         float       beats  = 8.0f;
-        std::string output = defaultOutputInstrument;
+        int         instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)
                 if (p.id == t.lanes[0].patternId) {
-                    ptype  = p.type;
-                    beats  = p.lengthBeats;
-                    output = p.outputInstrumentName;
+                    ptype   = p.type;
+                    beats   = p.lengthBeats;
+                    instrId = p.instrumentId;
                     break;
                 }
         }
@@ -550,11 +572,11 @@ int ObservableSong::addLane(int trackId)
 
         int patId = nextId++;
         Pattern newPat;
-        newPat.id                  = patId;
-        newPat.lengthBeats         = beats;
-        newPat.name                = "Pattern " + std::to_string(nextPatternNumber++);
-        newPat.type                = ptype;
-        newPat.outputInstrumentName = output;
+        newPat.id           = patId;
+        newPat.lengthBeats  = beats;
+        newPat.name         = "Pattern " + std::to_string(nextPatternNumber++);
+        newPat.type         = ptype;
+        newPat.instrumentId = instrId;
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
@@ -586,13 +608,13 @@ int ObservableSong::addPianorollLane(int trackId)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
 
-        float       beats  = 8.0f;
-        std::string output = defaultOutputInstrument;
+        float beats   = 8.0f;
+        int   instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)
                 if (p.id == t.lanes[0].patternId) {
-                    beats  = p.lengthBeats;
-                    output = p.outputInstrumentName;
+                    beats   = p.lengthBeats;
+                    instrId = p.instrumentId;
                     break;
                 }
         }
@@ -602,11 +624,11 @@ int ObservableSong::addPianorollLane(int trackId)
 
         int patId = nextId++;
         Pattern newPat;
-        newPat.id                  = patId;
-        newPat.lengthBeats         = beats;
-        newPat.name                = "Pattern " + std::to_string(nextPatternNumber++);
-        newPat.type                = PatternType::PIANOROLL;
-        newPat.outputInstrumentName = output;
+        newPat.id           = patId;
+        newPat.lengthBeats  = beats;
+        newPat.name         = "Pattern " + std::to_string(nextPatternNumber++);
+        newPat.type         = PatternType::PIANOROLL;
+        newPat.instrumentId = instrId;
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
@@ -847,18 +869,6 @@ const Pattern* ObservableSong::patternForInstance(int instanceId) const
                     return nullptr;
                 }
     return nullptr;
-}
-
-void ObservableSong::renamePatternOutputInstrument(const std::string& oldName, const std::string& newName)
-{
-    bool changed = false;
-    for (auto& p : data.patterns) {
-        if (p.outputInstrumentName == oldName) {
-            p.outputInstrumentName = newName;
-            changed = true;
-        }
-    }
-    if (changed) notify();
 }
 
 // ---------------------------------------------------------------------------

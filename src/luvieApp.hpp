@@ -10,6 +10,7 @@
 
 class ObservableSong;
 class ObservablePattern;
+class ObservableInstrument;
 
 class AppWindow;
 class ModernTabs;
@@ -81,12 +82,14 @@ public:
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;
 
-    void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern, ITransport* transport);
+    void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
+               ObservableInstrument* instruments, ITransport* transport);
     void pushInstruments();
 
 private:
-    ObservableSong*    song_    = nullptr;
-    ObservablePattern* pattern_ = nullptr;
+    ObservableSong*      song_        = nullptr;
+    ObservablePattern*   pattern_     = nullptr;
+    ObservableInstrument* instruments_ = nullptr;
 
     static void saveCb      (Fl_Widget*, void* data);
     static void saveAsCb    (Fl_Widget*, void* data);

@@ -8,6 +8,7 @@
 #include "jackTransport.hpp"
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
+#include "observableInstrument.hpp"
 #include "patternPanel.hpp"
 #include "transport.hpp"
 #include "noteLabels.hpp"
@@ -54,13 +55,7 @@ int main(int argc, char **argv) {
 
     ObservableSong songTimeline(120.0f, 4, 4);
     ObservablePattern patternObs(&songTimeline);
-    {
-        // Create an initial track matching the default instrument name.
-        // pushInstruments() (called inside app.build()) will sync this track
-        // with the overlay's "Instrument 1" entry and set defaultOutputInstrument.
-        int patId = patternObs.createPattern(LuvieApp::numPatternBeats);
-        songTimeline.addTrack("Instrument 1", patId);
-    }
+    ObservableInstrument instrObs(&songTimeline);
 
     JackTransport  jackTransport;
     SimpleTransport simpleTransport;
@@ -90,7 +85,7 @@ int main(int argc, char **argv) {
                                         app.patternPanel->chordType());
     };
 
-    app.build(&window, &songTimeline, &patternObs, transport);
+    app.build(&window, &songTimeline, &patternObs, &instrObs, transport);
 
     if (useJack)
         jackTransport.setActivePatterns(&app.aps);
@@ -121,7 +116,7 @@ int main(int argc, char **argv) {
         if (!useJack || !connOverlay) return;
         std::vector<JackTransport::InstrumentRouting> routings;
         for (const auto& ci : connOverlay->getInstruments())
-            routings.push_back({ci.name, ci.portName, ci.midiChannel,
+            routings.push_back({ci.id, ci.portName, ci.midiChannel,
                                 ci.programNumber, ci.bankMsb, ci.bankLsb});
         jackTransport.setInstruments(routings);
     };
@@ -163,7 +158,7 @@ int main(int argc, char **argv) {
                 jackTransport.addMidiPort(name);
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
-            instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
+            instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument});
         connOverlay->setInstruments(instrs);
@@ -180,7 +175,7 @@ int main(int argc, char **argv) {
             state.jackOutputs.push_back({name});
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
-            state.jackInstruments.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+            state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                              ci.isDrum, ci.fallbackNoteNames,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
                                              ci.gm1Instrument});

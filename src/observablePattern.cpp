@@ -203,10 +203,10 @@ int ObservablePattern::createPattern(float lengthBeats)
 {
     int id = song_->nextId++;
     Pattern p;
-    p.id = id;
-    p.lengthBeats = lengthBeats;
-    p.name = "Pattern " + std::to_string(song_->nextPatternNumber++);
-    p.outputInstrumentName = song_->defaultOutputInstrument;
+    p.id           = id;
+    p.lengthBeats  = lengthBeats;
+    p.name         = "Pattern " + std::to_string(song_->nextPatternNumber++);
+    p.instrumentId = song_->defaultInstrumentId;
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(p);
     song_->notify();
@@ -217,12 +217,12 @@ int ObservablePattern::createDrumPattern(float lengthBeats)
 {
     int id = song_->nextId++;
     Pattern p;
-    p.id = id;
-    p.lengthBeats = lengthBeats;
-    p.name = "Pattern " + std::to_string(song_->nextPatternNumber++);
-    p.type = PatternType::DRUM;
-    p.outputInstrumentName = song_->defaultDrumOutputInstrument.empty()
-        ? song_->defaultOutputInstrument : song_->defaultDrumOutputInstrument;
+    p.id           = id;
+    p.lengthBeats  = lengthBeats;
+    p.name         = "Pattern " + std::to_string(song_->nextPatternNumber++);
+    p.type         = PatternType::DRUM;
+    p.instrumentId = song_->defaultDrumInstrumentId
+        ? song_->defaultDrumInstrumentId : song_->defaultInstrumentId;
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(std::move(p));
     song_->notify();
@@ -233,11 +233,11 @@ int ObservablePattern::createPianorollPattern(float lengthBeats)
 {
     int id = song_->nextId++;
     Pattern p;
-    p.id = id;
-    p.lengthBeats = lengthBeats;
-    p.name = "Pattern " + std::to_string(song_->nextPatternNumber++);
-    p.type = PatternType::PIANOROLL;
-    p.outputInstrumentName = song_->defaultOutputInstrument;
+    p.id           = id;
+    p.lengthBeats  = lengthBeats;
+    p.name         = "Pattern " + std::to_string(song_->nextPatternNumber++);
+    p.type         = PatternType::PIANOROLL;
+    p.instrumentId = song_->defaultInstrumentId;
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(std::move(p));
     song_->notify();
@@ -317,11 +317,11 @@ void ObservablePattern::setPatternLength(int patId, float lengthBeats)
     }
 }
 
-void ObservablePattern::setPatternOutputInstrument(int patId, const std::string& instrumentName)
+void ObservablePattern::setPatternInstrument(int patId, int instrumentId)
 {
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
-            p.outputInstrumentName = instrumentName;
+            p.instrumentId = instrumentId;
             song_->notify();
             return;
         }

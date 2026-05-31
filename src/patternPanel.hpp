@@ -148,14 +148,15 @@ public:
     RecenterButton(int x, int y, int w, int h) : Fl_Widget(x, y, w, h) {}
 };
 
+class ObservableInstrument;
+
 class PatternPanel : public Fl_Group, public ITimelineObserver {
 
-    ObservablePattern* pattern      = nullptr;
+    ObservablePattern*   pattern = nullptr;
+    ObservableInstrument* instr_ = nullptr;
     int                 editingPatId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
-    std::vector<std::string> stdInstrumentNames_;
-    std::vector<std::string> drumInstrumentNames_;
 
     InlineInput     input;           // direct child of PatternPanel for overlay
     Fl_Flex         controlRow;      // outer flex — all subsequent members go here
@@ -209,8 +210,7 @@ public:
     bool isSharp()   const { return useSharp; }
 
     void setParams(int root, int chord, bool sharp);
-    void setInstruments(const std::vector<std::string>& stdNames,
-                        const std::vector<std::string>& drumNames);
+    void setInstruments(ObservableInstrument* instr);
 
     void setPattern(ObservablePattern* tl);
     void onTimelineChanged() override;

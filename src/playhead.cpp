@@ -108,7 +108,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		if (pat->notes.empty() && pat->drumNotes.empty() && pat->paramLanes.empty()) continue;
 		for (const auto& track : tl.tracks)
-			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = track.label; break; }
+			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = tl.instrumentName(track.instrumentId); break; }
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
@@ -290,7 +290,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 			if (p.id == patId) { pat = &p; break; }
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		for (const auto& track : tl.tracks)
-			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = track.label; break; }
+			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = tl.instrumentName(track.instrumentId); break; }
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);

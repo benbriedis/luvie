@@ -4,6 +4,7 @@
 #include "timelineIO.hpp"
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
+#include "observableInstrument.hpp"
 #include <filesystem>
 #include "appWindow.hpp"
 #include "songEditor.hpp"
@@ -109,9 +110,11 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     saveAppState(state, path);
 }
 
-void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern, ITransport* transport) {
-    song_    = song;
-    pattern_ = pattern;
+void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
+                     ObservableInstrument* instruments, ITransport* transport) {
+    song_         = song;
+    pattern_      = pattern;
+    instruments_  = instruments;
 
     const int off        = menuBarH;
     const int tabsH      = defaultWinH() - bottomH - menuBarH;
@@ -358,24 +361,19 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
                 item->clear();
         };
-        outputsOverlay->onInstrumentRenamed = [this](const std::string& old, const std::string& nw) {
-            song_->renamePatternOutputInstrument(old, nw);
-            // Keep track labels in sync with instrument names
-            for (const auto& t : song_->get().tracks)
-                if (t.label == old) { song_->renameTrack(t.id, nw); break; }
-        };
-        outputsOverlay->isInstrumentInUse = [this](const std::string& name) {
+        outputsOverlay->isInstrumentInUse = [this](int instrId) {
             for (const auto& p : song_->get().patterns)
-                if (p.outputInstrumentName == name) return true;
+                if (p.instrumentId == instrId) return true;
             return false;
         };
         outputsOverlay->onInstrumentsChanged = [this]() {
             pushInstruments();
             if (onInstrumentsChanged) onInstrumentsChanged();
         };
+        outputsOverlay->setObservableInstrument(instruments_);
         if (drumEd) {
-            drumEd->onDrumLabelChanged = [this](const std::string& instrName, int midiNote, const std::string& label) {
-                outputsOverlay->updateInstrumentDrumMap(instrName, midiNote, label);
+            drumEd->onDrumLabelChanged = [this](int instrId, int midiNote, const std::string& label) {
+                outputsOverlay->updateInstrumentDrumMap(instrId, midiNote, label);
             };
         }
         window->add(outputsOverlay);
@@ -392,19 +390,21 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     song_->addObserver(&editorSwitcher_);
     song_->addObserver(&changeNotifier_);
 
+    // Wire pattern panel to instrument observable
+    if (patternPanel)
+        patternPanel->setInstruments(instruments_);
+
     // ---- Initial state ----
-    // Seed the overlay with a default instrument on a fresh (empty) session
-    // so there's always at least one instrument+track pair.
-    if (outputsOverlay->getInstruments().empty()) {
-        OutputsOverlay::InstrumentInfo def;
-        def.id            = 0;
-        def.name          = "Instrument 1";
-        def.midiChannel   = 1;
-        def.programNumber = -1;
-        def.bankMsb       = -1;
-        def.bankLsb       = -1;
-        def.gm1Instrument = -1;
-        outputsOverlay->setInstruments({def});
+    // Seed with default instruments on a fresh (empty) session.
+    if (song_->get().instruments.empty()) {
+        const std::string port = outputsOverlay->getOutputs().empty()
+            ? "" : outputsOverlay->getOutputs()[0];
+        int id1 = instruments_->add("Instrument 1", false);
+        int id2 = instruments_->add("Drums 1", true);
+        outputsOverlay->setInstruments({
+            {id1, "Instrument 1", port,  1, {}, false, false, -1, -1, -1, -1},
+            {id2, "Drums 1",      port, 10, {}, true,  false, -1, -1, -1, -1}
+        });
     }
     pushInstruments();
     song_->selectTrack(0);
@@ -437,24 +437,24 @@ void LuvieApp::pushInstruments() {
     if (!outputsOverlay || !song_) return;
     const auto& instrs = outputsOverlay->getInstruments();
 
-    // Update default instrument names for newly created patterns
-    song_->defaultOutputInstrument = "";
-    song_->defaultDrumOutputInstrument = "";
+    // Update default instrument IDs for newly created patterns
+    song_->defaultInstrumentId     = 0;
+    song_->defaultDrumInstrumentId = 0;
     for (const auto& ci : instrs) {
-        if (!ci.isDrum && song_->defaultOutputInstrument.empty())
-            song_->defaultOutputInstrument = ci.name;
-        if (ci.isDrum && song_->defaultDrumOutputInstrument.empty())
-            song_->defaultDrumOutputInstrument = ci.name;
+        if (!ci.isDrum && !song_->defaultInstrumentId)
+            song_->defaultInstrumentId = ci.id;
+        if (ci.isDrum && !song_->defaultDrumInstrumentId)
+            song_->defaultDrumInstrumentId = ci.id;
     }
 
     // Sync tracks 1:1 with instruments (only when overlay has instruments)
     if (!instrs.empty()) {
-        // Remove tracks whose label no longer matches any instrument
+        // Remove tracks whose instrumentId no longer matches any overlay instrument
         std::vector<int> toRemove;
         for (const auto& t : song_->get().tracks) {
             bool found = false;
             for (const auto& ci : instrs)
-                if (ci.name == t.label) { found = true; break; }
+                if (ci.id == t.instrumentId) { found = true; break; }
             if (!found) toRemove.push_back(t.id);
         }
         for (int id : toRemove)
@@ -464,29 +464,23 @@ void LuvieApp::pushInstruments() {
         for (const auto& ci : instrs) {
             bool found = false;
             for (const auto& t : song_->get().tracks)
-                if (t.label == ci.name) { found = true; break; }
+                if (t.instrumentId == ci.id) { found = true; break; }
             if (!found && pattern_) {
                 int patId = ci.isDrum
                     ? pattern_->createDrumPattern(numPatternBeats)
                     : pattern_->createPattern(numPatternBeats);
-                pattern_->setPatternOutputInstrument(patId, ci.name);
-                song_->addTrack(ci.name, patId);
+                pattern_->setPatternInstrument(patId, ci.id);
+                song_->addTrack(ci.id, patId);
             }
         }
     }
 
-    if (patternPanel) {
-        std::vector<std::string> stdNames, drumNames;
-        for (const auto& ci : instrs)
-            (ci.isDrum ? drumNames : stdNames).push_back(ci.name);
-        patternPanel->setInstruments(stdNames, drumNames);
-    }
     if (drumEd) {
-        std::map<std::string, std::map<int, std::string>> allMaps;
-        std::map<std::string, bool> allFallbacks;
+        std::map<int, std::map<int, std::string>> allMaps;
+        std::map<int, bool> allFallbacks;
         for (const auto& ci : instrs) {
-            allMaps[ci.name]      = ci.drumMap;
-            allFallbacks[ci.name] = ci.fallbackNoteNames;
+            allMaps[ci.id]      = ci.drumMap;
+            allFallbacks[ci.id] = ci.fallbackNoteNames;
         }
         drumEd->setAllDrumMaps(allMaps, allFallbacks);
     }

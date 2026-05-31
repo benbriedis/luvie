@@ -63,29 +63,29 @@ static json patternToJson(const Pattern& p) {
     json jdrumMute = json::array();
     for (int n : p.drumMute) jdrumMute.push_back(n);
     return {
-        {"id",                p.id},
-        {"lengthBeats",       p.lengthBeats},
-        {"type",              (int)p.type},
-        {"notes",             jnotes},
-        {"drumNotes",         jdrum},
-        {"drumSolo",          jdrumSolo},
-        {"drumMute",          jdrumMute},
-        {"outputInstrumentName", p.outputInstrumentName},
-        {"name",              p.name},
-        {"timeSigTop",        p.timeSigTop},
-        {"timeSigBottom",     p.timeSigBottom},
+        {"id",           p.id},
+        {"lengthBeats",  p.lengthBeats},
+        {"type",         (int)p.type},
+        {"notes",        jnotes},
+        {"drumNotes",    jdrum},
+        {"drumSolo",     jdrumSolo},
+        {"drumMute",     jdrumMute},
+        {"instrumentId", p.instrumentId},
+        {"name",         p.name},
+        {"timeSigTop",   p.timeSigTop},
+        {"timeSigBottom",p.timeSigBottom},
     };
 }
 
 static Pattern patternFromJson(const json& j) {
     Pattern p;
-    p.id                = j.at("id");
-    p.lengthBeats       = j.at("lengthBeats");
-    p.type              = (PatternType)j.value("type", 0);
-    p.outputInstrumentName = j.value("outputInstrumentName", j.value("outputChannelName", ""));
-    p.name              = j.value("name", "");
-    p.timeSigTop        = j.value("timeSigTop",    4);
-    p.timeSigBottom     = j.value("timeSigBottom", 4);
+    p.id           = j.at("id");
+    p.lengthBeats  = j.at("lengthBeats");
+    p.type         = (PatternType)j.value("type", 0);
+    p.instrumentId = j.value("instrumentId", 0);
+    p.name         = j.value("name", "");
+    p.timeSigTop   = j.value("timeSigTop",    4);
+    p.timeSigBottom= j.value("timeSigBottom", 4);
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));
     for (const auto& jd : j.value("drumNotes", json::array())) p.drumNotes.push_back(drumNoteFromJson(jd));
     for (int n : j.value("drumSolo", json::array())) p.drumSolo.insert(n);
@@ -126,13 +126,12 @@ static json laneToJson(const Lane& l) {
 static json trackToJson(const Track& t) {
     json jlanes = json::array();
     for (const auto& l : t.lanes) jlanes.push_back(laneToJson(l));
-    // Keep flat lanes[0] fields for files that older loaders may read.
     json jinsts = json::array();
     if (!t.lanes.empty())
         for (const auto& inst : t.lanes[0].patterns) jinsts.push_back(instanceToJson(inst));
     return {
         {"id",           t.id},
-        {"label",        t.label},
+        {"instrumentId", t.instrumentId},
         {"patternId",    t.lanes.empty() ? 0 : t.lanes[0].patternId},
         {"solo",         t.solo},
         {"mute",         t.mute},
@@ -145,7 +144,7 @@ static json trackToJson(const Track& t) {
 static Track trackFromJson(const json& j) {
     Track t;
     t.id           = j.at("id");
-    t.label        = j.at("label");
+    t.instrumentId = j.value("instrumentId", 0);
     t.solo         = j.value("solo", false);
     t.mute         = j.value("mute", false);
     t.stackedLanes = j.value("stackedLanes", false);
@@ -207,6 +206,10 @@ static json timelineToJson(const Timeline& tl) {
     json jtracks = json::array();
     for (const auto& t : tl.tracks) jtracks.push_back(trackToJson(t));
 
+    json jinstrs = json::array();
+    for (const auto& i : tl.instruments)
+        jinstrs.push_back({{"id", i.id}, {"name", i.name}, {"isDrum", i.isDrum}});
+
     json jparams = json::array();
     for (const auto& lane : tl.paramLanes) jparams.push_back(paramLaneToJson(lane));
 
@@ -220,6 +223,7 @@ static json timelineToJson(const Timeline& tl) {
         {"timeSigs",           jsigs},
         {"patterns",           jpats},
         {"tracks",             jtracks},
+        {"instruments",        jinstrs},
         {"paramLanes",         jparams},
         {"rowOrder",           jrows},
         {"selectedTrackIndex", tl.selectedTrackIndex},
@@ -237,6 +241,8 @@ static Timeline timelineFromJson(const json& j) {
         tl.patterns.push_back(patternFromJson(jp));
     for (const auto& jt : j.value("tracks", json::array()))
         tl.tracks.push_back(trackFromJson(jt));
+    for (const auto& ji : j.value("instruments", json::array()))
+        tl.instruments.push_back({ji.at("id"), ji.at("name").get<std::string>(), ji.value("isDrum", false)});
     for (const auto& jp : j.value("paramLanes", json::array()))
         tl.paramLanes.push_back(paramLaneFromJson(jp));
     for (const auto& jr : j.value("rowOrder", json::array()))
@@ -257,7 +263,7 @@ std::string appStateToJsonString(const AppState& state) {
         json jmap;
         for (const auto& [note, name] : c.drumMap)
             jmap[std::to_string(note)] = name;
-        jinstrs.push_back({{"name", c.name}, {"portName", c.portName},
+        jinstrs.push_back({{"id", c.id}, {"name", c.name}, {"portName", c.portName},
                            {"midiChannel", c.midiChannel}, {"drumMap", jmap},
                            {"isDrum", c.isDrum}, {"fallbackNoteNames", c.fallbackNoteNames},
                            {"programNumber", c.programNumber},
@@ -294,6 +300,7 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
                                                     : j.value("jackChannels",    json::array());
     for (const auto& jc : instrArray) {
         JackInstrument ch;
+        ch.id          = jc.value("id", 0);
         ch.name        = jc.value("name", "");
         ch.portName    = jc.value("portName", "");
         ch.midiChannel = jc.value("midiChannel", 1);

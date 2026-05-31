@@ -9,6 +9,7 @@ struct JackOutput {
 };
 
 struct JackInstrument {
+    int         id                = 0;   // timeline Instrument ID (0 if unset)
     std::string name;
     std::string portName;
     int         midiChannel       = 1;

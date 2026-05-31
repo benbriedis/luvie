@@ -416,11 +416,13 @@ void LoopEditor::draw()
 
                 const char* label = nullptr;
                 char buf[16];
+                std::string nameStr;
                 if (tracksAsColumns) {
                     // track name
                     int ti = col;
                     if (ti < (int)tracks.size())
-                        label = tracks[ti].label.c_str();
+                        nameStr = tl.instrumentName(tracks[ti].instrumentId);
+                    label = nameStr.empty() ? nullptr : nameStr.c_str();
                 } else {
                     // "P1", "P2", etc.
                     std::snprintf(buf, sizeof(buf), "P%d", col + 1);
@@ -446,6 +448,7 @@ void LoopEditor::draw()
 
                 const char* label = nullptr;
                 char buf[16];
+                std::string nameStr;
                 if (tracksAsColumns) {
                     // "P1", "P2", etc.
                     std::snprintf(buf, sizeof(buf), "P%d", row + 1);
@@ -454,7 +457,8 @@ void LoopEditor::draw()
                     // track name
                     int ti = row;
                     if (ti < (int)tracks.size())
-                        label = tracks[ti].label.c_str();
+                        nameStr = tl.instrumentName(tracks[ti].instrumentId);
+                    label = nameStr.empty() ? nullptr : nameStr.c_str();
                 }
                 if (label)
                     fl_draw(label, lx, ly, lw, lh, FL_ALIGN_CENTER | FL_ALIGN_CLIP);
