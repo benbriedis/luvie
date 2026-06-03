@@ -312,7 +312,6 @@ Connect up to ALSA midi rather than Jack?
 
 FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
 
-
 BUG: noticed once - showing the Luvie plugin UI from the Carla icon - the GUI didn't
      restore properly. Wrong cursor, couldn't do anything.
 
@@ -333,75 +332,77 @@ Outputs/Instruments - Add a select for Jack|Alsa?  Or require all to be one or t
 
 BUG: loop mode notes don't sound unless song has played first?
   
-
-MAJOR ISSUE: 
-   - In the "Song Editor" the parameter lanes need to modified so as to be specific to instruments.
-   - cf grouping patterns that use the same instrument by colour or something, and or allowing filtering or
-        collapsing by instrument or forcing them together so we can put automation for them as a group underneith?
-   - When adding the automation need to specify the instrument somehow... 
-      cf right clicking over a pattern - the given pattern determines the instrument.
-         Would want an indication to show which instrument has the automation:
-            eg "Instrument 1 OVER Pitch"
-         [COULD optionally have instrument listed over every pattern name]
-   * There is a decision point: group patterns of an instrument together
-     CON: over the length of a song its more convenient to group patterns by verse, chorus, etc
-   COULD allow multiple lanes per channel and MAYBE attach lanes to 'tracks' (optionally hide. 
-        Only show over the pattern portions.)
-        
-        
-
 Found a bug: In "Loop" mode notes sometimes stop playing
 
 -------------------------------------------
 
 
-
-
-TODO Alsa connection
-TODO standalone transport
-
-TODO names as they appear in pattern editor dont include the entire name
-
-TODO one track per instrument.
-     Maybe change UI terminology to "Instrument" from "Track" (but keep in code)
-     
-- Change track names to 'Piano' etc.
-- Replace 'Add track' with 'Add instrument' and popup up instrument overlay
-
-- Abstract out Context Menu?     
-
 Solo & Mute options
 1. Leave as is
 2. Just place on top track
 3. Deal with patterns separately
-
-Double-clicking on pattern instances is weird...
-   eg create then click opens pattern
-   very slow double clicks seem to work 
-
-  There were also two items from the original design that haven't been implemented yet and weren't explicitly phased:
-
-  1. ParamLanes scoped to Track — currently paramLanes still live at Timeline root (song-global). The original design had them move inside each Track. The context popup's "Add
-  automation" option still adds a song-level param lane; it was meant to eventually add a track-scoped one.
-  2. midiChannel on Track — the plan mentioned Track.midiChannel for explicit MIDI routing, but this was never added to the struct.
-
-
-In Unstacked mode add a thin row containing the instrument name
-
-
-Cannot edit name of pattern on instrument in situ in Song editor
-
-Default name for pianoroll: 'pianoroll'
-Default name for drums: 'Drums'
+- Solution needs to work for stacked and unstacked.
 
 LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
  
-Pattern editor - remove the marquee gaps. Add scrollbars. Constant width and heights. remove P1, P2, etc labels.
-   Allow reordering.
+Loop editor - 
+	Add scrollbars. 
+	Constant width and heights. 
+	Allow reordering.
+	Allow instrument names to be editted from here?
  
-BUG: Song Editor - reordering a row containing the instrument label is weird when there are multiple patterns.
- 
-NOTE:  Song Editor - could allow an instrument without a pattern
-
 ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
+
+Pattern editors:
+  Make softly played notes lighter in colour
+
+Stacked:
+  Maybe colour tracks differently
+  Add some border around instrument name row so consecutive ones don't run together
+     
+Unstacked:  
+  Maybe remove vertical lines through the instrument headers? Or fade them there.
+
+
+GOOD STARTING POINT FOR JACK 
+============================
+1. Create a Transports overlay.
+   List the options:
+      1. Host  - automatically used and fixed when run as plugins.
+	  2. Internal
+	  3. Jack - always displayed and can be selected even if Jack is not yet running (show message in this case)
+	          - poll every second in this case (include this in message)
+			  - transport bar? to be disabled and have a warning message on it.
+
+	The user will USUALLY want to use the same transport, so save the selection in DB.
+	If 'Jack' has been saved in the project it will automatically go into poll mode.
+
+	Place an indicator on the transport bar: Jack/internal/host
+
+2. On the Outputs overlay:
+
+   Add a setting: 'Create new connections as: jack/native/...'
+   Store this setting with the project.
+
+   Outputs themselves to be marked as 'jack'|'native'|'debug', and to be saved with the project.
+
+   When Jack is used but not yet present, share the Jack detection polling loop with the transport.
+   Show messages on Output overlay if Jack not yet found + mention detection polling loop.
+   Place warning on transport bar iff transport is not ALSO using Jack but an output is.
+
+3. Support luvie --test <SESSION>
+	  Ignore the default output settings and transport settings. Maybe prevent modification of the relevant output and transport settings.
+
+  MAYBE have  'luvie --new=jack|standalone/native' <session> 
+     CHECK session is new.
+	 Set transport and connections to use Jack or not (ie old setting names:
+		   --initial-transport=jack|internal/alsa|host  (but not really "host")
+		   --initial-new-connections=jack|native|test
+	 )
+     OR on first creation (NO session name) can see if Jack is running or not.
+
+
+FIXME I'm fairly sure in some circumstances Luvie IS starting Jack. Don't think I want this.
+* Q: Is it ever really worth it to mix ALSA and Jack connections?
+     Would seem that going "native" if Jack is used would be best regarded as exceptional.
 
