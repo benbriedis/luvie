@@ -390,22 +390,15 @@ GOOD STARTING POINT FOR JACK
    Show messages on Output overlay if Jack not yet found + mention detection polling loop.
    Place warning on transport bar iff transport is not ALSO using Jack but an output is.
 
-3. Support luvie --test <SESSION>
-	  Ignore the default output settings and transport settings. 
-	  Maybe prevent modification of the relevant output and transport settings and/or saving.
-
-	Think providing 
-		luvie --new=jack|standalone <session>
-	is useful for documentation as much as anything else.
-	It sets 2 things:
+3. When creating a new project (session name omitted or file doesn't exist) 
+   create a startup settings box to set:
 		a. The transport
-		b. The default setting for new outputs
-     CHECK session is new otherwise error.
+		b. The default setting for new outputs (include 'debug' in output list for the moment)
 
-	Leaning towards having "standalone" as default:
-	PRO: makes Luvie look less like a "Jack thing only"
-	PRO: there may be alternative Jack-like providers in future.
-	CON: may encourages bad habits (ie not using Jack transport and Jack outputs)
+4. Still support luvie --test 
+	 DISALLOW use of --test with a session to prevent whoopsies.
+	 Maybe allow with existing "testing" sessions in future if there is demand for it.
+	 Note: handy for the AI and maybe auto-tests as well as for me.
 
 
 FIXME I'm fairly sure in some circumstances Luvie IS starting Jack. Don't think I want this.
