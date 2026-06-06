@@ -13,10 +13,8 @@
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-static constexpr int headerH  = 52;
-static constexpr int closeSz  = 36;
-static constexpr int closePad = 10;
-static constexpr int titlePad = 16;
+static constexpr int headerH  = OverlayWindow::headerH;
+static constexpr int titlePad = OverlayWindow::titlePad;
 static constexpr int sectionH = 44;
 static constexpr int colH     = 22;
 static constexpr int rowsTopY = headerH + sectionH + colH;
@@ -47,15 +45,15 @@ static constexpr int drumClearW        = 65;
 static constexpr int drumFallbackLabelW = 58;
 static constexpr int drumFallbackChoiceW = 90;
 static constexpr int drumBtnGap        = 8;
-static constexpr int scrollbarW        = 14;
+static constexpr int scrollbarW        = OverlayWindow::scrollbarW;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-static constexpr Fl_Color bgCol      = 0xFFFFFF00;
-static constexpr Fl_Color borderCol  = 0xCBD5E100;
-static constexpr Fl_Color dividerCol = 0xE5E7EB00;
-static constexpr Fl_Color textCol    = 0x37415100;
-static constexpr Fl_Color subTextCol = 0x6B728000;
+static constexpr Fl_Color bgCol      = OverlayWindow::bgCol;
+static constexpr Fl_Color borderCol  = OverlayWindow::borderCol;
+static constexpr Fl_Color dividerCol = OverlayWindow::dividerCol;
+static constexpr Fl_Color textCol    = OverlayWindow::textCol;
+static constexpr Fl_Color subTextCol = OverlayWindow::subTextCol;
 static constexpr Fl_Color inputBgCol = 0xF9FAFB00;
 static constexpr Fl_Color delRedCol  = 0xEF444400;
 static constexpr Fl_Color addBtnBg   = 0xF3F4F600;
@@ -154,21 +152,9 @@ public:
 // ── Constructor ───────────────────────────────────────────────────────────────
 
 OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
-    : BasePopup(x, y, w, h)
+    : OverlayWindow(x, y, w, h, "Outputs")
 {
-    box(FL_NO_BOX);
     begin();
-
-    closeBtn = new ModernButton(
-        w - closePad - closeSz, (headerH - closeSz) / 2,
-        closeSz, closeSz, "\xc3\x97");
-    closeBtn->labelsize(22);
-    closeBtn->labelcolor(textCol);
-    closeBtn->color(bgCol);
-    closeBtn->setBorderWidth(0);
-    closeBtn->callback([](Fl_Widget*, void* d) {
-        static_cast<OutputsOverlay*>(d)->hide();
-    }, this);
 
     addBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Port");
     addBtn->labelsize(12);
@@ -218,15 +204,6 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         self->rebuildInstrumentRows();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
-
-    vScrollbar_ = new GridScrollPane(Fl_Widget::w() - scrollbarW, headerH, scrollbarW, Fl_Widget::h() - headerH);
-    vScrollbar_->linesize(20);
-    vScrollbar_->callback([](Fl_Widget* w, void* d) {
-        auto* self = static_cast<OutputsOverlay*>(d);
-        auto* sb   = static_cast<GridScrollPane*>(w);
-        self->applyScrollY((int)sb->value());
-    }, this);
-    add(*vScrollbar_);
 
     end();
 
@@ -280,14 +257,10 @@ void OutputsOverlay::hide() {
         }
     }
     if (instrChanged && onInstrumentsChanged) onInstrumentsChanged();
-    if (onClose) onClose();
-    BasePopup::hide();
+    OverlayWindow::hide();
 }
 
-void OutputsOverlay::resize(int x, int y, int w, int h) {
-    Fl_Window::resize(x, y, w, h);
-    closeBtn->position(w - closePad - closeSz, (headerH - closeSz) / 2);
-    if (vScrollbar_) vScrollbar_->resize(w - scrollbarW, headerH, scrollbarW, h - headerH);
+void OutputsOverlay::onResized() {
     rebuildRows();
 }
 
@@ -720,25 +693,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
     redraw();
 }
 
-void OutputsOverlay::updateScrollbar() {
-    if (!vScrollbar_) return;
-    const int available = h() - headerH;
-    const int maxScroll = std::max(0, totalContentH_ - available);
-    if (maxScroll <= 0) {
-        scrollY_ = 0;
-        vScrollbar_->hide();
-    } else {
-        scrollY_ = std::clamp(scrollY_, 0, maxScroll);
-        vScrollbar_->value(scrollY_, available, 0, totalContentH_);
-        vScrollbar_->show();
-    }
-}
-
-void OutputsOverlay::applyScrollY(int newY) {
-    if (newY == scrollY_) return;
-    const int delta = scrollY_ - newY;
-    scrollY_ = newY;
-
+void OutputsOverlay::onScroll(int delta) {
     auto mv = [&](Fl_Widget* wp) { if (wp) wp->position(wp->x(), wp->y() + delta); };
 
     for (auto& row : rows_) { mv(row.input); mv(row.deleteBtn); }
@@ -755,9 +710,6 @@ void OutputsOverlay::applyScrollY(int newY) {
         mv(row.progLabel);      mv(row.gm1Label);
     }
     mv(addInstrBtn); mv(addDrumInstrBtn);
-
-    if (vScrollbar_) vScrollbar_->value(scrollY_, h() - headerH, 0, totalContentH_);
-    redraw();
 }
 
 void OutputsOverlay::rebuildPortChoices() {
@@ -1045,7 +997,7 @@ std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
         if (row.deleteBtn && row.deleteBtn->active())       order.push_back(row.deleteBtn);
     }
     order.push_back(addInstrBtn);
-    order.push_back(closeBtn);
+    order.push_back(closeBtn_);
     return order;
 }
 
@@ -1063,13 +1015,6 @@ void OutputsOverlay::advanceFocusBy(int dir) {
 }
 
 int OutputsOverlay::handle(int event) {
-    if (event == FL_MOUSEWHEEL && vScrollbar_ && vScrollbar_->visible()) {
-        const int available = h() - headerH;
-        const int maxScroll = std::max(0, totalContentH_ - available);
-        const int newY = std::clamp(scrollY_ + Fl::event_dy() * 20, 0, maxScroll);
-        applyScrollY(newY);
-        return 1;
-    }
     if (event == FL_KEYBOARD) {
         int k = Fl::event_key();
         if (k == FL_Tab) {
@@ -1081,104 +1026,54 @@ int OutputsOverlay::handle(int event) {
             return 1;
         }
     }
-    return BasePopup::handle(event);
+    return OverlayWindow::handle(event);
 }
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
 
-void OutputsOverlay::draw() {
-    const bool full = damage() & ~FL_DAMAGE_CHILD;
-    const int  sy   = scrollY_;
-    const int  sbW  = (vScrollbar_ && vScrollbar_->visible()) ? scrollbarW : 0;
+void OutputsOverlay::drawStaticContent(int sy, int sbW) {
+    fl_font(FL_HELVETICA_BOLD, 13);
+    fl_color(textCol);
+    fl_draw("MIDI Output Ports", titlePad, headerH + 12 - sy,
+            w() - 2*titlePad, sectionH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
-    if (full) {
-        // Fixed header background + border
-        fl_color(bgCol);
-        fl_rectf(0, 0, w(), h());
+    const int colY = headerH + sectionH;
+    fl_font(FL_HELVETICA, 10);
+    fl_color(subTextCol);
+    fl_draw("PORT NAME", pad, colY - sy,
+            w() - 2*pad, colH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
-        fl_color(borderCol);
-        fl_line_style(FL_SOLID, 1);
-        fl_rect(0, 0, w(), h());
-        fl_line_style(0);
+    fl_color(dividerCol);
+    fl_line_style(FL_SOLID, 1);
+    fl_line(pad, rowsTopY - sy, w() - sbW - pad, rowsTopY - sy);
+    fl_line_style(0);
 
+    // ── Instrument section ───────────────────────────────────────────────
+    if (instrSectionTopY_ > 0) {
         fl_color(dividerCol);
         fl_line_style(FL_SOLID, 1);
-        fl_line(0, headerH, w(), headerH);
+        fl_line(0, instrSectionTopY_ - sy, w() - sbW, instrSectionTopY_ - sy);
         fl_line_style(0);
-
-        fl_font(FL_HELVETICA_BOLD, 17);
-        fl_color(textCol);
-        fl_draw("Outputs", titlePad, 0, w() - 2*titlePad, headerH,
-                FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-        // Scrollable static content — clipped to content area
-        fl_push_clip(0, headerH, w() - sbW, h() - headerH);
 
         fl_font(FL_HELVETICA_BOLD, 13);
         fl_color(textCol);
-        fl_draw("MIDI Output Ports", titlePad, headerH + 12 - sy,
-                w() - 2*titlePad, sectionH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("Instruments", titlePad, instrSectionTopY_ + 12 - sy,
+                w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
-        const int colY = headerH + sectionH;
+        const int chanColY = instrRowsTopY_ - chanColH2;
+        const int nameX    = pad + typeLabelW + chanGap;
+        const int portX    = nameX + instrNameW_ + chanGap;
+        const int midiX    = portX + instrPortW_ + chanGap;
         fl_font(FL_HELVETICA, 10);
         fl_color(subTextCol);
-        fl_draw("PORT NAME", pad, colY - sy,
-                w() - 2*pad, colH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("TYPE",             pad,   chanColY - sy, typeLabelW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("NAME",             nameX, chanColY - sy, instrNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("MIDI OUTPUT PORT", portX, chanColY - sy, instrPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("MIDI CH",          midiX, chanColY - sy, chanMidiW,   chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
         fl_color(dividerCol);
         fl_line_style(FL_SOLID, 1);
-        fl_line(pad, rowsTopY - sy, w() - sbW - pad, rowsTopY - sy);
+        fl_line(pad, instrRowsTopY_ - sy, w() - sbW - pad, instrRowsTopY_ - sy);
         fl_line_style(0);
-
-        // ── Instrument section ───────────────────────────────────────────────
-        if (instrSectionTopY_ > 0) {
-            fl_color(dividerCol);
-            fl_line_style(FL_SOLID, 1);
-            fl_line(0, instrSectionTopY_ - sy, w() - sbW, instrSectionTopY_ - sy);
-            fl_line_style(0);
-
-            fl_font(FL_HELVETICA_BOLD, 13);
-            fl_color(textCol);
-            fl_draw("Instruments", titlePad, instrSectionTopY_ + 12 - sy,
-                    w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-            const int chanColY = instrRowsTopY_ - chanColH2;
-            const int nameX    = pad + typeLabelW + chanGap;
-            const int portX    = nameX + instrNameW_ + chanGap;
-            const int midiX    = portX + instrPortW_ + chanGap;
-            fl_font(FL_HELVETICA, 10);
-            fl_color(subTextCol);
-            fl_draw("TYPE",             pad,   chanColY - sy, typeLabelW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("NAME",             nameX, chanColY - sy, instrNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("MIDI OUTPUT PORT", portX, chanColY - sy, instrPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-            fl_draw("MIDI CH",          midiX, chanColY - sy, chanMidiW,   chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-            fl_color(dividerCol);
-            fl_line_style(FL_SOLID, 1);
-            fl_line(pad, instrRowsTopY_ - sy, w() - sbW - pad, instrRowsTopY_ - sy);
-            fl_line_style(0);
-        }
-
-        fl_pop_clip();
-    }
-
-    // Draw fixed header child (close button) without content-area clip
-    if (full) draw_child(*closeBtn);
-    else      update_child(*closeBtn);
-
-    // Draw content children clipped to content area
-    fl_push_clip(0, headerH, w() - sbW, h() - headerH);
-    for (int i = 0; i < children(); i++) {
-        Fl_Widget* c = child(i);
-        if (c == closeBtn || c == vScrollbar_) continue;
-        if (full) draw_child(*c);
-        else      update_child(*c);
-    }
-    fl_pop_clip();
-
-    // Draw scrollbar without content-area clip restriction
-    if (vScrollbar_ && vScrollbar_->visible()) {
-        if (full) draw_child(*vScrollbar_);
-        else      update_child(*vScrollbar_);
     }
 }

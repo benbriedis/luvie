@@ -1,5 +1,5 @@
 #pragma once
-#include "basePopup.hpp"
+#include "overlayWindow.hpp"
 #include <functional>
 #include <map>
 #include <string>
@@ -11,10 +11,8 @@ class ModernButton;
 class Fl_Box;
 class Fl_Input;
 class Fl_Choice;
-class GridScrollPane;
 
-class OutputsOverlay : public BasePopup {
-    ModernButton* closeBtn        = nullptr;
+class OutputsOverlay : public OverlayWindow {
     ModernButton* addBtn          = nullptr;
     ModernButton* addInstrBtn     = nullptr;
     ModernButton* addDrumInstrBtn = nullptr;
@@ -83,16 +81,9 @@ class OutputsOverlay : public BasePopup {
     int instrNameW_       = 0;
     int instrPortW_       = 0;
 
-    // Scroll state
-    GridScrollPane* vScrollbar_   = nullptr;
-    int             scrollY_      = 0;
-    int             totalContentH_= 0;
-
     void rebuildRows();
     void rebuildInstrumentRows();
     void rebuildPortChoices();
-    void updateScrollbar();
-    void applyScrollY(int newY);
     void syncFromInputs();
 
     std::vector<Fl_Widget*> getFocusOrder() const;
@@ -119,8 +110,9 @@ class OutputsOverlay : public BasePopup {
     static void bankMsbInputCb    (Fl_Widget*, void*);
     static void bankLsbInputCb    (Fl_Widget*, void*);
 
-    void resize(int x, int y, int w, int h) override;
-    void draw() override;
+    void onResized() override;
+    void onScroll(int delta) override;
+    void drawStaticContent(int scrollY, int sbW) override;
     int  handle(int event) override;
 
 public:
@@ -163,5 +155,4 @@ public:
     // Optional: return true if the instrument ID is currently used by a pattern.
     std::function<bool(int instrId)> isInstrumentInUse;
     void refreshInstrumentButtons();
-    std::function<void()> onClose;
 };

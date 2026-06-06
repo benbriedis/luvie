@@ -24,6 +24,7 @@ class NoteContextPopup;
 class MarkerPopup;
 class TrackContextPopup;
 class OutputsOverlay;
+class TransportOverlay;
 
 // Builds and wires the shared Luvie UI layout (tabs, editors, transport bar, popups).
 // Callers create AppWindow, ObservableSong, ObservablePattern, and ITransport,
@@ -81,6 +82,7 @@ public:
     LoopEditor*        loopEd       = nullptr;
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;
+    TransportOverlay*  transportOverlay = nullptr;
 
     void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
                ObservableInstrument* instruments, ITransport* transport);
@@ -96,6 +98,7 @@ private:
     static void importCb    (Fl_Widget*, void* data);
     static void exportCb    (Fl_Widget*, void* data);
     static void outputsCb   (Fl_Widget*, void* data);
+    static void transportCb (Fl_Widget*, void* data);
 
     struct EditorSwitcher : ITimelineObserver {
         LuvieApp* app;

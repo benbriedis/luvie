@@ -22,6 +22,7 @@
 #include "pianorollEditor.hpp"
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
+#include "transportOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
 #include "patternParamGrid.hpp"
@@ -134,6 +135,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     menuBar->add("File/Save As", 0,                nullptr, nullptr, FL_MENU_DIVIDER);
     menuBar->add("File/Import",  0,                nullptr, nullptr);
     menuBar->add("File/Export",  0,                nullptr, nullptr, 0);
+    menuBar->add("View/Transport", 0, nullptr, nullptr, FL_MENU_TOGGLE);
     menuBar->add("View/Outputs", 0, nullptr, nullptr, FL_MENU_TOGGLE);
     window->add(menuBar);
 
@@ -335,6 +337,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         item->callback(importCb, this);
     if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Export")))
         item->callback(exportCb, this);
+    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
+        item->callback(transportCb, this);
     if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
         item->callback(outputsCb, this);
 
@@ -378,6 +382,19 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         }
         window->add(outputsOverlay);
         window->registerPopup(outputsOverlay);
+    }
+
+    // Transport overlay — same footprint as the outputs overlay.
+    {
+        const int oy = menuBarH + 20;
+        const int om = 20;
+        transportOverlay = new TransportOverlay(om, oy, winW - 2*om, window->h() - oy - om);
+        transportOverlay->onClose = [this]() {
+            if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
+                item->clear();
+        };
+        window->add(transportOverlay);
+        window->registerPopup(transportOverlay);
     }
 
     // ---- Resizable chain + minimum size ----
@@ -431,6 +448,17 @@ void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
         app->outputsOverlay->show();
     else
         app->outputsOverlay->hide();
+}
+
+void LuvieApp::transportCb(Fl_Widget* w, void* data) {
+    auto* app  = static_cast<LuvieApp*>(data);
+    auto* item = static_cast<Fl_Menu_Item*>(
+        const_cast<Fl_Menu_Item*>(app->menuBar->find_item("View/Transport")));
+    if (!item || !app->transportOverlay) return;
+    if (item->value())
+        app->transportOverlay->show();
+    else
+        app->transportOverlay->hide();
 }
 
 void LuvieApp::pushInstruments() {
