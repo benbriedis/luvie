@@ -32,6 +32,12 @@ public:
 
     bool open(const char* clientName = "luvie", bool enableMidi = true);
 
+    // Tear down a (possibly dead) JACK client so a fresh open() can reconnect.
+    // Used by the reconnect path after the server has shut down; called on the
+    // UI thread. Closes the client handle, drops the now-invalid MIDI ports and
+    // resets RT-thread state. Safe to call on an already-closed transport.
+    void close();
+
     // Suppress JACK's own console logging (call once before opening). Used to
     // keep the availability poll quiet unless the app is run in verbose mode.
     static void silenceLogging();
@@ -60,6 +66,11 @@ public:
     bool renameMidiPort(const std::string& oldName, const std::string& newName);
 
     std::function<void()> onTransportEvent;
+
+    // Called on the FLTK main thread (marshalled via Fl::awake) when the JACK
+    // server shuts down or zombifies this client. Lets the app drop back to the
+    // availability poll and reconnect when a server reappears.
+    std::function<void()> onShutdown;
 
     // ITimelineObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
@@ -171,6 +182,9 @@ private:
     // ── JACK process callback ─────────────────────────────────────────────────
     static int processCallback(jack_nframes_t nframes, void* arg);
     int process(jack_nframes_t nframes);
+
+    // JACK server-shutdown callback (runs on a JACK-internal thread).
+    static void shutdownThunk(void* arg);
 
     using NamedBuf = std::pair<std::string, void*>;
     void fireNoteEvents (const std::vector<NamedBuf>& namedBufs,

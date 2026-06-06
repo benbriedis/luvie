@@ -185,6 +185,13 @@ int main(int argc, char **argv) {
                 static_cast<Transport*>(data)->syncPlayState();
             }, app.bottomPane);
         };
+        // Server vanished: clear jackUp so a reconnect re-runs this wiring (ports,
+        // instruments, program changes) on the fresh client, and hand off to the
+        // observer to drop back to polling.
+        jackTransport.onShutdown = [&]() {
+            jackUp = false;
+            jackObserver.serverLost();
+        };
         if (connOverlay)
             for (const auto& name : connOverlay->getOutputs())
                 jackTransport.addMidiPort(name);
@@ -364,6 +371,11 @@ int main(int argc, char **argv) {
             nsm.onSave();
         w->hide();
     }, nullptr);
+
+    // Arm FLTK's cross-thread wakeup so Fl::awake() callbacks posted from JACK's
+    // threads (transport events, server-shutdown notification) are delivered to
+    // the main thread.
+    Fl::lock();
 
     window.show(argc, argv);
     return Fl::run();

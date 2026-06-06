@@ -1,5 +1,6 @@
 #include "jackTransport.hpp"
 #include "chords.hpp"
+#include <FL/Fl.H>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -48,6 +49,11 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
 
     jack_set_process_callback(client, processCallback, this);
 
+    // Detect the server going away without polling: JACK invokes this from one
+    // of its own threads, so the thunk only flips an atomic and hands off to the
+    // main thread via Fl::awake.
+    jack_on_shutdown(client, &JackTransport::shutdownThunk, this);
+
     if (jack_activate(client) != 0) {
         fprintf(stderr, "JackTransport: could not activate JACK client\n");
         jack_client_close(client);
@@ -57,6 +63,46 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
 
     jackAlive.store(true);
     return true;
+}
+
+// ── Shutdown handling ─────────────────────────────────────────────────────────
+
+void JackTransport::shutdownThunk(void* arg)
+{
+    // Runs on a JACK-internal thread. The client is already dead here, so we
+    // must not call any JACK functions — just mark the transport down and wake
+    // the main thread to run the (UI-thread) onShutdown handler.
+    auto* self = static_cast<JackTransport*>(arg);
+    self->jackAlive.store(false);
+    self->playing_.store(false);
+    Fl::awake([](void* a) {
+        auto* s = static_cast<JackTransport*>(a);
+        if (s->onShutdown) s->onShutdown();
+    }, self);
+}
+
+void JackTransport::close()
+{
+    // Reached after the server has shut down (client is a zombie) or while
+    // tearing down for reconnect. Free the client handle — JACK requires
+    // jack_client_close() even on a dead client — and drop the MIDI ports,
+    // whose handles belonged to the old client and are now invalid. The fresh
+    // client created by the next open() re-registers them.
+    if (client) {
+        jack_client_close(client);
+        client = nullptr;
+    }
+    {
+        std::lock_guard<std::mutex> lk(portsMutex);
+        midiPorts_.clear();
+    }
+    jackAlive.store(false);
+
+    // Reset RT-thread state so a reconnected client starts clean.
+    activeNotes.clear();
+    lastFrame  = 0;
+    wasPlaying = false;
+    firstCall  = true;
 }
 
 // ── UI-thread setters ─────────────────────────────────────────────────────────

@@ -24,6 +24,13 @@ void JackObserver::stop() {
     if (state_ == State::Polling) setState(State::Down);
 }
 
+void JackObserver::serverLost() {
+    if (!up_) return;          // already down / polling — nothing to tear down
+    up_ = false;
+    jack_->close();            // free the zombie client and its stale ports
+    attempt();                 // retry now; falls through to Polling if still gone
+}
+
 void JackObserver::attempt() {
     if (jack_->open()) {
         up_ = true;

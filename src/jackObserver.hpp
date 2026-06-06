@@ -13,7 +13,9 @@ class JackTransport;
 //   Polling — JACK requested but not yet available; retried once per second.
 //   Up       — JACK is open and ready to use.
 //
-// Once JACK has come up it stays "up" for the life of the process; switching
+// If the server disappears while Up (detected via JackTransport's shutdown
+// callback), serverLost() tears down the dead client and drops back to Polling
+// so the observer reconnects automatically when a server reappears. Switching
 // the UI away from JACK simply stops the observer rather than tearing it down.
 class JackObserver {
 public:
@@ -31,6 +33,11 @@ public:
     // Stop requesting JACK / cancel any in-flight poll.
     void stop();
 
+    // The JACK server went away while we were Up: close the dead client and
+    // resume polling so we reconnect when a server returns. Call on the UI
+    // thread (wired to JackTransport::onShutdown).
+    void serverLost();
+
     State state() const { return state_; }
 
 private:
@@ -41,7 +48,7 @@ private:
 
     JackTransport* jack_;
     State          state_          = State::Down;
-    bool           up_             = false;  // open() has succeeded at least once
+    bool           up_             = false;  // JACK is currently open
     bool           timerScheduled_ = false;
     std::vector<Listener> listeners_;
 };
