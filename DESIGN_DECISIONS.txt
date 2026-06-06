@@ -25,3 +25,15 @@ FOLLOW
 1. At the moment I'm deliberately omitting follow for patterns as it think it would be too jumpy.
 2. In the song editor I'm scolling page by page rather than keep the playhead in the center, 
    which should give a stabler experience I think, and be lighter on the CPU.
+
+TRANSPORT SETTINGS
+==================
+
+The user will almost always want to use the same transport, so save the selection to the project.
+   DONT fallback to "Internal" if Jack is not present.
+   Revert to polling when Jack is selected but the server is not present.
+   Don't hide Jack as a possible transport if the server is not up... that is likely to make starting up fussy
+      and lead to bad settings being saved in projects. The polling loop approach seems to be the best approach.
+   New projects need a "Setup" window to popup, otherwise we're just guessing what the user wants.
+
+

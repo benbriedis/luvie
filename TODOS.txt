@@ -366,19 +366,6 @@ Unstacked:
 
 GOOD STARTING POINT FOR JACK 
 ============================
-1. Create a Transports overlay.
-   List the options:
-      1. Host  - automatically used and fixed when run as plugins.
-	  2. Internal
-	  3. Jack - always displayed and can be selected even if Jack is not yet running (show message in this case)
-	          - poll every second in this case (include this in message)
-			  - transport bar? to be disabled and have a warning message on it.
-
-	The user will USUALLY want to use the same transport, so save the selection in DB.
-	If 'Jack' has been saved in the project it will automatically go into poll mode.
-
-	Place an indicator on the transport bar: Jack/internal/host
-
 2. On the Outputs overlay:
 
    Add a setting: 'Create new connections as: jack/native/...'
