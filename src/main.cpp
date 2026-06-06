@@ -159,9 +159,21 @@ int main(int argc, char **argv) {
         if (!connOverlay) return;
         if (app.songEd) app.songEd->playheadPanicSoftNotes();   // release notes before teardown
         portReg.reconcile(connOverlay->getOutputsFull());
-        if (app.songEd) app.songEd->setPlayheadHasSoftPorts(portReg.anySoft());
+        if (app.songEd) {
+            app.songEd->setPlayheadHasSoftPorts(portReg.anySoft());
+            app.songEd->setPlayheadHasJackPorts(portReg.anyJack());
+        }
         updateJackWanted();
         updateJackWarning();
+    };
+
+    // Tell the song playhead whether the Jack RT engine is the active clock. When it
+    // isn't, the playhead soft-sequences Jack ports too; release held notes first so
+    // none hang across the switch.
+    auto applyClockMode = [&]() {
+        if (!app.songEd) return;
+        app.songEd->playheadPanicSoftNotes();
+        app.songEd->setPlayheadJackClockActive(router.active() == &jackTransport);
     };
 
     // JACK-specific instrument callback: push routings to jackTransport.
@@ -254,6 +266,7 @@ int main(int argc, char **argv) {
             activateJack();
             if (clockIsJack) {
                 router.setActive(&jackTransport);
+                applyClockMode();
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {
                     app.bottomPane->setTransportWaiting(false);
@@ -267,6 +280,7 @@ int main(int argc, char **argv) {
             // it comes up (only relevant when the clock is Jack).
             if (clockIsJack) {
                 router.setActive(&simpleTransport);
+                applyClockMode();
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
                 if (app.bottomPane) {
                     app.bottomPane->setTransportWaiting(true);
@@ -304,6 +318,7 @@ int main(int argc, char **argv) {
                 updateJackWanted();   // ensure JACK is up; Up-listener wires the clock
             } else {
                 router.setActive(&simpleTransport);
+                applyClockMode();
                 updateJackWanted();   // keep JACK only if an output port still needs it
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {

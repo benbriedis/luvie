@@ -71,7 +71,7 @@ void Playhead::tick()
 {
 	if (patternTrack < 0 && transport) {
 		const bool playing   = transport->isPlaying();
-		const bool runChecks = verbose || anySoftPort;
+		const bool runChecks = verbose || anySoftPort || (!jackClock && anyJackPort);
 		if (playing) {
 			float curPos = transport->position();
 			if (loopActive) {
@@ -444,7 +444,12 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 	}
 }
 
-// ── Soft (Native/Debug) output ────────────────────────────────────────────────
+// ── Soft (Native/Debug, plus Jack when it isn't the clock) output ─────────────
+
+bool Playhead::portNeedsSoftSeq(const Port* p) const
+{
+	return p->softSequenced() || (!jackClock && p->backend() == MidiBackend::Jack);
+}
 
 void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
                               float lenBeats, float beatsPerBar, float onBar)
@@ -453,7 +458,7 @@ void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
 	MidiInstrRoute r = instrRoute(instrumentId);
 	if (r.portName.empty()) return;
 	Port* p = portReg->find(r.portName);
-	if (!p || !p->softSequenced()) return;
+	if (!p || !portNeedsSoftSeq(p)) return;
 	int vel = (int)(velocity * 127.0f);
 	vel = std::clamp(vel, 1, 127);
 	p->noteOn(r.channel0, midi, vel);
@@ -467,7 +472,7 @@ void Playhead::emitSoftParam(int instrumentId, int ccNumber, int value)
 	MidiInstrRoute r = instrRoute(instrumentId);
 	if (r.portName.empty()) return;
 	Port* p = portReg->find(r.portName);
-	if (!p || !p->softSequenced()) return;
+	if (!p || !portNeedsSoftSeq(p)) return;
 	if (ccNumber < 0) p->pitchBend(r.channel0, value);
 	else              p->cc(r.channel0, ccNumber, value);
 }

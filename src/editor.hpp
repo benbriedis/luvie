@@ -42,6 +42,8 @@ public:
     void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName = std::move(fn); }
     void setPlayheadPortRegistry(PortRegistry* r)            { playhead.setPortRegistry(r); }
     void setPlayheadHasSoftPorts(bool b)                     { playhead.setHasSoftPorts(b); }
+    void setPlayheadHasJackPorts(bool b)                     { playhead.setHasJackPorts(b); }
+    void setPlayheadJackClockActive(bool b)                  { playhead.setJackClockActive(b); }
     void playheadPanicSoftNotes()                           { playhead.panicSoftNotes(); }
     void setPlayheadSoftRouting(std::function<int(int)> r2m,
                                 std::function<MidiInstrRoute(int)> ir) {

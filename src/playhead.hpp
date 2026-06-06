@@ -34,12 +34,18 @@ class Playhead : public ITimelineObserver {
 
 	// ── Soft (Native/Debug) output, driven from the same crossing logic ──────────
 	PortRegistry* portReg     = nullptr;
-	bool          anySoftPort = false;   // are any non-Jack ports present?
+	bool          anySoftPort = false;   // are any Native/Debug ports present?
+	bool          anyJackPort = false;   // are any Jack ports present?
+	bool          jackClock   = false;   // is the Jack RT engine the active clock?
 	bool          wasPlaying  = false;
 	std::function<int(int row)>             rowToMidi;   // pattern row → MIDI pitch
 	std::function<MidiInstrRoute(int)>      instrRoute;  // instrument id → port/channel
 	struct SoftActiveNote { std::string portName; int channel; int pitch; float offBar; };
 	std::vector<SoftActiveNote> softNotes;
+
+	// A port must be soft-sequenced unless the Jack RT engine is driving it (which
+	// only happens for Jack ports while the Jack clock is active).
+	bool portNeedsSoftSeq(const Port* p) const;
 
 	void emitSoftNoteOn(int instrumentId, int midi, float velocity,
 	                    float lenBeats, float beatsPerBar, float onBar);
@@ -72,6 +78,8 @@ public:
 	void setVerbose(bool v)       { verbose = v; }
 	void setPortRegistry(PortRegistry* r) { portReg = r; }
 	void setHasSoftPorts(bool b)          { anySoftPort = b; }
+	void setHasJackPorts(bool b)          { anyJackPort = b; }
+	void setJackClockActive(bool b)       { jackClock   = b; }
 	void setSoftRouting(std::function<int(int)> r2m,
 	                    std::function<MidiInstrRoute(int)> ir) {
 		rowToMidi  = std::move(r2m);
