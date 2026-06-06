@@ -199,21 +199,32 @@ int main(int argc, char **argv) {
             activateJack();
             router.setActive(&jackTransport);
             if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
-            if (app.bottomPane)       app.bottomPane->syncPlayState();
+            if (app.bottomPane) {
+                app.bottomPane->enableButtons();
+                app.bottomPane->syncPlayState();
+            }
             break;
         case JackObserver::State::Polling:
-            // Keep playing through the internal clock while we wait for JACK.
+            // Waiting for the JACK server: disable the transport controls until
+            // it comes up.
             router.setActive(&simpleTransport);
             if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
+            if (app.bottomPane)       app.bottomPane->disableButtons();
             break;
         case JackObserver::State::Down:
             if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
+            if (app.bottomPane)       app.bottomPane->enableButtons();
             break;
         }
     });
 
     if (app.transportOverlay) {
         app.transportOverlay->onTransportChanged = [&](int index) {
+            // Changing the clock source: stop playback if it's running.
+            if (router.isPlaying()) {
+                router.pause();
+                if (app.bottomPane) app.bottomPane->syncPlayState();
+            }
             // 0 = Host (informational), 1 = Internal, 2 = Jack
             if (index == 2) {
                 jackObserver.start();
@@ -239,6 +250,8 @@ int main(int argc, char **argv) {
             if (app.patternPanel)
                 app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
             applyLoadedOutputs(state);
+            if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
+                app.transportOverlay->setSelection(state.transport);
         }
         return true;
     };
@@ -252,6 +265,7 @@ int main(int argc, char **argv) {
             state.chordType = app.patternPanel->chordType();
             state.sharp     = app.patternPanel->isSharp();
         }
+        if (app.transportOverlay) state.transport = app.transportOverlay->selection();
         collectOutputs(state);
         return saveAppState(state, nsmSessionPath + ".json");
     };
@@ -278,6 +292,8 @@ int main(int argc, char **argv) {
                 if (app.patternPanel)
                     app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
                 applyLoadedOutputs(state);
+                if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
+                    app.transportOverlay->setSelection(state.transport);
             }
         }
 
@@ -306,6 +322,7 @@ int main(int argc, char **argv) {
                 state.chordType = app.patternPanel->chordType();
                 state.sharp     = app.patternPanel->isSharp();
             }
+            if (app.transportOverlay) state.transport = app.transportOverlay->selection();
             collectOutputs(state);
             saveAppState(state, path);
         };

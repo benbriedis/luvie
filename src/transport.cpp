@@ -130,6 +130,14 @@ void Transport::disableButtons()
 	playPauseBtn->redraw();
 }
 
+void Transport::enableButtons()
+{
+	rewindBtn->activate();
+	playPauseBtn->activate();
+	rewindBtn->redraw();
+	playPauseBtn->redraw();
+}
+
 void Transport::setControlTransport(ITransport* ct)
 {
 	controlTransport = ct;

@@ -28,6 +28,7 @@ struct AppState {
     int  rootPitch = 0;
     int  chordType = 0;
     bool sharp     = true;
+    int  transport = -1;  // clock source: 0=Host, 1=Internal, 2=Jack; -1=unset
     std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;
 };

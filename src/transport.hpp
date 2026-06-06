@@ -41,8 +41,10 @@ public:
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;
 
-	// LV2 use: disable buttons until JACK becomes available.
+	// Disable the transport buttons (e.g. while waiting for JACK to start up).
 	void disableButtons();
+	// Re-enable the transport buttons once a clock source is available.
+	void enableButtons();
 	// Enable buttons and route their actions through ct.
 	void setControlTransport(ITransport* ct);
 
