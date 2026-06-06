@@ -25,6 +25,7 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "../src/jackTransport.hpp"
 #include "../src/observableSong.hpp"
 #include "../src/observablePattern.hpp"
+#include "../src/observableInstrument.hpp"
 #include "../src/outputsOverlay.hpp"
 #include "../src/patternPanel.hpp"
 #include "../src/luvieApp.hpp"
@@ -68,11 +69,12 @@ struct LuvieUI {
     LV2_URID                time_speed          = 0;
 
     /* Owned heap objects */
-    AppWindow*          window         = nullptr;
-    ObservableSong*     song           = nullptr;
-    ObservablePattern*  pattern        = nullptr;
-    SimpleTransport*    simpleTransport= nullptr;
-    JackTransport*      jackTransport  = nullptr;
+    AppWindow*            window         = nullptr;
+    ObservableSong*       song           = nullptr;
+    ObservablePattern*    pattern        = nullptr;
+    ObservableInstrument* instruments    = nullptr;
+    SimpleTransport*      simpleTransport= nullptr;
+    JackTransport*        jackTransport  = nullptr;
 
     /* UI layout (owns FLTK widgets via window) */
     LuvieApp            app;
@@ -87,6 +89,7 @@ struct LuvieUI {
         delete jackTransport;
         delete simpleTransport;
         delete pattern;
+        delete instruments;
         delete song;
     }
 
@@ -108,7 +111,7 @@ struct LuvieUI {
                     jackTransport->addMidiPort(name);
                 std::vector<JackTransport::InstrumentRouting> routings;
                 for (const auto& ci : app.outputsOverlay->getInstruments())
-                    routings.push_back({ci.name, ci.portName, ci.midiChannel,
+                    routings.push_back({ci.id, ci.portName, ci.midiChannel,
                                         ci.programNumber, ci.bankMsb, ci.bankLsb});
                 jackTransport->setInstruments(routings);
             }
@@ -140,7 +143,7 @@ static std::string serializeStateToString(LuvieUI* ui)
         for (const auto& name : ui->app.outputsOverlay->getOutputs())
             state.jackOutputs.push_back({name});
         for (const auto& ci : ui->app.outputsOverlay->getInstruments())
-            state.jackInstruments.push_back({ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+            state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                              ci.isDrum, ci.fallbackNoteNames,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
                                              ci.gm1Instrument});
@@ -197,7 +200,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
                 ui->jackTransport->addMidiPort(name);
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
-            instrs.push_back({0, c.name, c.portName, c.midiChannel, c.drumMap,
+            instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument});
         overlay->setInstruments(instrs);
@@ -302,17 +305,16 @@ static LV2UI_Handle instantiate(
     ui->window->end();
 
     /* ---- Timeline + transport ---- */
-    ui->song    = new ObservableSong(120.0f, 4, 4);
-    ui->pattern = new ObservablePattern(ui->song);
-    {
-        int patId = ui->pattern->createPattern(LuvieApp::numPatternBeats);
-        ui->song->addTrack("Pattern 1", patId);
-    }
+    ui->song        = new ObservableSong(120.0f, 4, 4);
+    ui->pattern     = new ObservablePattern(ui->song);
+    ui->instruments = new ObservableInstrument(ui->song);
+    /* build() seeds default instruments + their tracks for an empty session. */
     ui->simpleTransport = new SimpleTransport;
     ui->simpleTransport->setTimeline(ui->song);
 
     /* ---- LuvieApp callbacks ---- */
     ui->app.disableTransportButtons = true;
+    ui->app.pluginMode              = true;
 
     ui->app.onExtraTimelineChange = [ui]() {
         if (!ui->restoringState) sendFullState(ui);
@@ -328,7 +330,7 @@ static LV2UI_Handle instantiate(
     };
 
     /* ---- Build all shared UI ---- */
-    ui->app.build(ui->window, ui->song, ui->pattern, ui->simpleTransport);
+    ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->simpleTransport);
     ui->app.disableSaveMenu(/*save=*/true, /*saveAs=*/true);
 
     /* ---- Wire port management (same as standalone) ---- */
@@ -349,7 +351,7 @@ static LV2UI_Handle instantiate(
         if (ui->jackTransport && ui->app.outputsOverlay) {
             std::vector<JackTransport::InstrumentRouting> routings;
             for (const auto& ci : ui->app.outputsOverlay->getInstruments())
-                routings.push_back({ci.name, ci.portName, ci.midiChannel,
+                routings.push_back({ci.id, ci.portName, ci.midiChannel,
                                     ci.programNumber, ci.bankMsb, ci.bankLsb});
             ui->jackTransport->setInstruments(routings);
         }
@@ -373,6 +375,7 @@ static LV2UI_Handle instantiate(
     }
 
     /* ---- Try to connect to JACK for transport control ---- */
+    JackTransport::silenceLogging();   /* keep the host's console clean */
     ui->tryConnectJack();
 
     /* Return the widget pointer as the LV2UI handle */

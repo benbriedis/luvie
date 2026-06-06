@@ -53,6 +53,7 @@ public:
     // Options — set before calling build()
     bool verbose                            = false;
     bool disableTransportButtons            = false;
+    bool pluginMode                         = false;  // true when hosted as an LV2 plugin
     std::function<std::string(int)> getPitchName;
     std::function<void()>           onExtraSeek;
     std::function<void()>           onExtraParamsChanged;

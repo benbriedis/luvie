@@ -388,7 +388,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     {
         const int oy = menuBarH + 20;
         const int om = 20;
-        transportOverlay = new TransportOverlay(om, oy, winW - 2*om, window->h() - oy - om);
+        transportOverlay = new TransportOverlay(om, oy, winW - 2*om, window->h() - oy - om, pluginMode);
         transportOverlay->onClose = [this]() {
             if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
                 item->clear();

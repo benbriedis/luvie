@@ -23,16 +23,26 @@ JackTransport::~JackTransport()
 
 // ── Open ──────────────────────────────────────────────────────────────────────
 
+static void jackSilentLog(const char*) {}
+
+void JackTransport::silenceLogging()
+{
+    // Route JACK's own console logging to a no-op so the once-per-second
+    // availability poll doesn't spam the terminal with "cannot connect to
+    // server" messages. Call once before opening; skipped in verbose mode.
+    jack_set_error_function(jackSilentLog);
+    jack_set_info_function(jackSilentLog);
+}
+
 bool JackTransport::open(const char* clientName, bool enableMidi)
 {
     midiEnabled = enableMidi;
 
-    jack_status_t status;
-    client = jack_client_open(clientName, JackNullOption, &status);
-    if (!client) {
-        fprintf(stderr, "JackTransport: could not connect to JACK (status 0x%x)\n", status);
+    // JackNoStartServer: connect only to an already-running server. Luvie waits
+    // (polls) for an external JACK server rather than spawning one itself.
+    client = jack_client_open(clientName, JackNoStartServer, nullptr);
+    if (!client)
         return false;
-    }
 
     sampleRate = jack_get_sample_rate(client);
 

@@ -32,6 +32,10 @@ public:
 
     bool open(const char* clientName = "luvie", bool enableMidi = true);
 
+    // Suppress JACK's own console logging (call once before opening). Used to
+    // keep the availability poll quiet unless the app is run in verbose mode.
+    static void silenceLogging();
+
     void setTimeline(ObservableSong* tl);
     void setActivePatterns(ActivePatternSet* aps);
     void setNoteParams(int rootPitch, int chordType);
