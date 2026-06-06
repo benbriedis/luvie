@@ -3,8 +3,29 @@
 
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Widget.H>
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
+#include <functional>
+#include <string>
+
+// Rounded pill on the LHS of the transport bar showing the active clock
+// source. Lightish green when connected; red while waiting for JACK. Double
+// click opens the Transport overlay.
+class TransportIndicator : public Fl_Widget {
+	std::string label;
+	bool        waiting = false;
+
+public:
+	std::function<void()> onDoubleClick;
+
+	TransportIndicator(int x, int y, int w, int h);
+	void setLabel(const std::string& text);
+	void setWaiting(bool w);
+	void draw() override;
+	int  handle(int event) override;
+};
+
 
 class TransportButton : public Fl_Button {
 public:
@@ -25,6 +46,7 @@ public:
 
 
 class Transport : public Fl_Group, public ITimelineObserver {
+	TransportIndicator* indicator;
 	TransportButton*    rewindBtn;
 	TransportButton*    playPauseBtn;
 
@@ -51,6 +73,13 @@ public:
 	// Call from the FLTK main thread (e.g. via Fl::awake) when JACK transport
 	// state or position has changed externally.
 	void syncPlayState();
+
+	// Update the LHS clock-source indicator.
+	void setTransportLabel(const std::string& label);
+	void setTransportWaiting(bool waiting);
+
+	// Fired when the indicator is double clicked (to open the Transport overlay).
+	void setIndicatorDoubleClick(std::function<void()> cb);
 };
 
 #endif

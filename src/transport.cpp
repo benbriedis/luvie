@@ -8,6 +8,85 @@ static constexpr Fl_Color borderColor = 0xCBD5E100;  // slate blue-grey
 static constexpr Fl_Color pressedColor = 0x3B82F600; // blue accent
 static constexpr Fl_Color iconColor = 0x37415100;    // dark slate
 
+static constexpr Fl_Color connectedColor = 0x86EFAC00; // lightish green
+static constexpr Fl_Color waitingColor   = 0xDC262600; // red
+static constexpr Fl_Color connectedText  = 0x14532D00; // dark green
+
+static constexpr int indicatorRadius = 5;
+
+// Filled rounded rectangle with an explicit corner radius (FLTK's rounded box
+// types scale the radius with the widget size, which is too large here).
+static void roundedRectf(int x, int y, int w, int h, int r) {
+	const int d = r * 2;
+	fl_pie(x,         y,         d, d, 90,  180);
+	fl_pie(x + w - d, y,         d, d, 0,   90);
+	fl_pie(x,         y + h - d, d, d, 180, 270);
+	fl_pie(x + w - d, y + h - d, d, d, 270, 360);
+	fl_rectf(x + r, y,     w - d, h);
+	fl_rectf(x,     y + r, w,     h - d);
+}
+
+// Matching rounded-rectangle outline.
+static void roundedRect(int x, int y, int w, int h, int r) {
+	const int d = r * 2;
+	fl_arc(x,         y,         d, d, 90,  180);
+	fl_arc(x + w - d, y,         d, d, 0,   90);
+	fl_arc(x,         y + h - d, d, d, 180, 270);
+	fl_arc(x + w - d, y + h - d, d, d, 270, 360);
+	fl_xyline(x + r, y,         x + w - r - 1);
+	fl_xyline(x + r, y + h - 1, x + w - r - 1);
+	fl_yxline(x,         y + r, y + h - r - 1);
+	fl_yxline(x + w - 1, y + r, y + h - r - 1);
+}
+
+// ---------------------------------------------------------------------------
+
+TransportIndicator::TransportIndicator(int x, int y, int w, int h)
+	: Fl_Widget(x, y, w, h)
+{
+}
+
+void TransportIndicator::setLabel(const std::string& text) {
+	if (label == text) return;
+	label = text;
+	redraw();
+}
+
+void TransportIndicator::setWaiting(bool w) {
+	if (waiting == w) return;
+	waiting = w;
+	redraw();
+}
+
+void TransportIndicator::draw() {
+	Fl_Color bg = waiting ? waitingColor : connectedColor;
+	fl_color(bg);
+	roundedRectf(x(), y(), w(), h(), indicatorRadius);
+
+	fl_color(fl_color_average(bg, FL_BLACK, 0.7f));
+	roundedRect(x(), y(), w(), h(), indicatorRadius);
+
+	fl_color(waiting ? FL_WHITE : connectedText);
+	fl_font(FL_HELVETICA, 11);
+	fl_draw(label.c_str(), x(), y(), w(), h(), FL_ALIGN_CENTER);
+}
+
+int TransportIndicator::handle(int event) {
+	switch (event) {
+	case FL_PUSH:
+		// Claim the click so we receive the following double-click report.
+		if (Fl::event_button() == FL_LEFT_MOUSE) {
+			if (Fl::event_clicks() > 0 && onDoubleClick) {
+				Fl::event_clicks(0);
+				onDoubleClick();
+			}
+			return 1;
+		}
+		break;
+	}
+	return Fl_Widget::handle(event);
+}
+
 // ---------------------------------------------------------------------------
 
 TransportButton::TransportButton(int x, int y, int w, int h, Icon icon, Icon altIcon)
@@ -100,6 +179,9 @@ void Transport::resize(int x, int y, int w, int h)
 	int by = y + (h - rewindBtn->h()) / 2;
 	rewindBtn->position(bx, by);
 	playPauseBtn->position(bx + bw + gap, by);
+
+	int iy = y + (h - indicator->h()) / 2;
+	indicator->position(x + 10, iy);
 }
 
 Transport::~Transport()
@@ -147,6 +229,21 @@ void Transport::setControlTransport(ITransport* ct)
 	playPauseBtn->redraw();
 }
 
+void Transport::setTransportLabel(const std::string& label)
+{
+	indicator->setLabel(label);
+}
+
+void Transport::setTransportWaiting(bool waiting)
+{
+	indicator->setWaiting(waiting);
+}
+
+void Transport::setIndicatorDoubleClick(std::function<void()> cb)
+{
+	indicator->onDoubleClick = std::move(cb);
+}
+
 Transport::Transport(int x, int y, int w, int h, ITransport* t)
 	: Fl_Group(x, y, w, h), transport(t)
 {
@@ -158,6 +255,10 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 	const int totalW  = 2 * btnSize + gap;
 	const int bx      = x + (w - totalW) / 2;
 	const int by      = y + (h - btnSize) / 2;
+
+	const int indW = 58;
+	const int indH = 22;
+	indicator = new TransportIndicator(x + 10, y + (h - indH) / 2, indW, indH);
 
 	rewindBtn = new TransportButton(bx, by, btnSize, btnSize,
 	                                TransportButton::REWIND);

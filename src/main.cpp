@@ -200,6 +200,7 @@ int main(int argc, char **argv) {
             router.setActive(&jackTransport);
             if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
             if (app.bottomPane) {
+                app.bottomPane->setTransportWaiting(false);
                 app.bottomPane->enableButtons();
                 app.bottomPane->syncPlayState();
             }
@@ -209,11 +210,17 @@ int main(int argc, char **argv) {
             // it comes up.
             router.setActive(&simpleTransport);
             if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
-            if (app.bottomPane)       app.bottomPane->disableButtons();
+            if (app.bottomPane) {
+                app.bottomPane->setTransportWaiting(true);
+                app.bottomPane->disableButtons();
+            }
             break;
         case JackObserver::State::Down:
             if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
-            if (app.bottomPane)       app.bottomPane->enableButtons();
+            if (app.bottomPane) {
+                app.bottomPane->setTransportWaiting(false);
+                app.bottomPane->enableButtons();
+            }
             break;
         }
     });
@@ -225,6 +232,11 @@ int main(int argc, char **argv) {
                 router.pause();
                 if (app.bottomPane) app.bottomPane->syncPlayState();
             }
+            if (app.bottomPane) {
+                static const char* names[] = {"Host", "Internal", "Jack"};
+                if (index >= 0 && index < 3)
+                    app.bottomPane->setTransportLabel(names[index]);
+            }
             // 0 = Host (informational), 1 = Internal, 2 = Jack
             if (index == 2) {
                 jackObserver.start();
@@ -232,6 +244,7 @@ int main(int argc, char **argv) {
                 jackObserver.stop();
                 router.setActive(&simpleTransport);
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
+                if (app.bottomPane)       app.bottomPane->setTransportWaiting(false);
             }
         };
         // --test forces the internal clock; otherwise default to JACK.
