@@ -16,8 +16,13 @@
 #include "noteLabels.hpp"
 #include "luvieApp.hpp"
 #include "outputsOverlay.hpp"
+#include "portRegistry.hpp"
+#include "port.hpp"
+#include "playhead.hpp"
+#include "chords.hpp"
 #include "transportOverlay.hpp"
 #include "drumPatternEditor.hpp"
+#include "songEditor.hpp"
 #include "itimelineobserver.hpp"
 #include "nsm.hpp"
 #include "timelineIO.hpp"
@@ -70,6 +75,7 @@ int main(int argc, char **argv) {
     SimpleTransport simpleTransport;
     TransportRouter router;
     JackObserver    jackObserver(&jackTransport);
+    PortRegistry    portReg(&jackTransport);   // owns the live Port objects (Jack/Native/Debug)
     bool            jackUp = false;   // set once JACK has been opened + wired up
 
     simpleTransport.setTimeline(&songTimeline);
@@ -93,19 +99,69 @@ int main(int argc, char **argv) {
                                         app.patternPanel->chordType());
     };
 
+    // Soft (Native/Debug) output routing for the song playhead. Lambdas read live
+    // state at playback time, so they're safe to set before build() populates widgets.
+    app.portRegistry = &portReg;
+    app.rowToMidi = [&app](int row) {
+        return rowToMidi(row, app.patternPanel->rootPitch(), app.patternPanel->chordType());
+    };
+    app.instrRoute = [&app](int instrumentId) -> MidiInstrRoute {
+        if (!app.outputsOverlay) return {};
+        for (const auto& ci : app.outputsOverlay->getInstruments())
+            if (ci.id == instrumentId) return { ci.portName, ci.midiChannel - 1 };
+        return {};
+    };
+
     app.build(&window, &songTimeline, &patternObs, &instrObs, transport);
 
     // --- JACK port management ---------------------------------------------
     OutputsOverlay* connOverlay = app.outputsOverlay;
 
-    // Helper: send program change (+ bank select) for all instruments that have one set.
+    // Debug ports print note names; map a MIDI pitch → e.g. "C4".
+    portReg.debugPitchName = [](int midi) -> std::string {
+        static const char* names[12] = {"C","C#","D","D#","E","F",
+                                         "F#","G","G#","A","A#","B"};
+        if (midi < 0) midi = 0;
+        return std::string(names[midi % 12]) + std::to_string(midi / 12 - 1);
+    };
+
+    // Helper: send program change (+ bank select) for all instruments that have one
+    // set, through whichever backend their port uses.
     auto sendAllProgramChanges = [&]() {
-        if (!jackUp || !connOverlay) return;
+        if (!connOverlay) return;
         for (const auto& ci : connOverlay->getInstruments()) {
             if (ci.programNumber < 0 && ci.bankMsb < 0 && ci.bankLsb < 0) continue;
-            jackTransport.sendProgramChange(ci.portName, ci.midiChannel - 1,
-                                            ci.bankMsb, ci.bankLsb, ci.programNumber);
+            if (Port* p = portReg.find(ci.portName))
+                p->programChange(ci.midiChannel - 1, ci.bankMsb, ci.bankLsb, ci.programNumber);
         }
+    };
+
+    // JACK is "wanted" (observer running) if the clock is Jack OR any port outputs to
+    // Jack. --test skips JACK entirely (per --help).
+    auto updateJackWanted = [&]() {
+        if (testMode) { jackObserver.stop(); return; }
+        bool wantJack = portReg.anyJack();
+        if (app.transportOverlay && app.transportOverlay->selection() == 2) wantJack = true;
+        if (wantJack) jackObserver.start();
+        else          jackObserver.stop();
+    };
+
+    // Red "JACK server not running" line shows while a Jack port exists but JACK is down.
+    auto updateJackWarning = [&]() {
+        if (connOverlay)
+            connOverlay->setJackWarning(portReg.anyJack() &&
+                                        jackObserver.state() != JackObserver::State::Up);
+    };
+
+    // Reconcile the Port set with the overlay, then refresh JACK want/warning state
+    // and tell the song playhead whether any soft (Native/Debug) ports need driving.
+    auto syncPorts = [&]() {
+        if (!connOverlay) return;
+        if (app.songEd) app.songEd->playheadPanicSoftNotes();   // release notes before teardown
+        portReg.reconcile(connOverlay->getOutputsFull());
+        if (app.songEd) app.songEd->setPlayheadHasSoftPorts(portReg.anySoft());
+        updateJackWanted();
+        updateJackWarning();
     };
 
     // JACK-specific instrument callback: push routings to jackTransport.
@@ -119,14 +175,13 @@ int main(int argc, char **argv) {
     };
 
     if (connOverlay) {
-        connOverlay->onPortAdded = [&](const std::string& name) {
-            if (jackUp) jackTransport.addMidiPort(name);
-        };
-        connOverlay->onPortRemoved = [&](const std::string& name) {
-            if (jackUp) jackTransport.removeMidiPort(name);
-        };
+        connOverlay->onPortAdded         = [&](const std::string&) { syncPorts(); };
+        connOverlay->onPortRemoved       = [&](const std::string&) { syncPorts(); };
+        connOverlay->onPortBackendChanged = [&]() { syncPorts(); };
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
-            if (jackUp) jackTransport.renameMidiPort(oldName, newName);
+            portReg.rename(oldName, newName);
+            if (app.onInstrumentsChanged) app.onInstrumentsChanged();
+            updateJackWarning();
         };
         connOverlay->onProgramChanged = [&](const std::string&) {
             if (app.onInstrumentsChanged) app.onInstrumentsChanged();
@@ -134,18 +189,11 @@ int main(int argc, char **argv) {
         };
     }
 
-    // Helper: unregister all current ports, then register ports from the overlay.
+    // Helper: load ports + instruments from a saved state into the overlay and
+    // reconcile the live Port set to match.
     auto applyLoadedOutputs = [&](const AppState& state) {
         if (!connOverlay) return;
-        if (jackUp)
-            for (const auto& name : connOverlay->getOutputs())
-                jackTransport.removeMidiPort(name);
-        std::vector<std::string> names;
-        for (const auto& c : state.jackOutputs) names.push_back(c.portName);
-        connOverlay->setOutputs(names);
-        if (jackUp)
-            for (const auto& name : connOverlay->getOutputs())
-                jackTransport.addMidiPort(name);
+        connOverlay->setOutputs(state.jackOutputs);
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
             instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
@@ -153,6 +201,7 @@ int main(int argc, char **argv) {
                               c.gm1Instrument});
         connOverlay->setInstruments(instrs);
         app.pushInstruments();
+        syncPorts();
         if (app.onInstrumentsChanged) app.onInstrumentsChanged();
         sendAllProgramChanges();
     };
@@ -160,9 +209,7 @@ int main(int argc, char **argv) {
     // Helper: fill jackOutputs and jackInstruments in an AppState from the overlay.
     auto collectOutputs = [&](AppState& state) {
         if (!connOverlay) return;
-        state.jackOutputs.clear();
-        for (const auto& name : connOverlay->getOutputs())
-            state.jackOutputs.push_back({name});
+        state.jackOutputs = connOverlay->getOutputsFull();
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
             state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
@@ -192,44 +239,52 @@ int main(int argc, char **argv) {
             jackUp = false;
             jackObserver.serverLost();
         };
-        if (connOverlay)
-            for (const auto& name : connOverlay->getOutputs())
-                jackTransport.addMidiPort(name);
+        portReg.reregisterJack();   // (re)register Jack ports on the fresh client
         if (app.onInstrumentsChanged) app.onInstrumentsChanged();
         sendAllProgramChanges();
     };
 
-    // React to JACK availability changes from the observer.
+    // React to JACK availability changes from the observer. The clock/transport-UI
+    // effects only apply when the *clock source* is Jack; a Jack output port alone
+    // keeps the observer running (to register ports + warn) without hijacking the clock.
     jackObserver.addListener([&](JackObserver::State s) {
+        bool clockIsJack = app.transportOverlay && app.transportOverlay->selection() == 2;
         switch (s) {
         case JackObserver::State::Up:
             activateJack();
-            router.setActive(&jackTransport);
-            if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
-            if (app.bottomPane) {
-                app.bottomPane->setTransportWaiting(false);
-                app.bottomPane->enableButtons();
-                app.bottomPane->syncPlayState();
+            if (clockIsJack) {
+                router.setActive(&jackTransport);
+                if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
+                if (app.bottomPane) {
+                    app.bottomPane->setTransportWaiting(false);
+                    app.bottomPane->enableButtons();
+                    app.bottomPane->syncPlayState();
+                }
             }
             break;
         case JackObserver::State::Polling:
             // Waiting for the JACK server: disable the transport controls until
-            // it comes up.
-            router.setActive(&simpleTransport);
-            if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
-            if (app.bottomPane) {
-                app.bottomPane->setTransportWaiting(true);
-                app.bottomPane->disableButtons();
+            // it comes up (only relevant when the clock is Jack).
+            if (clockIsJack) {
+                router.setActive(&simpleTransport);
+                if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
+                if (app.bottomPane) {
+                    app.bottomPane->setTransportWaiting(true);
+                    app.bottomPane->disableButtons();
+                }
             }
             break;
         case JackObserver::State::Down:
-            if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
-            if (app.bottomPane) {
-                app.bottomPane->setTransportWaiting(false);
-                app.bottomPane->enableButtons();
+            if (clockIsJack) {
+                if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
+                if (app.bottomPane) {
+                    app.bottomPane->setTransportWaiting(false);
+                    app.bottomPane->enableButtons();
+                }
             }
             break;
         }
+        updateJackWarning();
     });
 
     if (app.transportOverlay) {
@@ -246,17 +301,24 @@ int main(int argc, char **argv) {
             }
             // 0 = Host (informational), 1 = Internal, 2 = Jack
             if (index == 2) {
-                jackObserver.start();
+                updateJackWanted();   // ensure JACK is up; Up-listener wires the clock
             } else {
-                jackObserver.stop();
                 router.setActive(&simpleTransport);
+                updateJackWanted();   // keep JACK only if an output port still needs it
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
-                if (app.bottomPane)       app.bottomPane->setTransportWaiting(false);
+                if (app.bottomPane) {
+                    app.bottomPane->setTransportWaiting(false);
+                    app.bottomPane->enableButtons();   // were disabled while polling JACK
+                }
             }
+            updateJackWarning();
         };
         // --test forces the internal clock; otherwise default to JACK.
         app.transportOverlay->setSelection(testMode ? 1 : 2);
     }
+
+    // Initial reconcile of the default port set (and JACK want/warning state).
+    syncPorts();
 
     // --- NSM session management -------------------------------------------
     static NsmClient nsm;

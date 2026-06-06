@@ -257,7 +257,7 @@ static Timeline timelineFromJson(const json& j) {
 std::string appStateToJsonString(const AppState& state) {
     json jconns = json::array();
     for (const auto& c : state.jackOutputs)
-        jconns.push_back({{"portName", c.portName}});
+        jconns.push_back({{"portName", c.portName}, {"backend", backendToString(c.backend)}});
     json jinstrs = json::array();
     for (const auto& c : state.jackInstruments) {
         json jmap;
@@ -297,7 +297,8 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     if (j.contains("timeline"))
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackOutputs", json::array()))
-        state.jackOutputs.push_back({jc.value("portName", "")});
+        state.jackOutputs.push_back({jc.value("portName", ""),
+                                     backendFromString(jc.value("backend", "jack"))});
     auto instrArray = j.contains("jackInstruments") ? j.value("jackInstruments", json::array())
                                                     : j.value("jackChannels",    json::array());
     for (const auto& jc : instrArray) {

@@ -14,6 +14,8 @@ class ObservableInstrument;
 
 class AppWindow;
 class ModernTabs;
+class SongEditor;
+class PortRegistry;
 class PatternEditor;
 class DrumPatternEditor;
 class PianorollEditor;
@@ -55,6 +57,10 @@ public:
     bool disableTransportButtons            = false;
     bool pluginMode                         = false;  // true when hosted as an LV2 plugin
     std::function<std::string(int)> getPitchName;
+    // Soft (Native/Debug) MIDI output routing for the song playhead.
+    PortRegistry*                      portRegistry = nullptr;
+    std::function<int(int)>            rowToMidi;    // pattern row → MIDI pitch
+    std::function<MidiInstrRoute(int)> instrRoute;   // instrument id → port/channel
     std::function<void()>           onExtraSeek;
     std::function<void()>           onExtraParamsChanged;
     std::function<void()>           onExtraTimelineChange;
@@ -80,6 +86,7 @@ public:
     DrumPatternEditor* drumEd       = nullptr;
     PianorollEditor*   pianorollEd  = nullptr;
     PatternPanel*      patternPanel = nullptr;
+    SongEditor*        songEd       = nullptr;
     LoopEditor*        loopEd       = nullptr;
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;

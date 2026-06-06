@@ -40,6 +40,13 @@ public:
     void setPlayheadLoopMode(bool a)                         { playhead.setLoopActive(a); }
     void setVerbose(bool v)                                  { playhead.setVerbose(v); }
     void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName = std::move(fn); }
+    void setPlayheadPortRegistry(PortRegistry* r)            { playhead.setPortRegistry(r); }
+    void setPlayheadHasSoftPorts(bool b)                     { playhead.setHasSoftPorts(b); }
+    void playheadPanicSoftNotes()                           { playhead.panicSoftNotes(); }
+    void setPlayheadSoftRouting(std::function<int(int)> r2m,
+                                std::function<MidiInstrRoute(int)> ir) {
+        playhead.setSoftRouting(std::move(r2m), std::move(ir));
+    }
 };
 
 #endif

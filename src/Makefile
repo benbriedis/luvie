@@ -12,13 +12,16 @@ JACK_LIBS   := $(shell pkg-config --libs   jack 2>/dev/null)
 LO_CFLAGS   := $(shell pkg-config --cflags liblo 2>/dev/null)
 LO_LIBS     := $(shell pkg-config --libs   liblo 2>/dev/null)
 
-CXXFLAGS = $(FLTK_CXXFLAGS) $(JACK_CFLAGS) $(LO_CFLAGS) -std=c++23 -g -fPIC -MMD -MP -Imodern -I.
-LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS) $(LO_LIBS)
+ALSA_CFLAGS := $(shell pkg-config --cflags alsa 2>/dev/null)
+ALSA_LIBS   := $(shell pkg-config --libs   alsa 2>/dev/null)
+
+CXXFLAGS = $(FLTK_CXXFLAGS) $(JACK_CFLAGS) $(LO_CFLAGS) $(ALSA_CFLAGS) -std=c++23 -g -fPIC -MMD -MP -Imodern -I.
+LDFLAGS  = $(FLTK_LDFLAGS) $(JACK_LIBS) $(LO_LIBS) $(ALSA_LIBS)
 
 BUILDDIR = build
 TARGET   = $(BUILDDIR)/luvie
 
-SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp basePatternEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp trackControls.cpp noteContextPopup.cpp patternInstanceContextPopup.cpp modern/modernTabs.cpp modern/cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp jackObserver.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableSong.cpp observablePattern.cpp observableInstrument.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp
+SRCS = main.cpp appWindow.cpp editor.cpp songEditor.cpp basePatternEditor.cpp patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp trackControls.cpp noteContextPopup.cpp patternInstanceContextPopup.cpp modern/modernTabs.cpp modern/cursors.cpp transport.cpp simpleTransport.cpp jackTransport.cpp jackObserver.cpp playhead.cpp markerPopup.cpp markerRuler.cpp observableSong.cpp observablePattern.cpp observableInstrument.cpp activePatternSet.cpp patternPanel.cpp inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp jackPort.cpp alsaPort.cpp debugPort.cpp portRegistry.cpp
 
 OBJS     = $(SRCS:%.cpp=$(BUILDDIR)/%.o)
 DEPS     = $(SRCS:%.cpp=$(BUILDDIR)/%.d)

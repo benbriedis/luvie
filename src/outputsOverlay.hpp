@@ -1,5 +1,7 @@
 #pragma once
 #include "overlayWindow.hpp"
+#include "midiBackend.hpp"
+#include "timelineIO.hpp"
 #include <functional>
 #include <map>
 #include <string>
@@ -24,10 +26,12 @@ class OutputsOverlay : public OverlayWindow {
     struct Output {
         int id;
         std::string portName;
+        MidiBackend backend = MidiBackend::Jack;
     };
     struct RowWidgets {
-        Fl_Input*     input        = nullptr;
-        ModernButton* deleteBtn    = nullptr;
+        Fl_Input*     input         = nullptr;
+        Fl_Choice*    backendChoice = nullptr;
+        ModernButton* deleteBtn     = nullptr;
         std::string   committedName;
     };
 
@@ -75,6 +79,8 @@ class OutputsOverlay : public OverlayWindow {
     std::vector<Instrument>    instruments_;
     std::vector<InstrumentRow> instrRows_;
 
+    bool jackWarning_ = false;  // draw the red "JACK server not running" line
+
     // Layout state (recomputed by rebuildRows / rebuildInstrumentRows)
     int instrSectionTopY_ = 0;
     int instrRowsTopY_    = 0;
@@ -94,6 +100,7 @@ class OutputsOverlay : public OverlayWindow {
     std::string nextNumberedInstrName(bool isDrum) const;
 
     static void inputCb         (Fl_Widget*, void*);
+    static void backendChoiceCb (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
     static void instrNameCb     (Fl_Widget*, void*);
     static void instrDeleteCb   (Fl_Widget*, void*);
@@ -120,9 +127,14 @@ public:
     void show() override;
     void hide() override;
 
-    // Port API (unchanged)
+    // Port API
     void setOutputs(const std::vector<std::string>& portNames);
+    void setOutputs(const std::vector<JackOutput>& ports);
     std::vector<std::string> getOutputs() const;
+    std::vector<JackOutput>  getOutputsFull() const;  // names + backends
+
+    // Show/hide the red "JACK server not running" warning under the title.
+    void setJackWarning(bool show);
 
     // Instrument API
     struct InstrumentInfo {
@@ -146,6 +158,8 @@ public:
     std::function<void(const std::string& name)>                                onPortAdded;
     std::function<void(const std::string& name)>                                onPortRemoved;
     std::function<void(const std::string& oldName, const std::string& newName)> onPortRenamed;
+    // Fired when any port's backend (Jack/Native/Debug) changes; main re-syncs the port set.
+    std::function<void()>                                                       onPortBackendChanged;
 
     // Fired whenever the instruments list or any instrument's fields change.
     std::function<void()> onInstrumentsChanged;

@@ -1,11 +1,13 @@
 #pragma once
 #include "timeline.hpp"
+#include "midiBackend.hpp"
 #include <map>
 #include <string>
 #include <vector>
 
 struct JackOutput {
-    std::string portName; // name of our registered JACK output port
+    std::string portName; // name of our registered MIDI output port
+    MidiBackend backend = MidiBackend::Jack;  // where the port sends (Jack/Native/Debug)
 };
 
 struct JackInstrument {

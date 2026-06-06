@@ -25,6 +25,8 @@ static constexpr int addBtnW  = 150;
 static constexpr int addBtnPad= 10;
 static constexpr int pad      = 16;
 static constexpr int delBtnSz = 26;
+static constexpr int backendW = 90;   // per-port Jack/Native/Debug dropdown
+static constexpr int backendGap = 8;
 
 static constexpr int chanSecH    = 44;
 static constexpr int chanColH2   = 22;
@@ -273,11 +275,33 @@ void OutputsOverlay::setOutputs(const std::vector<std::string>& portNames) {
     rebuildRows();
 }
 
+void OutputsOverlay::setOutputs(const std::vector<JackOutput>& ports) {
+    outputs_.clear();
+    for (const auto& p : ports)
+        if (!p.portName.empty()) outputs_.push_back({nextPortId_++, p.portName, p.backend});
+    if (outputs_.empty())
+        outputs_.push_back({nextPortId_++, "midi_out_1"});
+    rebuildRows();
+}
+
 std::vector<std::string> OutputsOverlay::getOutputs() const {
     std::vector<std::string> result;
     for (const auto& c : outputs_)
         result.push_back(c.portName);
     return result;
+}
+
+std::vector<JackOutput> OutputsOverlay::getOutputsFull() const {
+    std::vector<JackOutput> result;
+    for (const auto& c : outputs_)
+        result.push_back({c.portName, c.backend});
+    return result;
+}
+
+void OutputsOverlay::setJackWarning(bool show) {
+    if (jackWarning_ == show) return;
+    jackWarning_ = show;
+    redraw();
 }
 
 void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
@@ -368,12 +392,13 @@ void OutputsOverlay::syncFromInputs() {
 
 void OutputsOverlay::rebuildRows() {
     for (auto& row : rows_) {
-        if (row.input)     { remove(row.input);     Fl::delete_widget(row.input); }
-        if (row.deleteBtn) { remove(row.deleteBtn); Fl::delete_widget(row.deleteBtn); }
+        if (row.input)         { remove(row.input);         Fl::delete_widget(row.input); }
+        if (row.backendChoice) { remove(row.backendChoice); Fl::delete_widget(row.backendChoice); }
+        if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
     }
     rows_.clear();
 
-    const int inputW = w() - scrollbarW - 2*pad - delBtnSz - 8;
+    const int inputW = w() - scrollbarW - 2*pad - delBtnSz - 8 - backendW - backendGap;
     int y = rowsTopY;
 
     begin();
@@ -386,6 +411,20 @@ void OutputsOverlay::rebuildRows() {
         inp->textsize(12);
         inp->value(outputs_[i].portName.c_str());
         inp->callback(inputCb, this);
+
+        const int backendX = pad + inputW + backendGap;
+        auto* be = new ModernChoice(backendX, iy, backendW, inputH);
+        be->color(inputBgCol);
+        be->labelcolor(textCol);
+        be->textsize(12);
+        be->setBorderColor(borderCol);
+        be->setArrowColor(subTextCol);
+        be->setHoverColor(0xF3F4F600);
+        be->add("Jack");
+        be->add("Native");
+        be->add("Debug");
+        be->value(static_cast<int>(outputs_[i].backend));
+        be->callback(backendChoiceCb, this);
 
         auto* del = new ModernButton(
             w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2 - scrollY_,
@@ -401,7 +440,7 @@ void OutputsOverlay::rebuildRows() {
             [&](const Instrument& instr){ return instr.portName == pname; });
         if (referenced) del->deactivate();
 
-        rows_.push_back({inp, del, outputs_[i].portName});
+        rows_.push_back({inp, be, del, outputs_[i].portName});
         y += rowH;
     }
     end();
@@ -696,7 +735,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 void OutputsOverlay::onScroll(int delta) {
     auto mv = [&](Fl_Widget* wp) { if (wp) wp->position(wp->x(), wp->y() + delta); };
 
-    for (auto& row : rows_) { mv(row.input); mv(row.deleteBtn); }
+    for (auto& row : rows_) { mv(row.input); mv(row.backendChoice); mv(row.deleteBtn); }
     mv(addBtn);
 
     for (auto& row : instrRows_) {
@@ -756,6 +795,18 @@ void OutputsOverlay::inputCb(Fl_Widget* w, void* d) {
             if (instr.portName == oldName) instr.portName = newName;
         if (self->onPortRenamed) self->onPortRenamed(oldName, newName);
         self->rebuildPortChoices();
+        return;
+    }
+}
+
+void OutputsOverlay::backendChoiceCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->rows_.size(); i++) {
+        if (w != self->rows_[i].backendChoice) continue;
+        int idx = static_cast<Fl_Choice*>(w)->value();
+        if (idx < 0) return;
+        self->outputs_[i].backend = static_cast<MidiBackend>(idx);
+        if (self->onPortBackendChanged) self->onPortBackendChanged();
         return;
     }
 }
@@ -986,7 +1037,8 @@ void OutputsOverlay::bankLsbInputCb(Fl_Widget* w, void* d) {
 std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
     std::vector<Fl_Widget*> order;
     for (const auto& row : rows_) {
-        if (row.input && row.input->active())     order.push_back(row.input);
+        if (row.input && row.input->active())         order.push_back(row.input);
+        if (row.backendChoice && row.backendChoice->active()) order.push_back(row.backendChoice);
         if (row.deleteBtn && row.deleteBtn->active()) order.push_back(row.deleteBtn);
     }
     order.push_back(addBtn);
@@ -1034,8 +1086,15 @@ int OutputsOverlay::handle(int event) {
 void OutputsOverlay::drawStaticContent(int sy, int sbW) {
     fl_font(FL_HELVETICA_BOLD, 13);
     fl_color(textCol);
-    fl_draw("MIDI Output Ports", titlePad, headerH + 12 - sy,
-            w() - 2*titlePad, sectionH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    fl_draw("MIDI Output Ports", titlePad, headerH + 10 - sy,
+            w() - 2*titlePad, 16, FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+
+    if (jackWarning_) {
+        fl_font(FL_HELVETICA, 11);
+        fl_color(delRedCol);
+        fl_draw("JACK server not running", titlePad, headerH + 28 - sy,
+                w() - 2*titlePad, 14, FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
+    }
 
     const int colY = headerH + sectionH;
     fl_font(FL_HELVETICA, 10);

@@ -60,6 +60,10 @@ public:
     void sendProgramChange(const std::string& portName, int midiCh0,
                            int bankMsb, int bankLsb, int program);
 
+    // Queue a raw MIDI message (1-3 bytes) to be written to the named port on the
+    // next RT cycle. Thread-safe; called from the UI thread (e.g. by JackPort).
+    void enqueue(const std::string& portName, const uint8_t* data, int len);
+
     // MIDI port management — call from UI thread.
     bool addMidiPort(const std::string& name);
     bool removeMidiPort(const std::string& name);

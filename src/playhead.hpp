@@ -7,6 +7,16 @@
 #include <FL/Fl_Widget.H>
 #include <functional>
 #include <string>
+#include <vector>
+
+class Port;
+class PortRegistry;
+
+// Routing for an instrument's soft (non-Jack) output: which port + 0-based channel.
+struct MidiInstrRoute {
+    std::string portName;
+    int         channel0 = 0;
+};
 
 class Playhead : public ITimelineObserver {
 	ITransport*         transport    = nullptr;
@@ -21,6 +31,21 @@ class Playhead : public ITimelineObserver {
 	bool  loopActive   = false;
 	float lastPosition = 0.0f;
 	std::function<bool(int)> loopEnabledFn;
+
+	// ── Soft (Native/Debug) output, driven from the same crossing logic ──────────
+	PortRegistry* portReg     = nullptr;
+	bool          anySoftPort = false;   // are any non-Jack ports present?
+	bool          wasPlaying  = false;
+	std::function<int(int row)>             rowToMidi;   // pattern row → MIDI pitch
+	std::function<MidiInstrRoute(int)>      instrRoute;  // instrument id → port/channel
+	struct SoftActiveNote { std::string portName; int channel; int pitch; float offBar; };
+	std::vector<SoftActiveNote> softNotes;
+
+	void emitSoftNoteOn(int instrumentId, int midi, float velocity,
+	                    float lenBeats, float beatsPerBar, float onBar);
+	void emitSoftParam (int instrumentId, int ccNumber, int value);
+	void flushSoftNoteOffs(float curPos);
+	void allSoftNotesOff();
 
 	static void timerCb(void* data);
 	void tick();
@@ -45,6 +70,16 @@ public:
 	void setActivePatterns(ActivePatternSet* a) { aps = a; }
 	void setOwner(Fl_Widget* w)   { owner   = w; }
 	void setVerbose(bool v)       { verbose = v; }
+	void setPortRegistry(PortRegistry* r) { portReg = r; }
+	void setHasSoftPorts(bool b)          { anySoftPort = b; }
+	void setSoftRouting(std::function<int(int)> r2m,
+	                    std::function<MidiInstrRoute(int)> ir) {
+		rowToMidi  = std::move(r2m);
+		instrRoute = std::move(ir);
+	}
+	// Release all held soft notes; call before the Port set is reconciled so notes
+	// don't hang when a port is destroyed or changes backend.
+	void panicSoftNotes() { allSoftNotesOff(); }
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
 	void setPatternTrack(int track) { patternTrack = track; }
 	void setNumCols(int n)        { numCols = n; }

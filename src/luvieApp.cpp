@@ -177,6 +177,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     auto* og2 = new SongEditor(0, off + tabBarH + 2*markerRulerH, winW,
                                10, 60, 45, 60, 0.25, *p2);
+    songEd = og2;
     tab1->add(og2);
     tab1->resizable(og2);
     tabs->add(*tab1);
@@ -265,6 +266,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (getPitchName)
             og2->setPitchName(getPitchName);
     }
+    // Soft (Native/Debug) MIDI output: drive non-Jack ports from the song playhead.
+    og2->setPlayheadPortRegistry(portRegistry);
+    if (rowToMidi || instrRoute)
+        og2->setPlayheadSoftRouting(rowToMidi, instrRoute);
 
     // ---- Wire up active pattern set ----
     loopEd->setActivePatterns(&aps);

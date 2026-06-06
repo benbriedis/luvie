@@ -1,4 +1,7 @@
 #include "playhead.hpp"
+#include "port.hpp"
+#include "portRegistry.hpp"
+#include "chords.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -7,6 +10,7 @@
 
 static constexpr Fl_Color headColor     = 0xEF444400;  // red
 static constexpr Fl_Color headColorDim  = 0xD1D5DB00;  // light grey
+static constexpr float    drumNoteLen   = 0.1f;        // beats (matches jackTransport)
 
 Playhead::Playhead(int numCols, int colWidth)
 	: numCols(numCols), colWidth(colWidth)
@@ -66,28 +70,40 @@ void Playhead::setLoopActive(bool a, std::function<bool(int)> enabledFn)
 void Playhead::tick()
 {
 	if (patternTrack < 0 && transport) {
-		if (transport->isPlaying()) {
+		const bool playing   = transport->isPlaying();
+		const bool runChecks = verbose || anySoftPort;
+		if (playing) {
 			float curPos = transport->position();
 			if (loopActive) {
-				if (verbose && obsTl && curPos >= lastPosition)
-					checkLoopVerboseNotes(lastPosition, curPos);
+				if (curPos >= lastPosition) {
+					if (runChecks && obsTl) checkLoopVerboseNotes(lastPosition, curPos);
+				} else {
+					allSoftNotesOff();   // loop wrapped — silence anything still on
+				}
 			} else {
 				if (aps && obsTl) aps->sync(*obsTl, curPos);
-				if (verbose && obsTl && curPos >= lastPosition) {
-					checkVerboseNotes(lastPosition, curPos);
-					checkVerboseSongParams(lastPosition, curPos);
+				if (curPos >= lastPosition) {
+					if (runChecks && obsTl) {
+						checkVerboseNotes(lastPosition, curPos);
+						checkVerboseSongParams(lastPosition, curPos);
+					}
+				} else {
+					allSoftNotesOff();   // seeked backward
 				}
 				if (curPos >= (float)numCols) {
 					transport->pause();
 					if (onEndReached) onEndReached();
 				}
 			}
+			flushSoftNoteOffs(curPos);
 			lastPosition = curPos;
 		} else {
+			if (wasPlaying) allSoftNotesOff();   // stopped — release held notes
 			float curPos = transport->position();
 			if (aps && obsTl && !loopActive) aps->sync(*obsTl, curPos);
 			lastPosition = curPos;
 		}
+		wasPlaying = playing;
 	} else if (transport) {
 		lastPosition = transport->position();
 	}
@@ -103,12 +119,17 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;
 		std::string    label;
+		int            instrumentId = 0;
 		for (const auto& p : tl.patterns)
 			if (p.id == patId) { pat = &p; break; }
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		if (pat->notes.empty() && pat->drumNotes.empty() && pat->paramLanes.empty()) continue;
 		for (const auto& track : tl.tracks)
-			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = tl.instrumentName(track.instrumentId); break; }
+			if (!track.lanes.empty() && track.lanes[0].patternId == patId) {
+				label = tl.instrumentName(track.instrumentId);
+				instrumentId = track.instrumentId;
+				break;
+			}
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
@@ -126,10 +147,15 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
-				std::string name = pitchName ? pitchName(note.row)
-				                             : std::to_string(note.row);
-				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
-				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
+				if (verbose) {
+					std::string name = pitchName ? pitchName(note.row)
+					                             : std::to_string(note.row);
+					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
+					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
+				}
+				if (rowToMidi)
+					emitSoftNoteOn(instrumentId, rowToMidi(note.row), note.velocity,
+					               note.length, beatsPerBar, songBar);
 			}
 		}
 
@@ -146,8 +172,11 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
 					int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
-					printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
-					       bar, beat, label.c_str(), dn.note, dn.beat);
+					if (verbose)
+						printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
+						       bar, beat, label.c_str(), dn.note, dn.beat);
+					emitSoftNoteOn(instrumentId, dn.note, dn.velocity,
+					               drumNoteLen, beatsPerBar, songBar);
 				}
 			}
 		}
@@ -161,8 +190,10 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
-				printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
-				       bar, beat, label.c_str(), lane.type.c_str(), value);
+				if (verbose)
+					printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
+					       bar, beat, label.c_str(), lane.type.c_str(), value);
+				emitSoftParam(instrumentId, ccForType(lane.type), value);
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
 				checkFire(lane.points[i].beat, lane.points[i].value);
@@ -286,11 +317,16 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;
 		std::string    label;
+		int            instrumentId = 0;
 		for (const auto& p : tl.patterns)
 			if (p.id == patId) { pat = &p; break; }
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		for (const auto& track : tl.tracks)
-			if (!track.lanes.empty() && track.lanes[0].patternId == patId) { label = tl.instrumentName(track.instrumentId); break; }
+			if (!track.lanes.empty() && track.lanes[0].patternId == patId) {
+				label = tl.instrumentName(track.instrumentId);
+				instrumentId = track.instrumentId;
+				break;
+			}
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
@@ -308,9 +344,14 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
-				std::string name = pitchName ? pitchName(note.row) : std::to_string(note.row);
-				printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
-				       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
+				if (verbose) {
+					std::string name = pitchName ? pitchName(note.row) : std::to_string(note.row);
+					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
+					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
+				}
+				if (rowToMidi)
+					emitSoftNoteOn(instrumentId, rowToMidi(note.row), note.velocity,
+					               note.length, beatsPerBar, songBar);
 			}
 		}
 
@@ -327,8 +368,11 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
 					int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
-					printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
-					       bar, beat, label.c_str(), dn.note, dn.beat);
+					if (verbose)
+						printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
+						       bar, beat, label.c_str(), dn.note, dn.beat);
+					emitSoftNoteOn(instrumentId, dn.note, dn.velocity,
+					               drumNoteLen, beatsPerBar, songBar);
 				}
 			}
 		}
@@ -342,8 +386,10 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
-				printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
-				       bar, beat, label.c_str(), lane.type.c_str(), value);
+				if (verbose)
+					printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
+					       bar, beat, label.c_str(), lane.type.c_str(), value);
+				emitSoftParam(instrumentId, ccForType(lane.type), value);
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
 				checkFire(lane.points[i].beat, lane.points[i].value);
@@ -374,6 +420,7 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 		for (int i = 0; i < (int)lane.points.size(); i++) {
 			auto report = [&](float barPos, int value) {
 				if (barPos < prevPos || barPos >= curPos) return;
+				if (!verbose) return;   // song-level soft output not yet routed
 				int bar = (int)barPos + 1;
 				printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
 				       bar, lane.type.c_str(), value);
@@ -395,6 +442,55 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 			}
 		}
 	}
+}
+
+// ── Soft (Native/Debug) output ────────────────────────────────────────────────
+
+void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
+                              float lenBeats, float beatsPerBar, float onBar)
+{
+	if (!portReg || !instrRoute) return;
+	MidiInstrRoute r = instrRoute(instrumentId);
+	if (r.portName.empty()) return;
+	Port* p = portReg->find(r.portName);
+	if (!p || !p->softSequenced()) return;
+	int vel = (int)(velocity * 127.0f);
+	vel = std::clamp(vel, 1, 127);
+	p->noteOn(r.channel0, midi, vel);
+	float offBar = onBar + (beatsPerBar > 0.0f ? lenBeats / beatsPerBar : 0.0f);
+	softNotes.push_back({r.portName, r.channel0, midi, offBar});
+}
+
+void Playhead::emitSoftParam(int instrumentId, int ccNumber, int value)
+{
+	if (!portReg || !instrRoute) return;
+	MidiInstrRoute r = instrRoute(instrumentId);
+	if (r.portName.empty()) return;
+	Port* p = portReg->find(r.portName);
+	if (!p || !p->softSequenced()) return;
+	if (ccNumber < 0) p->pitchBend(r.channel0, value);
+	else              p->cc(r.channel0, ccNumber, value);
+}
+
+void Playhead::flushSoftNoteOffs(float curPos)
+{
+	for (auto it = softNotes.begin(); it != softNotes.end(); ) {
+		if (it->offBar <= curPos) {
+			if (Port* p = portReg ? portReg->find(it->portName) : nullptr)
+				p->noteOff(it->channel, it->pitch);
+			it = softNotes.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+void Playhead::allSoftNotesOff()
+{
+	if (portReg)
+		for (const auto& n : softNotes)
+			if (Port* p = portReg->find(n.portName)) p->noteOff(n.channel, n.pitch);
+	softNotes.clear();
 }
 
 void Playhead::seek(int mouseX, int rulerX)

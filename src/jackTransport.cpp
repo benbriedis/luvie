@@ -130,21 +130,31 @@ void JackTransport::setInstruments(const std::vector<InstrumentRouting>& routing
     rebuildSnapshot();
 }
 
+void JackTransport::enqueue(const std::string& portName, const uint8_t* data, int len)
+{
+    if (!client || !midiEnabled || len < 1 || len > 3) return;
+    PendingMsg m{portName, {0, 0, 0}, len};
+    for (int i = 0; i < len; i++) m.data[i] = data[i];
+    std::lock_guard<std::mutex> lk(pendingMutex_);
+    pendingMsgs_.push_back(std::move(m));
+}
+
 void JackTransport::sendProgramChange(const std::string& portName, int midiCh0,
                                       int bankMsb, int bankLsb, int program)
 {
-    if (!client || !midiEnabled) return;
     uint8_t ch = static_cast<uint8_t>(midiCh0 & 0x0F);
-    std::vector<PendingMsg> msgs;
-    if (bankMsb >= 0)
-        msgs.push_back({portName, {static_cast<uint8_t>(0xB0 | ch), 0,  static_cast<uint8_t>(bankMsb)}, 3});
-    if (bankLsb >= 0)
-        msgs.push_back({portName, {static_cast<uint8_t>(0xB0 | ch), 32, static_cast<uint8_t>(bankLsb)}, 3});
-    if (program >= 0)
-        msgs.push_back({portName, {static_cast<uint8_t>(0xC0 | ch), static_cast<uint8_t>(program), 0}, 2});
-    if (msgs.empty()) return;
-    std::lock_guard<std::mutex> lk(pendingMutex_);
-    for (auto& m : msgs) pendingMsgs_.push_back(std::move(m));
+    if (bankMsb >= 0) {
+        uint8_t m[3] = {static_cast<uint8_t>(0xB0 | ch), 0,  static_cast<uint8_t>(bankMsb)};
+        enqueue(portName, m, 3);
+    }
+    if (bankLsb >= 0) {
+        uint8_t m[3] = {static_cast<uint8_t>(0xB0 | ch), 32, static_cast<uint8_t>(bankLsb)};
+        enqueue(portName, m, 3);
+    }
+    if (program >= 0) {
+        uint8_t m[2] = {static_cast<uint8_t>(0xC0 | ch), static_cast<uint8_t>(program)};
+        enqueue(portName, m, 2);
+    }
 }
 
 void JackTransport::setActivePatterns(ActivePatternSet* a)
@@ -204,10 +214,6 @@ void JackTransport::rebuildSnapshot()
     }
 
     // Build per-track note data.
-    int chordSize = chordDefs[chordType].size;
-    int rootSemi  = (rootPitch + 9) % 12;
-    int rootMidi0 = 12 + rootSemi;
-
     auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx) {
         is.portName    = "";
         is.midiChannel = trackIdx % 16;
@@ -230,23 +236,10 @@ void JackTransport::rebuildSnapshot()
         } else {
             for (const Note& note : pat->notes) {
                 if (note.disabled) continue;
-                int n    = note.row;
-                int midi = rootMidi0
-                         + chordDefs[chordType].intervals[n % chordSize]
-                         + (n / chordSize) * 12;
-                midi = std::clamp(midi, 0, 127);
+                int midi = rowToMidi(note.row, rootPitch, chordType);
                 is.notes.push_back({midi, note.beat, note.length, note.velocity});
             }
         }
-    };
-
-    // Maps param lane type name → MIDI CC number; -1 means pitch bend.
-    auto ccForType = [](const std::string& type) -> int {
-        if (type == "Modulation")  return 1;
-        if (type == "Volume")      return 7;
-        if (type == "Pan")         return 10;
-        if (type == "Expression")  return 11;
-        return -1; // "Pitch" and unknowns → pitch bend
     };
 
     // Pre-compute all firing events (point values + half-integer crossings) for a lane.
