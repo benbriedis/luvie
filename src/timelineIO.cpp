@@ -180,12 +180,14 @@ static ParamPoint paramPointFromJson(const json& j) {
 static json paramLaneToJson(const ParamLane& lane) {
     json jpts = json::array();
     for (const auto& p : lane.points) jpts.push_back(paramPointToJson(p));
-    return {{"id", lane.id}, {"type", lane.type}, {"points", jpts}};
+    return {{"id", lane.id}, {"type", lane.type}, {"points", jpts},
+            {"instrumentId", lane.instrumentId}};
 }
 static ParamLane paramLaneFromJson(const json& j) {
     ParamLane lane;
-    lane.id   = j.at("id");
-    lane.type = j.at("type").get<std::string>();
+    lane.id           = j.at("id");
+    lane.type         = j.at("type").get<std::string>();
+    lane.instrumentId = j.value("instrumentId", 0);
     for (const auto& jp : j.value("points", json::array()))
         lane.points.push_back(paramPointFromJson(jp));
     return lane;

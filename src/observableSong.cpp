@@ -423,6 +423,25 @@ void ObservableSong::moveRow(int from, int toGap)
             break;
         }
 
+    } else if (ref.kind == RowKind::Param) {
+        // A param row belongs to the track it sits under: scan backward to the nearest
+        // lane/header, then re-point the lane to that track's instrument so it routes there.
+        int destTrackId = -1;
+        for (int i = insertAt - 1; i >= 0 && destTrackId < 0; i--) {
+            if (ro[i].kind == RowKind::Lane) {
+                destTrackId = trackIdForLaneId(ro[i].id);
+            } else if (ro[i].kind == RowKind::Header) {
+                destTrackId = ro[i].id;
+                break;
+            }
+        }
+        if (destTrackId >= 0) {
+            int instrId = 0;
+            for (const auto& t : data.tracks)
+                if (t.id == destTrackId) { instrId = t.instrumentId; break; }
+            for (auto& lane : data.paramLanes)
+                if (lane.id == ref.id) { lane.instrumentId = instrId; break; }
+        }
     }
 
     rebuildInstrumentHeaders();
@@ -759,9 +778,13 @@ void ObservableSong::removeLane(int trackId, int laneId)
 void ObservableSong::removeTrack(int trackId)
 {
     std::set<int> laneIds;
+    int instrumentId = 0;
     for (const auto& t : data.tracks)
-        if (t.id == trackId)
+        if (t.id == trackId) {
+            instrumentId = t.instrumentId;
             for (const auto& l : t.lanes) laneIds.insert(l.id);
+        }
+    removeParamLanesForInstrument(instrumentId);
 
     data.tracks.erase(
         std::remove_if(data.tracks.begin(), data.tracks.end(),
@@ -807,6 +830,7 @@ void ObservableSong::removeTrackAndPattern(int trackId)
     std::set<int> laneIds;
     for (const auto& l : it->lanes) laneIds.insert(l.id);
     int patId = it->lanes.empty() ? 0 : it->lanes[0].patternId;
+    removeParamLanesForInstrument(it->instrumentId);
     data.tracks.erase(it);
     data.rowOrder.erase(
         std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
@@ -1011,19 +1035,20 @@ std::vector<Note> ObservableSong::buildNotes() const
     return notes;
 }
 
-bool ObservableSong::hasParamLane(const std::string& type) const
+bool ObservableSong::hasParamLane(const std::string& type, int instrumentId) const
 {
     for (const auto& lane : data.paramLanes)
-        if (lane.type == type) return true;
+        if (lane.type == type && lane.instrumentId == instrumentId) return true;
     return false;
 }
 
-int ObservableSong::addParamLane(const std::string& type, int atIndex)
+int ObservableSong::addParamLane(const std::string& type, int instrumentId, int atIndex)
 {
     int laneId = nextId++;
     ParamLane lane;
-    lane.id   = laneId;
-    lane.type = type;
+    lane.id           = laneId;
+    lane.type         = type;
+    lane.instrumentId = instrumentId;
     lane.points.push_back({nextId++, 0.0f, laneDefaultValue(type), true});
     data.paramLanes.push_back(std::move(lane));
     RowRef ref{RowKind::Param, laneId};
@@ -1033,6 +1058,33 @@ int ObservableSong::addParamLane(const std::string& type, int atIndex)
         data.rowOrder.push_back(ref);
     notify();
     return laneId;
+}
+
+int ObservableSong::instrumentIdForParamLane(int laneId) const
+{
+    for (const auto& lane : data.paramLanes)
+        if (lane.id == laneId) return lane.instrumentId;
+    return 0;
+}
+
+// Drop every param lane owned by an instrument (and its rowOrder rows). Does not
+// notify — call from a method that already notifies. instrumentId 0 is a no-op.
+void ObservableSong::removeParamLanesForInstrument(int instrumentId)
+{
+    if (instrumentId == 0) return;
+    std::set<int> laneIds;
+    for (const auto& lane : data.paramLanes)
+        if (lane.instrumentId == instrumentId) laneIds.insert(lane.id);
+    if (laneIds.empty()) return;
+    data.paramLanes.erase(
+        std::remove_if(data.paramLanes.begin(), data.paramLanes.end(),
+            [instrumentId](const ParamLane& l) { return l.instrumentId == instrumentId; }),
+        data.paramLanes.end());
+    data.rowOrder.erase(
+        std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+            [&laneIds](const RowRef& r) {
+                return r.kind == RowKind::Param && laneIds.count(r.id); }),
+        data.rowOrder.end());
 }
 
 void ObservableSong::removeParamLane(int laneId)

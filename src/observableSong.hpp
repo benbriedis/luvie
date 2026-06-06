@@ -84,10 +84,12 @@ public:
     void setPatternStartOffset(int instanceId, float startOffset);
     void placePattern(int laneId, int patternId, float startBar, float length);
 
-    // Song-level param lane management
-    bool hasParamLane(const std::string& type) const;
-    int  addParamLane(const std::string& type, int atIndex = -1);
+    // Song-level param lane management. Each lane belongs to one instrument and
+    // routes only to that instrument's port; uniqueness is per (type, instrument).
+    bool hasParamLane(const std::string& type, int instrumentId) const;
+    int  addParamLane(const std::string& type, int instrumentId, int atIndex = -1);
     void removeParamLane(int laneId);
+    int  instrumentIdForParamLane(int laneId) const;
     int  addParamPoint(int laneId, float beat, int value);
     void removeParamPoint(int pointId);
     void moveParamPoint(int pointId, float beat, int value);
@@ -113,6 +115,7 @@ private:
     void notify();
     void sortBpms();
     void sortTimeSigs();
+    void removeParamLanesForInstrument(int instrumentId);
 };
 
 #endif

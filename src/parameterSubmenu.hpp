@@ -49,8 +49,10 @@ public:
         redraw();
     }
 
-    void update(ObservableSong* tl) {
-        update([tl](const char* type) { return tl && tl->hasParamLane(type); });
+    void update(ObservableSong* tl, int instrumentId) {
+        update([tl, instrumentId](const char* type) {
+            return tl && tl->hasParamLane(type, instrumentId);
+        });
     }
 
     void showFor(BasePopup* parent, int btnY, const std::function<bool(const char*)>& hasFn) {
@@ -66,8 +68,10 @@ public:
         show();
     }
 
-    void showFor(BasePopup* parent, int btnY, ObservableSong* tl) {
-        showFor(parent, btnY, [tl](const char* type) { return tl && tl->hasParamLane(type); });
+    void showFor(BasePopup* parent, int btnY, ObservableSong* tl, int instrumentId) {
+        showFor(parent, btnY, [tl, instrumentId](const char* type) {
+            return tl && tl->hasParamLane(type, instrumentId);
+        });
     }
 };
 

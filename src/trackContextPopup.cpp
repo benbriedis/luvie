@@ -44,8 +44,10 @@ TrackContextPopup::TrackContextPopup()
     paramSubmenu = new ParameterSubmenu();
     paramSubmenu->onSelect = [this](const char* type) {
         hide();
-        if (!timeline || timeline->song()->hasParamLane(type)) return;
-        timeline->song()->addParamLane(type, rowOrderIdxForTrackId(targetTrackId) + 1);
+        if (!timeline) return;
+        int instrId = targetInstrumentId();
+        if (timeline->song()->hasParamLane(type, instrId)) return;
+        timeline->song()->addParamLane(type, instrId, rowOrderIdxForTrackId(targetTrackId) + 1);
     };
 
     end();
@@ -115,10 +117,18 @@ void TrackContextPopup::doShowInstruments()
     if (onShowInstruments) onShowInstruments();
 }
 
+int TrackContextPopup::targetInstrumentId() const
+{
+    if (!timeline) return 0;
+    for (const auto& t : timeline->get().tracks)
+        if (t.id == targetTrackId) return t.instrumentId;
+    return 0;
+}
+
 void TrackContextPopup::doShowParamSubmenu()
 {
     if (!paramSubmenu) return;
-    paramSubmenu->showFor(this, y() + 1 + 2*btnH, timeline->song());
+    paramSubmenu->showFor(this, y() + 1 + 2*btnH, timeline->song(), targetInstrumentId());
 }
 
 void TrackContextPopup::doAddLane()

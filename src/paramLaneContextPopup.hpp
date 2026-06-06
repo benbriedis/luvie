@@ -11,7 +11,8 @@ class ParamLaneContextPopup : public ContextMenuPopup {
 
     void doShowParamSubmenu() {
         if (!paramSubmenu) return;
-        paramSubmenu->showFor(this, y() + 1 + 0*btnH, timeline->song());
+        int instrId = timeline->song()->instrumentIdForParamLane(laneId);
+        paramSubmenu->showFor(this, y() + 1 + 0*btnH, timeline->song(), instrId);
     }
 
     void doRemove() {
@@ -44,13 +45,15 @@ public:
         paramSubmenu = new ParameterSubmenu();
         paramSubmenu->onSelect = [this](const char* type) {
             hide();
-            if (!timeline || timeline->song()->hasParamLane(type)) return;
+            if (!timeline) return;
+            int instrId = timeline->song()->instrumentIdForParamLane(laneId);
+            if (timeline->song()->hasParamLane(type, instrId)) return;
+            // Insert the new lane right after the right-clicked lane in rowOrder.
             int atIndex = -1;
-            const auto& lanes = timeline->get().paramLanes;
-            for (int i = 0; i < (int)lanes.size(); i++) {
-                if (lanes[i].id == laneId) { atIndex = i + 1; break; }
-            }
-            timeline->song()->addParamLane(type, atIndex);
+            const auto& ro = timeline->get().rowOrder;
+            for (int i = 0; i < (int)ro.size(); i++)
+                if (ro[i].kind == RowKind::Param && ro[i].id == laneId) { atIndex = i + 1; break; }
+            timeline->song()->addParamLane(type, instrId, atIndex);
         };
 
         end();

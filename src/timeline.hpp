@@ -52,6 +52,7 @@ struct ParamLane {
 	int                      id;
 	std::string              type;    // "Pitch", "Modulation", etc.
 	std::vector<ParamPoint>  points;  // sorted by beat
+	int                      instrumentId = 0;  // owning instrument; routes to its port only
 };
 
 struct Pattern {

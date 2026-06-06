@@ -416,14 +416,21 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 {
 	if (!obsTl) return;
 	const Timeline& tl = obsTl->get();
+
+	// Each song-level param lane routes only to its owning instrument's port —
+	// emitSoftParam filters to ports that need soft sequencing, so Jack-clock-driven
+	// ports are left to JackTransport.
 	for (const auto& lane : tl.paramLanes) {
+		int cc = ccForType(lane.type);
 		for (int i = 0; i < (int)lane.points.size(); i++) {
 			auto report = [&](float barPos, int value) {
 				if (barPos < prevPos || barPos >= curPos) return;
-				if (!verbose) return;   // song-level soft output not yet routed
-				int bar = (int)barPos + 1;
-				printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
-				       bar, lane.type.c_str(), value);
+				if (verbose) {
+					int bar = (int)barPos + 1;
+					printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
+					       bar, lane.type.c_str(), value);
+				}
+				emitSoftParam(lane.instrumentId, cc, value);
 			};
 			report(lane.points[i].beat, lane.points[i].value);
 			if (i + 1 < (int)lane.points.size()) {

@@ -23,6 +23,7 @@ private:
     int                 targetLaneId  = -1;
 
     int  rowOrderIdxForTrackId(int trackId) const;
+    int  targetInstrumentId() const;
     void doOpenPattern();
     void doShowInstruments();
     void doShowParamSubmenu();

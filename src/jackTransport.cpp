@@ -365,32 +365,26 @@ void JackTransport::rebuildSnapshot()
             ++trackIdx;
         }
 
-        // Song-level param lanes: broadcast to all active (port, channel) pairs,
+        // Song-level param lanes: each routes only to its owning instrument's port,
         // priority 0 (lowest). Beat field stores bar position (1 unit = 1 bar).
-        std::set<std::pair<std::string,int>> allPorts;
-        for (const auto& ts : newSnap.tracks)
-            for (const auto& inst : ts.instances)
-                if (!inst.portName.empty())
-                    allPorts.insert({inst.portName, inst.midiChannel});
-
         for (const auto& lane : tl.paramLanes) {
+            if (lane.instrumentId == 0) continue;
+            auto rit = instrumentMap_.find(lane.instrumentId);
+            if (rit == instrumentMap_.end() || rit->second.portName.empty()) continue;
             auto evts = buildParamEvents(lane);
             if (evts.empty()) continue;
-            int cc = ccForType(lane.type);
-            for (const auto& [port, ch] : allPorts) {
-                ParamInstSnap pis;
-                pis.startBar     = 0.0f;
-                pis.length       = 1.0e9f;
-                pis.startOffset  = 0.0f;
-                pis.beatsPerBar  = 1.0f;  // 1 beat = 1 bar at song level
-                pis.patternBeats = 0.0f;  // sentinel: song-level, no loop
-                pis.portName     = port;
-                pis.midiChannel  = ch;
-                pis.priority     = 0;
-                pis.ccNumber     = cc;
-                pis.events       = evts;
-                newSnap.paramInsts.push_back(std::move(pis));
-            }
+            ParamInstSnap pis;
+            pis.startBar     = 0.0f;
+            pis.length       = 1.0e9f;
+            pis.startOffset  = 0.0f;
+            pis.beatsPerBar  = 1.0f;  // 1 beat = 1 bar at song level
+            pis.patternBeats = 0.0f;  // sentinel: song-level, no loop
+            pis.portName     = rit->second.portName;
+            pis.midiChannel  = rit->second.midiChannel - 1;  // store 0-based
+            pis.priority     = 0;
+            pis.ccNumber     = ccForType(lane.type);
+            pis.events       = std::move(evts);
+            newSnap.paramInsts.push_back(std::move(pis));
         }
     }
 
