@@ -1,5 +1,6 @@
 #include "transport.hpp"
 #include "editor.hpp"
+#include "popupStyle.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -13,6 +14,9 @@ static constexpr Fl_Color waitingColor   = 0xDC262600; // red
 static constexpr Fl_Color connectedText  = 0x14532D00; // dark green
 
 static constexpr int indicatorRadius = 5;
+
+static constexpr Fl_Color alertColor   = 0xDC262600; // red
+static constexpr Fl_Color bubbleBorder = 0x94A3B800; // slate grey
 
 // Filled rounded rectangle with an explicit corner radius (FLTK's rounded box
 // types scale the radius with the widget size, which is too large here).
@@ -83,6 +87,130 @@ int TransportIndicator::handle(int event) {
 			return 1;
 		}
 		break;
+	}
+	return Fl_Widget::handle(event);
+}
+
+// ---------------------------------------------------------------------------
+
+static constexpr int alertPad      = 8;
+static constexpr int alertLineH    = 18;
+static constexpr int alertFontSize = 12;
+
+AlertPopup::AlertPopup()
+	: BasePopup(0, 0, 10, 10)
+{
+	box(FL_NO_BOX);   // draw() paints the background and border
+	color(popupBg);
+	end();
+}
+
+void AlertPopup::setLines(const std::vector<std::string>& l) {
+	lines = l;
+	fl_font(FL_HELVETICA, alertFontSize);
+	int maxW = 0;
+	for (const auto& s : lines)
+		maxW = std::max(maxW, (int)fl_width(s.c_str()));
+	size(maxW + 2 * alertPad, (int)lines.size() * alertLineH + 2 * alertPad);
+}
+
+void AlertPopup::draw() {
+	fl_color(popupBg);
+	fl_rectf(0, 0, w(), h());
+	fl_color(bubbleBorder);
+	fl_rect(0, 0, w(), h());
+
+	fl_font(FL_HELVETICA, alertFontSize);
+	fl_color(popupText);
+	int ty = alertPad;
+	for (const auto& s : lines) {
+		fl_draw(s.c_str(), alertPad, ty, w() - 2 * alertPad, alertLineH,
+		        FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+		ty += alertLineH;
+	}
+}
+
+// ---------------------------------------------------------------------------
+
+AlertIndicator::AlertIndicator(int x, int y, int w, int h)
+	: Fl_Widget(x, y, w, h)
+{
+	// Creating a window clears the current group; preserve it so widgets built
+	// after this indicator still get added to the enclosing group. The popup is
+	// added to the main window (and owned by it) by the caller.
+	Fl_Group* prev = Fl_Group::current();
+	popup = new AlertPopup();
+	popup->hide();
+	Fl_Group::current(prev);
+}
+
+void AlertIndicator::setAlerts(const std::vector<std::string>& a) {
+	if (alerts == a) return;
+	alerts = a;
+	if (popup->shown()) showPopup();   // refresh the open popup's contents
+	redraw();
+}
+
+void AlertIndicator::showPopup() {
+	popup->setLines(alerts.empty()
+	                    ? std::vector<std::string>{"No notifications"}
+	                    : alerts);
+	// position() is window-relative (the popup is a sub-window of the
+	// AppWindow). Right-align to the indicator, just above it; the transport
+	// bar sits at the window bottom.
+	int px = x() + w() - popup->w();
+	int py = y() - popup->h() - 4;
+	popup->position(std::max(0, px), py);
+	popup->show();
+}
+
+void AlertIndicator::draw() {
+	// Clear our slice of the bar first so a previous (larger) glyph doesn't
+	// show through when the state changes.
+	fl_color(bgColor);
+	fl_rectf(x(), y(), w(), h());
+
+	int cx = x() + w() / 2;
+	int cy = y() + h() / 2;
+	int s  = std::min(w(), h()) / 2 - 2;   // glyph half-extent
+
+	if (!alerts.empty()) {
+		// Red warning triangle with a white '!'.
+		fl_color(alertColor);
+		fl_polygon(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
+		fl_color(fl_color_average(alertColor, FL_BLACK, 0.7f));
+		fl_loop(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
+		fl_color(FL_WHITE);
+		fl_font(FL_HELVETICA_BOLD, s + 4);
+		// Centre on the triangle's axis (+1 optical nudge for the glyph's bearing).
+		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
+	} else {
+		// White thought bubble with an 'i'.
+		fl_color(popupBg);
+		fl_pie(cx - s, cy - s, s * 2, s * 2, 0.0, 360.0);
+		fl_color(bubbleBorder);
+		fl_arc(cx - s, cy - s, s * 2, s * 2, 0.0, 360.0);
+		// Two little trailing dots, like a thought bubble.
+		fl_color(popupBg);
+		fl_pie(cx + s - 1, cy + s - 1, 4, 4, 0.0, 360.0);
+		fl_pie(cx + s + 3, cy + s + 2, 3, 3, 0.0, 360.0);
+		fl_color(bubbleBorder);
+		fl_arc(cx + s - 1, cy + s - 1, 4, 4, 0.0, 360.0);
+		fl_arc(cx + s + 3, cy + s + 2, 3, 3, 0.0, 360.0);
+		fl_color(iconColor);
+		fl_font(FL_HELVETICA_BOLD, s + 3);
+		fl_draw("i", cx - s, cy - s, s * 2, s * 2, FL_ALIGN_CENTER);
+	}
+}
+
+int AlertIndicator::handle(int event) {
+	switch (event) {
+	case FL_ENTER:
+		showPopup();
+		return 1;
+	case FL_LEAVE:
+		if (popup->shown()) popup->hide();
+		return 1;
 	}
 	return Fl_Widget::handle(event);
 }
@@ -180,8 +308,11 @@ void Transport::resize(int x, int y, int w, int h)
 	rewindBtn->position(bx, by);
 	playPauseBtn->position(bx + bw + gap, by);
 
+	int ay = y + (h - alertIndicator->h()) / 2;
+	alertIndicator->position(x + w - 10 - alertIndicator->w(), ay);
+
 	int iy = y + (h - indicator->h()) / 2;
-	indicator->position(x + 10, iy);
+	indicator->position(alertIndicator->x() - 8 - indicator->w(), iy);
 }
 
 Transport::~Transport()
@@ -239,6 +370,16 @@ void Transport::setTransportWaiting(bool waiting)
 	indicator->setWaiting(waiting);
 }
 
+void Transport::setAlerts(const std::vector<std::string>& alerts)
+{
+	alertIndicator->setAlerts(alerts);
+}
+
+AlertPopup* Transport::alertPopup() const
+{
+	return alertIndicator->popupWindow();
+}
+
 void Transport::setIndicatorDoubleClick(std::function<void()> cb)
 {
 	indicator->onDoubleClick = std::move(cb);
@@ -256,9 +397,13 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 	const int bx      = x + (w - totalW) / 2;
 	const int by      = y + (h - btnSize) / 2;
 
-	const int indW = 58;
-	const int indH = 22;
-	indicator = new TransportIndicator(x + 10, y + (h - indH) / 2, indW, indH);
+	const int indW   = 58;
+	const int indH   = 22;
+	const int alertW = 26;
+	alertIndicator = new AlertIndicator(x + w - 10 - alertW, y + (h - indH) / 2,
+	                                    alertW, indH);
+	indicator = new TransportIndicator(alertIndicator->x() - 8 - indW,
+	                                   y + (h - indH) / 2, indW, indH);
 
 	rewindBtn = new TransportButton(bx, by, btnSize, btnSize,
 	                                TransportButton::REWIND);

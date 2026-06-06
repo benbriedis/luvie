@@ -4,10 +4,12 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Widget.H>
+#include "modern/basePopup.hpp"
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
 #include <functional>
 #include <string>
+#include <vector>
 
 // Rounded pill on the LHS of the transport bar showing the active clock
 // source. Lightish green when connected; red while waiting for JACK. Double
@@ -22,6 +24,37 @@ public:
 	TransportIndicator(int x, int y, int w, int h);
 	void setLabel(const std::string& text);
 	void setWaiting(bool w);
+	void draw() override;
+	int  handle(int event) override;
+};
+
+
+// Hover popup listing the current alerts, shown just above the alert indicator
+// while the pointer is over it. It is a sub-window of the main AppWindow (added
+// via window->add()), so its position() is window-relative.
+class AlertPopup : public BasePopup {
+	std::vector<std::string> lines;
+
+public:
+	AlertPopup();
+	void setLines(const std::vector<std::string>& l);
+	void draw() override;
+};
+
+
+// Indicator to the right of the transport indicator. With no alerts it shows an
+// 'i' in a white thought bubble; with one or more alerts a '!' in a red
+// triangle, and hovering pops up the list of alerts.
+class AlertIndicator : public Fl_Widget {
+	std::vector<std::string> alerts;
+	AlertPopup*              popup = nullptr;
+
+	void showPopup();
+
+public:
+	AlertIndicator(int x, int y, int w, int h);
+	void setAlerts(const std::vector<std::string>& a);
+	AlertPopup* popupWindow() const { return popup; }
 	void draw() override;
 	int  handle(int event) override;
 };
@@ -47,6 +80,7 @@ public:
 
 class Transport : public Fl_Group, public ITimelineObserver {
 	TransportIndicator* indicator;
+	AlertIndicator*     alertIndicator;
 	TransportButton*    rewindBtn;
 	TransportButton*    playPauseBtn;
 
@@ -74,9 +108,16 @@ public:
 	// state or position has changed externally.
 	void syncPlayState();
 
-	// Update the LHS clock-source indicator.
+	// Update the clock-source indicator.
 	void setTransportLabel(const std::string& label);
 	void setTransportWaiting(bool waiting);
+
+	// Replace the current set of alerts shown by the alert indicator.
+	void setAlerts(const std::vector<std::string>& alerts);
+
+	// The alert hover popup; the caller must add it to the main window
+	// (window->add + registerPopup) so it positions as a sub-window.
+	AlertPopup* alertPopup() const;
 
 	// Fired when the indicator is double clicked (to open the Transport overlay).
 	void setIndicatorDoubleClick(std::function<void()> cb);

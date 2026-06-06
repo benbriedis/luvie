@@ -368,11 +368,6 @@ GOOD STARTING POINT FOR JACK
 ============================
 2. On the Outputs overlay:
 
-   Add a setting: 'Create new connections as: jack/native/...'
-   Store this setting with the project.
-
-   Outputs themselves to be marked as 'jack'|'native'|'debug', and to be saved with the project.
-
    When Jack is used but not yet present, share the Jack detection polling loop with the transport.
    Show messages on Output overlay if Jack not yet found + mention detection polling loop.
    Place warning on transport bar iff transport is not ALSO using Jack but an output is.
@@ -388,7 +383,6 @@ GOOD STARTING POINT FOR JACK
 	 Note: handy for the AI and maybe auto-tests as well as for me.
 
 
-FIXME I'm fairly sure in some circumstances Luvie IS starting Jack. Don't think I want this.
 * Q: Is it ever really worth it to mix ALSA and Jack connections?
      Would seem that going "native" if Jack is used would be best regarded as exceptional.
 

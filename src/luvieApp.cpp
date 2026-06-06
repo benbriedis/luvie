@@ -360,6 +360,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(pdPop);  window->registerPopup(pdPop);
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
+    // Hover popup: a positioned sub-window, but NOT registered — registering
+    // would route mouse-moves through AppWindow's click-away logic and break the
+    // indicator's enter/leave tracking.
+    window->add(bottomPane->alertPopup());
 
     // Connections overlay last — large sub-window, click-away via registerPopup.
     {

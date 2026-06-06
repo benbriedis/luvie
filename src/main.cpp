@@ -146,11 +146,27 @@ int main(int argc, char **argv) {
         else          jackObserver.stop();
     };
 
+    // Refresh the transport-bar alert indicator. Two JACK-related alerts can be
+    // active; both clear once JACK connects, the clock source moves off Jack, or
+    // the last Jack MIDI output goes away.
+    auto updateAlerts = [&]() {
+        if (!app.bottomPane) return;
+        bool jackDown    = jackObserver.state() != JackObserver::State::Up;
+        bool clockIsJack = app.transportOverlay && app.transportOverlay->selection() == 2;
+        std::vector<std::string> alerts;
+        if (clockIsJack && jackDown)
+            alerts.push_back("Jack transport selected but JACK is not running");
+        if (portReg.anyJack() && jackDown)
+            alerts.push_back("Jack MIDI output in use but JACK is not running");
+        app.bottomPane->setAlerts(alerts);
+    };
+
     // Red "JACK server not running" line shows while a Jack port exists but JACK is down.
     auto updateJackWarning = [&]() {
         if (connOverlay)
             connOverlay->setJackWarning(portReg.anyJack() &&
                                         jackObserver.state() != JackObserver::State::Up);
+        updateAlerts();
     };
 
     // Reconcile the Port set with the overlay, then refresh JACK want/warning state
