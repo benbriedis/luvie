@@ -367,3 +367,33 @@ Unstacked:
 * Q: Is it ever really worth it to mix ALSA and Jack connections?
      Would seem that going "native" if Jack is used would be best regarded as exceptional.
 
+
+cf master volume rubberband control? Or any other global parameters?
+
+
+Maybe split src/
+
+Q: do we want the option to be the transport master? 
+   We change BPM and thats a Master thing I think...
+   
+Re Native: cf Pipewire...
+
+Compile in ALSA dependencies? (Linux)
+   What can/should we do wrt ALSA?  
+   Is name passed through OK?   
+   
+Combine the File and View menus? Put into a Setttings dropdown - cf putting next to Pattern Editor
+
+TODO test song parameters via Alsa and Jack
+
+MAYBE remove the transport indicator
+
+Auto-save? NSM does this already I think. Plugins?
+
+Change .json to .luv 
+Error window when starting (invalid project file) is old fashioned.
+Exit on save on closing window is old fashioned.
+
+TODO test setup window in NSM and check plugin version (should use Jack outputs) 
+  
+The information icon is a bit silly. Just use a circle.  
