@@ -106,15 +106,15 @@ void AlertIndicator::draw() {
 		// Centre on the triangle's axis (+1 optical nudge for the glyph's bearing).
 		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
 	} else {
-		// White circle with an 'i'.
+		// Same warning triangle as the alert state, but with a white background.
 		fl_color(popupBg);
-		fl_pie(cx - s, cy - s, s * 2, s * 2, 0.0, 360.0);
+		fl_polygon(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
 		fl_color(bubbleBorder);
-		fl_arc(cx - s, cy - s, s * 2, s * 2, 0.0, 360.0);
+		fl_loop(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
 		fl_color(iconColor);
-		fl_font(FL_HELVETICA_BOLD, s + 3);
-		// +1 optical nudge for the glyph's left bearing.
-		fl_draw("i", cx - s + 1, cy - s, s * 2, s * 2, FL_ALIGN_CENTER);
+		fl_font(FL_HELVETICA_BOLD, s + 4);
+		// Centre on the triangle's axis (+1 optical nudge for the glyph's bearing).
+		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
 	}
 }
 

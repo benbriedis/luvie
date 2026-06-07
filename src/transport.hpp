@@ -24,9 +24,9 @@ public:
 };
 
 
-// Indicator to the right of the transport indicator. With no alerts it shows an
-// 'i' in a white thought bubble; with one or more alerts a '!' in a red
-// triangle, and hovering pops up the list of alerts.
+// Indicator to the right of the transport indicator. With no alerts it shows a
+// '!' in a white triangle; with one or more alerts a '!' in a red triangle, and
+// hovering pops up the list of alerts.
 class AlertIndicator : public Fl_Widget {
 	std::vector<std::string> alerts;
 	AlertPopup*              popup = nullptr;
