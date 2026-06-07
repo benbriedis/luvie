@@ -1,5 +1,6 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Native_File_Chooser.H>
+#include <FL/fl_ask.H>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -398,17 +399,6 @@ int main(int argc, char **argv) {
 
     } else {
         // Standalone mode: load from CLI path if provided, then set up Save.
-        if (!projectPath.empty()) {
-            AppState state;
-            if (loadAppState(projectPath, state)) {
-                songTimeline.loadTimeline(state.timeline);
-                if (app.patternPanel)
-                    app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
-                applyLoadedOutputs(state);
-                if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
-                    app.transportOverlay->setSelection(state.transport);
-            }
-        }
 
         // Helper: shows a Save As dialog, returns chosen path (with .json),
         // or empty string if cancelled.
@@ -439,6 +429,27 @@ int main(int argc, char **argv) {
             collectOutputs(state);
             saveAppState(state, path);
         };
+
+        // Load the CLI project file if given. If it doesn't exist yet, create an
+        // empty project at that path so the user can start a new project there.
+        if (!projectPath.empty()) {
+            AppState state;
+            if (loadAppState(projectPath, state)) {
+                songTimeline.loadTimeline(state.timeline);
+                if (app.patternPanel)
+                    app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+                applyLoadedOutputs(state);
+                if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
+                    app.transportOverlay->setSelection(state.transport);
+            } else if (!std::filesystem::exists(projectPath)) {
+                saveToPath(projectPath);   // new project: write out the empty default
+            } else {
+                fprintf(stderr, "[luvie] invalid project file: %s\n",
+                        projectPath.c_str());
+                fl_alert("Invalid project file");
+                return 1;
+            }
+        }
 
         app.onSaveAs = [&, pickSavePath, saveToPath]() mutable {
             std::string p = pickSavePath();
