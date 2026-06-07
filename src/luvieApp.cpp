@@ -407,13 +407,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         };
         window->add(transportOverlay);
         window->registerPopup(transportOverlay);
-
-        bottomPane->setIndicatorDoubleClick([this]() {
-            if (!transportOverlay) return;
-            transportOverlay->show();
-            if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
-                item->set();
-        });
     }
 
     // New-project startup dialog — centred over the main window. main() shows it

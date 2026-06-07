@@ -11,24 +11,6 @@
 #include <string>
 #include <vector>
 
-// Rounded pill on the LHS of the transport bar showing the active clock
-// source. Lightish green when connected; red while waiting for JACK. Double
-// click opens the Transport overlay.
-class TransportIndicator : public Fl_Widget {
-	std::string label;
-	bool        waiting = false;
-
-public:
-	std::function<void()> onDoubleClick;
-
-	TransportIndicator(int x, int y, int w, int h);
-	void setLabel(const std::string& text);
-	void setWaiting(bool w);
-	void draw() override;
-	int  handle(int event) override;
-};
-
-
 // Hover popup listing the current alerts, shown just above the alert indicator
 // while the pointer is over it. It is a sub-window of the main AppWindow (added
 // via window->add()), so its position() is window-relative.
@@ -79,7 +61,6 @@ public:
 
 
 class Transport : public Fl_Group, public ITimelineObserver {
-	TransportIndicator* indicator;
 	AlertIndicator*     alertIndicator;
 	TransportButton*    rewindBtn;
 	TransportButton*    playPauseBtn;
@@ -108,19 +89,12 @@ public:
 	// state or position has changed externally.
 	void syncPlayState();
 
-	// Update the clock-source indicator.
-	void setTransportLabel(const std::string& label);
-	void setTransportWaiting(bool waiting);
-
 	// Replace the current set of alerts shown by the alert indicator.
 	void setAlerts(const std::vector<std::string>& alerts);
 
 	// The alert hover popup; the caller must add it to the main window
 	// (window->add + registerPopup) so it positions as a sub-window.
 	AlertPopup* alertPopup() const;
-
-	// Fired when the indicator is double clicked (to open the Transport overlay).
-	void setIndicatorDoubleClick(std::function<void()> cb);
 };
 
 #endif

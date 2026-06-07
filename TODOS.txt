@@ -386,8 +386,6 @@ Combine the File and View menus? Put into a Setttings dropdown - cf putting next
 
 TODO test song parameters via Alsa and Jack
 
-MAYBE remove the transport indicator
-
 cf Auto-save? NSM does this already I think. Plugins?
 
 Error window when starting (invalid project file) is old fashioned.
@@ -395,4 +393,3 @@ Exit on save on closing window is old fashioned.
 
 TODO test setup window in NSM and check plugin version (should use Jack outputs) 
   
-The information icon is a bit silly. Just use a circle.  

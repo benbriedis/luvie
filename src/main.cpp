@@ -304,7 +304,6 @@ int main(int argc, char **argv) {
                 applyClockMode();
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {
-                    app.bottomPane->setTransportWaiting(false);
                     app.bottomPane->enableButtons();
                     app.bottomPane->syncPlayState();
                 }
@@ -318,7 +317,6 @@ int main(int argc, char **argv) {
                 applyClockMode();
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
                 if (app.bottomPane) {
-                    app.bottomPane->setTransportWaiting(true);
                     app.bottomPane->disableButtons();
                 }
             }
@@ -327,7 +325,6 @@ int main(int argc, char **argv) {
             if (clockIsJack) {
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {
-                    app.bottomPane->setTransportWaiting(false);
                     app.bottomPane->enableButtons();
                 }
             }
@@ -343,11 +340,6 @@ int main(int argc, char **argv) {
                 router.pause();
                 if (app.bottomPane) app.bottomPane->syncPlayState();
             }
-            if (app.bottomPane) {
-                static const char* names[] = {"Host", "Internal", "Jack"};
-                if (index >= 0 && index < 3)
-                    app.bottomPane->setTransportLabel(names[index]);
-            }
             // 0 = Host (informational), 1 = Internal, 2 = Jack
             if (index == 2) {
                 updateJackWanted();   // ensure JACK is up; Up-listener wires the clock
@@ -357,7 +349,6 @@ int main(int argc, char **argv) {
                 updateJackWanted();   // keep JACK only if an output port still needs it
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {
-                    app.bottomPane->setTransportWaiting(false);
                     app.bottomPane->enableButtons();   // were disabled while polling JACK
                 }
             }
