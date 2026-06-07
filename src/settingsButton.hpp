@@ -17,7 +17,10 @@ class SettingsButton : public Fl_Menu_Button {
     bool hovered = false;
 
     void drawGear() {
-        const double cx = x() + w() / 2.0;
+        // Centre on the area right of the left divider (x()+1 .. x()+w()),
+        // which is a pixel narrower than the full button, else the gear reads
+        // as shifted left.
+        const double cx = x() + 1 + (w() - 1) / 2.0;
         const double cy = y() + h() / 2.0;
         const double R  = std::min(w(), h()) * 0.30;   // tooth-tip radius
         const double r  = R * 0.72;                     // tooth-valley radius
@@ -35,9 +38,16 @@ class SettingsButton : public Fl_Menu_Button {
         fl_end_complex_polygon();
 
         // Punch the hub hole in the (possibly hovered) background colour.
+        // Use a polygon with the same double-precision centre as the teeth so
+        // the hole is exactly concentric (fl_pie's integer coords drift off).
         double hole = R * 0.42;
         fl_color(bg());
-        fl_pie(int(cx - hole), int(cy - hole), int(2 * hole), int(2 * hole), 0, 360);
+        fl_begin_complex_polygon();
+        for (int i = 0; i < 32; ++i) {
+            double a = i * 2.0 * M_PI / 32;
+            fl_vertex(cx + hole * std::cos(a), cy + hole * std::sin(a));
+        }
+        fl_end_complex_polygon();
     }
 
     Fl_Color bg() const {

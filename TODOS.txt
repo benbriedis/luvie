@@ -253,10 +253,6 @@ MINOR BUG: when editting label text can get a danky FLTK popup appear when right
 Conversion routine to clone a regular pattern to pianoroll? 
 	The opposite way would be harder, but something could be attempted in time maybe.
 
-cf Adding a Settings button in the control row:
-   - Move/Add toggle or maybe better 'Rapid Add'
-  
-
 BUG: Size of popups sometimes goes wrong: too wide.
 
 Coding: 

@@ -127,6 +127,12 @@ void ModernTabs::draw() {
 			fl_line_style(0);
 		}
 	}
+
+	// The docked gear is a sibling that overlaps our bar; our background fill
+	// above just painted over it, so redraw it here to keep it from vanishing
+	// when only the tabs are damaged.
+	if (rightWidget)
+		draw_child(*rightWidget);
 }
 
 void ModernTabs::resize(int x, int y, int w, int h) {

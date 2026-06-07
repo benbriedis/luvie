@@ -158,11 +158,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     settingsMenu = new SettingsButton(winW - gearSize, off, gearSize, gearSize);
     settingsMenu->textsize(13);
     settingsMenu->add("Save",      FL_COMMAND + 's', saveCb,      this, 0);
-    settingsMenu->add("Save As",   0,                saveAsCb,    this, FL_MENU_DIVIDER);
+    settingsMenu->add("Save As",   0,                saveAsCb,    this, 0);
     settingsMenu->add("Import",    0,                importCb,    this, 0);
     settingsMenu->add("Export",    0,                exportCb,    this, FL_MENU_DIVIDER);
-    settingsMenu->add("Transport", 0,                transportCb, this, FL_MENU_TOGGLE);
-    settingsMenu->add("Outputs",   0,                outputsCb,   this, FL_MENU_TOGGLE);
+    settingsMenu->add("Transport", 0,                transportCb, this, 0);
+    settingsMenu->add("Outputs",   0,                outputsCb,   this, 0);
     window->add(settingsMenu);
     tabs->setRightWidget(settingsMenu, gearSize);
 
@@ -244,10 +244,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);
     ctxPop->onShowInstruments = [this]() {
-        if (!outputsOverlay) return;
-        outputsOverlay->show();
-        if (auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Outputs")))
-            item->set();
+        if (outputsOverlay) outputsOverlay->show();
     };
     og2->setParamLaneContextPopup(plcPop);
     og2->onEndReached = [this]() { bottomPane->notifyEndReached(); };
@@ -360,10 +357,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         const int oy = 20;
         const int om = 20;
         outputsOverlay = new OutputsOverlay(om, oy, winW - 2*om, window->h() - oy - om);
-        outputsOverlay->onClose = [this]() {
-            if (auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Outputs")))
-                item->clear();
-        };
         outputsOverlay->isInstrumentInUse = [this](int instrId) {
             for (const auto& p : song_->get().patterns)
                 if (p.instrumentId == instrId) return true;
@@ -388,10 +381,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         const int oy = 20;
         const int om = 20;
         transportOverlay = new TransportOverlay(om, oy, winW - 2*om, window->h() - oy - om, pluginMode);
-        transportOverlay->onClose = [this]() {
-            if (auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Transport")))
-                item->clear();
-        };
         window->add(transportOverlay);
         window->registerPopup(transportOverlay);
     }
@@ -452,25 +441,13 @@ void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
 }
 
 void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
-    auto* app  = static_cast<LuvieApp*>(data);
-    auto* item = static_cast<Fl_Menu_Item*>(
-        const_cast<Fl_Menu_Item*>(app->settingsMenu->find_item("Outputs")));
-    if (!item || !app->outputsOverlay) return;
-    if (item->value())
-        app->outputsOverlay->show();
-    else
-        app->outputsOverlay->hide();
+    auto* app = static_cast<LuvieApp*>(data);
+    if (app->outputsOverlay) app->outputsOverlay->show();
 }
 
 void LuvieApp::transportCb(Fl_Widget* w, void* data) {
-    auto* app  = static_cast<LuvieApp*>(data);
-    auto* item = static_cast<Fl_Menu_Item*>(
-        const_cast<Fl_Menu_Item*>(app->settingsMenu->find_item("Transport")));
-    if (!item || !app->transportOverlay) return;
-    if (item->value())
-        app->transportOverlay->show();
-    else
-        app->transportOverlay->hide();
+    auto* app = static_cast<LuvieApp*>(data);
+    if (app->transportOverlay) app->transportOverlay->show();
 }
 
 void LuvieApp::pushInstruments() {
