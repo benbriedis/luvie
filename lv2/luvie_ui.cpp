@@ -130,6 +130,46 @@ struct LuvieUI {
    Full JSON state serialization / deserialization
    ----------------------------------------------------------------------- */
 
+/* Read the Outputs overlay (ports + backends + default type + instruments)
+   into `state`. Shared by LV2 state save and the File/Export menu. */
+static void collectOverlayOutputs(LuvieUI* ui, AppState& state)
+{
+    auto* overlay = ui->app.outputsOverlay;
+    if (!overlay) return;
+    state.defaultPortBackend = overlay->getDefaultBackend();
+    state.jackOutputs        = overlay->getOutputsFull();  // names + backends
+    state.jackInstruments.clear();
+    for (const auto& ci : overlay->getInstruments())
+        state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
+                                         ci.isDrum, ci.fallbackNoteNames,
+                                         ci.programNumber, ci.bankMsb, ci.bankLsb,
+                                         ci.gm1Instrument});
+}
+
+/* Push a loaded `state` into the Outputs overlay and re-register JACK ports to
+   match. Shared by LV2 state restore and the File/Import menu. */
+static void applyOverlayOutputs(LuvieUI* ui, const AppState& state)
+{
+    auto* overlay = ui->app.outputsOverlay;
+    if (!overlay) return;
+    overlay->setDefaultBackend(state.defaultPortBackend);
+    if (ui->jackTransport)
+        for (const auto& name : overlay->getOutputs())
+            ui->jackTransport->removeMidiPort(name);
+    if (!state.jackOutputs.empty())
+        overlay->setOutputs(state.jackOutputs);  // JackOutput overload keeps backends
+    if (ui->jackTransport)
+        for (const auto& name : overlay->getOutputs())
+            ui->jackTransport->addMidiPort(name);
+    std::vector<OutputsOverlay::InstrumentInfo> instrs;
+    for (const auto& c : state.jackInstruments)
+        instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
+                          c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
+                          c.gm1Instrument});
+    overlay->setInstruments(instrs);
+    ui->app.pushInstruments();
+}
+
 static std::string serializeStateToString(LuvieUI* ui)
 {
     if (!ui->song || !ui->app.patternPanel)
@@ -139,15 +179,7 @@ static std::string serializeStateToString(LuvieUI* ui)
     state.rootPitch = ui->app.patternPanel->rootPitch();
     state.chordType = ui->app.patternPanel->chordType();
     state.sharp     = ui->app.patternPanel->isSharp();
-    if (ui->app.outputsOverlay) {
-        for (const auto& name : ui->app.outputsOverlay->getOutputs())
-            state.jackOutputs.push_back({name});
-        for (const auto& ci : ui->app.outputsOverlay->getInstruments())
-            state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
-                                             ci.isDrum, ci.fallbackNoteNames,
-                                             ci.programNumber, ci.bankMsb, ci.bankLsb,
-                                             ci.gm1Instrument});
-    }
+    collectOverlayOutputs(ui, state);
     return appStateToJsonString(state);
 }
 
@@ -185,27 +217,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->restoringState = true;
     ui->app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
     ui->song->loadTimeline(state.timeline);
-    if (ui->app.outputsOverlay) {
-        auto* overlay = ui->app.outputsOverlay;
-        if (ui->jackTransport)
-            for (const auto& name : overlay->getOutputs())
-                ui->jackTransport->removeMidiPort(name);
-        if (!state.jackOutputs.empty()) {
-            std::vector<std::string> names;
-            for (const auto& c : state.jackOutputs) names.push_back(c.portName);
-            overlay->setOutputs(names);
-        }
-        if (ui->jackTransport)
-            for (const auto& name : overlay->getOutputs())
-                ui->jackTransport->addMidiPort(name);
-        std::vector<OutputsOverlay::InstrumentInfo> instrs;
-        for (const auto& c : state.jackInstruments)
-            instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
-                              c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
-                              c.gm1Instrument});
-        overlay->setInstruments(instrs);
-        ui->app.pushInstruments();
-    }
+    applyOverlayOutputs(ui, state);
     ui->restoringState = false;
     sendFullState(ui);
 }
@@ -356,6 +368,15 @@ static LV2UI_Handle instantiate(
             ui->jackTransport->setInstruments(routings);
         }
         if (!ui->restoringState) sendFullState(ui);
+    };
+
+    /* ---- Let File/Import and File/Export carry the outputs section ---- */
+    ui->app.onCollectOutputs = [ui](AppState& state) { collectOverlayOutputs(ui, state); };
+    ui->app.onApplyOutputs   = [ui](const AppState& state) {
+        ui->restoringState = true;
+        applyOverlayOutputs(ui, state);
+        ui->restoringState = false;
+        sendFullState(ui);
     };
 
     /* ---- Restore from file if available ---- */

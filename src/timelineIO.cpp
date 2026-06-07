@@ -278,6 +278,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"chordType",       state.chordType},
         {"sharp",           state.sharp},
         {"transport",       state.transport},
+        {"defaultPortBackend", backendToString(state.defaultPortBackend)},
         {"timeline",        timelineToJson(state.timeline)},
         {"jackOutputs",     jconns},
         {"jackInstruments", jinstrs},
@@ -296,6 +297,7 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     state.chordType = j.value("chordType", 0);
     state.sharp     = j.value("sharp",     true);
     state.transport = j.value("transport", -1);
+    state.defaultPortBackend = backendFromString(j.value("defaultPortBackend", "jack"));
     if (j.contains("timeline"))
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackOutputs", json::array()))

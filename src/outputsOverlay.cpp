@@ -15,9 +15,9 @@
 
 static constexpr int headerH  = OverlayWindow::headerH;
 static constexpr int titlePad = OverlayWindow::titlePad;
-static constexpr int sectionH = 44;
 static constexpr int colH     = 22;
-static constexpr int rowsTopY = headerH + sectionH + colH;
+static constexpr int defaultTypeRowH = 34;  // "Default port type" row height
+static constexpr int defaultLabelW   = 110; // label preceding the default-type dropdown
 static constexpr int rowH     = 40;
 static constexpr int inputH   = 26;
 static constexpr int addBtnH  = 32;
@@ -158,6 +158,20 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
 {
     begin();
 
+    auto* dtc = new ModernChoice(0, 0, backendW, inputH);
+    dtc->color(inputBgCol);
+    dtc->labelcolor(textCol);
+    dtc->textsize(12);
+    dtc->setBorderColor(borderCol);
+    dtc->setArrowColor(subTextCol);
+    dtc->setHoverColor(0xF3F4F600);
+    dtc->add("Jack");
+    dtc->add("Native");
+    dtc->add("Debug");
+    dtc->value(static_cast<int>(defaultBackend_));
+    dtc->callback(defaultTypeChoiceCb, this);
+    defaultTypeChoice = dtc;
+
     addBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Port");
     addBtn->labelsize(12);
     addBtn->labelcolor(textCol);
@@ -168,7 +182,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         auto* self = static_cast<OutputsOverlay*>(d);
         std::string name = self->uniquePortName(
             "midi_out_" + std::to_string(self->outputs_.size() + 1));
-        self->outputs_.push_back({self->nextPortId_++, name});
+        self->outputs_.push_back({self->nextPortId_++, name, self->defaultBackend_});
         self->rebuildRows();
         if (self->onPortAdded) self->onPortAdded(name);
     }, this);
@@ -298,9 +312,15 @@ std::vector<JackOutput> OutputsOverlay::getOutputsFull() const {
     return result;
 }
 
+void OutputsOverlay::setDefaultBackend(MidiBackend backend) {
+    defaultBackend_ = backend;
+    if (defaultTypeChoice) defaultTypeChoice->value(static_cast<int>(backend));
+}
+
 void OutputsOverlay::setJackWarning(bool show) {
     if (jackWarning_ == show) return;
     jackWarning_ = show;
+    rebuildRows();  // warning toggling shifts the default-type row + ports down/up
     redraw();
 }
 
@@ -390,6 +410,19 @@ void OutputsOverlay::syncFromInputs() {
         if (rows_[i].input) outputs_[i].portName = rows_[i].input->value();
 }
 
+int OutputsOverlay::defaultTypeRowY() const {
+    // Sits just under the title, dropping below the JACK warning when it shows.
+    return headerH + (jackWarning_ ? 48 : 30);
+}
+
+int OutputsOverlay::portsColY() const {
+    return defaultTypeRowY() + defaultTypeRowH;
+}
+
+int OutputsOverlay::portsRowsTopY() const {
+    return portsColY() + colH;
+}
+
 void OutputsOverlay::rebuildRows() {
     for (auto& row : rows_) {
         if (row.input)         { remove(row.input);         Fl::delete_widget(row.input); }
@@ -398,8 +431,11 @@ void OutputsOverlay::rebuildRows() {
     }
     rows_.clear();
 
+    defaultTypeChoice->position(pad + defaultLabelW + backendGap,
+                                defaultTypeRowY() - scrollY_);
+
     const int inputW = w() - scrollbarW - 2*pad - delBtnSz - 8 - backendW - backendGap;
-    int y = rowsTopY;
+    int y = portsRowsTopY();
 
     begin();
     for (int i = 0; i < (int)outputs_.size(); i++) {
@@ -735,6 +771,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 void OutputsOverlay::onScroll(int delta) {
     auto mv = [&](Fl_Widget* wp) { if (wp) wp->position(wp->x(), wp->y() + delta); };
 
+    mv(defaultTypeChoice);
     for (auto& row : rows_) { mv(row.input); mv(row.backendChoice); mv(row.deleteBtn); }
     mv(addBtn);
 
@@ -809,6 +846,13 @@ void OutputsOverlay::backendChoiceCb(Fl_Widget* w, void* d) {
         if (self->onPortBackendChanged) self->onPortBackendChanged();
         return;
     }
+}
+
+void OutputsOverlay::defaultTypeChoiceCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    int idx = static_cast<Fl_Choice*>(w)->value();
+    if (idx < 0) return;
+    self->defaultBackend_ = static_cast<MidiBackend>(idx);
 }
 
 void OutputsOverlay::deleteCb(Fl_Widget* w, void* d) {
@@ -1036,6 +1080,7 @@ void OutputsOverlay::bankLsbInputCb(Fl_Widget* w, void* d) {
 
 std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
     std::vector<Fl_Widget*> order;
+    if (defaultTypeChoice && defaultTypeChoice->active()) order.push_back(defaultTypeChoice);
     for (const auto& row : rows_) {
         if (row.input && row.input->active())         order.push_back(row.input);
         if (row.backendChoice && row.backendChoice->active()) order.push_back(row.backendChoice);
@@ -1096,12 +1141,18 @@ void OutputsOverlay::drawStaticContent(int sy, int sbW) {
                 w() - 2*titlePad, 14, FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
     }
 
-    const int colY = headerH + sectionH;
+    fl_font(FL_HELVETICA, 11);
+    fl_color(subTextCol);
+    fl_draw("Default port type", pad, defaultTypeRowY() - sy, defaultLabelW, inputH,
+            FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+    const int colY = portsColY();
     fl_font(FL_HELVETICA, 10);
     fl_color(subTextCol);
     fl_draw("PORT NAME", pad, colY - sy,
             w() - 2*pad, colH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
+    const int rowsTopY = portsRowsTopY();
     fl_color(dividerCol);
     fl_line_style(FL_SOLID, 1);
     fl_line(pad, rowsTopY - sy, w() - sbW - pad, rowsTopY - sy);

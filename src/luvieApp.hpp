@@ -8,6 +8,7 @@
 #include "itimelineobserver.hpp"
 #include "activePatternSet.hpp"
 
+struct AppState;
 class ObservableSong;
 class ObservablePattern;
 class ObservableInstrument;
@@ -74,6 +75,12 @@ public:
     std::function<void()> onSave;
     std::function<void()> onSaveAs;
     void disableSaveMenu(bool save, bool saveAs);
+
+    // Outputs (ports/instruments) persistence — wired by main so Import/Export
+    // include the outputs section. onCollectOutputs fills state from the overlay
+    // for Export; onApplyOutputs pushes a loaded state into the overlay on Import.
+    std::function<void(AppState&)>       onCollectOutputs;
+    std::function<void(const AppState&)> onApplyOutputs;
 
     // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
     ActivePatternSet aps;

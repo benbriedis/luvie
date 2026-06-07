@@ -18,8 +18,10 @@ class OutputsOverlay : public OverlayWindow {
     ModernButton* addBtn          = nullptr;
     ModernButton* addInstrBtn     = nullptr;
     ModernButton* addDrumInstrBtn = nullptr;
+    Fl_Choice*    defaultTypeChoice = nullptr;  // "Default port type" for new ports
 
     int nextPortId_ = 1;
+    MidiBackend defaultBackend_ = MidiBackend::Jack;  // type assigned to newly added ports
     ObservableInstrument* instrObs_ = nullptr;
 
     // ── Port data ──────────────────────────────────────────────────────────────
@@ -92,6 +94,11 @@ class OutputsOverlay : public OverlayWindow {
     void rebuildPortChoices();
     void syncFromInputs();
 
+    // Vertical layout of the ports section (depends on whether the JACK warning shows).
+    int defaultTypeRowY() const;  // top Y of the "Default port type" row
+    int portsColY()       const;  // top Y of the "PORT NAME" column header
+    int portsRowsTopY()   const;  // top Y of the first port row / divider
+
     std::vector<Fl_Widget*> getFocusOrder() const;
     void advanceFocusBy(int dir);
 
@@ -99,8 +106,9 @@ class OutputsOverlay : public OverlayWindow {
     std::string uniqueInstrName(const std::string& base, int excludeIdx = -1) const;
     std::string nextNumberedInstrName(bool isDrum) const;
 
-    static void inputCb         (Fl_Widget*, void*);
-    static void backendChoiceCb (Fl_Widget*, void*);
+    static void inputCb            (Fl_Widget*, void*);
+    static void backendChoiceCb    (Fl_Widget*, void*);
+    static void defaultTypeChoiceCb(Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
     static void instrNameCb     (Fl_Widget*, void*);
     static void instrDeleteCb   (Fl_Widget*, void*);
@@ -132,6 +140,10 @@ public:
     void setOutputs(const std::vector<JackOutput>& ports);
     std::vector<std::string> getOutputs() const;
     std::vector<JackOutput>  getOutputsFull() const;  // names + backends
+
+    // Default port type applied to newly added ports.
+    void        setDefaultBackend(MidiBackend backend);
+    MidiBackend getDefaultBackend() const { return defaultBackend_; }
 
     // Show/hide the red "JACK server not running" warning under the title.
     void setJackWarning(bool show);

@@ -82,6 +82,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     app->song_->loadTimeline(state.timeline);
     if (app->patternPanel)
         app->patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+    if (app->onApplyOutputs) app->onApplyOutputs(state);
 }
 
 void LuvieApp::exportCb(Fl_Widget*, void* data) {
@@ -108,6 +109,7 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
         state.chordType = app->patternPanel->chordType();
         state.sharp     = app->patternPanel->isSharp();
     }
+    if (app->onCollectOutputs) app->onCollectOutputs(state);
     saveAppState(state, path);
 }
 

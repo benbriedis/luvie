@@ -222,6 +222,7 @@ int main(int argc, char **argv) {
     // reconcile the live Port set to match.
     auto applyLoadedOutputs = [&](const AppState& state) {
         if (!connOverlay) return;
+        connOverlay->setDefaultBackend(state.defaultPortBackend);
         connOverlay->setOutputs(state.jackOutputs);
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
@@ -238,6 +239,7 @@ int main(int argc, char **argv) {
     // Helper: fill jackOutputs and jackInstruments in an AppState from the overlay.
     auto collectOutputs = [&](AppState& state) {
         if (!connOverlay) return;
+        state.defaultPortBackend = connOverlay->getDefaultBackend();
         state.jackOutputs = connOverlay->getOutputsFull();
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
@@ -246,6 +248,10 @@ int main(int argc, char **argv) {
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
                                              ci.gm1Instrument});
     };
+
+    // Let the menu's Import/Export include the outputs section.
+    app.onApplyOutputs   = [&](const AppState& state) { applyLoadedOutputs(state); };
+    app.onCollectOutputs = [&](AppState& state)       { collectOutputs(state); };
 
     // --- Transport selection ----------------------------------------------
     // One-time JACK wiring, run when the server first becomes available.
