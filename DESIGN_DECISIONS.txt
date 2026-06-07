@@ -36,4 +36,7 @@ The user will almost always want to use the same transport, so save the selectio
       and lead to bad settings being saved in projects. The polling loop approach seems to be the best approach.
    New projects need a "Setup" window to popup, otherwise we're just guessing what the user wants.
 
+ I've disallowed the use of --test with a session to prevent the accidental changing of settings in
+ existing projects. Could support it in future if useful.
+
 

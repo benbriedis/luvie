@@ -364,14 +364,6 @@ Unstacked:
   Maybe remove vertical lines through the instrument headers? Or fade them there.
 
 
-GOOD STARTING POINT FOR JACK 
-============================
-4. Still support luvie --test 
-	 DISALLOW use of --test with a session to prevent whoopsies.
-	 Maybe allow with existing "testing" sessions in future if there is demand for it.
-	 Note: handy for the AI and maybe auto-tests as well as for me.
-
-
 * Q: Is it ever really worth it to mix ALSA and Jack connections?
      Would seem that going "native" if Jack is used would be best regarded as exceptional.
 

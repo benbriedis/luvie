@@ -41,7 +41,8 @@ int main(int argc, char **argv) {
             printf("Usage: luvie [options] [project-file]\n\n"
                    "Options:\n"
                    "  --verbose        Print notes and parameter changes during playback\n"
-                   "  --test           Use internal transport; skip JACK (implies --verbose)\n"
+                   "  --test           Use internal transport and debug MIDI output;\n"
+                   "                   skip JACK (implies --verbose; no project file allowed)\n"
                    "  -h, --help       Show this help message\n\n"
                    "Arguments:\n"
                    "  project-file     Path to a .json project file to open on startup\n\n"
@@ -58,6 +59,15 @@ int main(int argc, char **argv) {
             argv[fltk_argc++] = argv[i];
     }
     argc = fltk_argc;
+
+    // --test runs a self-contained internal session; pairing it with a named
+    // project file on the command line is contradictory, so reject it.
+    if (testMode && !projectPath.empty()) {
+        fprintf(stderr,
+                "Error: --test cannot be used together with a project file "
+                "(\"%s\").\n", projectPath.c_str());
+        return 1;
+    }
 
     AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
     window.color(bgColor);
@@ -357,6 +367,15 @@ int main(int argc, char **argv) {
         app.transportOverlay->setSelection(testMode ? 1 : 2);
     }
 
+    // --test also routes MIDI to the debug console by default: make Debug the
+    // default backend for new ports and retype any ports already present.
+    if (testMode && connOverlay) {
+        connOverlay->setDefaultBackend(MidiBackend::Debug);
+        auto outs = connOverlay->getOutputsFull();
+        for (auto& o : outs) o.backend = MidiBackend::Debug;
+        connOverlay->setOutputs(outs);
+    }
+
     // Initial reconcile of the default port set (and JACK want/warning state).
     syncPorts();
 
@@ -510,12 +529,38 @@ int main(int argc, char **argv) {
         };
     }
 
-    // When the window is closed save the session (NSM or standalone with a path).
-    window.callback([](Fl_Widget* w, void*) {
-        if (nsm.isActive() && nsm.onSave)
-            nsm.onSave();
-        w->hide();
-    }, nullptr);
+    // On window close, prompt whether to save before quitting. The window
+    // callback must be a plain function pointer, so the bits it needs are bundled
+    // in a context passed via the data pointer (valid for all of Fl::run()).
+    struct CloseCtx {
+        NsmClient*            nsm;
+        std::function<void()> save;   // performs a save in the current mode
+    };
+    CloseCtx closeCtx;
+    closeCtx.nsm  = &nsm;
+    closeCtx.save = [&]() {
+        if (nsm.isActive()) { if (nsm.onSave) nsm.onSave(); }
+        else if (app.onSave) app.onSave();
+    };
+
+    window.callback([](Fl_Widget* w, void* data) {
+        auto* ctx = static_cast<CloseCtx*>(data);
+
+        // Under NSM the session manager owns the session file, so just save and go.
+        if (ctx->nsm->isActive()) {
+            ctx->save();
+            w->hide();
+            return;
+        }
+
+        // Standalone: ask the user what to do with the session.
+        // b0 is the default (also fired by Esc / WM close), so make it Cancel.
+        int choice = fl_choice("Save this session before closing?",
+                               "Cancel", "Don't Save", "Save");
+        if (choice == 0) return;           // Cancel — keep the window open
+        if (choice == 2) ctx->save();      // Save, then close
+        w->hide();                         // Save or Don't Save both close
+    }, &closeCtx);
 
     // Arm FLTK's cross-thread wakeup so Fl::awake() callbacks posted from JACK's
     // threads (transport events, server-shutdown notification) are delivered to
@@ -526,8 +571,9 @@ int main(int argc, char **argv) {
 
     // For a fresh standalone project, prompt for the transport + default MIDI
     // output before the user starts. (Fresh NSM sessions get the same dialog from
-    // the NSM open handler, once the session path is known.)
-    if (newProject && !nsm.isActive())
+    // the NSM open handler, once the session path is known.) --test picks its
+    // own defaults (internal transport + debug output), so skip the dialog.
+    if (newProject && !nsm.isActive() && !testMode)
         showStartupDialog();
 
     return Fl::run();
