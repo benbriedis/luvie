@@ -12,6 +12,26 @@ void ModernTabs::enableModeToggle(Fl_Color songCol, Fl_Color loopCol)
 	redraw();
 }
 
+void ModernTabs::setRightWidget(Fl_Widget* w, int reserveW)
+{
+	rightWidget  = w;
+	rightReserve = reserveW;
+	layoutRightWidget();
+	redraw();
+}
+
+void ModernTabs::layoutRightWidget()
+{
+	if (!rightWidget) return;
+	int tbH = tabBarH();
+	int nx  = x() + w() - rightReserve, ny = y();
+	// Pin to the tab bar's top-right. The window's own resize logic would
+	// otherwise drift it, so re-assert the position whenever it diverges.
+	if (rightWidget->x() != nx || rightWidget->y() != ny ||
+	    rightWidget->w() != rightReserve || rightWidget->h() != tbH)
+		rightWidget->resize(nx, ny, rightReserve, tbH);
+}
+
 void ModernTabs::setTabAccent(int tabIdx, Fl_Color c)
 {
 	if (tabIdx >= (int)tabAccents.size())
@@ -43,6 +63,7 @@ void ModernTabs::drawModeToggle(int tbH)
 }
 
 void ModernTabs::draw() {
+	layoutRightWidget();   // keep the docked gear pinned through window resizes
 	int tbH = tabBarH();
 	int n   = children();
 	Fl_Widget* v = value();
@@ -72,7 +93,7 @@ void ModernTabs::draw() {
 	if (n == 0) return;
 
 	int tabsX = x() + leftReserve;
-	int tabsW = w() - leftReserve;
+	int tabsW = w() - leftReserve - rightReserve;
 	int tabW  = tabsW / n;
 
 	for (int i = 0; i < n; i++) {
@@ -113,6 +134,7 @@ void ModernTabs::resize(int x, int y, int w, int h) {
 	int tbH = tabBarH();
 	for (int i = 0; i < children(); i++)
 		child(i)->resize(x, y + tbH, w, h - tbH);
+	layoutRightWidget();
 }
 
 int ModernTabs::handle(int event) {
@@ -156,8 +178,8 @@ int ModernTabs::handle(int event) {
 		int n = children();
 		if (n > 0) {
 			int tabsX = x() + leftReserve;
-			int tabsW = w() - leftReserve;
-			if (ex >= tabsX) {
+			int tabsW = w() - leftReserve - rightReserve;
+			if (ex >= tabsX && ex < tabsX + tabsW) {
 				int idx = (ex - tabsX) * n / tabsW;
 				if (idx < 0) idx = 0;
 				if (idx >= n) idx = n - 1;

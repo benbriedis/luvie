@@ -15,6 +15,8 @@ class ModernTabs : public Fl_Tabs {
 	bool     modeIsLoop   = false;
 	bool     toggleHovered = false;
 	int      leftReserve  = 0;
+	int      rightReserve = 0;            // space reserved for a right-docked widget
+	Fl_Widget* rightWidget = nullptr;     // e.g. the Settings gear button
 	Fl_Color songColor    = 0x22C55E00;
 	Fl_Color loopColor    = 0x3B82F600;
 
@@ -22,6 +24,7 @@ class ModernTabs : public Fl_Tabs {
 
 	int  tabBarH() const;
 	void drawModeToggle(int tbH);
+	void layoutRightWidget();
 
 public:
 	std::function<void(bool isLoop)> onModeChanged;
@@ -29,6 +32,8 @@ public:
 	ModernTabs(int x, int y, int w, int h);
 
 	void enableModeToggle(Fl_Color songCol, Fl_Color loopCol);
+	// Dock a widget at the right end of the tab bar; tabs shrink to make room.
+	void setRightWidget(Fl_Widget* w, int reserveW);
 	void setTabAccent(int tabIdx, Fl_Color c);
 	bool modeLoop() const { return modeIsLoop; }
 

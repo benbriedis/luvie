@@ -12,6 +12,7 @@
 #include "noteContextPopup.hpp"
 #include "patternInstanceContextPopup.hpp"
 #include "modernTabs.hpp"
+#include "settingsButton.hpp"
 #include "transport.hpp"
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
@@ -120,27 +121,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     pattern_      = pattern;
     instruments_  = instruments;
 
-    const int off        = menuBarH;
-    const int tabsH      = defaultWinH() - bottomH - menuBarH;
+    const int off        = 0;
+    const int tabsH      = defaultWinH() - bottomH;
     const int drumRowH   = 20;
     const int numRows     = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / rowHeight;
     const int drumNumRows = (tabsH - tabBarH - Editor::rulerH - panelH - Editor::hScrollH) / drumRowH;
 
     Fl_Group::current(nullptr);
-
-    // ---- Menu bar ----
-    menuBar = new Fl_Menu_Bar(0, 0, winW, menuBarH);
-    menuBar->box(FL_FLAT_BOX);
-    menuBar->color(0xF3F4F600);
-    menuBar->textcolor(0x37415100);
-    menuBar->textsize(13);
-    menuBar->add("File/Save",    FL_COMMAND + 's', nullptr, nullptr, 0);
-    menuBar->add("File/Save As", 0,                nullptr, nullptr, FL_MENU_DIVIDER);
-    menuBar->add("File/Import",  0,                nullptr, nullptr);
-    menuBar->add("File/Export",  0,                nullptr, nullptr, 0);
-    menuBar->add("View/Transport", 0, nullptr, nullptr, FL_MENU_TOGGLE);
-    menuBar->add("View/Outputs", 0, nullptr, nullptr, FL_MENU_TOGGLE);
-    window->add(menuBar);
 
     // ---- Popups (created before any group so they stay unparented until explicit add) ----
     auto* p1      = new NoteContextPopup{};
@@ -164,6 +151,20 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tabs->setTabAccent(1, loopColor);
     tabs->setTabAccent(2, 0xF9731600);
     window->add(tabs);
+
+    // ---- Settings gear (right end of the tab bar) ----
+    // Square, tab-bar height; drops a menu carrying the former File/View items.
+    constexpr int gearSize = tabBarH;
+    settingsMenu = new SettingsButton(winW - gearSize, off, gearSize, gearSize);
+    settingsMenu->textsize(13);
+    settingsMenu->add("Save",      FL_COMMAND + 's', saveCb,      this, 0);
+    settingsMenu->add("Save As",   0,                saveAsCb,    this, FL_MENU_DIVIDER);
+    settingsMenu->add("Import",    0,                importCb,    this, 0);
+    settingsMenu->add("Export",    0,                exportCb,    this, FL_MENU_DIVIDER);
+    settingsMenu->add("Transport", 0,                transportCb, this, FL_MENU_TOGGLE);
+    settingsMenu->add("Outputs",   0,                outputsCb,   this, FL_MENU_TOGGLE);
+    window->add(settingsMenu);
+    tabs->setRightWidget(settingsMenu, gearSize);
 
     // ---- Song Editor tab ----
     auto* tab1 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Song Editor");
@@ -245,7 +246,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     ctxPop->onShowInstruments = [this]() {
         if (!outputsOverlay) return;
         outputsOverlay->show();
-        if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
+        if (auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Outputs")))
             item->set();
     };
     og2->setParamLaneContextPopup(plcPop);
@@ -336,20 +337,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
     syncNoteLabels();
 
-    // ---- Menu callbacks ----
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Save")))
-        item->callback(saveCb, this);
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Save As")))
-        item->callback(saveAsCb, this);
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Import")))
-        item->callback(importCb, this);
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("File/Export")))
-        item->callback(exportCb, this);
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
-        item->callback(transportCb, this);
-    if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
-        item->callback(outputsCb, this);
-
     // ---- Popups — added last (FLTK dispatches in reverse order) ----
     window->add(p1);     window->registerPopup(p1);
     window->add(p2);     window->registerPopup(p2);
@@ -370,11 +357,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // Connections overlay last — large sub-window, click-away via registerPopup.
     {
-        const int oy = menuBarH + 20;
+        const int oy = 20;
         const int om = 20;
         outputsOverlay = new OutputsOverlay(om, oy, winW - 2*om, window->h() - oy - om);
         outputsOverlay->onClose = [this]() {
-            if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Outputs")))
+            if (auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Outputs")))
                 item->clear();
         };
         outputsOverlay->isInstrumentInUse = [this](int instrId) {
@@ -398,11 +385,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // Transport overlay — same footprint as the outputs overlay.
     {
-        const int oy = menuBarH + 20;
+        const int oy = 20;
         const int om = 20;
         transportOverlay = new TransportOverlay(om, oy, winW - 2*om, window->h() - oy - om, pluginMode);
         transportOverlay->onClose = [this]() {
-            if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
+            if (auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Transport")))
                 item->clear();
         };
         window->add(transportOverlay);
@@ -425,7 +412,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Resizable chain + minimum size ----
     window->resizable(tabs);
     const int minW = 14 + 70 + 5*40;
-    const int minH = menuBarH + tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
+    const int minH = tabBarH + Editor::rulerH + 5*rowHeight + Editor::hScrollH + panelH + bottomH;
     window->size_range(minW, minH);
 
     // ---- Timeline observers ----
@@ -453,21 +440,21 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 }
 
 void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
-    if (!menuBar) return;
+    if (!settingsMenu) return;
     auto setActive = [this](const char* path, bool active) {
-        auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item(path));
+        auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item(path));
         if (!item) return;
         if (active) item->activate(); else item->deactivate();
     };
-    setActive("File/Save",    !save);
-    setActive("File/Save As", !saveAs);
-    menuBar->redraw();
+    setActive("Save",    !save);
+    setActive("Save As", !saveAs);
+    settingsMenu->redraw();
 }
 
 void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
     auto* app  = static_cast<LuvieApp*>(data);
     auto* item = static_cast<Fl_Menu_Item*>(
-        const_cast<Fl_Menu_Item*>(app->menuBar->find_item("View/Outputs")));
+        const_cast<Fl_Menu_Item*>(app->settingsMenu->find_item("Outputs")));
     if (!item || !app->outputsOverlay) return;
     if (item->value())
         app->outputsOverlay->show();
@@ -478,7 +465,7 @@ void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
 void LuvieApp::transportCb(Fl_Widget* w, void* data) {
     auto* app  = static_cast<LuvieApp*>(data);
     auto* item = static_cast<Fl_Menu_Item*>(
-        const_cast<Fl_Menu_Item*>(app->menuBar->find_item("View/Transport")));
+        const_cast<Fl_Menu_Item*>(app->settingsMenu->find_item("Transport")));
     if (!item || !app->transportOverlay) return;
     if (item->value())
         app->transportOverlay->show();
