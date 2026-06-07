@@ -22,6 +22,7 @@
 #include "playhead.hpp"
 #include "chords.hpp"
 #include "transportOverlay.hpp"
+#include "startupOverlay.hpp"
 #include "drumPatternEditor.hpp"
 #include "songEditor.hpp"
 #include "itimelineobserver.hpp"
@@ -78,6 +79,7 @@ int main(int argc, char **argv) {
     JackObserver    jackObserver(&jackTransport);
     PortRegistry    portReg(&jackTransport);   // owns the live Port objects (Jack/Native/Debug)
     bool            jackUp = false;   // set once JACK has been opened + wired up
+    bool            newProject = true;   // cleared once an existing project loads
 
     simpleTransport.setTimeline(&songTimeline);
     router.setActive(&simpleTransport);
@@ -358,6 +360,34 @@ int main(int argc, char **argv) {
     // Initial reconcile of the default port set (and JACK want/warning state).
     syncPorts();
 
+    // --- New-project startup dialog ---------------------------------------
+    // Applies its two choices live to the existing overlays. The MIDI-output
+    // choice sets the default for new ports and also retypes the ports already
+    // present so the pick takes effect on this fresh project.
+    if (app.startupOverlay) {
+        app.startupOverlay->onTransportChanged = [&](int index) {
+            if (app.transportOverlay) app.transportOverlay->setSelection(index);
+        };
+        app.startupOverlay->onDefaultBackendChanged = [&](MidiBackend backend) {
+            if (!connOverlay) return;
+            connOverlay->setDefaultBackend(backend);
+            auto outs = connOverlay->getOutputsFull();
+            for (auto& o : outs) o.backend = backend;
+            connOverlay->setOutputs(outs);
+            syncPorts();
+        };
+    }
+
+    // Pop the new-project dialog, seeded with the current defaults. Shown for a
+    // fresh standalone project (below) and for a fresh NSM session (from onOpen).
+    auto showStartupDialog = [&]() {
+        if (app.pluginMode || !app.startupOverlay) return;
+        app.startupOverlay->setSelections(
+            app.transportOverlay ? app.transportOverlay->selection() : 2,
+            connOverlay ? connOverlay->getDefaultBackend() : MidiBackend::Jack);
+        app.startupOverlay->show();
+    };
+
     // --- NSM session management -------------------------------------------
     static NsmClient nsm;
     std::string nsmSessionPath;
@@ -366,12 +396,16 @@ int main(int argc, char **argv) {
         nsmSessionPath = path;
         AppState state;
         if (loadAppState(path + ".json", state)) {
+            newProject = false;
             songTimeline.loadTimeline(state.timeline);
             if (app.patternPanel)
                 app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
             applyLoadedOutputs(state);
             if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
                 app.transportOverlay->setSelection(state.transport);
+        } else {
+            // Fresh NSM session — no saved file yet; let the user pick defaults.
+            showStartupDialog();
         }
         return true;
     };
@@ -441,6 +475,7 @@ int main(int argc, char **argv) {
         if (!projectPath.empty()) {
             AppState state;
             if (loadAppState(projectPath, state)) {
+                newProject = false;
                 songTimeline.loadTimeline(state.timeline);
                 if (app.patternPanel)
                     app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
@@ -488,5 +523,12 @@ int main(int argc, char **argv) {
     Fl::lock();
 
     window.show(argc, argv);
+
+    // For a fresh standalone project, prompt for the transport + default MIDI
+    // output before the user starts. (Fresh NSM sessions get the same dialog from
+    // the NSM open handler, once the session path is known.)
+    if (newProject && !nsm.isActive())
+        showStartupDialog();
+
     return Fl::run();
 }

@@ -23,6 +23,7 @@
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
 #include "transportOverlay.hpp"
+#include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
 #include "patternParamGrid.hpp"
@@ -413,6 +414,19 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             if (auto* item = const_cast<Fl_Menu_Item*>(menuBar->find_item("View/Transport")))
                 item->set();
         });
+    }
+
+    // New-project startup dialog — centred over the main window. main() shows it
+    // (and wires its callbacks) only for a fresh project. Deliberately NOT
+    // registered as a popup: it must be dismissed via its Confirm button, not by
+    // clicking away.
+    {
+        const int dlgW = 380;
+        const int dlgH = 250;
+        const int dx = (winW - dlgW) / 2;
+        const int dy = (window->h() - dlgH) / 2;
+        startupOverlay = new StartupOverlay(dx, dy, dlgW, dlgH, pluginMode);
+        window->add(startupOverlay);
     }
 
     // ---- Resizable chain + minimum size ----

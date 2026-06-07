@@ -28,6 +28,7 @@ class MarkerPopup;
 class TrackContextPopup;
 class OutputsOverlay;
 class TransportOverlay;
+class StartupOverlay;
 
 // Builds and wires the shared Luvie UI layout (tabs, editors, transport bar, popups).
 // Callers create AppWindow, ObservableSong, ObservablePattern, and ITransport,
@@ -98,6 +99,7 @@ public:
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;
     TransportOverlay*  transportOverlay = nullptr;
+    StartupOverlay*    startupOverlay = nullptr;
 
     void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
                ObservableInstrument* instruments, ITransport* transport);

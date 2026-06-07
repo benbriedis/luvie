@@ -366,17 +366,6 @@ Unstacked:
 
 GOOD STARTING POINT FOR JACK 
 ============================
-2. On the Outputs overlay:
-
-   When Jack is used but not yet present, share the Jack detection polling loop with the transport.
-   Show messages on Output overlay if Jack not yet found + mention detection polling loop.
-   Place warning on transport bar iff transport is not ALSO using Jack but an output is.
-
-3. When creating a new project (session name omitted or file doesn't exist) 
-   create a startup settings box to set:
-		a. The transport
-		b. The default setting for new outputs (include 'debug' in output list for the moment)
-
 4. Still support luvie --test 
 	 DISALLOW use of --test with a session to prevent whoopsies.
 	 Maybe allow with existing "testing" sessions in future if there is demand for it.

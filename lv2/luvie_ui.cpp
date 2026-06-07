@@ -347,6 +347,8 @@ static LV2UI_Handle instantiate(
 
     /* ---- Wire port management (same as standalone) ---- */
     if (auto* overlay = ui->app.outputsOverlay) {
+        /* No new-project dialog in the plugin; default MIDI output is Jack. */
+        overlay->setDefaultBackend(MidiBackend::Jack);
         overlay->onPortAdded = [ui](const std::string& name) {
             if (ui->jackTransport) ui->jackTransport->addMidiPort(name);
         };
