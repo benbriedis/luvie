@@ -388,9 +388,8 @@ TODO test song parameters via Alsa and Jack
 
 MAYBE remove the transport indicator
 
-Auto-save? NSM does this already I think. Plugins?
+cf Auto-save? NSM does this already I think. Plugins?
 
-Change .json to .luv 
 Error window when starting (invalid project file) is old fashioned.
 Exit on save on closing window is old fashioned.
 

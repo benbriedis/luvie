@@ -24,7 +24,7 @@ public:
     // --- Callbacks (set before calling init) ---
 
     // Called when the session manager sends /nsm/client/open.
-    // path is the base path for session data (append an extension, e.g. ".json").
+    // path is the base path for session data (append an extension, e.g. ".luv").
     // Return true on success; false to report an error to the session manager.
     std::function<bool(const std::string& path, const std::string& displayName)> onOpen;
 

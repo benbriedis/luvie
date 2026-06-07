@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
                    "                   skip JACK (implies --verbose; no project file allowed)\n"
                    "  -h, --help       Show this help message\n\n"
                    "Arguments:\n"
-                   "  project-file     Path to a .json project file to open on startup\n\n"
+                   "  project-file     Path to a .luv project file to open on startup\n\n"
                    "Environment:\n"
                    "  NSM_URL          Connect to a Non Session Manager at this OSC address\n");
             return 0;
@@ -414,7 +414,7 @@ int main(int argc, char **argv) {
     nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
         nsmSessionPath = path;
         AppState state;
-        if (loadAppState(path + ".json", state)) {
+        if (loadAppState(path + ".luv", state)) {
             newProject = false;
             songTimeline.loadTimeline(state.timeline);
             if (app.patternPanel)
@@ -440,7 +440,7 @@ int main(int argc, char **argv) {
         }
         if (app.transportOverlay) state.transport = app.transportOverlay->selection();
         collectOutputs(state);
-        return saveAppState(state, nsmSessionPath + ".json");
+        return saveAppState(state, nsmSessionPath + ".luv");
     };
 
     std::string exeName = argv[0];
@@ -459,18 +459,18 @@ int main(int argc, char **argv) {
     } else {
         // Standalone mode: load from CLI path if provided, then set up Save.
 
-        // Helper: shows a Save As dialog, returns chosen path (with .json),
+        // Helper: shows a Save As dialog, returns chosen path (with .luv),
         // or empty string if cancelled.
         auto pickSavePath = [&]() -> std::string {
             Fl_Native_File_Chooser fc;
             fc.title("Save Project As");
             fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
-            fc.filter("JSON Files\t*.json\nAll Files\t*");
+            fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
             fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
             if (!LuvieApp::lastFileDir.empty()) fc.directory(LuvieApp::lastFileDir.c_str());
             if (fc.show() != 0) return {};
             std::string p = fc.filename();
-            if (p.size() < 5 || p.substr(p.size() - 5) != ".json") p += ".json";
+            if (p.size() < 4 || p.substr(p.size() - 4) != ".luv") p += ".luv";
             LuvieApp::lastFileDir = std::filesystem::path(p).parent_path().string();
             return p;
         };
