@@ -80,6 +80,25 @@ std::string NoteLabels::noteForRow(int virtualPos) const {
     return noteName(n, rootPitch, chordType, useSharp);
 }
 
+// visual row → MIDI pitch (canonical rowToMidi, matching playback); -1 if empty
+int NoteLabels::midiForRow(int r) const {
+    if (groupSize <= 0) return -1;
+    int virtualPos = rowOffset + (numRows - 1 - r);
+    if (virtualPos < 0 || virtualPos >= totalTones) return -1;
+    int gs     = groupSize;
+    int pos    = ((virtualPos % gs) + gs) % gs;
+    int octave = virtualPos / gs;
+    int n;
+    if (pos >= chordSize) {
+        int ddIdx = pos - chordSize;
+        if (ddIdx >= (int)disabledDegrees.size()) return -1;
+        n = octave * chordSize + disabledDegrees[ddIdx];
+    } else {
+        n = octave * chordSize + pos;
+    }
+    return rowToMidi(n, rootPitch, chordType);
+}
+
 void NoteLabels::draw() {
     static constexpr Fl_Color bgCol     = 0x1F293700;
     static constexpr Fl_Color borderCol = 0x37415100;
@@ -116,6 +135,9 @@ int NoteLabels::handle(int event) {
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();
+        } else if (Fl::event_button() == FL_LEFT_MOUSE && onRowClicked) {
+            int r = (Fl::event_y() - y()) / rowHeight;
+            if (r >= 0 && r < numRows) onRowClicked(midiForRow(r));
         }
         return 1;
     }

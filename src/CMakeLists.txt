@@ -12,6 +12,7 @@ add_library(luvie_core STATIC
     luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp
     outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp jackPort.cpp
     rtMidiPort.cpp debugPort.cpp portRegistry.cpp jackShim.cpp
+    noteAuditioner.cpp
 )
 
 target_include_directories(luvie_core PUBLIC

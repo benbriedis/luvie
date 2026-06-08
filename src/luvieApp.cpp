@@ -272,6 +272,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     if (rowToMidi || instrRoute)
         og2->setPlayheadSoftRouting(rowToMidi, instrRoute);
 
+    // Clicking a pattern-editor row label auditions that note on the selected
+    // track's instrument port.
+    auditioner.setPortRegistry(portRegistry);
+    auditioner.setInstrRoute(instrRoute);
+
     // ---- Wire up active pattern set ----
     loopEd->setActivePatterns(&aps);
     og2->setPlayheadActivePatterns(&aps);
@@ -307,6 +312,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     patternEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
+    patternEd->setAuditioner(&auditioner);
+    drumEd->setAuditioner(&auditioner);
+    pianorollEd->setAuditioner(&auditioner);
 
     // ---- Note label / params sync ----
     auto syncNoteLabels = [this]() {

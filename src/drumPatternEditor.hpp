@@ -29,7 +29,8 @@ public:
     void setFallbackNoteNames(bool b) { fallbackNoteNames = b; redraw(); }
 
     std::function<void(int midiNote, int rowY, int rowH)> onRowDoubleClicked;
-    std::function<void()> onRightClick;
+    std::function<void()>    onRightClick;
+    std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 };
 
 // ---------------------------------------------------------------------------
@@ -65,7 +66,6 @@ class DrumPatternEditor : public BasePatternEditor {
     std::map<int, std::map<int, std::string>> allDrumMaps;
     std::map<int, bool>                       allFallbackModes;
 
-    int currentInstrumentId() const;
     void applyCurrentDrumMap();
     void startDrumLabelEdit(int midiNote, int rowY, int rowH);
     void commitDrumLabelEdit();
@@ -97,6 +97,7 @@ class DrumPatternEditor : public BasePatternEditor {
         drumRowControls.resize(x + labelsW, y, controlsW, h);
     }
     void labelsSetOnRightClick(std::function<void()> fn) override { drumLabels.onRightClick = std::move(fn); }
+    void labelsSetOnRowClicked(std::function<void(int)> fn) override { drumLabels.onRowClicked = std::move(fn); }
 
     void setGridPattern(int patId) override;
     void afterTimelineChanged(int patId) override;

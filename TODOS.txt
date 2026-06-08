@@ -378,10 +378,6 @@ cf Pipewire
  - Are there any programming implications?
  - To launch under Pipewire... try:    pw-jack luvie
 
-Compile in ALSA dependencies? (Linux)
-   What can/should we do wrt ALSA?  
-   Is name passed through OK?   
-   
 TODO test song parameters via Alsa and Jack
 
 cf Auto-save? NSM does this already I think. Do plugins?

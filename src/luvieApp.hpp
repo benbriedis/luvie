@@ -6,6 +6,7 @@
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
 #include "activePatternSet.hpp"
+#include "noteAuditioner.hpp"
 
 struct AppState;
 class ObservableSong;
@@ -84,6 +85,9 @@ public:
 
     // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
     ActivePatternSet aps;
+
+    // Auditions single notes when a pattern-editor row label is clicked.
+    NoteAuditioner auditioner;
 
     // Widgets — valid after build()
     SettingsButton*    settingsMenu = nullptr;

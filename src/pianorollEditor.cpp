@@ -51,7 +51,12 @@ int PianorollLabels::handle(int event)
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();
-            return 1;
+        } else if (Fl::event_button() == FL_LEFT_MOUSE && onRowClicked) {
+            int r = (Fl::event_y() - y()) / rowHeight;
+            if (r >= 0 && r < numRows) {
+                int midiNote = rowOffset + numRows - 1 - r;
+                if (midiNote >= 0 && midiNote <= 127) onRowClicked(midiNote);
+            }
         }
         return 1;
     }

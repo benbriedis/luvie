@@ -17,7 +17,8 @@ class PianorollLabels : public Fl_Widget {
     int  handle(int event) override;
 
 public:
-    std::function<void()> onRightClick;
+    std::function<void()>    onRightClick;
+    std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 
     PianorollLabels(int x, int y, int w, int numRows, int rowHeight);
     void setRowOffset(int offset) { rowOffset = offset; redraw(); }
@@ -48,6 +49,7 @@ class PianorollEditor : public BasePatternEditor {
     void labelsSetNumRows(int n)     override { labels.setNumRows(n); }
     void labelsResize(int x, int y, int w, int h) override { labels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { labels.onRightClick = std::move(fn); }
+    void labelsSetOnRowClicked(std::function<void(int)> fn) override { labels.onRowClicked = std::move(fn); }
 
     void setGridPattern(int patId) override;
 

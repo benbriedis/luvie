@@ -61,11 +61,12 @@ int DrumNoteLabels::handle(int event)
             if (onRightClick) onRightClick();
             return 1;
         }
-        if (Fl::event_clicks() >= 1 && onRowDoubleClicked) {
-            int r = (Fl::event_y() - y()) / rowHeight;
-            if (r >= 0 && r < numRows) {
-                int midiNote = rowOffset + numRows - 1 - r;
-                if (midiNote >= 0 && midiNote <= 127)
+        int r = (Fl::event_y() - y()) / rowHeight;
+        if (r >= 0 && r < numRows) {
+            int midiNote = rowOffset + numRows - 1 - r;
+            if (midiNote >= 0 && midiNote <= 127) {
+                if (onRowClicked) onRowClicked(midiNote);
+                if (Fl::event_clicks() >= 1 && onRowDoubleClicked)
                     onRowDoubleClicked(midiNote, y() + r * rowHeight, rowHeight);
             }
         }
@@ -230,18 +231,6 @@ void DrumPatternEditor::setAllDrumMaps(const std::map<int, std::map<int, std::st
     allDrumMaps      = maps;
     allFallbackModes = fallbacks;
     applyCurrentDrumMap();
-}
-
-int DrumPatternEditor::currentInstrumentId() const
-{
-    if (!pattern) return 0;
-    int sel = pattern->get().selectedTrackIndex;
-    const auto& tracks = pattern->get().tracks;
-    if (sel < 0 || sel >= (int)tracks.size()) return 0;
-    int patId = tracks[sel].lanes.empty() ? 0 : tracks[sel].lanes[0].patternId;
-    for (const auto& p : pattern->get().patterns)
-        if (p.id == patId) return p.instrumentId;
-    return 0;
 }
 
 void DrumPatternEditor::startDrumLabelEdit(int midiNote, int rowY, int rowH)

@@ -34,6 +34,7 @@ class PatternEditor : public BasePatternEditor {
     void labelsSetNumRows(int n)     override { noteLabels.setNumRows(n); }
     void labelsResize(int x, int y, int w, int h) override { noteLabels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { noteLabels.onRightClick = std::move(fn); }
+    void labelsSetOnRowClicked(std::function<void(int)> fn) override { noteLabels.onRowClicked = std::move(fn); }
 
     void setGridPattern(int patId) override;
     void afterTimelineChanged(int patId) override;

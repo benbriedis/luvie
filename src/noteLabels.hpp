@@ -25,11 +25,13 @@ class NoteLabels : public Fl_Widget {
 
     int         computeTotalTones() const;
     std::string noteForRow(int virtualPos) const;
+    int         midiForRow(int r) const;
     void        draw() override;
     int         handle(int event) override;
 
 public:
-    std::function<void()> onRightClick;
+    std::function<void()>    onRightClick;
+    std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 
     NoteLabels(int x, int y, int w, int numRows, int rowHeight);
 

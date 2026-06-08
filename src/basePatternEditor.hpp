@@ -10,6 +10,8 @@
 #include "gridScrollPane.hpp"
 #include <functional>
 
+class NoteAuditioner;
+
 class BasePatternEditor : public Editor, public ITimelineObserver {
 protected:
     static constexpr int scrollbarW = 14;
@@ -19,6 +21,7 @@ protected:
     PatternParamLabels paramLabels;
     PatternParamGrid   paramGrid;
     ObservablePattern* pattern             = nullptr;
+    NoteAuditioner*    auditioner          = nullptr;
     int                lastSelectedTrack  = -1;
     int                lastSelectedLaneId = -1;
     int                lastPatId          = -1;
@@ -42,6 +45,10 @@ protected:
     virtual void labelsSetNumRows(int n)                  = 0;
     virtual void labelsResize(int x, int y, int w, int h) = 0;
     virtual void labelsSetOnRightClick(std::function<void()> fn) = 0;
+    virtual void labelsSetOnRowClicked(std::function<void(int midi)> fn) = 0;
+
+    // Instrument of the currently selected track's pattern (0 if none).
+    int currentInstrumentId() const;
 
     // onTimelineChanged skeleton hooks
     virtual void setGridPattern(int patId)    = 0;
@@ -62,6 +69,7 @@ public:
     virtual void focusPattern() {}
     virtual void setSnap(float s) { paramGrid.setSnap(s); }
     void setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex);
+    void setAuditioner(NoteAuditioner* a);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }

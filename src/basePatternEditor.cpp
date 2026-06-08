@@ -1,4 +1,5 @@
 #include "basePatternEditor.hpp"
+#include "noteAuditioner.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
 
@@ -71,6 +72,27 @@ void BasePatternEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat
     swapObserver(pattern, pat, this);
     playhead.setTransport(t, pat ? pat->song() : nullptr);
     playhead.setPatternTrack(trackIndex);
+}
+
+int BasePatternEditor::currentInstrumentId() const
+{
+    if (!pattern) return 0;
+    const auto& tl  = pattern->get();
+    int         sel = tl.selectedTrackIndex;
+    if (sel < 0 || sel >= (int)tl.tracks.size()) return 0;
+    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+    for (const auto& p : tl.patterns)
+        if (p.id == patId) return p.instrumentId;
+    return 0;
+}
+
+void BasePatternEditor::setAuditioner(NoteAuditioner* a)
+{
+    auditioner = a;
+    labelsSetOnRowClicked([this](int midi) {
+        if (auditioner && midi >= 0)
+            auditioner->play(currentInstrumentId(), midi, 100, 0.5f);
+    });
 }
 
 void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
