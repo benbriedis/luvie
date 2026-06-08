@@ -4,3 +4,4 @@ target/
 *.d
 *.o
 *.so
+CMakeUserPresets.json

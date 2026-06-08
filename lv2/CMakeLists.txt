@@ -20,16 +20,51 @@ target_link_libraries(luvie_ui PRIVATE luvie_core lv2_headers)
 # The entry points live in the module's own object (not an archive), so they survive.
 # A version script then pins the dynamic symbol table to exactly those entry points,
 # also catching stray std:: template instantiations emitted into the module itself.
-target_compile_options(luvie_dsp PRIVATE -fvisibility=hidden)
-target_compile_options(luvie_ui  PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+#
+# The mechanisms here are toolchain-specific: -fvisibility is a GCC/Clang flag, and
+# --exclude-libs / --version-script are GNU binutils-ld / lld features. They cover
+# the Linux build. macOS (ld64: -exported_symbols_list) and Windows (MSVC: hidden by
+# default, export via __declspec/.def) use different mechanisms — wire those up when
+# those ports land. Each flag is feature-detected so an unsupported toolchain simply
+# builds without it (with a warning) rather than failing to configure.
+include(CheckCompilerFlag)
+include(CheckLinkerFlag)
+
 set(LUVIE_VERSION_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/luvie.version")
-target_link_options(luvie_dsp PRIVATE
-    -Wl,--exclude-libs,ALL -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
-target_link_options(luvie_ui PRIVATE
-    -Wl,--exclude-libs,ALL -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
-# Relink the modules if the version script changes.
-set_target_properties(luvie_dsp luvie_ui PROPERTIES
-    LINK_DEPENDS "${LUVIE_VERSION_SCRIPT}")
+
+# -fvisibility=hidden (and the C++ inlines variant) — GCC/Clang; not an MSVC concept.
+check_compiler_flag(CXX -fvisibility=hidden          LUVIE_HAVE_FVISIBILITY)
+check_compiler_flag(CXX -fvisibility-inlines-hidden  LUVIE_HAVE_FVISIBILITY_INLINES)
+# --exclude-libs,ALL and --version-script — GNU ld / lld only.
+check_linker_flag(CXX "-Wl,--exclude-libs,ALL"                         LUVIE_HAVE_EXCLUDE_LIBS)
+check_linker_flag(CXX "-Wl,--version-script=${LUVIE_VERSION_SCRIPT}"   LUVIE_HAVE_VERSION_SCRIPT)
+
+if(LUVIE_HAVE_FVISIBILITY)
+    target_compile_options(luvie_dsp PRIVATE -fvisibility=hidden)
+    target_compile_options(luvie_ui  PRIVATE -fvisibility=hidden)
+endif()
+if(LUVIE_HAVE_FVISIBILITY_INLINES)
+    target_compile_options(luvie_ui PRIVATE -fvisibility-inlines-hidden)
+endif()
+if(LUVIE_HAVE_EXCLUDE_LIBS)
+    target_link_options(luvie_dsp PRIVATE -Wl,--exclude-libs,ALL)
+    target_link_options(luvie_ui  PRIVATE -Wl,--exclude-libs,ALL)
+endif()
+if(LUVIE_HAVE_VERSION_SCRIPT)
+    target_link_options(luvie_dsp PRIVATE -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
+    target_link_options(luvie_ui  PRIVATE -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
+    # Relink the modules if the version script changes.
+    set_target_properties(luvie_dsp luvie_ui PROPERTIES
+        LINK_DEPENDS "${LUVIE_VERSION_SCRIPT}")
+endif()
+
+if(NOT (LUVIE_HAVE_EXCLUDE_LIBS AND LUVIE_HAVE_VERSION_SCRIPT))
+    message(WARNING
+        "LV2 plugin symbol-hiding is incomplete on this toolchain: the modules may "
+        "export internal FLTK/libstdc++/RtMidi symbols and risk being interposed by "
+        "the host. Add the platform-specific export-control mechanism (macOS "
+        "-exported_symbols_list / Windows .def) before shipping this build.")
+endif()
 
 # Match the Makefile output names (luvie_dsp.so, not libluvie_dsp.so)
 # and drop both into the .lv2 bundle directory.
