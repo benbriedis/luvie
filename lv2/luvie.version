@@ -1,0 +1,13 @@
+/* Restrict the plugin's dynamic symbol table to exactly the LV2 entry points the
+   host looks up via dlsym. Everything else — FLTK, libstdc++, RtMidi, luvie_core,
+   and stray std:: template instantiations — is made local so it cannot be
+   interposed against the host's own copies. lv2_descriptor is for the DSP module,
+   lv2ui_descriptor for the UI; each module exports only the one it defines (an
+   unmatched name in the list is harmless). */
+{
+  global:
+    lv2_descriptor;
+    lv2ui_descriptor;
+  local:
+    *;
+};

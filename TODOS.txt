@@ -94,7 +94,7 @@ isn't complex enough to warrant indexing yet.
 
 cf being able to select a group of notes? cf picking the tool from the context menu?
 
-Luvie (GUI) in window titlebar is odd.
+Luvie (GUI) in window titlebar is odd... maybe Carla is adding it?
 
 BUG? When changing chord the position of the notes change...
 
@@ -389,3 +389,8 @@ Exit on save on closing window is old fashioned.
 
 TODO test setup window in NSM and check plugin version (should use Jack outputs) 
   
+Distro and Build:
+	- Probably build .deb, .rpm, maybe .aur for Linux. 
+	  AppImage is a possibility, but not that interested personally (going to need a build process for Windows and Mac eventually anyway).
+	  MAYBE have a .zip or something for installation as a plugin.
+
