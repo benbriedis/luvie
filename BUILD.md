@@ -10,33 +10,31 @@ Luvie builds with **CMake** (≥ 3.28) and produces three artifacts:
 
 - A C++23 compiler (**g++-13** or newer; clang 16+ also works)
 - CMake ≥ 3.28 and a generator (**Ninja** recommended; Make works too)
-- **FLTK 1.5** — vendored and built locally under `deps/` (see below)
+- **git** and a network connection (the configure step fetches FLTK + LV2)
 - System development libraries (Linux):
   - **JACK** (`libjack-dev` / `jack2`)
   - **ALSA** (`libasound2-dev`)
   - **liblo** (`liblo-dev`)
-  - Plus the X11/Wayland/cairo/pango/fontconfig stack pulled in by FLTK
+  - Plus the X11/Wayland/cairo/pango/fontconfig stack FLTK builds against
+    (`libx11-dev libwayland-dev libxkbcommon-dev libcairo2-dev libpango1.0-dev
+    libfontconfig1-dev libdbus-1-dev libgtk-3-dev`)
 
 On Debian/Ubuntu:
 
 ```sh
-sudo apt install build-essential g++-13 cmake ninja-build pkg-config \
-    libjack-jackd2-dev libasound2-dev liblo-dev
+sudo apt install build-essential g++-13 cmake ninja-build pkg-config git \
+    libjack-jackd2-dev libasound2-dev liblo-dev \
+    libx11-dev libwayland-dev libxkbcommon-dev libcairo2-dev libpango1.0-dev \
+    libfontconfig1-dev libdbus-1-dev
 ```
 
-## Step 0 — Build the vendored dependencies (one time)
+## Vendored dependencies
 
-FLTK is built from source into `deps/installation/`. If that directory is empty:
-
-```sh
-cd deps
-./downloadAll.sh          # clones FLTK + LV2 sources into deps/sources/
-./installScripts/fltk.sh  # builds + installs FLTK (static) into deps/installation/
-cd ..
-```
-
-The LV2 headers used by the plugin come from `deps/sources/lv2/include` (header
-only — nothing to compile).
+FLTK 1.5 and the LV2 headers are fetched and pinned automatically by CMake
+(`FetchContent`) during the configure step — there is no separate dependency
+bootstrap. Pinned revisions live in the top-level `CMakeLists.txt`; sources are
+cloned into `build/_deps/` and FLTK is built static in-tree. liblo, JACK, and
+ALSA are host-provided system libraries (found via `pkg-config`).
 
 ## Step 1 — Configure
 
@@ -127,8 +125,9 @@ After `rm -rf build` you must re-run the **configure** command (Step 1) before
 - **`Error: could not load cache`** — you ran `cmake --build build` without
   configuring first (or created an empty `build/` by hand). Run the Step 1
   configure command; don't create `build/` yourself.
-- **`Could NOT find FLTK`** — you haven't built the vendored FLTK yet. Run
-  Step 0. The build looks for it under `deps/installation/`.
+- **FLTK fetch/build fails** — FLTK is fetched and built during configure; make
+  sure you have network access and the X11/Wayland/cairo/pango/fontconfig `-dev`
+  packages (see Prerequisites). Re-run configure after installing them.
 - **`Could NOT find jack/alsa/liblo`** — install the corresponding `-dev`
   packages (see Prerequisites).
 - **C++23 errors** — your compiler is too old; pass `-DCMAKE_CXX_COMPILER=g++-13`.

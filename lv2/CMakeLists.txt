@@ -2,15 +2,11 @@ set(LV2_BUNDLE "${CMAKE_BINARY_DIR}/luvie.lv2")
 
 # DSP (pure C)
 add_library(luvie_dsp MODULE luvie_dsp.c)
-target_include_directories(luvie_dsp PRIVATE
-    ${CMAKE_SOURCE_DIR}/deps/sources/lv2/include)
-target_link_libraries(luvie_dsp PRIVATE m)
+target_link_libraries(luvie_dsp PRIVATE m lv2_headers)
 
 # UI (links the shared core; LV2 headers; FLTK/jack come via luvie_core)
 add_library(luvie_ui MODULE luvie_ui.cpp)
-target_include_directories(luvie_ui PRIVATE
-    ${CMAKE_SOURCE_DIR}/deps/sources/lv2/include)
-target_link_libraries(luvie_ui PRIVATE luvie_core)
+target_link_libraries(luvie_ui PRIVATE luvie_core lv2_headers)
 
 # Match the Makefile output names (luvie_dsp.so, not libluvie_dsp.so)
 # and drop both into the .lv2 bundle directory.
