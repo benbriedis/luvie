@@ -93,6 +93,32 @@ Run the standalone app:
     ./build/src/luvie
 
 
+Running under PipeWire
+----------------------
+
+On most current distros PipeWire is the session audio server and provides a
+drop-in JACK implementation (pipewire-jack), so Luvie's JACK transport/MIDI
+works without manually starting jackd -- PipeWire is always running. Luvie loads
+libjack via dlopen, so it transparently uses whichever libjack.so.0 is on the
+loader path.
+
+  - Fedora-style systems install pipewire-jack's libjack on the normal library
+    path, so a plain `./build/src/luvie` already routes JACK through PipeWire.
+
+  - Debian/Ubuntu-style systems keep pipewire-jack's libjack off the default
+    path (e.g. /usr/lib/x86_64-linux-gnu/pipewire-0.3/jack/) so it doesn't
+    shadow real JACK. There, launch Luvie through the pw-jack wrapper to route
+    JACK through PipeWire:
+
+        pw-jack ./build/src/luvie
+
+    (pw-jack just sets LD_LIBRARY_PATH to PipeWire's libjack; without it Luvie
+    uses real jack2 if installed, or runs with JACK unavailable.)
+
+The Native (ALSA) MIDI backend uses the kernel ALSA sequencer and works
+regardless of PipeWire.
+
+
 Installing
 ----------
 

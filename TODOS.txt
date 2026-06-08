@@ -372,17 +372,19 @@ Maybe split src/
 Q: do we want the option to be the transport master? 
    We change BPM and thats a Master thing I think...
    
-Re Native: cf Pipewire...
+cf Pipewire
+ - I think its working in "bridge mode" on top of Jack.
+ - cf using pw-jack qjackctl instead ?  / pipewire-jack
+ - Are there any programming implications?
+ - To launch under Pipewire... try:    pw-jack luvie
 
 Compile in ALSA dependencies? (Linux)
    What can/should we do wrt ALSA?  
    Is name passed through OK?   
    
-Combine the File and View menus? Put into a Setttings dropdown - cf putting next to Pattern Editor
-
 TODO test song parameters via Alsa and Jack
 
-cf Auto-save? NSM does this already I think. Plugins?
+cf Auto-save? NSM does this already I think. Do plugins?
 
 Error window when starting (invalid project file) is old fashioned.
 Exit on save on closing window is old fashioned.
@@ -397,4 +399,11 @@ Distro and Build:
 	- Use CPack per platform to bundle
 	- macOS: "CPack DragNDrop (.dmg) for the app; plugin as luvie.lv2 containing a .dylib, codesigned + notarized."
 	- Windows: "CPack NSIS (or WiX) installer for the app; plugin .dll in a .lv2 bundle."
+
+cf if no Jack is available making transport and default port options use 'internal' and 'native'.
+  
+cf Licence... maximum of Fltk, LV2, rtMidi distros.  We could separate our parts.
+  TODO create a directory for all the licences.
+  
+TODO clicking on LHS of pattern editor - play the note
 
