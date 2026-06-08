@@ -392,5 +392,9 @@ TODO test setup window in NSM and check plugin version (should use Jack outputs)
 Distro and Build:
 	- Probably build .deb, .rpm, maybe .aur for Linux. 
 	  AppImage is a possibility, but not that interested personally (going to need a build process for Windows and Mac eventually anyway).
-	  MAYBE have a .zip or something for installation as a plugin.
+			Also look at Flatpak and Snap.
+	  MAYBE have a .zip or something for installation as a plugin. NB Can share libluvie.a between standalone and plugin versions.
+	- Use CPack per platform to bundle
+	- macOS: "CPack DragNDrop (.dmg) for the app; plugin as luvie.lv2 containing a .dylib, codesigned + notarized."
+	- Windows: "CPack NSIS (or WiX) installer for the app; plugin .dll in a .lv2 bundle."
 

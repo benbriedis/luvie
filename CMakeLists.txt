@@ -61,6 +61,14 @@ target_include_directories(lv2_headers INTERFACE ${lv2_SOURCE_DIR}/include)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JACK REQUIRED IMPORTED_TARGET jack)
 pkg_check_modules(LO   REQUIRED IMPORTED_TARGET liblo)
+
+# JACK is loaded at runtime via dlopen (see src/jackShim.cpp), NOT linked. Linking
+# -ljack would bake a load-time NEEDED dependency into the binary, so it would
+# refuse to start on machines without libjack installed. Instead we compile against
+# the JACK *headers* only and resolve the library at runtime when present. This
+# interface target carries the include dirs without the -ljack link flag.
+add_library(jack_headers INTERFACE)
+target_include_directories(jack_headers INTERFACE ${JACK_INCLUDE_DIRS})
 # ALSA is no longer a direct dependency: the "native" MIDI backend goes through
 # RtMidi, which finds and links libasound itself.
 

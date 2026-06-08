@@ -11,7 +11,7 @@ add_library(luvie_core STATIC
     drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp
     luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp
     outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp jackPort.cpp
-    rtMidiPort.cpp debugPort.cpp portRegistry.cpp
+    rtMidiPort.cpp debugPort.cpp portRegistry.cpp jackShim.cpp
 )
 
 target_include_directories(luvie_core PUBLIC
@@ -22,7 +22,8 @@ target_include_directories(luvie_core PUBLIC
 # PUBLIC so the plugin (which links luvie_core) inherits these too
 target_link_libraries(luvie_core PUBLIC
     fltk::fltk
-    PkgConfig::JACK
+    jack_headers          # JACK headers only; the library is dlopen'd at runtime (jackShim.cpp)
+    ${CMAKE_DL_LIBS}      # dlopen/dlsym for the JACK shim
     rtmidi
     PkgConfig::LO
 )

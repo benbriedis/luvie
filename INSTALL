@@ -16,7 +16,11 @@ Prerequisites
   - CMake >= 3.28 and a generator (Ninja recommended; Make works too)
   - git and a network connection (the configure step fetches FLTK + LV2)
   - System development libraries (Linux):
-      - JACK   (libjack-dev / jack2)
+      - JACK   (libjack-dev / jack2) -- HEADERS ONLY at build time. The JACK
+               library itself is loaded at runtime via dlopen, not linked, so
+               the resulting binary runs on machines without JACK installed
+               (JACK transport + MIDI simply stay unavailable until libjack is
+               present). See src/jackShim.cpp.
       - ALSA   (libasound2-dev)
       - liblo  (liblo-dev)
       - Plus the X11/Wayland/cairo/pango/fontconfig stack FLTK builds
@@ -37,8 +41,10 @@ Vendored dependencies
 FLTK 1.5 and the LV2 headers are fetched and pinned automatically by CMake
 (FetchContent) during the configure step -- there is no separate dependency
 bootstrap. Pinned revisions live in the top-level CMakeLists.txt; sources are
-cloned into build/_deps/ and FLTK is built static in-tree. liblo, JACK, and
-ALSA are host-provided system libraries (found via pkg-config).
+cloned into build/_deps/ and FLTK is built static in-tree. liblo and ALSA are
+host-provided system libraries (found via pkg-config). JACK is provided the same
+way for its headers only -- the library is not linked but dlopen'd at runtime, so
+JACK is a build-time (header) dependency yet only an optional runtime one.
 
 
 Step 1 -- Configure
