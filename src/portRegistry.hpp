@@ -1,6 +1,5 @@
 #pragma once
 #include "port.hpp"
-#include "alsaPort.hpp"
 #include "timelineIO.hpp"
 #include <functional>
 #include <memory>
@@ -37,6 +36,5 @@ private:
     std::unique_ptr<Port> make(const JackOutput& o);
 
     JackTransport* jack_;
-    AlsaClient     alsa_;
     std::vector<std::unique_ptr<Port>> ports_;
 };

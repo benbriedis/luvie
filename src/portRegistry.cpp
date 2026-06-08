@@ -1,5 +1,6 @@
 #include "portRegistry.hpp"
 #include "jackPort.hpp"
+#include "rtMidiPort.hpp"
 #include "debugPort.hpp"
 #include "jackTransport.hpp"
 #include <algorithm>
@@ -9,7 +10,7 @@ std::unique_ptr<Port> PortRegistry::make(const JackOutput& o)
 {
     switch (o.backend) {
         case MidiBackend::Native:
-            return std::make_unique<AlsaPort>(&alsa_, o.portName);
+            return std::make_unique<RtMidiPort>(o.portName);
         case MidiBackend::Debug: {
             auto p = std::make_unique<DebugPort>(o.portName);
             p->pitchName = debugPitchName;

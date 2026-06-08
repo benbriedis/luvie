@@ -11,7 +11,7 @@ add_library(luvie_core STATIC
     drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp
     luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp
     outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp jackPort.cpp
-    alsaPort.cpp debugPort.cpp portRegistry.cpp
+    rtMidiPort.cpp debugPort.cpp portRegistry.cpp
 )
 
 target_include_directories(luvie_core PUBLIC
@@ -23,7 +23,7 @@ target_include_directories(luvie_core PUBLIC
 target_link_libraries(luvie_core PUBLIC
     fltk::fltk
     PkgConfig::JACK
-    PkgConfig::ALSA
+    rtmidi
     PkgConfig::LO
 )
 

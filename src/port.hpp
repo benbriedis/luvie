@@ -4,9 +4,9 @@
 #include <utility>
 
 // A single MIDI output port. Subclasses implement the actual sending:
-//   JackPort  — JACK MIDI output (driven by the RT transport engine).
-//   AlsaPort  — ALSA sequencer output.
-//   DebugPort — prints to the console.
+//   JackPort    — JACK MIDI output (driven by the RT transport engine).
+//   RtMidiPort  — native MIDI output via RtMidi (ALSA / CoreMIDI).
+//   DebugPort   — prints to the console.
 //
 // All methods are called on the UI thread. Ports whose softSequenced() is true
 // are driven note-by-note by the Playhead; Jack ports return false because their

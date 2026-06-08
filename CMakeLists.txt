@@ -5,9 +5,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)        # replaces `bear`
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)              # matches Makefile `-g`
+    set(CMAKE_BUILD_TYPE Debug)
 endif()
 
 include(GNUInstallDirs)
@@ -36,7 +36,22 @@ FetchContent_Declare(lv2
     GIT_SHALLOW    TRUE
 )
 
-FetchContent_MakeAvailable(fltk lv2)
+# RtMidi — cross-platform "native" MIDI I/O (ALSA on Linux, CoreMIDI on macOS).
+# Built static, ALSA-only: JACK is handled by our own engine, so disable RtMidi's
+# JACK backend to avoid a second JACK client. (CMP0077 is NEW at our cmake_minimum,
+# so these normal vars override RtMidi's option() defaults.)
+set(RTMIDI_BUILD_SHARED_LIBS OFF)
+set(RTMIDI_BUILD_TESTING     OFF)
+set(RTMIDI_API_JACK          OFF)
+# Rename RtMidi's "uninstall" target to avoid a clash with FLTK's same-named one.
+set(RTMIDI_TARGETNAME_UNINSTALL "rtmidi_uninstall")
+FetchContent_Declare(rtmidi
+    GIT_REPOSITORY https://github.com/thestk/rtmidi.git
+    GIT_TAG        6.0.0
+    GIT_SHALLOW    TRUE
+)
+
+FetchContent_MakeAvailable(fltk lv2 rtmidi)
 
 # Expose the fetched LV2 headers as an interface target for the plugin.
 add_library(lv2_headers INTERFACE)
@@ -45,8 +60,9 @@ target_include_directories(lv2_headers INTERFACE ${lv2_SOURCE_DIR}/include)
 # ---- System libraries (host-provided; not vendored) ----
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JACK REQUIRED IMPORTED_TARGET jack)
-pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
 pkg_check_modules(LO   REQUIRED IMPORTED_TARGET liblo)
+# ALSA is no longer a direct dependency: the "native" MIDI backend goes through
+# RtMidi, which finds and links libasound itself.
 
 add_subdirectory(src)
 add_subdirectory(lv2)

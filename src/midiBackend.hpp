@@ -3,7 +3,7 @@
 
 // Where a MIDI output port sends its events.
 //   Jack   — a JACK MIDI output port, driven by the real-time transport engine.
-//   Native — an ALSA sequencer output port.
+//   Native — a native MIDI port via RtMidi (ALSA on Linux, CoreMIDI on macOS).
 //   Debug  — print note/CC messages to the console.
 enum class MidiBackend { Jack, Native, Debug };
 

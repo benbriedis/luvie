@@ -39,4 +39,9 @@ The user will almost always want to use the same transport, so save the selectio
  I've disallowed the use of --test with a session to prevent the accidental changing of settings in
  existing projects. Could support it in future if useful.
 
+Weakjack
+--------
+Is GPL so I'm not including. Therefore building code requires Jack.
+Could provide similar functionality ourselves.
+
 
