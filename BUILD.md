@@ -40,10 +40,18 @@ only — nothing to compile).
 
 ## Step 1 — Configure
 
+This step creates and populates the `build/` directory (it generates
+`CMakeCache.txt` and the Ninja files). **You must run it before building.** Do
+**not** create `build/` yourself — CMake makes it. Running `cmake --build build`
+on a missing or empty `build/` fails with `Error: could not load cache`.
+
 ```sh
 cmake -S . -B build -G Ninja \
     -DCMAKE_CXX_COMPILER=g++-13 -DCMAKE_C_COMPILER=gcc
 ```
+
+You only need to re-run configure after a clean (`rm -rf build`) or when you
+change a `CMakeLists.txt`. Otherwise just rebuild (Step 2).
 
 Notes:
 - The build is `Debug` by default (matches the old `-g` flags). For an optimized
@@ -107,12 +115,18 @@ lv2ls | grep luvie
 ## Cleaning / rebuilding
 
 ```sh
-rm -rf build        # full clean
+rm -rf build        # full clean — then re-run Step 1 (configure) before building
 cmake --build build --target clean   # remove build outputs, keep config
 ```
 
+After `rm -rf build` you must re-run the **configure** command (Step 1) before
+`cmake --build build` — the cleaned directory has no cache.
+
 ## Troubleshooting
 
+- **`Error: could not load cache`** — you ran `cmake --build build` without
+  configuring first (or created an empty `build/` by hand). Run the Step 1
+  configure command; don't create `build/` yourself.
 - **`Could NOT find FLTK`** — you haven't built the vendored FLTK yet. Run
   Step 0. The build looks for it under `deps/installation/`.
 - **`Could NOT find jack/alsa/liblo`** — install the corresponding `-dev`
