@@ -402,19 +402,19 @@ int TrackLabels::handle(int event)
                     // Right-click instrument header → show track context menu
                     if (contextPopup && patternObs) {
                         contextPopup->open(ref.id, -1, patternObs,
-                                           Fl::event_x_root(), Fl::event_y_root());
+                                           Fl::event_x(), Fl::event_y());
                     }
                 } else if (ref.kind == RowKind::Lane) {
                     if (contextPopup && patternObs) {
                         int trackId = timeline->trackIdForLaneId(ref.id);
                         if (trackId >= 0)
                             contextPopup->open(trackId, ref.id, patternObs,
-                                               Fl::event_x_root(), Fl::event_y_root());
+                                               Fl::event_x(), Fl::event_y());
                     }
                 } else {
                     if (paramLanePopup && patternObs)
                         paramLanePopup->open(ref.id, patternObs,
-                                             Fl::event_x_root(), Fl::event_y_root());
+                                             Fl::event_x(), Fl::event_y());
                 }
             }
             return 1;

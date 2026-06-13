@@ -401,7 +401,7 @@ int PatternParamGrid::handle(int event)
                 int ptId = pt.id; float beat = pt.beat; int val = pt.value; bool anc = pt.anchor;
                 int maxVal = laneMaxValue(localLanes[laneIdx].type);
                 paramState = ParamIdle{};
-                dotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc, maxVal,
+                dotPopup->open(Fl::event_x(), Fl::event_y(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
                         if (pattern) pattern->moveParamPoint(ptId, beat, newVal);
                     },

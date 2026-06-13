@@ -603,7 +603,7 @@ int LoopEditor::handle(int event)
             if (trackIdx < (int)tracks.size() && laneIdx < (int)tracks[trackIdx].lanes.size())
                 laneId = tracks[trackIdx].lanes[laneIdx].id;
             contextPopup->open(trackId, laneId, patternObs,
-                               Fl::event_x_root(), Fl::event_y_root());
+                               Fl::event_x(), Fl::event_y());
             return 1;
         }
         return 0;

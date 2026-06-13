@@ -51,11 +51,17 @@ public:
         hasFn_          = std::move(hasFn);
         pendingOnSelect = std::move(onSelect);
         pendingOnRemove = std::move(onRemove);
+        // "Remove automation" only applies to existing param lanes; when there
+        // is nothing to remove, hide the row and shrink the popup so it doesn't
+        // leave an empty-looking gap at the bottom.
         if (removeBtn) {
-            if (pendingOnRemove)
-                removeBtn->activate();
-            else
-                removeBtn->deactivate();
+            if (pendingOnRemove) {
+                removeBtn->show();
+                size(popW, 2 * btnH + 2);
+            } else {
+                removeBtn->hide();
+                size(popW, 1 * btnH + 2);
+            }
         }
         openAt(wx, wy);
     }

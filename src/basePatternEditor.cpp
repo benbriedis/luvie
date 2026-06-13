@@ -102,7 +102,7 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
         if (lastSelectedTrack >= (int)pattern->get().tracks.size()) return;
         int patId = pattern->get().patternIdForSelectedLane();
         popup->open(
-            Fl::event_x_root(), Fl::event_y_root(),
+            Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
             [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); }
         );
@@ -119,7 +119,7 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
         if (laneId >= 0)
             onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
         popup->open(
-            Fl::event_x_root(), Fl::event_y_root(),
+            Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
             [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
             std::move(onRemove)

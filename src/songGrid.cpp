@@ -455,7 +455,7 @@ int SongGrid::handleParamEvent(int event)
                 bool  anc  = pt.anchor;
                 int maxVal = laneMaxValue(localParamLanes[laneIdx].type);
                 paramState = ParamIdle{};
-                paramDotPopup->open(Fl::event_x_root(), Fl::event_y_root(), val, anc, maxVal,
+                paramDotPopup->open(Fl::event_x(), Fl::event_y(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
                         if (timeline) timeline->moveParamPoint(ptId, beat, newVal);
                     },
