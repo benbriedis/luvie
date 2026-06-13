@@ -10,6 +10,7 @@
 #include <lv2/midi/midi.h>
 #include <lv2/time/time.h>
 #include <lv2/urid/urid.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include "dsp_timeline.h"
 
@@ -34,6 +35,7 @@ typedef struct {
     LV2_URID time_speed;
     LV2_URID atom_Chunk;
     LV2_URID luvie_state;         /* full JSON state blob */
+    LV2_URID state_StateChanged;  /* notify host that state is dirty */
 } URIs;
 
 typedef struct {
@@ -57,6 +59,7 @@ typedef struct {
     /* Saved JSON state for LV2 state save/restore */
     char*    stateJson;      /* heap-allocated, NULL if none */
     uint32_t stateJsonSize;  /* strlen + 1 (includes null terminator) */
+    bool     stateChanged;   /* pending state:StateChanged to emit to host */
 } Self;
 
 #endif /* LUVIE_DSP_H */

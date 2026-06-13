@@ -59,10 +59,9 @@ TO TEST
 
 DISTRO TO DOS?
 ==============
--CMake?  (how much is Ardour used in Windows an Mac?)
 
 Think about installation of dependencies - eg 
-   nlohmann/json
+   nlohmann/json			ADD license
 Nice if we had an install script that installed everything locally (FLTK, JSON, Jack and LV2 deps)
 
 - Add support for Debian build
@@ -380,10 +379,8 @@ cf Pipewire
 
 TODO test song parameters via Alsa and Jack
 
-cf Auto-save? NSM does this already I think. Do plugins?
-
 Error window when starting (invalid project file) is old fashioned.
-Exit on save on closing window is old fashioned.
+
 
 TODO test setup window in NSM and check plugin version (should use Jack outputs) 
   
@@ -401,5 +398,7 @@ cf if no Jack is available making transport and default port options use 'intern
 cf Licence... maximum of Fltk, LV2, rtMidi distros.  We could separate our parts.
   TODO create a directory for all the licences.
   
-TODO clicking on LHS of pattern editor - play the note
+cf Auto-save? NSM does this already I think. Do plugins?
+    - Probably REMOVE 'save' altogether.
+    - Exit on save on closing window is old fashioned. (Probably remove this too, just do a final save if required instead)
 

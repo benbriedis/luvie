@@ -219,7 +219,10 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->song->loadTimeline(state.timeline);
     applyOverlayOutputs(ui, state);
     ui->restoringState = false;
-    sendFullState(ui);
+    /* No sendFullState() here: the DSP already holds this exact state (it just
+       restored it, or we share its persistent instance). Echoing it back would
+       trip the DSP's stateChanged flag and make the host report a spurious
+       unsaved-change right after load. */
 }
 
 /* -----------------------------------------------------------------------

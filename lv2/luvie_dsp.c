@@ -24,6 +24,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->time_beatsPerMinute= map->map(map->handle, LV2_TIME__beatsPerMinute);
     uris->time_speed         = map->map(map->handle, LV2_TIME__speed);
     uris->luvie_state        = map->map(map->handle, LUVIE_STATE_URI);
+    uris->state_StateChanged = map->map(map->handle, LV2_STATE__StateChanged);
 }
 
 static LV2_Handle instantiate(
@@ -112,6 +113,9 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                 memcpy(self->stateJson, LV2_ATOM_BODY(&ev->body), size);
                 self->stateJsonSize = size;
             }
+            /* The plugin's internal state changed; tell the host to mark
+               its project dirty (and re-save us) via state:StateChanged. */
+            self->stateChanged = true;
             continue;
         }
 
@@ -124,6 +128,16 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                                      sizeof(LV2_Atom) + ev->body.size);
             }
         }
+    }
+
+    /* Emit a state:StateChanged notification once per pending UI edit so the
+       host marks its project dirty. It carries no body — the type is the signal. */
+    if (hasNotify && self->stateChanged) {
+        LV2_Atom_Forge_Frame objFrame;
+        lv2_atom_forge_frame_time(&self->forge, 0);
+        lv2_atom_forge_object(&self->forge, &objFrame, 0, self->uris.state_StateChanged);
+        lv2_atom_forge_pop(&self->forge, &objFrame);
+        self->stateChanged = false;
     }
 
     if (hasNotify)
