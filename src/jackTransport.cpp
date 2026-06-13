@@ -550,8 +550,12 @@ int JackTransport::process(jack_nframes_t nframes)
         }
 
         if (snapMutex.try_lock()) {
-            float prevBars = snapSecondsToBar(static_cast<double>(
-                                 (firstCall || jumped) ? pos.frame : lastFrame) / sampleRate);
+            // Fire events for exactly this buffer: [pos.frame, blockEnd). JACK
+            // advances pos.frame contiguously by nframes when rolling, so each
+            // cycle's window abuts the previous one — using anything earlier than
+            // pos.frame (e.g. lastFrame) would re-cover the previous buffer and
+            // emit every note a second time, clamped to frame 0 of this block.
+            float prevBars = snapSecondsToBar(static_cast<double>(pos.frame) / sampleRate);
             float curBars  = snapSecondsToBar(static_cast<double>(blockEnd) / sampleRate);
 
             fireNoteEvents (namedBufs, nframes, pos.frame, prevBars, curBars);
