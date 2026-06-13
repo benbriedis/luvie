@@ -279,6 +279,7 @@ void JackTransport::rebuildSnapshot()
                     is.length       = 1.0e9f;
                     is.startOffset  = 0.0f;
                     is.patternBeats = pat->lengthBeats;
+                    is.loop         = true;
                     int top, bot;
                     timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
                     is.beatsPerBar = (float)top;
@@ -295,6 +296,7 @@ void JackTransport::rebuildSnapshot()
                         pis.startOffset  = 0.0f;
                         pis.beatsPerBar  = (float)top;
                         pis.patternBeats = pat->lengthBeats;
+                        pis.loop         = true;
                         pis.portName     = is.portName;
                         pis.midiChannel  = is.midiChannel;
                         pis.priority     = trackIdx + 1;
@@ -608,16 +610,23 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
 {
     for (const TrackSnap& track : snap.tracks) {
         for (const InstanceSnap& inst : track.instances) {
-            if (inst.startBar + inst.length <= prevBars) continue;
-            if (inst.startBar >= curBars)                continue;
             if (inst.patternBeats <= 0.0f)               continue;
             if (inst.notes.empty())                      continue;
+            // Loop instances play forever; the anchor bar is only a phase
+            // reference, so fire across the whole transport window (the wrap math
+            // handles a playhead that is before the anchor). Finite (song) instances
+            // are clamped to their placement.
+            if (!inst.loop) {
+                if (inst.startBar + inst.length <= prevBars) continue;
+                if (inst.startBar >= curBars)                continue;
+            }
 
             void* instBuf = findBuf(namedBufs, inst.portName);
             if (!instBuf) continue;
 
-            float windowStart = std::max(prevBars, inst.startBar);
-            float windowEnd   = std::min(curBars,  inst.startBar + inst.length);
+            float windowStart = inst.loop ? prevBars : std::max(prevBars, inst.startBar);
+            float windowEnd   = inst.loop ? curBars  : std::min(curBars,  inst.startBar + inst.length);
+            if (windowEnd <= windowStart) continue;
             float beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
             float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
 
@@ -697,14 +706,19 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
             }
         } else {
             // Pattern-level: event.beat is a within-pattern beat; wraps with patternBeats.
-            if (inst.startBar + inst.length <= prevBars) continue;
-            if (inst.startBar >= curBars)                continue;
+            // Loop instances play forever (anchor is phase only); finite (song)
+            // instances are clamped to their placement.
+            if (!inst.loop) {
+                if (inst.startBar + inst.length <= prevBars) continue;
+                if (inst.startBar >= curBars)                continue;
+            }
 
             void* buf = findBuf(namedBufs, inst.portName);
             if (!buf) continue;
 
-            float windowStart = std::max(prevBars, inst.startBar);
-            float windowEnd   = std::min(curBars,  inst.startBar + inst.length);
+            float windowStart = inst.loop ? prevBars : std::max(prevBars, inst.startBar);
+            float windowEnd   = inst.loop ? curBars  : std::min(curBars,  inst.startBar + inst.length);
+            if (windowEnd <= windowStart) continue;
             float beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
             float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
 

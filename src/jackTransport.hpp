@@ -136,6 +136,7 @@ private:
         float startOffset;
         float beatsPerBar;
         float patternBeats;
+        bool  loop = false;      // loop-mode instance: anchor is phase only, plays forever
         std::string portName;    // JACK port name to use; empty = all ports
         int   midiChannel = 0;  // 0-based MIDI channel
         std::vector<NoteSnap> notes;
@@ -153,6 +154,7 @@ private:
         float startOffset;   // beats offset into pattern at instance start; 0 for song-level
         float beatsPerBar;   // 1.0f for song-level (beat == bar)
         float patternBeats;  // 0.0f = song-level (no loop); >0 = pattern length in beats
+        bool  loop = false;  // loop-mode instance: anchor is phase only, plays forever
         std::string portName;
         int   midiChannel;   // 0-based
         int   priority;      // 0 = song-level; trackIdx+1 for pattern lanes
