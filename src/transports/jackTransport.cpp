@@ -6,11 +6,25 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <set>
 
 // ── Construction / destruction ────────────────────────────────────────────────
 
-JackTransport::JackTransport() {}
+JackTransport::JackTransport()
+{
+    // Pre-reserve every RT-thread scratch buffer so the process() callback never
+    // allocates — not even on its first invocation. A JACK cycle is
+    // nframes/sampleRate, up to ~90 ms at the largest common period (4096 frames
+    // @ 44.1 kHz); even a dense window across every track stays well under these
+    // bounds (and param-ramp densification is capped per segment). Exceeding a
+    // bound would reallocate (an RT-safety violation) but would not crash.
+    namedBufs.reserve(64);
+    outEvents.reserve(4096);
+    activeNotes.reserve(2048);
+    paramScratch.reserve(4096);
+    resetScratch.reserve(64);
+}
 
 JackTransport::~JackTransport()
 {
@@ -454,13 +468,21 @@ int JackTransport::processCallback(jack_nframes_t nframes, void* arg)
     return static_cast<JackTransport*>(arg)->process(nframes);
 }
 
-// Find buffer for a named port; returns nullptr if not found.
-static void* findBuf(const std::vector<std::pair<std::string, void*>>& bufs,
-                     const std::string& name)
+// Find the namedBufs entry for a port; returns nullptr if not found. The entry's
+// first is a pointer to the stable midiPorts_ key, second is the cycle's buffer.
+using NamedBuf = std::pair<const std::string*, void*>;
+static const NamedBuf* findEntry(const std::vector<NamedBuf>& bufs, const char* name)
 {
-    for (const auto& [n, b] : bufs)
-        if (n == name) return b;
+    for (const auto& e : bufs)
+        if (*e.first == name) return &e;
     return nullptr;
+}
+
+// Convenience: just the buffer for a named port; nullptr if not found.
+static void* findBuf(const std::vector<NamedBuf>& bufs, const char* name)
+{
+    const NamedBuf* e = findEntry(bufs, name);
+    return e ? e->second : nullptr;
 }
 
 int JackTransport::process(jack_nframes_t nframes)
@@ -469,14 +491,14 @@ int JackTransport::process(jack_nframes_t nframes)
     jack_transport_state_t state = jack_transport_query(client, &pos);
     bool nowPlaying = (state == JackTransportRolling);
 
-    // Collect port buffers, keyed by name for per-channel routing.
-    std::vector<NamedBuf> namedBufs;
+    // Collect port buffers, keyed by name for per-channel routing. Each entry
+    // points at the stable midiPorts_ key (no string copy); valid for this cycle.
+    namedBufs.clear();
     if (midiEnabled && portsMutex.try_lock()) {
-        namedBufs.reserve(midiPorts_.size());
         for (auto& [name, port] : midiPorts_) {
             void* b = jack_port_get_buffer(port, nframes);
             jack_midi_clear_buffer(b);
-            namedBufs.push_back({name, b});
+            namedBufs.push_back({&name, b});
         }
         portsMutex.unlock();
     }
@@ -485,7 +507,7 @@ int JackTransport::process(jack_nframes_t nframes)
 
     if (!namedBufs.empty() && pendingMutex_.try_lock()) {
         for (const auto& pm : pendingMsgs_) {
-            void* b = findBuf(namedBufs, pm.portName);
+            void* b = findBuf(namedBufs, pm.portName.c_str());
             if (b) emit(b, 0, pm.data, pm.len);
         }
         pendingMsgs_.clear();
@@ -508,13 +530,20 @@ int JackTransport::process(jack_nframes_t nframes)
         activeNotes.clear();
 
         if (snapMutex.try_lock()) {
-            std::set<std::pair<std::string,int>> seen;
+            // Dedup (port, channel) without a std::set: instance counts are tiny,
+            // so a linear scan over the reused resetScratch vector is cheaper and
+            // allocates nothing. Pointers reference snap strings, valid under lock.
+            resetScratch.clear();
             for (const auto& track : snap.tracks)
-                for (const auto& inst : track.instances)
-                    if (!inst.portName.empty())
-                        seen.insert({inst.portName, inst.midiChannel});
-            for (const auto& [port, ch] : seen) {
-                void* buf = findBuf(namedBufs, port);
+                for (const auto& inst : track.instances) {
+                    if (inst.portName.empty()) continue;
+                    bool dup = false;
+                    for (const auto& [p, c] : resetScratch)
+                        if (*p == inst.portName && c == inst.midiChannel) { dup = true; break; }
+                    if (!dup) resetScratch.push_back({&inst.portName, inst.midiChannel});
+                }
+            for (const auto& [port, ch] : resetScratch) {
+                void* buf = findBuf(namedBufs, port->c_str());
                 if (!buf) continue;
                 uint8_t base = static_cast<uint8_t>(0xB0 | (ch & 0x0F));
                 uint8_t resetMsg[3]  = { base, 121, 0 };  // Reset All Controllers
@@ -570,7 +599,8 @@ int JackTransport::process(jack_nframes_t nframes)
     // be an in-place std::sort (no temp-buffer allocation on the RT thread,
     // unlike std::stable_sort) while still keeping same-frame insertion order
     // (pending, note-offs, then note-ons / params) — so an off at a given frame
-    // still precedes an on. n is the events in one ~ms cycle, so n log n is tiny.
+    // still precedes an on. n is the events in one cycle (tens to low hundreds),
+    // so n log n is tiny.
     std::sort(outEvents.begin(), outEvents.end(),
         [](const OutEvent& a, const OutEvent& b) {
             if (a.buf   != b.buf)   return a.buf   < b.buf;
@@ -624,8 +654,9 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
                 if (inst.startBar >= curBars)                continue;
             }
 
-            void* instBuf = findBuf(namedBufs, inst.portName);
-            if (!instBuf) continue;
+            const NamedBuf* instEntry = findEntry(namedBufs, inst.portName.c_str());
+            if (!instEntry) continue;
+            void* instBuf = instEntry->second;
 
             float windowStart = inst.loop ? prevBars : std::max(prevBars, inst.startBar);
             float windowEnd   = inst.loop ? curBars  : std::min(curBars,  inst.startBar + inst.length);
@@ -659,8 +690,9 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
                     auto offFrame = static_cast<jack_nframes_t>(
                         snapBarToSeconds(offBar) * sampleRate);
 
-                    activeNotes.push_back({note.midiPitch, inst.midiChannel, offFrame,
-                                           inst.portName});
+                    ActiveNote an{note.midiPitch, inst.midiChannel, offFrame, {}};
+                    std::strncpy(an.portName, inst.portName.c_str(), sizeof(an.portName) - 1);
+                    activeNotes.push_back(an);
                 });
             }
         }
@@ -674,22 +706,15 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                                      jack_nframes_t blockStart,
                                      float prevBars, float curBars)
 {
-    struct PendingParam {
-        jack_nframes_t frame;
-        const std::string* portName;
-        int   midiChannel;
-        int   ccNumber;
-        int   value;
-        int   priority;
-    };
-    std::vector<PendingParam> pending;
+    // Reused, pre-reserved scratch — no per-cycle allocation.
+    paramScratch.clear();
 
     for (const ParamInstSnap& inst : snap.paramInsts) {
         if (inst.events.empty()) continue;
 
         if (inst.patternBeats == 0.0f) {
             // Song-level: event.beat is a bar position; no looping.
-            void* buf = findBuf(namedBufs, inst.portName);
+            void* buf = findBuf(namedBufs, inst.portName.c_str());
             if (!buf) continue;
             for (const ParamEventSnap& evt : inst.events) {
                 if (evt.beat < prevBars || evt.beat >= curBars) continue;
@@ -697,8 +722,8 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                 auto   fr   = static_cast<jack_nframes_t>(secs * sampleRate);
                 jack_nframes_t off = (fr >= blockStart) ? (fr - blockStart) : 0;
                 off = std::min(off, nframes - 1);
-                pending.push_back({off, &inst.portName, inst.midiChannel,
-                                   inst.ccNumber, evt.value, inst.priority});
+                paramScratch.push_back({off, &inst.portName, inst.midiChannel,
+                                        inst.ccNumber, evt.value, inst.priority});
             }
         } else {
             // Pattern-level: event.beat is a within-pattern beat; wraps with patternBeats.
@@ -709,7 +734,7 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                 if (inst.startBar >= curBars)                continue;
             }
 
-            void* buf = findBuf(namedBufs, inst.portName);
+            void* buf = findBuf(namedBufs, inst.portName.c_str());
             if (!buf) continue;
 
             float windowStart = inst.loop ? prevBars : std::max(prevBars, inst.startBar);
@@ -726,18 +751,18 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                     auto   fr     = static_cast<jack_nframes_t>(onSecs * sampleRate);
                     jack_nframes_t off = (fr >= blockStart) ? (fr - blockStart) : 0;
                     off = std::min(off, nframes - 1);
-                    pending.push_back({off, &inst.portName, inst.midiChannel,
-                                       inst.ccNumber, evt.value, inst.priority});
+                    paramScratch.push_back({off, &inst.portName, inst.midiChannel,
+                                            inst.ccNumber, evt.value, inst.priority});
                 });
             }
         }
     }
 
-    if (pending.empty()) return;
+    if (paramScratch.empty()) return;
 
     // Sort by (portName, channel, cc, frame) then priority descending so the
     // highest-priority entry for each combination comes first.
-    std::sort(pending.begin(), pending.end(), [](const PendingParam& a, const PendingParam& b) {
+    std::sort(paramScratch.begin(), paramScratch.end(), [](const PendingParam& a, const PendingParam& b) {
         if (a.portName    != b.portName)    return *a.portName    < *b.portName;
         if (a.midiChannel != b.midiChannel) return a.midiChannel  < b.midiChannel;
         if (a.ccNumber    != b.ccNumber)    return a.ccNumber      < b.ccNumber;
@@ -745,18 +770,18 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
         return a.priority > b.priority;   // higher priority first within same slot
     });
 
-    for (int i = 0; i < (int)pending.size(); ) {
-        const PendingParam& p = pending[i];
+    for (int i = 0; i < (int)paramScratch.size(); ) {
+        const PendingParam& p = paramScratch[i];
         // Advance past lower-priority duplicates for the same (port,ch,cc,frame).
         int j = i + 1;
-        while (j < (int)pending.size()       &&
-               *pending[j].portName == *p.portName &&
-               pending[j].midiChannel == p.midiChannel &&
-               pending[j].ccNumber    == p.ccNumber    &&
-               pending[j].frame       == p.frame)
+        while (j < (int)paramScratch.size()       &&
+               *paramScratch[j].portName == *p.portName &&
+               paramScratch[j].midiChannel == p.midiChannel &&
+               paramScratch[j].ccNumber    == p.ccNumber    &&
+               paramScratch[j].frame       == p.frame)
             ++j;
 
-        void* buf = findBuf(namedBufs, *p.portName);
+        void* buf = findBuf(namedBufs, p.portName->c_str());
         if (buf) {
             if (p.ccNumber < 0) {
                 // Pitch bend: value is already 0-16383 (14-bit).

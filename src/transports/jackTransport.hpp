@@ -178,7 +178,11 @@ private:
         int            midiPitch;
         int            channel;
         jack_nframes_t offFrame;
-        std::string    portName;   // empty = all ports
+        // Self-contained copy of the port name (not a pointer): an active note
+        // can outlive its port if the port is removed mid-playback, so it must
+        // not reference the now-freed midiPorts_ key. POD copy => no per-note
+        // heap allocation when pushed onto activeNotes. Empty = all ports.
+        char           portName[64];
     };
     std::vector<ActiveNote> activeNotes;
     jack_nframes_t          lastFrame  = 0;
@@ -199,6 +203,27 @@ private:
     };
     std::vector<OutEvent> outEvents;
 
+    // Per-cycle scratch reused across cycles so the RT callback allocates nothing
+    // — all are pre-reserved in the constructor so even the first process() call
+    // is allocation-free. NamedBuf holds a pointer to the stable midiPorts_ map
+    // key (valid for the cycle), not a string copy.
+    using NamedBuf = std::pair<const std::string*, void*>;
+    std::vector<NamedBuf>  namedBufs;
+
+    // One pending CC/pitch-bend event awaiting priority resolution in fireParamEvents.
+    struct PendingParam {
+        jack_nframes_t     frame;
+        const std::string* portName;
+        int                midiChannel;
+        int                ccNumber;
+        int                value;
+        int                priority;
+    };
+    std::vector<PendingParam> paramScratch;
+
+    // Dedup scratch for the stop/jump controller-reset pass: (port name, channel).
+    std::vector<std::pair<const std::string*, int>> resetScratch;
+
     // ── JACK process callback ─────────────────────────────────────────────────
     static int processCallback(jack_nframes_t nframes, void* arg);
     int process(jack_nframes_t nframes);
@@ -206,7 +231,6 @@ private:
     // JACK server-shutdown callback (runs on a JACK-internal thread).
     static void shutdownThunk(void* arg);
 
-    using NamedBuf = std::pair<std::string, void*>;
     void fireNoteEvents (const std::vector<NamedBuf>& namedBufs,
                          jack_nframes_t nframes,
                          jack_nframes_t blockStart, float prevBars, float curBars);
