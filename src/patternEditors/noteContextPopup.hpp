@@ -7,7 +7,7 @@
 #include <functional>
 
 class Grid;
-class Fl_Slider;
+class ModernSlider;
 
 class NoteContextPopup : public ContextMenuPopup {
 public:
@@ -28,7 +28,7 @@ private:
 	int selected;
 	std::vector<Note>* notes;
 	Grid* grid;
-	Fl_Slider* velSlider;
+	ModernSlider* velSlider;
 	std::function<void()> onDeleteFn;
 	std::function<void(float)> onVelocityFn;
 };

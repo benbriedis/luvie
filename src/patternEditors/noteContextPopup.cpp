@@ -2,7 +2,7 @@
 #include "FL/Fl.H"
 #include "FL/Fl_Box.H"
 #include "FL/Fl_Flex.H"
-#include "FL/Fl_Slider.H"
+#include "modern/modernSlider.hpp"
 #include "grid.hpp"
 
 NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
@@ -21,10 +21,9 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
 	velLabel->labelcolor(popupText);
 	velLabel->box(FL_NO_BOX);
 	sliderRow->fixed(velLabel, 30);
-	velSlider = new Fl_Slider(0, 0, 120, 30);
-	velSlider->type(FL_HOR_NICE_SLIDER);
-	velSlider->box(FL_FLAT_BOX);
-	velSlider->color(popupInputBg);
+	velSlider = new ModernSlider(0, 0, 120, 30);
+	velSlider->type(FL_HORIZONTAL);
+	velSlider->color(popupBg);
 	velSlider->selection_color(popupAccent);
 	velSlider->bounds(0.0,1.0);
 	velSlider->value(0.8);
