@@ -3,13 +3,13 @@ add_library(luvie_core STATIC
     appWindow.cpp editor.cpp songEditor/songEditor.cpp patternEditors/basePatternEditor.cpp
     patternEditors/patternEditor.cpp grid.cpp songEditor/songGrid.cpp
     patternEditors/patternGrid.cpp songEditor/trackLabels.cpp
-    songEditor/trackControls.cpp noteContextPopup.cpp songEditor/patternInstanceContextPopup.cpp
+    songEditor/trackControls.cpp patternEditors/noteContextPopup.cpp songEditor/patternInstanceContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
     transports/simpleTransport.cpp transports/jackTransport.cpp
-    jackObserver.cpp transports/playhead.cpp songEditor/markerPopup.cpp
-    songEditor/markerRuler.cpp observableSong.cpp observablePattern.cpp
-    observableInstrument.cpp activePatternSet.cpp patternPanel.cpp
-    inlineEditDispatch.cpp patternEditors/noteLabels.cpp songEditor/trackContextPopup.cpp
+    transports/jackObserver.cpp transports/playhead.cpp songEditor/markerPopup.cpp
+    songEditor/markerRuler.cpp songEditor/observableSong.cpp songEditor/observablePattern.cpp
+    outputs/observableInstrument.cpp activePatternSet.cpp patternEditors/patternPanel.cpp
+    modern/inlineEditDispatch.cpp patternEditors/noteLabels.cpp songEditor/trackContextPopup.cpp
     patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp
     loopEditor.cpp

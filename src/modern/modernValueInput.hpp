@@ -4,7 +4,7 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Value_Input.H>
 #include <FL/fl_draw.H>
-#include "../panelStyle.hpp"
+#include "panelStyle.hpp"
 
 class ModernValueInput : public Fl_Value_Input {
     Fl_Color borderCol = panelCtrlBorder;
