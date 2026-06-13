@@ -3,8 +3,9 @@ add_library(luvie_core STATIC
     appWindow.cpp editor.cpp songEditor.cpp basePatternEditor.cpp
     patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp
     trackControls.cpp noteContextPopup.cpp patternInstanceContextPopup.cpp
-    modern/modernTabs.cpp modern/cursors.cpp transport.cpp simpleTransport.cpp
-    jackTransport.cpp jackObserver.cpp playhead.cpp markerPopup.cpp
+    modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
+    transports/simpleTransport.cpp transports/jackTransport.cpp
+    jackObserver.cpp transports/playhead.cpp markerPopup.cpp
     markerRuler.cpp observableSong.cpp observablePattern.cpp
     observableInstrument.cpp activePatternSet.cpp patternPanel.cpp
     inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp
@@ -18,6 +19,7 @@ add_library(luvie_core STATIC
 target_include_directories(luvie_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/modern
+    ${CMAKE_CURRENT_SOURCE_DIR}/transports
 )
 
 # PUBLIC so the plugin (which links luvie_core) inherits these too

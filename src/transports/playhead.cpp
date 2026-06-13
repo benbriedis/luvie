@@ -2,6 +2,7 @@
 #include "port.hpp"
 #include "portRegistry.hpp"
 #include "chords.hpp"
+#include "loopFiring.hpp"
 #include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -11,7 +12,6 @@
 
 static constexpr Fl_Color headColor     = 0xEF444400;  // red
 static constexpr Fl_Color headColorDim  = 0xD1D5DB00;  // light grey
-static constexpr float    drumNoteLen   = 0.1f;        // beats (matches jackTransport)
 
 Playhead::Playhead(int numCols, int colWidth)
 	: numCols(numCols), colWidth(colWidth)
@@ -141,10 +141,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 		for (const Note& note : pat->notes) {
 			if (note.disabled) continue;
-			float cycles    = std::floor((prevBeats - note.beat) / len);
-			float firstFire = note.beat + cycles * len;
-			if (firstFire < prevBeats) firstFire += len;
-			if (firstFire < curBeats) {
+			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
@@ -157,7 +154,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				if (rowToMidi)
 					emitSoftNoteOn(instrumentId, rowToMidi(note.row), note.velocity,
 					               note.length, beatsPerBar, songBar);
-			}
+			});
 		}
 
 		{
@@ -166,10 +163,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				bool isSolo = pat->drumSolo.count(dn.note) > 0;
 				bool isMute = pat->drumMute.count(dn.note) > 0;
 				if (isMute || (anySolo && !isSolo)) continue;
-				float cycles    = std::floor((prevBeats - dn.beat) / len);
-				float firstFire = dn.beat + cycles * len;
-				if (firstFire < prevBeats) firstFire += len;
-				if (firstFire < curBeats) {
+				forEachFiring(dn.beat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
 					int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
@@ -178,23 +172,21 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 						       bar, beat, label.c_str(), dn.note, dn.beat);
 					emitSoftNoteOn(instrumentId, dn.note, dn.velocity,
 					               drumNoteLen, beatsPerBar, songBar);
-				}
+				});
 			}
 		}
 
 		for (const auto& lane : pat->paramLanes) {
 			auto checkFire = [&](float evtBeat, int value) {
-				float cycles    = std::floor((prevBeats - evtBeat) / len);
-				float firstFire = evtBeat + cycles * len;
-				if (firstFire < prevBeats) firstFire += len;
-				if (firstFire >= curBeats) return;
-				float songBar = anchorBar + firstFire / beatsPerBar;
-				int   bar     = (int)songBar + 1;
-				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
-				if (verbose)
-					printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
-					       bar, beat, label.c_str(), lane.type.c_str(), value);
-				emitSoftParam(instrumentId, ccForType(lane.type), value);
+				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
+					float songBar = anchorBar + firstFire / beatsPerBar;
+					int   bar     = (int)songBar + 1;
+					int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+					if (verbose)
+						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
+						       bar, beat, label.c_str(), lane.type.c_str(), value);
+					emitSoftParam(instrumentId, ccForType(lane.type), value);
+				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
 				checkFire(lane.points[i].beat, lane.points[i].value);
@@ -327,10 +319,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 
 		for (const Note& note : pat->notes) {
 			if (note.disabled) continue;
-			float cycles    = std::floor((prevBeats - note.beat) / len);
-			float firstFire = note.beat + cycles * len;
-			if (firstFire < prevBeats) firstFire += len;
-			if (firstFire < curBeats) {
+			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
@@ -342,7 +331,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				if (rowToMidi)
 					emitSoftNoteOn(instrumentId, rowToMidi(note.row), note.velocity,
 					               note.length, beatsPerBar, songBar);
-			}
+			});
 		}
 
 		{
@@ -351,10 +340,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				bool isSolo = pat->drumSolo.count(dn.note) > 0;
 				bool isMute = pat->drumMute.count(dn.note) > 0;
 				if (isMute || (anySolo && !isSolo)) continue;
-				float cycles    = std::floor((prevBeats - dn.beat) / len);
-				float firstFire = dn.beat + cycles * len;
-				if (firstFire < prevBeats) firstFire += len;
-				if (firstFire < curBeats) {
+				forEachFiring(dn.beat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
 					int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
@@ -363,23 +349,21 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 						       bar, beat, label.c_str(), dn.note, dn.beat);
 					emitSoftNoteOn(instrumentId, dn.note, dn.velocity,
 					               drumNoteLen, beatsPerBar, songBar);
-				}
+				});
 			}
 		}
 
 		for (const auto& lane : pat->paramLanes) {
 			auto checkFire = [&](float evtBeat, int value) {
-				float cycles    = std::floor((prevBeats - evtBeat) / len);
-				float firstFire = evtBeat + cycles * len;
-				if (firstFire < prevBeats) firstFire += len;
-				if (firstFire >= curBeats) return;
-				float songBar = anchorBar + firstFire / beatsPerBar;
-				int   bar     = (int)songBar + 1;
-				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
-				if (verbose)
-					printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
-					       bar, beat, label.c_str(), lane.type.c_str(), value);
-				emitSoftParam(instrumentId, ccForType(lane.type), value);
+				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
+					float songBar = anchorBar + firstFire / beatsPerBar;
+					int   bar     = (int)songBar + 1;
+					int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+					if (verbose)
+						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
+						       bar, beat, label.c_str(), lane.type.c_str(), value);
+					emitSoftParam(instrumentId, ccForType(lane.type), value);
+				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
 				checkFire(lane.points[i].beat, lane.points[i].value);

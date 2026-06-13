@@ -1,5 +1,6 @@
 #include "jackTransport.hpp"
 #include "chords.hpp"
+#include "loopFiring.hpp"
 #include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
@@ -173,8 +174,6 @@ void JackTransport::setLoopMode(bool mode)
 }
 
 // ── Snapshot building (UI thread) ─────────────────────────────────────────────
-
-static constexpr float drumNoteLen = 0.1f;
 
 void JackTransport::rebuildSnapshot()
 {
@@ -635,13 +634,8 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
             float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
 
             for (const NoteSnap& note : inst.notes) {
-                float len = inst.patternBeats;
-
-                float cycles    = std::floor((beatStart - note.beat) / len);
-                float firstFire = note.beat + cycles * len;
-                if (firstFire < beatStart) firstFire += len;
-
-                while (firstFire < beatEnd) {
+                forEachFiring(note.beat, inst.patternBeats, beatStart, beatEnd,
+                              [&](float firstFire) {
                     float onBar = inst.startBar
                                 + (firstFire - inst.startOffset) / inst.beatsPerBar;
                     double onSecs = snapBarToSeconds(onBar);
@@ -667,9 +661,7 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
 
                     activeNotes.push_back({note.midiPitch, inst.midiChannel, offFrame,
                                            inst.portName});
-
-                    firstFire += len;
-                }
+                });
             }
         }
     }
@@ -727,12 +719,8 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
             float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
 
             for (const ParamEventSnap& evt : inst.events) {
-                float len       = inst.patternBeats;
-                float cycles    = std::floor((beatStart - evt.beat) / len);
-                float firstFire = evt.beat + cycles * len;
-                if (firstFire < beatStart) firstFire += len;
-
-                while (firstFire < beatEnd) {
+                forEachFiring(evt.beat, inst.patternBeats, beatStart, beatEnd,
+                              [&](float firstFire) {
                     float  onBar  = inst.startBar + (firstFire - inst.startOffset) / inst.beatsPerBar;
                     double onSecs = snapBarToSeconds(onBar);
                     auto   fr     = static_cast<jack_nframes_t>(onSecs * sampleRate);
@@ -740,8 +728,7 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                     off = std::min(off, nframes - 1);
                     pending.push_back({off, &inst.portName, inst.midiChannel,
                                        inst.ccNumber, evt.value, inst.priority});
-                    firstFire += len;
-                }
+                });
             }
         }
     }

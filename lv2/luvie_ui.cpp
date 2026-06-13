@@ -19,17 +19,18 @@
    display-init time and skips Wayland if it is true. */
 extern "C" FL_EXPORT bool fl_disable_wayland = true;
 
-#include "../src/appWindow.hpp"
-#include "../src/transport.hpp"
-#include "../src/simpleTransport.hpp"
-#include "../src/jackTransport.hpp"
-#include "../src/observableSong.hpp"
-#include "../src/observablePattern.hpp"
-#include "../src/observableInstrument.hpp"
-#include "../src/outputsOverlay.hpp"
-#include "../src/patternPanel.hpp"
-#include "../src/luvieApp.hpp"
-#include "../src/timelineIO.hpp"
+// luvie_core's include dirs (src/, src/modern, src/transports) propagate here.
+#include "appWindow.hpp"
+#include "transport.hpp"
+#include "simpleTransport.hpp"
+#include "jackTransport.hpp"
+#include "observableSong.hpp"
+#include "observablePattern.hpp"
+#include "observableInstrument.hpp"
+#include "outputsOverlay.hpp"
+#include "patternPanel.hpp"
+#include "luvieApp.hpp"
+#include "timelineIO.hpp"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 
