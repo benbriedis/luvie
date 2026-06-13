@@ -307,10 +307,6 @@ ISSUE: too easy to accidently add a marker to a ruler
 
 MINOR BUG: clicking on Instrument selector highlights it as if it were a text field
 
-cf 
---transport jack|internal
---default-new-connections  jack|alsa/native
-
 Outputs/Instruments - Add a select for Jack|Alsa?  Or require all to be one or the other...
 
 "Alsa" options should only be included for platforms that support it.
@@ -358,8 +354,6 @@ Unstacked:
 
 cf master volume rubberband control? Or any other global parameters?
 
-
-Maybe split src/
 
 Q: do we want the option to be the transport master? 
    We change BPM and thats a Master thing I think...

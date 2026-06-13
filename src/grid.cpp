@@ -164,6 +164,24 @@ int Grid::handle(int event)
             findNoteForCursor();
             return 0;
 
+        case FL_KEYBOARD:
+        case FL_SHORTCUT: {
+            int key = Fl::event_key();
+            if (key != FL_Delete && key != FL_BackSpace)
+                return 0;
+            int idx = -1;
+            if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
+            else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
+            if (idx < 0)
+                return 0;
+            if (auto cb = makeDeleteCallback(idx)) {
+                cb();
+                state = StateIdle{};
+                window()->cursor(FL_CURSOR_DEFAULT);
+            }
+            return 1;
+        }
+
         default:
             return 0;
     }

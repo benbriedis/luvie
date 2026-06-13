@@ -251,6 +251,21 @@ int DrumGrid::handle(int evt)
         if (window()) window()->cursor(FL_CURSOR_DEFAULT);
         return 0;
 
+    case FL_KEYBOARD:
+    case FL_SHORTCUT: {
+        int key = Fl::event_key();
+        if (key != FL_Delete && key != FL_BackSpace)
+            return 0;
+        auto* h = std::get_if<DrumStateHover>(&state);
+        if (!h || !pattern)
+            return 0;
+        int id = notes[h->noteIdx].id;
+        state = DrumStateIdle{};
+        if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+        pattern->removeDrumNote(id);
+        return 1;
+    }
+
     default:
         return 0;
     }
