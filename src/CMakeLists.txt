@@ -1,15 +1,15 @@
 # Core: every SRC from the old Makefile except main.cpp
 add_library(luvie_core STATIC
-    appWindow.cpp editor.cpp songEditor.cpp patternEditors/basePatternEditor.cpp
-    patternEditors/patternEditor.cpp grid.cpp songGrid.cpp
-    patternEditors/patternGrid.cpp trackLabels.cpp
-    trackControls.cpp noteContextPopup.cpp patternInstanceContextPopup.cpp
+    appWindow.cpp editor.cpp songEditor/songEditor.cpp patternEditors/basePatternEditor.cpp
+    patternEditors/patternEditor.cpp grid.cpp songEditor/songGrid.cpp
+    patternEditors/patternGrid.cpp songEditor/trackLabels.cpp
+    songEditor/trackControls.cpp noteContextPopup.cpp songEditor/patternInstanceContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
     transports/simpleTransport.cpp transports/jackTransport.cpp
-    jackObserver.cpp transports/playhead.cpp markerPopup.cpp
-    markerRuler.cpp observableSong.cpp observablePattern.cpp
+    jackObserver.cpp transports/playhead.cpp songEditor/markerPopup.cpp
+    songEditor/markerRuler.cpp observableSong.cpp observablePattern.cpp
     observableInstrument.cpp activePatternSet.cpp patternPanel.cpp
-    inlineEditDispatch.cpp patternEditors/noteLabels.cpp trackContextPopup.cpp
+    inlineEditDispatch.cpp patternEditors/noteLabels.cpp songEditor/trackContextPopup.cpp
     patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp
     loopEditor.cpp
@@ -26,6 +26,7 @@ target_include_directories(luvie_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/transports
     ${CMAKE_CURRENT_SOURCE_DIR}/patternEditors
     ${CMAKE_CURRENT_SOURCE_DIR}/outputs
+    ${CMAKE_CURRENT_SOURCE_DIR}/songEditor
 )
 
 # PUBLIC so the plugin (which links luvie_core) inherits these too
