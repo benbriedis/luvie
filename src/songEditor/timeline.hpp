@@ -1,33 +1,18 @@
 #ifndef TIMELINE_HPP
 #define TIMELINE_HPP
 
-#include <set>
+#include "patternData.hpp"   // Note, DrumNote, ParamLane, Pattern, PatternType
 #include <string>
 #include <vector>
+
+// Song-level arrangement: how patterns are placed on tracks/lanes over time,
+// plus tempo/time-signature markers and the overall Timeline aggregate. The
+// per-pattern content structs live in patternEditors/patternData.hpp.
 
 struct Instrument {
     int         id;
     std::string name;
     bool        isDrum = false;
-};
-
-enum class PatternType { STANDARD = 0, DRUM = 1, PIANOROLL = 2 };
-
-struct DrumNote {
-	int   id;
-	int   note;        // MIDI note number (0–127)
-	float beat;
-	float velocity = 0.8f;
-};
-
-struct Note {
-	int   id;
-	int   row;             // abs_row in current chord encoding; when disabled: stores octave only
-	float beat;
-	float length;
-	float velocity       = 0.0f;
-	bool  disabled       = false;
-	int   disabledDegree = -1;  // degree at time of disabling (>= chord size); -1 when enabled
 };
 
 struct BpmMarker {
@@ -39,35 +24,6 @@ struct TimeSigMarker {
 	int bar;
 	int top;
 	int bottom;
-};
-
-struct ParamPoint {
-	int   id;
-	float beat;
-	int   value   = 63;    // 0-127 for CC, 0-16383 for pitch bend
-	bool  anchor  = false; // can't be deleted or moved horizontally
-};
-
-struct ParamLane {
-	int                      id;
-	std::string              type;    // "Pitch", "Modulation", etc.
-	std::vector<ParamPoint>  points;  // sorted by beat
-	int                      instrumentId = 0;  // owning instrument; routes to its port only
-};
-
-struct Pattern {
-	int   id;
-	float lengthBeats;
-	PatternType            type = PatternType::STANDARD;
-	std::vector<Note>      notes;
-	std::vector<DrumNote>  drumNotes;
-	std::set<int>          drumSolo;   // MIDI notes to solo (empty = all play)
-	std::set<int>          drumMute;   // MIDI notes to silence
-	std::vector<ParamLane> paramLanes;
-	int  instrumentId = 0;             // 0 = no routing assigned
-	std::string name;                  // display name; empty = auto ("InstrumentName N")
-	int timeSigTop    = 4;
-	int timeSigBottom = 4;
 };
 
 struct PatternInstance {
