@@ -3,6 +3,7 @@
 #include "FL/Fl_Box.H"
 #include "FL/Fl_Flex.H"
 #include "modern/modernSlider.hpp"
+#include "noteColor.hpp"
 #include "grid.hpp"
 
 NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
@@ -24,7 +25,10 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
 	velSlider = new ModernSlider(0, 0, 120, 30);
 	velSlider->type(FL_HORIZONTAL);
 	velSlider->color(popupBg);
-	velSlider->selection_color(popupAccent);
+	// Thumb uses the 80%-velocity reference blue; the filled bar tracks the
+	// note's velocity colour (light blue = soft, dark blue = loud).
+	velSlider->selection_color(velocityFill(0.8f));
+	velSlider->setFillColorFn([](double v) { return velocityFill((float)v); });
 	velSlider->bounds(0.0,1.0);
 	velSlider->value(0.8);
 	velSlider->when(FL_WHEN_CHANGED);

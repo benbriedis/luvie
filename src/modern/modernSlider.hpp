@@ -5,6 +5,7 @@
 #include <FL/Fl_Slider.H>
 #include <FL/Fl_Group.H>
 #include <FL/fl_draw.H>
+#include <functional>
 
 // A flat, modern horizontal slider: a thin rounded track with a filled
 // portion and a circular thumb. Inherits Fl_Slider so value()/bounds()/
@@ -16,6 +17,7 @@ class ModernSlider : public Fl_Slider {
     bool     hovered   = false;
     bool     pressed   = false;
     Fl_Color trackCol  = 0xE5E7EB00;  // gray-200 (unfilled track)
+    std::function<Fl_Color(double)> fillColorFn;  // optional value-driven fill
 
     double normalized() const {
         double range = maximum() - minimum();
@@ -43,10 +45,11 @@ class ModernSlider : public Fl_Slider {
         fl_color(parent() ? parent()->color() : FL_WHITE);
         fl_rectf(X, Y, W, H);
 
-        // Unfilled track, then the filled portion up to the thumb.
+        // Unfilled track, then the filled portion up to the thumb. The fill
+        // colour may vary with the value (e.g. note-velocity colouring).
         fl_color(trackCol);
         capsule(x0, x1, cy, rad);
-        fl_color(selection_color());
+        fl_color(fillColorFn ? fillColorFn(value()) : selection_color());
         capsule(x0, thumbX, cy, rad);
 
         // Hover/press halo behind the thumb.
@@ -105,6 +108,7 @@ public:
         box(FL_NO_BOX);
     }
 
+    void setFillColorFn(std::function<Fl_Color(double)> fn) { fillColorFn = std::move(fn); }
     void setTrackColor(Fl_Color c)  { trackCol = c; }
     void setTrackHeight(int h)      { trackH = h; }
     void setThumbRadius(int r)      { thumbR = r; }
