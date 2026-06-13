@@ -42,6 +42,10 @@ bool NsmClient::init(const char* appName, const char* exe) {
         (lo_method_handler)cbOpen, this);
     lo_server_add_method(srv, "/nsm/client/save", "",
         (lo_method_handler)cbSave, this);
+    lo_server_add_method(srv, "/nsm/client/show_optional_gui", nullptr,
+        (lo_method_handler)cbShowGui, this);
+    lo_server_add_method(srv, "/nsm/client/hide_optional_gui", nullptr,
+        (lo_method_handler)cbHideGui, this);
     // Catch /reply messages (e.g. the announce reply) — wildcard type.
     lo_server_add_method(srv, "/reply", nullptr,
         (lo_method_handler)cbReply, this);
@@ -64,13 +68,22 @@ bool NsmClient::init(const char* appName, const char* exe) {
         "/nsm/server/announce",
         "sssiii",
         appName,          // human-readable name
-        "",               // capabilities (none claimed yet)
+        ":optional-gui:", // capabilities (show/hide GUI from the session manager)
         exe,              // executable name
         1,                // API major version
         2,                // API minor version
         (int)getpid());
     active_ = true;
     return true;
+}
+
+// ── direct polling (used while no FLTK window is shown) ────────────────────────
+
+void NsmClient::poll(int timeoutMs) {
+    if (!server_) return;
+    // Block up to timeoutMs for the first message, then drain without blocking.
+    lo_server_recv_noblock((lo_server)server_, timeoutMs);
+    while (lo_server_recv_noblock((lo_server)server_, 0) > 0) {}
 }
 
 // ── fd callback ───────────────────────────────────────────────────────────────
@@ -93,6 +106,20 @@ void NsmClient::replyError(const char* addr, int code, const char* message) {
     if (!nsmAddr_ || !server_) return;
     lo_send_from((lo_address)nsmAddr_, (lo_server)server_,
         LO_TT_IMMEDIATE, "/error", "sis", addr, code, message);
+}
+
+void NsmClient::sendGuiState() {
+    if (!nsmAddr_ || !server_) return;
+    lo_send_from((lo_address)nsmAddr_, (lo_server)server_, LO_TT_IMMEDIATE,
+        guiVisible_ ? "/nsm/client/gui_is_shown" : "/nsm/client/gui_is_hidden", "");
+}
+
+void NsmClient::setGuiVisible(bool visible) {
+    guiVisible_ = visible;
+    // Report immediately: the server address is valid once NSM_URL is parsed,
+    // and the server must learn the new visibility to keep its "eye" toggle in
+    // sync (otherwise it never sends the matching show/hide message back).
+    sendGuiState();
 }
 
 // ── OSC handlers ─────────────────────────────────────────────────────────────
@@ -126,7 +153,7 @@ int NsmClient::cbSave(const char* /*oscPath*/, const char* /*types*/,
 }
 
 int NsmClient::cbReply(const char* /*oscPath*/, const char* /*types*/,
-                       void* argv[], int argc, void* /*msg*/, void* /*ud*/)
+                       void* argv[], int argc, void* /*msg*/, void* ud)
 {
     // The first string argument is the address this is a reply to.
     if (argc < 1) return 0;
@@ -135,6 +162,25 @@ int NsmClient::cbReply(const char* /*oscPath*/, const char* /*types*/,
     if (std::string(replyTo) == "/nsm/server/announce") {
         const char* welcome = (argc >= 2) ? &args[1]->s : "";
         printf("[nsm] Connected to session manager: %s\n", welcome);
+        // Now that we're registered, report the initial GUI visibility so the
+        // session manager's "eye" toggle reflects reality.
+        ((NsmClient*)ud)->sendGuiState();
     }
+    return 0;
+}
+
+int NsmClient::cbShowGui(const char* /*oscPath*/, const char* /*types*/,
+                         void* /*argv*/[], int /*argc*/, void* /*msg*/, void* ud)
+{
+    auto* self = (NsmClient*)ud;
+    if (self->onShowGui) self->onShowGui();
+    return 0;
+}
+
+int NsmClient::cbHideGui(const char* /*oscPath*/, const char* /*types*/,
+                         void* /*argv*/[], int /*argc*/, void* /*msg*/, void* ud)
+{
+    auto* self = (NsmClient*)ud;
+    if (self->onHideGui) self->onHideGui();
     return 0;
 }

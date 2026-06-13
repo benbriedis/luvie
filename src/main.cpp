@@ -1,6 +1,8 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <FL/fl_ask.H>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -30,6 +32,16 @@
 #include "timelineIO.hpp"
 
 int main(int argc, char **argv) {
+    /* Force FLTK to use X11 (not native Wayland). FLTK 1.5's Wayland backend
+       does not cleanly destroy a toplevel on hide(), so under a session manager
+       the GUI window can't be hidden/re-shown via NSM's optional-gui "eye" (the
+       dock icon lingers and the window won't remap). X11 (via XWayland on
+       Wayland sessions) destroys/recreates windows properly. The `fl_disable_wayland`
+       symbol only works for shared objects (the LV2 plugin uses it); for an
+       executable FLTK honours FLTK_BACKEND. Set it before any FLTK display init,
+       leaving an explicit user override in place. */
+    setenv("FLTK_BACKEND", "x11", 0);
+
     bool verbose = false;
     bool testMode = false;
     std::string projectPath;   // optional CLI project file (standalone only)
@@ -68,6 +80,10 @@ int main(int argc, char **argv) {
                 "(\"%s\").\n", projectPath.c_str());
         return 1;
     }
+
+    // Match the WM_CLASS to luvie.desktop so the desktop/dock shows the Luvie
+    // icon for our windows (and drops it when the window is hidden under NSM).
+    Fl_Window::default_xclass("luvie");
 
     AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
     window.color(bgColor);
@@ -434,6 +450,11 @@ int main(int argc, char **argv) {
         return saveAppState(state, nsmSessionPath + ".luv");
     };
 
+    // Optional-GUI "eye" toggle: show/hide the window on the session manager's
+    // request and report the resulting visibility back.
+    nsm.onShowGui = [&]() { window.show(); nsm.setGuiVisible(true); };
+    nsm.onHideGui = [&]() { window.hide(); nsm.setGuiVisible(false); };
+
     std::string exeName = argv[0];
     auto slash = exeName.rfind('/');
     if (slash != std::string::npos) exeName = exeName.substr(slash + 1);
@@ -537,10 +558,12 @@ int main(int argc, char **argv) {
     window.callback([](Fl_Widget* w, void* data) {
         auto* ctx = static_cast<CloseCtx*>(data);
 
-        // Under NSM the session manager owns the session file, so just save and go.
+        // Under NSM the session manager owns the app's lifecycle. Closing the
+        // window just hides the optional GUI (it can be re-shown via the "eye");
+        // the process keeps running. Saving is server-driven, so don't save here.
         if (ctx->nsm->isActive()) {
-            ctx->save();
             w->hide();
+            ctx->nsm->setGuiVisible(false);
             return;
         }
 
@@ -560,12 +583,35 @@ int main(int argc, char **argv) {
 
     window.show(argc, argv);
 
+    // The window starts visible; tell NSM so the "eye" toggle starts in sync.
+    if (nsm.isActive()) nsm.setGuiVisible(true);
+
     // For a fresh standalone project, prompt for the transport + default MIDI
     // output before the user starts. (Fresh NSM sessions get the same dialog from
     // the NSM open handler, once the session path is known.) --test picks its
     // own defaults (internal transport + debug output), so skip the dialog.
     if (newProject && !nsm.isActive() && !testMode)
         showStartupDialog();
+
+    // Under NSM the GUI is optional: hiding it must not end the program (the
+    // session manager keeps us running and terminates us with SIGTERM).
+    //
+    // FLTK's event loop goes idle once the last window is destroyed (hidden) — it
+    // then services neither timers nor our Fl::add_fd NSM-socket watch, so we'd
+    // never see show_optional_gui. So: when a window is shown, drive FLTK normally
+    // (it services the NSM fd); when none is shown, block on the NSM socket
+    // directly and pump any pending FLTK work without blocking.
+    if (nsm.isActive()) {
+        while (nsm.isActive()) {
+            if (Fl::first_window()) {
+                Fl::wait();
+            } else {
+                nsm.poll(100);   // block up to 100ms for an NSM message
+                Fl::wait(0.0);   // run due timers / deferred work, don't block
+            }
+        }
+        return 0;
+    }
 
     return Fl::run();
 }

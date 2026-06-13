@@ -17,9 +17,16 @@
    xmlns:svg="http://www.w3.org/2000/svg">
   <defs
      id="defs138">
-    <linearGradient
+    <radialGradient
        inkscape:collect="always"
-       id="linearGradient457">
+       id="radialGradient459"
+       cx="7.9091001"
+       cy="6.9316573"
+       fx="7.9091001"
+       fy="6.9316573"
+       r="8"
+       gradientTransform="matrix(1.1444716,-1.1366771,1.1868971,1.1428739,-9.3698048,7.9891774)"
+       gradientUnits="userSpaceOnUse">
       <stop
          style="stop-color:#ca94a4;stop-opacity:1;"
          offset="0"
@@ -28,18 +35,7 @@
          style="stop-color:#b93458;stop-opacity:1;"
          offset="1"
          id="stop455" />
-    </linearGradient>
-    <radialGradient
-       inkscape:collect="always"
-       xlink:href="#linearGradient457"
-       id="radialGradient459"
-       cx="7.9091001"
-       cy="6.9316573"
-       fx="7.9091001"
-       fy="6.9316573"
-       r="8"
-       gradientTransform="matrix(1.1444716,-1.1366771,1.1868971,1.1428739,-9.3698048,7.9891774)"
-       gradientUnits="userSpaceOnUse" />
+    </radialGradient>
   </defs>
   <sodipodi:namedview
      id="namedview136"
@@ -62,7 +58,7 @@
      inkscape:current-layer="svg134" />
   <path
      d="M 1.24264,8.24761 8,15.8605 14.7574,8.24761 C 15.553,7.3512249 16,6.1354694 16,4.8677886 V 4.6533952 C 16,2.1320033 14.1857,0.088 11.9477,0.088 10.7166,0.088 9.55233,0.71843804 8.78331,1.8014118 L 8,2.9045179 7.21669,1.8014118 C 6.44767,0.71843804 5.28338,0.088 4.05234,0.088 1.8143,0.088 0,2.1320033 0,4.6533952 V 4.8677886 C 0,6.1354694 0.44699,7.3512249 1.24264,8.24761 Z"
-     fill="#000000"
+     fill="#b93458"
      id="path132"
      style="fill:url(#radialGradient459);fill-opacity:1;stroke-width:1.06142"
      inkscape:highlight-color="#ff007a" />

@@ -9,5 +9,6 @@ TryExec=luvie
 Icon=luvie
 Terminal=false
 StartupNotify=false
+StartupWMClass=luvie
 Categories=AudioVideo;Audio;Sequencer;Midi;
 X-NSM-Capable=true
