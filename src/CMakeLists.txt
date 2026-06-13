@@ -1,25 +1,30 @@
 # Core: every SRC from the old Makefile except main.cpp
 add_library(luvie_core STATIC
-    appWindow.cpp editor.cpp songEditor.cpp basePatternEditor.cpp
-    patternEditor.cpp grid.cpp songGrid.cpp patternGrid.cpp trackLabels.cpp
+    appWindow.cpp editor.cpp songEditor.cpp patternEditors/basePatternEditor.cpp
+    patternEditors/patternEditor.cpp grid.cpp songGrid.cpp
+    patternEditors/patternGrid.cpp trackLabels.cpp
     trackControls.cpp noteContextPopup.cpp patternInstanceContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
     transports/simpleTransport.cpp transports/jackTransport.cpp
     jackObserver.cpp transports/playhead.cpp markerPopup.cpp
     markerRuler.cpp observableSong.cpp observablePattern.cpp
     observableInstrument.cpp activePatternSet.cpp patternPanel.cpp
-    inlineEditDispatch.cpp noteLabels.cpp trackContextPopup.cpp drumGrid.cpp
-    drumPatternEditor.cpp pianorollGrid.cpp pianorollEditor.cpp loopEditor.cpp
+    inlineEditDispatch.cpp patternEditors/noteLabels.cpp trackContextPopup.cpp
+    patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
+    patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp
+    loopEditor.cpp
     luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp
-    outputsOverlay.cpp paramDotPopup.cpp patternParamGrid.cpp jackPort.cpp
+    outputsOverlay.cpp paramDotPopup.cpp patternEditors/patternParamGrid.cpp
+    jackPort.cpp
     rtMidiPort.cpp debugPort.cpp portRegistry.cpp jackShim.cpp
-    noteAuditioner.cpp
+    patternEditors/noteAuditioner.cpp
 )
 
 target_include_directories(luvie_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/modern
     ${CMAKE_CURRENT_SOURCE_DIR}/transports
+    ${CMAKE_CURRENT_SOURCE_DIR}/patternEditors
 )
 
 # PUBLIC so the plugin (which links luvie_core) inherits these too
