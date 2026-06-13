@@ -267,13 +267,6 @@ TEST
 
 --------
 
-Logo - less 'red' and more 'bubblegum pink'.
-	   probably what to thinken the base of the L (top side)
-       At the top of the heart in the middle at the point where the two arcs meet, probably want to extend the
-	   left arc a little way into the heart - using a stroke that cuts away the heart underneith.
-	   Probably want to drop the meeting point down a little bit and widen the heart to occupy the full 512.
-	   Consider a solid colour for the L... yellow, cyan, black
-
 Wider initial app (so we can fit in pattern editor controls at start)
 
 Loop editor: BPM should be a spinner.  Change so dragging up and down spins, not left and right + reduce the sensitivity
@@ -371,13 +364,12 @@ Maybe split src/
 Q: do we want the option to be the transport master? 
    We change BPM and thats a Master thing I think...
    
-cf Pipewire
+Pipewire:
  - I think its working in "bridge mode" on top of Jack.
  - cf using pw-jack qjackctl instead ?  / pipewire-jack
- - Are there any programming implications?
  - To launch under Pipewire... try:    pw-jack luvie
-
-TODO test song parameters via Alsa and Jack
+ - Polling for Jack may not be necessary on Linux in time as Pipewire should always be there.
+   The same may not be true for Windows and mac.
 
 Error window when starting (invalid project file) is old fashioned.
 
@@ -395,10 +387,27 @@ Distro and Build:
 
 cf if no Jack is available making transport and default port options use 'internal' and 'native'.
   
-cf Licence... maximum of Fltk, LV2, rtMidi distros.  We could separate our parts.
-  TODO create a directory for all the licences.
-  
 cf Auto-save? NSM does this already I think. Do plugins?
     - Probably REMOVE 'save' altogether.
     - Exit on save on closing window is old fashioned. (Probably remove this too, just do a final save if required instead)
+
+RaySession: 
+	- Unit test again some API?
+		See https://github.com/jackaudio/new-session-manager
+	- When view in the application list Luvie lacks an icon. Is present on the desktop.
+	- Some odd behaviour restoring projects? Sometime the apps just disappear altogether.
+	- LOST ability to add notes
+	- context menus popping up in weird places
+	- losing connections (possibly a RaySession thing)
+
+Carla:
+	- some odd behaviour here too.
+
+Create my own license...
+
+Add luvie --version
+  Coordinate with git tags
+  
+TODO test song parameters via Alsa and Jack
+
 

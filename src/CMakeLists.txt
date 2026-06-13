@@ -40,3 +40,21 @@ install(FILES ${CMAKE_SOURCE_DIR}/luvie.desktop
 install(FILES ${CMAKE_SOURCE_DIR}/logo/logo.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
         RENAME luvie.svg)
+# Raster icons at standard sizes. App lists / launchers request a fixed small
+# size and don't always fall back to the scalable SVG, so ship size-specific
+# PNGs too (this is what makes the icon show in RaySession's application list).
+foreach(sz 16 24 32 48 64 128 256)
+    install(FILES ${CMAKE_SOURCE_DIR}/logo/png/luvie-${sz}.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${sz}x${sz}/apps
+            RENAME luvie.png)
+endforeach()
+# Also install to the legacy pixmaps dir. Some apps (e.g. RaySession) look up
+# app icons here directly, bypassing the icon theme — which matters because Qt
+# apps under non-Qt desktops often have no icon theme set, so QIcon.fromTheme
+# returns nothing.
+install(FILES ${CMAKE_SOURCE_DIR}/logo/png/luvie-256.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps
+        RENAME luvie.png)
+install(FILES ${CMAKE_SOURCE_DIR}/logo/logo.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps
+        RENAME luvie.svg)

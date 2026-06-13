@@ -183,6 +183,20 @@ private:
     bool                    wasPlaying = false;
     bool                    firstCall  = true;
 
+    // All MIDI output for a cycle is collected here, then sorted by frame per
+    // buffer and written at the end of process(). JACK drops any event whose
+    // frame is earlier than the last one already written to a buffer, so the
+    // note-off / note-on / param passes must be merged into one ordered stream.
+    // Reused across cycles to avoid per-cycle allocation on the RT thread.
+    struct OutEvent {
+        void*          buf;
+        jack_nframes_t frame;
+        uint32_t       seq;     // insertion order; tiebreak so sort stays in-place
+        uint8_t        data[3];
+        int            len;
+    };
+    std::vector<OutEvent> outEvents;
+
     // ── JACK process callback ─────────────────────────────────────────────────
     static int processCallback(jack_nframes_t nframes, void* arg);
     int process(jack_nframes_t nframes);
@@ -197,6 +211,9 @@ private:
     void fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                          jack_nframes_t nframes,
                          jack_nframes_t blockStart, float prevBars, float curBars);
+
+    // Queue one event for the current cycle (collected, sorted, then written).
+    void emit(void* buf, jack_nframes_t frame, const uint8_t* data, int len);
 };
 
 #endif

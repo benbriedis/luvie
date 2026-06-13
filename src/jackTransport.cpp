@@ -1,5 +1,6 @@
 #include "jackTransport.hpp"
 #include "chords.hpp"
+#include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
 #include <cmath>
@@ -245,22 +246,12 @@ void JackTransport::rebuildSnapshot()
     // Pre-compute all firing events (point values + half-integer crossings) for a lane.
     auto buildParamEvents = [](const ParamLane& lane) -> std::vector<ParamEventSnap> {
         std::vector<ParamEventSnap> evts;
+        auto sink = [&](float beat, int value) { evts.push_back({beat, value}); };
         for (int i = 0; i < (int)lane.points.size(); i++) {
             evts.push_back({lane.points[i].beat, lane.points[i].value});
-            if (i + 1 < (int)lane.points.size()) {
-                float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
-                int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
-                if (b1 > b0 && v1 != v0) {
-                    float db = b1 - b0;
-                    int   dv = v1 - v0;
-                    if (dv > 0)
-                        for (int N = v0; N < v1; N++)
-                            evts.push_back({b0 + (N + 0.5f - v0) / dv * db, N + 1});
-                    else
-                        for (int N = v1; N < v0; N++)
-                            evts.push_back({b0 + (N + 0.5f - v0) / dv * db, N});
-                }
-            }
+            if (i + 1 < (int)lane.points.size())
+                densifyParamRamp(lane.points[i].beat,  lane.points[i+1].beat,
+                                 lane.points[i].value, lane.points[i+1].value, sink);
         }
         std::sort(evts.begin(), evts.end(),
                   [](const ParamEventSnap& a, const ParamEventSnap& b) { return a.beat < b.beat; });
@@ -292,10 +283,9 @@ void JackTransport::rebuildSnapshot()
                     timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
                     is.beatsPerBar = (float)top;
                     buildNotes(is, pat, trackIdx);
-                    if (!is.notes.empty())
-                        ts.instances.push_back(std::move(is));
 
-                    // Param lanes for this active pattern.
+                    // Param lanes for this active pattern. Build BEFORE moving
+                    // `is` below — moving leaves is.portName empty.
                     for (const auto& lane : pat->paramLanes) {
                         auto evts = buildParamEvents(lane);
                         if (evts.empty()) continue;
@@ -312,6 +302,9 @@ void JackTransport::rebuildSnapshot()
                         pis.events       = std::move(evts);
                         newSnap.paramInsts.push_back(std::move(pis));
                     }
+
+                    if (!is.notes.empty())
+                        ts.instances.push_back(std::move(is));
                 }
             }
             newSnap.tracks.push_back(std::move(ts));
@@ -340,26 +333,28 @@ void JackTransport::rebuildSnapshot()
                 timeline->timeSigAt((int)inst.startBar, top, bot);
                 is.beatsPerBar = (float)top;
                 buildNotes(is, pat, trackIdx);
-                ts.instances.push_back(std::move(is));
 
-                // Param lanes for this pattern instance.
-                if (is.portName.empty()) continue;
-                for (const auto& lane : pat->paramLanes) {
-                    auto evts = buildParamEvents(lane);
-                    if (evts.empty()) continue;
-                    ParamInstSnap pis;
-                    pis.startBar     = inst.startBar;
-                    pis.length       = inst.length;
-                    pis.startOffset  = inst.startOffset;
-                    pis.beatsPerBar  = (float)top;
-                    pis.patternBeats = pat->lengthBeats;
-                    pis.portName     = is.portName;
-                    pis.midiChannel  = is.midiChannel;
-                    pis.priority     = trackIdx + 1;
-                    pis.ccNumber     = ccForType(lane.type);
-                    pis.events       = std::move(evts);
-                    newSnap.paramInsts.push_back(std::move(pis));
+                // Param lanes for this pattern instance. Build BEFORE moving `is`
+                // into ts.instances below — moving leaves is.portName empty.
+                if (!is.portName.empty()) {
+                    for (const auto& lane : pat->paramLanes) {
+                        auto evts = buildParamEvents(lane);
+                        if (evts.empty()) continue;
+                        ParamInstSnap pis;
+                        pis.startBar     = inst.startBar;
+                        pis.length       = inst.length;
+                        pis.startOffset  = inst.startOffset;
+                        pis.beatsPerBar  = (float)top;
+                        pis.patternBeats = pat->lengthBeats;
+                        pis.portName     = is.portName;
+                        pis.midiChannel  = is.midiChannel;
+                        pis.priority     = trackIdx + 1;
+                        pis.ccNumber     = ccForType(lane.type);
+                        pis.events       = std::move(evts);
+                        newSnap.paramInsts.push_back(std::move(pis));
+                    }
                 }
+                ts.instances.push_back(std::move(is));
             }
             newSnap.tracks.push_back(std::move(ts));
             ++trackIdx;
@@ -485,10 +480,12 @@ int JackTransport::process(jack_nframes_t nframes)
         portsMutex.unlock();
     }
 
+    outEvents.clear();
+
     if (!namedBufs.empty() && pendingMutex_.try_lock()) {
         for (const auto& pm : pendingMsgs_) {
             void* b = findBuf(namedBufs, pm.portName);
-            if (b) jack_midi_event_write(b, 0, pm.data, pm.len);
+            if (b) emit(b, 0, pm.data, pm.len);
         }
         pendingMsgs_.clear();
         pendingMutex_.unlock();
@@ -505,7 +502,7 @@ int JackTransport::process(jack_nframes_t nframes)
                 0
             };
             void* b = findBuf(namedBufs, an.portName);
-            if (b) jack_midi_event_write(b, 0, msg, 3);
+            if (b) emit(b, 0, msg, 3);
         }
         activeNotes.clear();
 
@@ -521,8 +518,8 @@ int JackTransport::process(jack_nframes_t nframes)
                 uint8_t base = static_cast<uint8_t>(0xB0 | (ch & 0x0F));
                 uint8_t resetMsg[3]  = { base, 121, 0 };  // Reset All Controllers
                 uint8_t allOffMsg[3] = { base, 123, 0 };  // All Notes Off
-                jack_midi_event_write(buf, 0, resetMsg,  3);
-                jack_midi_event_write(buf, 0, allOffMsg, 3);
+                emit(buf, 0, resetMsg,  3);
+                emit(buf, 0, allOffMsg, 3);
             }
             snapMutex.unlock();
         }
@@ -543,7 +540,7 @@ int JackTransport::process(jack_nframes_t nframes)
                     0
                 };
                 void* b = findBuf(namedBufs, it->portName);
-                if (b) jack_midi_event_write(b, off, msg, 3);
+                if (b) emit(b, off, msg, 3);
                 it = activeNotes.erase(it);
             } else {
                 ++it;
@@ -561,6 +558,23 @@ int JackTransport::process(jack_nframes_t nframes)
         }
     }
 
+    // Flush the cycle's events in non-decreasing frame order per buffer. JACK
+    // drops any event written out of frame order, so this single ordered pass
+    // replaces the previously interleaved note-off / note-on / param writes.
+    // seq is the insertion index, used as a total-order tiebreaker so this can
+    // be an in-place std::sort (no temp-buffer allocation on the RT thread,
+    // unlike std::stable_sort) while still keeping same-frame insertion order
+    // (pending, note-offs, then note-ons / params) — so an off at a given frame
+    // still precedes an on. n is the events in one ~ms cycle, so n log n is tiny.
+    std::sort(outEvents.begin(), outEvents.end(),
+        [](const OutEvent& a, const OutEvent& b) {
+            if (a.buf   != b.buf)   return a.buf   < b.buf;
+            if (a.frame != b.frame) return a.frame < b.frame;
+            return a.seq < b.seq;
+        });
+    for (const OutEvent& e : outEvents)
+        jack_midi_event_write(e.buf, e.frame, e.data, e.len);
+
     posFrames.store(pos.frame + nframes);
     playing_.store(nowPlaying);
 
@@ -572,6 +586,17 @@ int JackTransport::process(jack_nframes_t nframes)
     firstCall  = false;
 
     return 0;
+}
+
+// ── Output event collection (RT thread) ──────────────────────────────────────
+
+void JackTransport::emit(void* buf, jack_nframes_t frame,
+                          const uint8_t* data, int len)
+{
+    OutEvent e{buf, frame, static_cast<uint32_t>(outEvents.size()), {}, len};
+    for (int i = 0; i < len && i < 3; ++i)
+        e.data[i] = data[i];
+    outEvents.push_back(e);
 }
 
 // ── Note event generation (RT thread, called with snapMutex held) ─────────────
@@ -620,7 +645,7 @@ void JackTransport::fireNoteEvents(const std::vector<NamedBuf>& namedBufs,
                         static_cast<uint8_t>(note.midiPitch),
                         vel
                     };
-                    jack_midi_event_write(instBuf, onOff, onMsg, 3);
+                    emit(instBuf, onOff, onMsg, 3);
 
                     float offBar = inst.startBar
                                  + (firstFire + note.length - inst.startOffset) / inst.beatsPerBar;
@@ -736,14 +761,14 @@ void JackTransport::fireParamEvents(const std::vector<NamedBuf>& namedBufs,
                     static_cast<uint8_t>(val14 & 0x7F),
                     static_cast<uint8_t>((val14 >> 7) & 0x7F)
                 };
-                jack_midi_event_write(buf, p.frame, msg, 3);
+                emit(buf, p.frame, msg, 3);
             } else {
                 uint8_t msg[3] = {
                     static_cast<uint8_t>(0xB0 | (p.midiChannel & 0x0F)),
                     static_cast<uint8_t>(p.ccNumber & 0x7F),
                     static_cast<uint8_t>(p.value    & 0x7F)
                 };
-                jack_midi_event_write(buf, p.frame, msg, 3);
+                emit(buf, p.frame, msg, 3);
             }
         }
         i = j;

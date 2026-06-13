@@ -2,6 +2,7 @@
 #include "port.hpp"
 #include "portRegistry.hpp"
 #include "chords.hpp"
+#include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -197,20 +198,9 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
 				checkFire(lane.points[i].beat, lane.points[i].value);
-				if (i + 1 < (int)lane.points.size()) {
-					float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
-					int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
-					if (b1 > b0 && v1 != v0) {
-						float db = b1 - b0;
-						int   dv = v1 - v0;
-						if (dv > 0)
-							for (int N = v0; N < v1; N++)
-								checkFire(b0 + (N + 0.5f - v0) / dv * db, N + 1);
-						else
-							for (int N = v1; N < v0; N++)
-								checkFire(b0 + (N + 0.5f - v0) / dv * db, N);
-					}
-				}
+				if (i + 1 < (int)lane.points.size())
+					densifyParamRamp(lane.points[i].beat,  lane.points[i+1].beat,
+					                 lane.points[i].value, lane.points[i+1].value, checkFire);
 			}
 		}
 	}
@@ -393,20 +383,9 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
 				checkFire(lane.points[i].beat, lane.points[i].value);
-				if (i + 1 < (int)lane.points.size()) {
-					float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
-					int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
-					if (b1 > b0 && v1 != v0) {
-						float db = b1 - b0;
-						int   dv = v1 - v0;
-						if (dv > 0)
-							for (int N = v0; N < v1; N++)
-								checkFire(b0 + (N + 0.5f - v0) / dv * db, N + 1);
-						else
-							for (int N = v1; N < v0; N++)
-								checkFire(b0 + (N + 0.5f - v0) / dv * db, N);
-					}
-				}
+				if (i + 1 < (int)lane.points.size())
+					densifyParamRamp(lane.points[i].beat,  lane.points[i+1].beat,
+					                 lane.points[i].value, lane.points[i+1].value, checkFire);
 			}
 		}
 	}

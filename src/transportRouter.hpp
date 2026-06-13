@@ -16,6 +16,11 @@ public:
         if (t == active_) return;
         const float pos     = active_ ? active_->position()  : 0.0f;
         const bool  playing = active_ ? active_->isPlaying() : false;
+        // Stop the outgoing transport before switching, otherwise it keeps
+        // running (e.g. JACK transport stays rolling, so JackTransport's RT
+        // engine keeps sequencing) while the incoming clock also plays — every
+        // note then fires twice. Carry pos/play state onto the new transport.
+        if (active_ && playing) active_->pause();
         active_ = t;
         if (active_) {
             active_->setLoopMode(loopMode_);
