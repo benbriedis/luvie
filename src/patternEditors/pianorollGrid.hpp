@@ -16,6 +16,7 @@ protected:
     Fl_Color rowLineColor(int i)  const override;
     Fl_Color rowBgColor(int row)  const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
+    std::function<void(float)> makeVelocityCallback(int noteIdx) override;
     void onCommitMove(const StateDragMove& s) override;
     void onCommitResize(const StateDragResize& s) override;
     void toggleNote() override;

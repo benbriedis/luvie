@@ -61,6 +61,16 @@ int SongGrid::totalPixelH() const
     return h;
 }
 
+void SongGrid::drawNoteBlock(const Note& /*note*/, int x0, int y0, int width, int rh)
+{
+    fl_rectf(x0, y0 + 1, width, rh - 1, kBlockFill);
+    const int barWidth = 5;
+    fl_color(kBlockBar);
+    fl_line_style(FL_SOLID, barWidth);
+    fl_line(x0 + barWidth / 2, y0 + 1, x0 + barWidth / 2, y0 + rh - 1);
+    fl_line_style(0);
+}
+
 void SongGrid::draw()
 {
     Grid::draw();

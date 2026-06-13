@@ -2,6 +2,7 @@
 #include "playhead.hpp"
 #include "editor.hpp"
 #include "cursors.hpp"
+#include "noteColor.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -11,8 +12,6 @@
 static constexpr Fl_Color kRowLine = 0xEE888800;
 static constexpr Fl_Color kBarCol  = 0x00660000;
 static constexpr Fl_Color kBeatCol = 0x00EE0000;
-static constexpr Fl_Color kDotFill = 0x5555EE00;
-static constexpr Fl_Color kDotRim  = 0x1111EE00;
 
 DrumGrid::DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight),
@@ -126,9 +125,9 @@ void DrumGrid::draw()
         int dotX = x() + (int)((n.beat - colOffset) * colWidth);
         int dotY = y() + vr * rowHeight + rowHeight / 2;
         if (dotX + dotR < x() || dotX - dotR > x() + w()) continue;
-        fl_color(kDotFill);
+        fl_color(velocityFill(n.velocity));
         fl_pie(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
-        fl_color(kDotRim);
+        fl_color(velocityAccent(n.velocity));
         fl_arc(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
     }
 
@@ -155,8 +154,9 @@ int DrumGrid::handle(int evt)
                 int dotX = x() + (int)((n.beat - colOffset) * colWidth);
                 int dotY = y() + vr * rowHeight + rowHeight / 2;
                 int id   = n.id;
-                popup.openForDot(dotX, dotY, this, rowHeight,
-                    [this, id]() { if (pattern) pattern->removeDrumNote(id); });
+                popup.openForDot(dotX, dotY, this, rowHeight, n.velocity,
+                    [this, id]() { if (pattern) pattern->removeDrumNote(id); },
+                    [this, id](float v) { if (pattern) pattern->setDrumNoteVelocity(id, v); });
             }
             return 1;
         }

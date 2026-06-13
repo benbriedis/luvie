@@ -21,13 +21,17 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
 	velLabel->labelcolor(popupText);
 	velLabel->box(FL_NO_BOX);
 	sliderRow->fixed(velLabel, 30);
-	Fl_Slider *slider = new Fl_Slider(0, 0, 120, 30);
-	slider->type(FL_HOR_NICE_SLIDER);
-	slider->box(FL_FLAT_BOX);
-	slider->color(popupInputBg);
-	slider->selection_color(popupAccent);
-	slider->bounds(0.0,1.0);
-	slider->value(0.5);
+	velSlider = new Fl_Slider(0, 0, 120, 30);
+	velSlider->type(FL_HOR_NICE_SLIDER);
+	velSlider->box(FL_FLAT_BOX);
+	velSlider->color(popupInputBg);
+	velSlider->selection_color(popupAccent);
+	velSlider->bounds(0.0,1.0);
+	velSlider->value(0.8);
+	velSlider->when(FL_WHEN_CHANGED);
+	velSlider->callback([](Fl_Widget*, void* me) {
+		((NoteContextPopup*)me)->onVelocityChanged();
+	}, this);
 	sliderRow->end();
 
 	ModernButton *deleteItem = new ModernButton(0, 0, 40, 30, "Delete");
@@ -51,15 +55,23 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
 	}, this);
 }
 
-void NoteContextPopup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
-                 std::function<void()> onDelete)
+void NoteContextPopup::onVelocityChanged()
 {
-	selected   = mySelected;
-	notes      = myNotes;
-	grid       = myGrid;
-	onDeleteFn = std::move(onDelete);
+	if (onVelocityFn)
+		onVelocityFn((float)velSlider->value());
+}
+
+void NoteContextPopup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
+                 std::function<void()> onDelete, std::function<void(float)> onVelocity)
+{
+	selected     = mySelected;
+	notes        = myNotes;
+	grid         = myGrid;
+	onDeleteFn   = std::move(onDelete);
+	onVelocityFn = std::move(onVelocity);
 
 	const Note& cell = (*notes)[mySelected];
+	velSlider->value(cell.velocity);
 	Point2 anchor = {
 		(int)(grid->x() + cell.beat * grid->colWidth),
 		(int)(grid->y() + cell.row * grid->rowHeight)
@@ -68,12 +80,15 @@ void NoteContextPopup::open(int mySelected, std::vector<Note>* myNotes, Grid* my
 	openAt({win->w(), win->h()}, anchor, grid->rowHeight);
 }
 
-void NoteContextPopup::openForDot(int dotX, int dotY, Fl_Widget* w, int rowH,
-                                   std::function<void()> onDelete)
+void NoteContextPopup::openForDot(int dotX, int dotY, Fl_Widget* w, int rowH, float velocity,
+                                   std::function<void()> onDelete,
+                                   std::function<void(float)> onVelocity)
 {
-	onDeleteFn = std::move(onDelete);
+	onDeleteFn   = std::move(onDelete);
+	onVelocityFn = std::move(onVelocity);
 	notes = nullptr;
 	grid  = nullptr;
+	velSlider->value(velocity);
 
 	Fl_Window* win = w->window();
 	openAt({win->w(), win->h()}, {dotX, dotY}, rowH);

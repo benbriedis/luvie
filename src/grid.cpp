@@ -1,6 +1,7 @@
 #include "grid.hpp"
 #include "playhead.hpp"
 #include "editor.hpp"
+#include "noteColor.hpp"
 #include <FL/Fl.H>
 #include "FL/Enumerations.H"
 #include "noteContextPopup.hpp"
@@ -286,7 +287,7 @@ int Grid::overlappingCell(int noteIdx) const
 
 void Grid::openContextMenu(int idx)
 {
-    popup.open(idx, &notes, this, makeDeleteCallback(idx));
+    popup.open(idx, &notes, this, makeDeleteCallback(idx), makeVelocityCallback(idx));
 }
 
 void Grid::clampSelection()
@@ -299,10 +300,10 @@ void Grid::clampSelection()
     else if (auto* s = std::get_if<StateDragResize> (&state)) { if (oob(s->noteIdx)) state = StateIdle{}; }
 }
 
-void Grid::drawNoteBlock(const Note& /*note*/, int x0, int y0, int width, int rh)
+void Grid::drawNoteBlock(const Note& note, int x0, int y0, int width, int rh)
 {
-    static constexpr Fl_Color fill = 0x5555EE00;
-    static constexpr Fl_Color bar  = 0x1111EE00;
+    const Fl_Color fill = velocityFill(note.velocity);
+    const Fl_Color bar  = velocityAccent(note.velocity);
     fl_rectf(x0, y0 + 1, width, rh - 1, fill);
     const int barWidth = 5;
     fl_color(bar);

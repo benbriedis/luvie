@@ -27,12 +27,14 @@ public:
     void moveNote(int noteId, float newStart, float newPitch);
     void resizeNoteRight(int noteId, float newLength);
     void resizeNoteLeft(int noteId, float newStart, float newLength);
+    void setNoteVelocity(int noteId, float velocity);
     std::vector<Note> buildPatternNotes(int patternId) const;
     void remapPatternNotes(int patId, int oldSize, int newSize);
 
     // Drum note CRUD
     void addDrumNote(int patternId, int note, float beat, float velocity = 0.8f);
     void removeDrumNote(int drumNoteId);
+    void setDrumNoteVelocity(int drumNoteId, float velocity);
     std::vector<DrumNote> buildDrumPatternNotes(int patternId) const;
     void setDrumNoteSolo(int patternId, int note, bool solo);
     void setDrumNoteMute(int patternId, int note, bool mute);

@@ -103,6 +103,19 @@ void ObservablePattern::resizeNoteLeft(int noteId, float newStart, float newLeng
     }
 }
 
+void ObservablePattern::setNoteVelocity(int noteId, float velocity)
+{
+    for (auto& pat : song_->data.patterns) {
+        for (auto& n : pat.notes) {
+            if (n.id == noteId) {
+                n.velocity = std::clamp(velocity, 0.0f, 1.0f);
+                song_->notify();
+                return;
+            }
+        }
+    }
+}
+
 std::vector<Note> ObservablePattern::buildPatternNotes(int patternId) const
 {
     for (const auto& pat : song_->data.patterns)
@@ -162,6 +175,19 @@ void ObservablePattern::removeDrumNote(int drumNoteId)
             pat.drumNotes.erase(it);
             song_->notify();
             return;
+        }
+    }
+}
+
+void ObservablePattern::setDrumNoteVelocity(int drumNoteId, float velocity)
+{
+    for (auto& pat : song_->data.patterns) {
+        for (auto& n : pat.drumNotes) {
+            if (n.id == drumNoteId) {
+                n.velocity = std::clamp(velocity, 0.0f, 1.0f);
+                song_->notify();
+                return;
+            }
         }
     }
 }

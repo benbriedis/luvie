@@ -138,6 +138,13 @@ std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)
     return [this, id]() { pattern->removeNote(id); };
 }
 
+std::function<void(float)> PatternGrid::makeVelocityCallback(int noteIdx)
+{
+    if (!pattern) return nullptr;
+    int id = notes[noteIdx].id;
+    return [this, id](float v) { pattern->setNoteVelocity(id, v); };
+}
+
 void PatternGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern || notes[s.noteIdx].disabled) return;

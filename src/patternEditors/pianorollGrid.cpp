@@ -84,6 +84,13 @@ std::function<void()> PianorollGrid::makeDeleteCallback(int noteIdx)
     return [this, id]() { pattern->removeNote(id); };
 }
 
+std::function<void(float)> PianorollGrid::makeVelocityCallback(int noteIdx)
+{
+    if (!pattern) return nullptr;
+    int id = notes[noteIdx].id;
+    return [this, id](float v) { pattern->setNoteVelocity(id, v); };
+}
+
 void PianorollGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern) return;
