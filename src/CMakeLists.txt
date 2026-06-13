@@ -14,9 +14,9 @@ add_library(luvie_core STATIC
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp
     loopEditor.cpp
     luvieApp.cpp nsm.cpp timelineIO.cpp modern/overlayWindow.cpp
-    outputsOverlay.cpp paramDotPopup.cpp patternEditors/patternParamGrid.cpp
-    jackPort.cpp
-    rtMidiPort.cpp debugPort.cpp portRegistry.cpp jackShim.cpp
+    outputs/outputsOverlay.cpp paramDotPopup.cpp patternEditors/patternParamGrid.cpp
+    outputs/jackPort.cpp
+    outputs/rtMidiPort.cpp outputs/debugPort.cpp outputs/portRegistry.cpp jackShim.cpp
     patternEditors/noteAuditioner.cpp
 )
 
@@ -25,6 +25,7 @@ target_include_directories(luvie_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/modern
     ${CMAKE_CURRENT_SOURCE_DIR}/transports
     ${CMAKE_CURRENT_SOURCE_DIR}/patternEditors
+    ${CMAKE_CURRENT_SOURCE_DIR}/outputs
 )
 
 # PUBLIC so the plugin (which links luvie_core) inherits these too
