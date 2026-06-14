@@ -23,7 +23,6 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "appWindow.hpp"
 #include "transport.hpp"
 #include "simpleTransport.hpp"
-#include "jackTransport.hpp"
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
 #include "observableInstrument.hpp"
@@ -43,7 +42,7 @@ static std::string g_stateFilePath;
 
 struct LuvieUI;
 static std::string serializeStateToString(LuvieUI* ui);
-static void sendFullState(LuvieUI* ui);
+static void writeStateFile(LuvieUI* ui);
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size);
 
 /* -----------------------------------------------------------------------
@@ -75,7 +74,6 @@ struct LuvieUI {
     ObservablePattern*    pattern        = nullptr;
     ObservableInstrument* instruments    = nullptr;
     SimpleTransport*      simpleTransport= nullptr;
-    JackTransport*        jackTransport  = nullptr;
 
     /* UI layout (owns FLTK widgets via window) */
     LuvieApp            app;
@@ -87,38 +85,10 @@ struct LuvieUI {
         /* app destructor removes timeline observers */
         /* Widgets are owned by window (added via add()), deleted with window */
         delete window;
-        delete jackTransport;
         delete simpleTransport;
         delete pattern;
         delete instruments;
         delete song;
-    }
-
-    /* Try once to open JACK with MIDI enabled. Registers all current output ports on
-       success and enables transport-sync buttons. */
-    void tryConnectJack() {
-        auto* jt = new JackTransport();
-        if (jt->open("luvie_lv2", /*enableMidi=*/true)) {
-            jackTransport = jt;
-            jackTransport->setTimeline(song);
-            jackTransport->onTransportEvent = [this]() {
-                Fl::awake([](void* data) {
-                    static_cast<LuvieUI*>(data)->app.bottomPane->syncPlayState();
-                }, this);
-            };
-            if (app.bottomPane) app.bottomPane->setControlTransport(jackTransport);
-            if (app.outputsOverlay) {
-                for (const auto& name : app.outputsOverlay->getOutputs())
-                    jackTransport->addMidiPort(name);
-                std::vector<JackTransport::InstrumentRouting> routings;
-                for (const auto& ci : app.outputsOverlay->getInstruments())
-                    routings.push_back({ci.id, ci.portName, ci.midiChannel,
-                                        ci.programNumber, ci.bankMsb, ci.bankLsb});
-                jackTransport->setInstruments(routings);
-            }
-        } else {
-            delete jt;
-        }
     }
 };
 
@@ -154,14 +124,8 @@ static void applyOverlayOutputs(LuvieUI* ui, const AppState& state)
     auto* overlay = ui->app.outputsOverlay;
     if (!overlay) return;
     overlay->setDefaultBackend(state.defaultPortBackend);
-    if (ui->jackTransport)
-        for (const auto& name : overlay->getOutputs())
-            ui->jackTransport->removeMidiPort(name);
     if (!state.jackOutputs.empty())
         overlay->setOutputs(state.jackOutputs);  // JackOutput overload keeps backends
-    if (ui->jackTransport)
-        for (const auto& name : overlay->getOutputs())
-            ui->jackTransport->addMidiPort(name);
     std::vector<OutputsOverlay::InstrumentInfo> instrs;
     for (const auto& c : state.jackInstruments)
         instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
@@ -171,40 +135,36 @@ static void applyOverlayOutputs(LuvieUI* ui, const AppState& state)
     ui->app.pushInstruments();
 }
 
-static std::string serializeStateToString(LuvieUI* ui)
+static bool buildAppState(LuvieUI* ui, AppState& state)
 {
     if (!ui->song || !ui->app.patternPanel)
-        return {};
-    AppState state;
+        return false;
     state.timeline  = ui->song->get();
     state.rootPitch = ui->app.patternPanel->rootPitch();
     state.chordType = ui->app.patternPanel->chordType();
     state.sharp     = ui->app.patternPanel->isSharp();
     collectOverlayOutputs(ui, state);
+    return true;
+}
+
+static std::string serializeStateToString(LuvieUI* ui)
+{
+    AppState state;
+    if (!buildAppState(ui, state))
+        return {};
     return appStateToJsonString(state);
 }
 
-static void sendFullState(LuvieUI* ui)
+/* Persist the full project to the per-process state file. The DSP plugin's poll
+   thread watches this file and applies each change to the real-time engine, so
+   this — not an atom write — is how UI edits reach playback. saveAppState writes
+   atomically (temp file + rename) so the poll thread never sees a partial file. */
+static void writeStateFile(LuvieUI* ui)
 {
-    if (!ui->writeFunc) return;
-
-    std::string jsonStr = serializeStateToString(ui);
-    if (jsonStr.empty()) return;
-
-    /* Include null terminator so the DSP can treat it as a C string */
-    uint32_t jsonSize = (uint32_t)jsonStr.size() + 1;
-
-    std::vector<uint8_t> atomBuf(sizeof(LV2_Atom) + jsonSize);
-    LV2_Atom* atom = reinterpret_cast<LV2_Atom*>(atomBuf.data());
-    atom->type = ui->luvie_state_urid;
-    atom->size = jsonSize;
-    memcpy(atomBuf.data() + sizeof(LV2_Atom), jsonStr.c_str(), jsonSize);
-
-    ui->writeFunc(ui->controller,
-                  0 /* PORT_CONTROL_IN */,
-                  (uint32_t)atomBuf.size(),
-                  ui->atom_eventTransfer,
-                  atomBuf.data());
+    if (g_stateFilePath.empty()) return;
+    AppState state;
+    if (!buildAppState(ui, state)) return;
+    saveAppState(state, g_stateFilePath);
 }
 
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
@@ -230,10 +190,9 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->song->loadTimeline(state.timeline);
     applyOverlayOutputs(ui, state);
     ui->restoringState = false;
-    /* No sendFullState() here: the DSP already holds this exact state (it just
-       restored it, or we share its persistent instance). Echoing it back would
-       trip the DSP's stateChanged flag and make the host report a spurious
-       unsaved-change right after load. */
+    /* No writeStateFile() here: this is called from the restore path, where the
+       state file already holds exactly this content (the DSP wrote it in
+       dsp_restore). Rewriting it would only churn the DSP poll thread. */
 }
 
 /* -----------------------------------------------------------------------
@@ -343,47 +302,40 @@ static LV2UI_Handle instantiate(
     ui->app.pluginMode              = true;
 
     ui->app.onExtraTimelineChange = [ui]() {
-        if (!ui->restoringState) sendFullState(ui);
+        if (!ui->restoringState) writeStateFile(ui);
     };
 
-    ui->app.onExtraSeek = [ui]() {
-        if (ui->jackTransport)
-            ui->jackTransport->seek(ui->simpleTransport->position());
-    };
+    /* Transport is host-driven in plugin mode (the engine follows JACK transport),
+       so UI seeks are not propagated to the engine — the host's next time:Position
+       resyncs the playhead display anyway. */
 
     ui->app.onExtraParamsChanged = [ui]() {
-        if (!ui->restoringState) sendFullState(ui);
+        if (!ui->restoringState) writeStateFile(ui);
     };
 
     /* ---- Build all shared UI ---- */
+    /* Suppress state-file writes while build() seeds its default tracks: the DSP
+       may already have restored a project to the state file (dsp_restore), and a
+       default-seeding write here would clobber it before the restore block below
+       reads it back. */
+    ui->restoringState = true;
     ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->simpleTransport);
     ui->app.disableSaveMenu(/*saveAs=*/true);
 
-    /* ---- Wire port management (same as standalone) ---- */
+    /* ---- Wire port management ---- */
     if (auto* overlay = ui->app.outputsOverlay) {
-        /* No new-project dialog in the plugin; default MIDI output is Jack. */
+        /* No new-project dialog in the plugin; default MIDI output is Jack. The DSP
+           engine reconciles its JACK ports from the state file, so every change just
+           rewrites the file. */
         overlay->setDefaultBackend(MidiBackend::Jack);
-        overlay->onPortAdded = [ui](const std::string& name) {
-            if (ui->jackTransport) ui->jackTransport->addMidiPort(name);
-        };
-        overlay->onPortRemoved = [ui](const std::string& name) {
-            if (ui->jackTransport) ui->jackTransport->removeMidiPort(name);
-        };
-        overlay->onPortRenamed = [ui](const std::string& oldName, const std::string& newName) {
-            if (ui->jackTransport) ui->jackTransport->renameMidiPort(oldName, newName);
-        };
+        overlay->onPortAdded   = [ui](const std::string&) { if (!ui->restoringState) writeStateFile(ui); };
+        overlay->onPortRemoved = [ui](const std::string&) { if (!ui->restoringState) writeStateFile(ui); };
+        overlay->onPortRenamed = [ui](const std::string&, const std::string&) { if (!ui->restoringState) writeStateFile(ui); };
     }
 
-    /* ---- Wire DSP sends and JACK routings when instruments change ---- */
+    /* ---- Persist instrument-routing changes for the DSP engine ---- */
     ui->app.onInstrumentsChanged = [ui]() {
-        if (ui->jackTransport && ui->app.outputsOverlay) {
-            std::vector<JackTransport::InstrumentRouting> routings;
-            for (const auto& ci : ui->app.outputsOverlay->getInstruments())
-                routings.push_back({ci.id, ci.portName, ci.midiChannel,
-                                    ci.programNumber, ci.bankMsb, ci.bankLsb});
-            ui->jackTransport->setInstruments(routings);
-        }
-        if (!ui->restoringState) sendFullState(ui);
+        if (!ui->restoringState) writeStateFile(ui);
     };
 
     /* ---- Let File/Import and File/Export carry the outputs section ---- */
@@ -392,7 +344,7 @@ static LV2UI_Handle instantiate(
         ui->restoringState = true;
         applyOverlayOutputs(ui, state);
         ui->restoringState = false;
-        sendFullState(ui);
+        writeStateFile(ui);
     };
 
     /* ---- Restore from file if available ---- */
@@ -411,9 +363,11 @@ static LV2UI_Handle instantiate(
         }
     }
 
-    /* ---- Try to connect to JACK for transport control ---- */
-    JackTransport::silenceLogging();   /* keep the host's console clean */
-    ui->tryConnectJack();
+    /* Done restoring (deserializeFullState clears this too, but not when there was
+       no file). Then write the file once so the DSP engine's poll thread picks up
+       the current project — whether restored or freshly seeded defaults. */
+    ui->restoringState = false;
+    writeStateFile(ui);
 
     /* Return the widget pointer as the LV2UI handle */
     *widget = &ui->widget;
@@ -453,13 +407,8 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
 
     const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);
 
-    /* Handle state sent back from DSP (belt-and-suspenders: file is primary path) */
-    if (atom->type == ui->luvie_state_urid) {
-        const uint8_t* body = reinterpret_cast<const uint8_t*>(atom) + sizeof(LV2_Atom);
-        deserializeFullState(ui, body, atom->size);
-        return;
-    }
-
+    /* The DSP forwards host time:Position here (for the playhead display) and emits
+       state:StateChanged (for the host) — only the former concerns the UI. */
     if ((atom->type != ui->atom_Object && atom->type != ui->atom_Blank) ||
         !ui->simpleTransport)
         return;

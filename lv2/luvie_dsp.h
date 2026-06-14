@@ -12,7 +12,6 @@
 #include <lv2/urid/urid.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "dsp_timeline.h"
 
 #define LUVIE_DSP_URI "https://github.com/benbriedis/luvie/luvie_dsp"
 
@@ -37,29 +36,5 @@ typedef struct {
     LV2_URID luvie_state;         /* full JSON state blob */
     LV2_URID state_StateChanged;  /* notify host that state is dirty */
 } URIs;
-
-typedef struct {
-    LV2_URID_Map*  map;
-    LV2_Log_Logger logger;
-    LV2_Atom_Forge forge;
-
-    /* Ports */
-    const LV2_Atom_Sequence* controlIn;
-    LV2_Atom_Sequence*       notifyOut;
-
-    URIs uris;
-
-    double  sampleRate;
-    float   speed;         /* 0=stopped, 1=playing */
-    int64_t bar;           /* current bar (from host) */
-    float   barBeat;       /* beat within current bar (from host) */
-    float   beatsPerBar;   /* time signature numerator */
-    float   bpm;
-
-    /* Saved JSON state for LV2 state save/restore */
-    char*    stateJson;      /* heap-allocated, NULL if none */
-    uint32_t stateJsonSize;  /* strlen + 1 (includes null terminator) */
-    bool     stateChanged;   /* pending state:StateChanged to emit to host */
-} Self;
 
 #endif /* LUVIE_DSP_H */

@@ -71,10 +71,16 @@ public:
 
     std::function<void()> onTransportEvent;
 
-    // Called on the FLTK main thread (marshalled via Fl::awake) when the JACK
-    // server shuts down or zombifies this client. Lets the app drop back to the
-    // availability poll and reconnect when a server reappears.
+    // Called when the JACK server shuts down or zombifies this client. Lets the
+    // app drop back to the availability poll and reconnect when a server reappears.
+    // Marshalled to the owner's thread via awakeFn (see below) when that is set.
     std::function<void()> onShutdown;
+
+    // Marshals a callback to the owner's UI/main thread. The shutdown notification
+    // fires from a JACK-internal thread; an owner with a UI event loop sets this
+    // (e.g. to wrap Fl::awake) so onShutdown runs on its main thread instead. If
+    // null (e.g. the headless LV2 DSP), the callback runs directly on the JACK thread.
+    void (*awakeFn)(void (*)(void*), void*) = nullptr;
 
     // ITimelineObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
@@ -89,6 +95,9 @@ public:
     void  seek(float bars) override;
     float position()  const override;
     bool  isPlaying() const override { return playing_.load(); }
+
+    // True once a JACK client is open and live (so port registration / MIDI work).
+    bool  isOpen() const { return client != nullptr && jackAlive.load(); }
     void  setLoopMode(bool loopMode) override;
 
 private:

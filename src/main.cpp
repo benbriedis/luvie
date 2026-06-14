@@ -329,7 +329,9 @@ int main(int argc, char **argv) {
         };
         // Server vanished: clear jackUp so a reconnect re-runs this wiring (ports,
         // instruments, program changes) on the fresh client, and hand off to the
-        // observer to drop back to polling.
+        // observer to drop back to polling. onShutdown fires from a JACK-internal
+        // thread, so marshal it to the FLTK main thread via Fl::awake.
+        jackTransport.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
         jackTransport.onShutdown = [&]() {
             jackUp = false;
             jackObserver.serverLost();

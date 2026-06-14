@@ -2,7 +2,6 @@
 #include "chords.hpp"
 #include "loopFiring.hpp"
 #include "paramLaneTypes.hpp"
-#include <FL/Fl.H>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -86,15 +85,17 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
 void JackTransport::shutdownThunk(void* arg)
 {
     // Runs on a JACK-internal thread. The client is already dead here, so we
-    // must not call any JACK functions — just mark the transport down and wake
-    // the main thread to run the (UI-thread) onShutdown handler.
+    // must not call any JACK functions — just mark the transport down and run the
+    // onShutdown handler, marshalled to the owner's thread via awakeFn if set.
     auto* self = static_cast<JackTransport*>(arg);
     self->jackAlive.store(false);
     self->playing_.store(false);
-    Fl::awake([](void* a) {
+    auto deliver = [](void* a) {
         auto* s = static_cast<JackTransport*>(a);
         if (s->onShutdown) s->onShutdown();
-    }, self);
+    };
+    if (self->awakeFn) self->awakeFn(deliver, self);
+    else               deliver(self);
 }
 
 void JackTransport::close()
