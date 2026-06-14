@@ -215,6 +215,16 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
         fprintf(stderr, "[luvie_ui] deserializeFullState: JSON parse failed\n");
         return;
     }
+    /* A valid Luvie session always has at least one track — the UI makes it
+       impossible to delete the last one. An empty timeline therefore means there
+       is nothing meaningful to restore (a stale or empty state file, e.g. one
+       saved before the default tracks were seeded). Applying it would wipe the
+       defaults that build() just seeded and leave the Song Editor with zero
+       tracks, so skip it. */
+    if (state.timeline.tracks.empty()) {
+        fprintf(stderr, "[luvie_ui] deserializeFullState: ignoring empty timeline\n");
+        return;
+    }
     ui->restoringState = true;
     ui->app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
     ui->song->loadTimeline(state.timeline);
@@ -414,8 +424,12 @@ static void cleanup(LV2UI_Handle handle)
 {
     LuvieUI* ui = reinterpret_cast<LuvieUI*>(handle);
 
-    /* Save current state to file so the next instantiate can restore it */
-    if (!g_stateFilePath.empty()) {
+    /* Save current state to file so the next instantiate can restore it.
+       Never persist an empty (zero-track) session: a valid session always has at
+       least one track, so an empty one would only be a transient/uninitialised
+       state. Writing it would poison the file and make the next open show no
+       tracks (see deserializeFullState). */
+    if (!g_stateFilePath.empty() && ui->song && !ui->song->get().tracks.empty()) {
         std::string json = serializeStateToString(ui);
         if (!json.empty()) {
             FILE* f = fopen(g_stateFilePath.c_str(), "wb");

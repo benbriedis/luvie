@@ -22,6 +22,12 @@ FUTURE FUNCTIONALITY
 
 - cf make install (required for RaySession) may be Linux specific...
 
+LIMITATION
+==========
+Currently only one Luvie instance per Ardour will work. 
+   cf checking to see if any others exist.
+   Otherwise options exist I think. Look a bit involved.
+
 MIDI 2.0 and other MIDI extensions
 ==================================
 Currently Ardour doesn't appear to support Midi2 very well, although it is coming.
@@ -61,6 +67,27 @@ Probably could/should leave to later. (+ seek advice)
 TO TEST
 =======
 1. If multiple midi plugins get called in same cycle and emit notes, are multiple notes outputted successfully?
+
+
+BACKUPS AND VERSIONING
+======================
+- Generally Ardour and NSM should look after these.
+
+- In standalone mode it reasonable I think for the external programs and the user to 
+  look after most of this. 'Export' and 'Import' is enough. Some people use Git.
+
+- Nice to have though: some basic backups.
+  - Can store versions INSIDE the project file for convenience.
+    MAYBE just in standalone? If in NSM or Ardour code cause confusion.
+  - Could save the last few exit states (not saves)
+	  + A copy at least an hour old
+	  + A copy at least a day old
+	  + Maybe a copy at least 3 days old
+  - Then need to be able to swap to using the old version and saving the current version.
+
+RECENT PROJECTS etc 
+===================
+Probably use FL_Preferences (part of FLTK) to make it cross-platform compatible.
 
 
 DISTRO TO DOS?
@@ -381,13 +408,14 @@ cf Auto-save? NSM does this already I think. Do plugins?
 RaySession: 
 	- Unit test again some API?
 		See https://github.com/jackaudio/new-session-manager
-	- When view in the application list Luvie lacks an icon. Is present on the desktop.
 	- Some odd behaviour restoring projects? Sometime the apps just disappear altogether.
 	- LOST ability to add notes
 	- context menus popping up in weird places
 	- losing connections (possibly a RaySession thing)
 	- looks like the startup menu might appear each time it is started and stopped?  
 	- Maybe add a Dirty asterisk to Luvie?
+	- When view in the application list Luvie lacks an icon. Is present on the desktop.
+	  PROBABLY really a RaySession error. Note too that Linux uses SVGs for icons I think.
 
 Standalone
 	- Maybe add a Dirty asterisk to Luvie?
@@ -397,6 +425,7 @@ Carla:
 
 Create my own license...
 	Also are NSM or Jack licenses required?
+	JSON library. Others?
 
 Add luvie --version
   Coordinate with git tags. Show git hash if no tag. 
