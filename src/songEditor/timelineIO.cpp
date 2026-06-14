@@ -1,5 +1,6 @@
 #include "timelineIO.hpp"
 #include <nlohmann/json.hpp>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -325,11 +326,37 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     return true;
 }
 
+// Crash-safe save: write to a sibling temp file first, then atomically rename it
+// over the target. If the temp write fails we abort and leave the existing file
+// untouched. std::filesystem::rename replaces an existing destination on both
+// POSIX and Windows (MSVC maps it to MoveFileEx with MOVEFILE_REPLACE_EXISTING),
+// so a half-written file can never clobber a good project. The temp file lives in
+// the same directory as the target so the rename is a same-volume move.
 bool saveAppState(const AppState& state, const std::string& filePath) {
-    std::ofstream f(filePath);
-    if (!f) return false;
-    f << appStateToJsonString(state);
-    return f.good();
+    namespace fs = std::filesystem;
+    fs::path target(filePath);
+    fs::path tmp = target;
+    tmp += ".tmp";
+
+    {
+        std::ofstream f(tmp);
+        if (!f) return false;
+        f << appStateToJsonString(state);
+        f.flush();
+        if (!f.good()) {
+            std::error_code ec;
+            fs::remove(tmp, ec);   // drop the partial temp file
+            return false;
+        }
+    }
+
+    std::error_code ec;
+    fs::rename(tmp, target, ec);
+    if (ec) {
+        fs::remove(tmp, ec);
+        return false;
+    }
+    return true;
 }
 
 bool loadAppState(const std::string& filePath, AppState& state) {

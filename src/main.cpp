@@ -472,8 +472,13 @@ int main(int argc, char **argv) {
         session = std::move(s);
         // NSM manages the session file; Save As makes no sense here.
         app.disableSaveMenu(/*save=*/false, /*saveAs=*/true);
-    } else {
-        session = std::make_unique<StandaloneSession>(collectState, projectPath);
+    }
+
+    StandaloneSession* standaloneSession = nullptr;   // non-null only standalone
+    if (!nsm.isActive()) {
+        auto s = std::make_unique<StandaloneSession>(collectState, projectPath);
+        standaloneSession = s.get();
+        session = std::move(s);
     }
 
     // Forward every edit to the session (NSM emits is_dirty; standalone notes
@@ -526,11 +531,13 @@ int main(int argc, char **argv) {
     // in a context passed via the data pointer (valid for all of Fl::run()).
     struct CloseCtx {
         NsmClient*            nsm;
-        std::function<void()> save;   // performs a save in the current mode
+        std::function<bool()> hasPath;   // standalone project file already chosen?
+        std::function<void()> save;      // performs a save in the current mode
     };
     CloseCtx closeCtx;
-    closeCtx.nsm  = &nsm;
-    closeCtx.save = [&]() { session->save(); };
+    closeCtx.nsm     = &nsm;
+    closeCtx.hasPath = [&]() { return standaloneSession && !standaloneSession->path().empty(); };
+    closeCtx.save    = [&]() { session->save(); };
 
     window.callback([](Fl_Widget* w, void* data) {
         auto* ctx = static_cast<CloseCtx*>(data);
@@ -544,12 +551,19 @@ int main(int argc, char **argv) {
             return;
         }
 
-        // Standalone: ask the user what to do with the session.
+        // Standalone with a known project file: save silently on exit, no dialog.
+        if (ctx->hasPath()) {
+            ctx->save();
+            w->hide();
+            return;
+        }
+
+        // No project file yet: ask the user what to do with the session.
         // b0 is the default (also fired by Esc / WM close), so make it Cancel.
         int choice = fl_choice("Save this session before closing?",
                                "Cancel", "Don't Save", "Save");
         if (choice == 0) return;           // Cancel — keep the window open
-        if (choice == 2) ctx->save();      // Save, then close
+        if (choice == 2) ctx->save();      // Save (prompts for a path), then close
         w->hide();                         // Save or Don't Save both close
     }, &closeCtx);
 
