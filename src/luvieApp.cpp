@@ -54,11 +54,6 @@ void LuvieApp::EditorSwitcher::onTimelineChanged() {
     }
 }
 
-void LuvieApp::saveCb(Fl_Widget*, void* data) {
-    auto* app = static_cast<LuvieApp*>(data);
-    if (app->onSave) app->onSave();
-}
-
 void LuvieApp::saveAsCb(Fl_Widget*, void* data) {
     auto* app = static_cast<LuvieApp*>(data);
     if (app->onSaveAs) app->onSaveAs();
@@ -157,7 +152,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     constexpr int gearSize = tabBarH;
     settingsMenu = new SettingsButton(winW - gearSize, off, gearSize, gearSize);
     settingsMenu->textsize(13);
-    settingsMenu->add("Save",      FL_COMMAND + 's', saveCb,      this, 0);
     settingsMenu->add("Save As",   0,                saveAsCb,    this, 0);
     settingsMenu->add("Import",    0,                importCb,    this, 0);
     settingsMenu->add("Export",    0,                exportCb,    this, FL_MENU_DIVIDER);
@@ -436,15 +430,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     song_->selectTrack(0);
 }
 
-void LuvieApp::disableSaveMenu(bool save, bool saveAs) {
+void LuvieApp::disableSaveMenu(bool saveAs) {
     if (!settingsMenu) return;
-    auto setActive = [this](const char* path, bool active) {
-        auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item(path));
-        if (!item) return;
-        if (active) item->activate(); else item->deactivate();
-    };
-    setActive("Save",    !save);
-    setActive("Save As", !saveAs);
+    auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Save As"));
+    if (!item) return;
+    if (saveAs) item->deactivate(); else item->activate();
     settingsMenu->redraw();
 }
 

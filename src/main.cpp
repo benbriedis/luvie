@@ -471,7 +471,7 @@ int main(int argc, char **argv) {
         nsmSession = s.get();
         session = std::move(s);
         // NSM manages the session file; Save As makes no sense here.
-        app.disableSaveMenu(/*save=*/false, /*saveAs=*/true);
+        app.disableSaveMenu(/*saveAs=*/true);
     }
 
     StandaloneSession* standaloneSession = nullptr;   // non-null only standalone
@@ -521,10 +521,28 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Save / Save As route through the session in every mode (NSM's saveAs is a
-    // no-op and its menu item is disabled above).
-    app.onSave   = [&]() { session->save(); };
-    app.onSaveAs = [&]() { session->saveAs(); };
+    // Standalone window title: "Luvie" plus the project file name once known.
+    // (NSM/plugin modes manage their own titling, so this is standalone-only.)
+    auto updateTitle = [&]() {
+        if (!standaloneSession) return;
+        std::string title = "Luvie";
+        const std::string& p = standaloneSession->path();
+        if (!p.empty()) {
+            std::filesystem::path fsp(p);
+            std::string tail = fsp.filename().string();
+            // Prefix the bottom-most directory name, if there is one.
+            std::string dir = fsp.parent_path().filename().string();
+            if (!dir.empty()) tail = dir + "/" + tail;
+            title += " - " + tail;
+        }
+        window.copy_label(title.c_str());
+    };
+    updateTitle();   // reflect the CLI project path (if any) at startup
+
+    // Save As routes through the session. Under NSM it's a no-op and the menu
+    // item is disabled above; standalone uses it to (re)name the project file,
+    // after which auto-save and exit-save follow the new path.
+    app.onSaveAs = [&]() { if (session->saveAs()) updateTitle(); };
 
     // On window close, prompt whether to save before quitting. The window
     // callback must be a plain function pointer, so the bits it needs are bundled

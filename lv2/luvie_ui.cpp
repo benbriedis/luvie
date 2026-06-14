@@ -347,7 +347,7 @@ static LV2UI_Handle instantiate(
 
     /* ---- Build all shared UI ---- */
     ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->simpleTransport);
-    ui->app.disableSaveMenu(/*save=*/true, /*saveAs=*/true);
+    ui->app.disableSaveMenu(/*saveAs=*/true);
 
     /* ---- Wire port management (same as standalone) ---- */
     if (auto* overlay = ui->app.outputsOverlay) {
