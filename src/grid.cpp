@@ -75,7 +75,11 @@ int Grid::handle(int event)
 
     switch (event) {
         case FL_PUSH:
-            if (std::holds_alternative<StateIdle>(state))
+            // Refresh the hovered note on a right-click: while a context popup
+            // was open this grid got no FL_MOVE events, so its hover state may
+            // be stale (pointing at the previously-clicked note). Left-clicks
+            // keep the existing state to preserve drag grab offsets.
+            if (Fl::event_button() == FL_RIGHT_MOUSE || std::holds_alternative<StateIdle>(state))
                 findNoteForCursor();
             if (Fl::event_button() == FL_RIGHT_MOUSE) {
                 int idx = -1;

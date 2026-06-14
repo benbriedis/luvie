@@ -112,6 +112,9 @@ private:
     int nextId = 1;
     int nextPatternNumber = 1;
 
+    // True if patId is referenced by any lane's editor pattern or any placed instance.
+    bool patternStillReferenced(int patId) const;
+
     void notify();
     void sortBpms();
     void sortTimeSigs();

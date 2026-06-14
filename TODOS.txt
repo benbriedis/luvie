@@ -1,4 +1,10 @@
 
+Add extra using:
+	Valgrind: Comprehensive but slow.
+	ASan (AddressSanitizer): Flags out-of-bounds array usage and use-after-free errors instantly.
+	UBSan (UndefinedBehaviorSanitizer): Flags integer overflows, null pointer dereferences, and other illegal operations.
+
+
 FUTURE FUNCTIONALITY
 ====================
 - Linear ramping of tempos...

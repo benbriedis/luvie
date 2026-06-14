@@ -745,17 +745,11 @@ void ObservableSong::removeLane(int trackId, int laneId)
                 [laneId](const RowRef& r) { return r.kind == RowKind::Lane && r.id == laneId; }),
             data.rowOrder.end());
 
-        if (patId > 0) {
-            bool stillUsed = false;
-            for (const auto& tr : data.tracks)
-                for (const auto& l : tr.lanes)
-                    if (l.patternId == patId) { stillUsed = true; break; }
-            if (!stillUsed)
-                data.patterns.erase(
-                    std::remove_if(data.patterns.begin(), data.patterns.end(),
-                        [patId](const Pattern& p) { return p.id == patId; }),
-                    data.patterns.end());
-        }
+        if (patId > 0 && !patternStillReferenced(patId))
+            data.patterns.erase(
+                std::remove_if(data.patterns.begin(), data.patterns.end(),
+                    [patId](const Pattern& p) { return p.id == patId; }),
+                data.patterns.end());
 
         if (t.lanes.empty())
             t.stackedLanes = false;
@@ -840,12 +834,7 @@ void ObservableSong::removeTrackAndPattern(int trackId)
             }),
         data.rowOrder.end());
 
-    bool stillUsed = std::any_of(data.tracks.begin(), data.tracks.end(),
-        [patId](const Track& t) {
-            return std::any_of(t.lanes.begin(), t.lanes.end(),
-                [patId](const Lane& l) { return l.patternId == patId; });
-        });
-    if (!stillUsed && patId > 0)
+    if (patId > 0 && !patternStillReferenced(patId))
         data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
             [patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
 
@@ -879,6 +868,23 @@ int ObservableSong::laneIdForInstance(int instanceId) const
                 if (inst.id == instanceId)
                     return lane.id;
     return -1;
+}
+
+// A Pattern is reachable two independent ways: a Lane.patternId (the pattern
+// open in the editor / named in the song-editor left column) and each placed
+// PatternInstance.patternId. Pattern GC MUST check both — dropping a pattern
+// that a lane still points at orphans the lane (blank name, can't add notes).
+// Route every "is this pattern still used?" check through here so neither kind
+// is forgotten.
+bool ObservableSong::patternStillReferenced(int patId) const
+{
+    for (const auto& t : data.tracks)
+        for (const auto& l : t.lanes) {
+            if (l.patternId == patId) return true;          // lane's editor pattern
+            for (const auto& p : l.patterns)
+                if (p.patternId == patId) return true;      // placed instance
+        }
+    return false;
 }
 
 const Pattern* ObservableSong::patternForInstance(int instanceId) const
@@ -920,16 +926,9 @@ void ObservableSong::removePattern(int instanceId)
             if (it != lane.patterns.end()) {
                 int patId = it->patternId;
                 lane.patterns.erase(it);
-                if (patId > 0) {
-                    bool stillUsed = false;
-                    for (const auto& t : data.tracks)
-                        for (const auto& l : t.lanes)
-                            for (const auto& p : l.patterns)
-                                if (p.patternId == patId) { stillUsed = true; break; }
-                    if (!stillUsed)
-                        data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
-                            [patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
-                }
+                if (patId > 0 && !patternStillReferenced(patId))
+                    data.patterns.erase(std::remove_if(data.patterns.begin(), data.patterns.end(),
+                        [patId](const Pattern& p) { return p.id == patId; }), data.patterns.end());
                 notify();
                 return;
             }

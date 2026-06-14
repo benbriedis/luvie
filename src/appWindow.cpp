@@ -206,6 +206,12 @@ int AppWindow::handle(int event)
             if (!inAny) {
                 if (event == FL_PUSH) {
                     for (auto* p : popups) p->hide();
+                    // A right-click outside the popup should dismiss it AND
+                    // open the context menu of whatever was clicked, in a
+                    // single click. Let the push propagate to that widget so
+                    // its handler can open its own popup; don't swallow it.
+                    if (Fl::event_button() == FL_RIGHT_MOUSE)
+                        break;
                     closingClick = true;
                 }
                 return 1;
