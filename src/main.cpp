@@ -30,6 +30,11 @@
 #include "itimelineobserver.hpp"
 #include "nsm.hpp"
 #include "timelineIO.hpp"
+#include "session/sessionManager.hpp"
+#include "session/standaloneSession.hpp"
+#include "session/nsmSession.hpp"
+#include "session/dirtyTracker.hpp"
+#include <memory>
 
 int main(int argc, char **argv) {
     /* Force FLTK to use X11 (not native Wayland). FLTK 1.5's Wayland backend
@@ -281,6 +286,33 @@ int main(int argc, char **argv) {
     app.onApplyOutputs   = [&](const AppState& state) { applyLoadedOutputs(state); };
     app.onCollectOutputs = [&](AppState& state)       { collectOutputs(state); };
 
+    // The single AppState collector, shared by every save path (standalone +
+    // NSM). Handed to the SessionManager so that layer needs no app internals.
+    auto collectState = [&]() -> AppState {
+        AppState state;
+        state.timeline = songTimeline.get();
+        if (app.patternPanel) {
+            state.rootPitch = app.patternPanel->rootPitch();
+            state.chordType = app.patternPanel->chordType();
+            state.sharp     = app.patternPanel->isSharp();
+        }
+        if (app.transportOverlay) state.transport = app.transportOverlay->selection();
+        collectOutputs(state);
+        return state;
+    };
+
+    // Apply a loaded AppState into the live app. Shared by the CLI-path load and
+    // the NSM open handler. Callers suppress dirty tracking around this, since
+    // loadTimeline() fires onTimelineChanged().
+    auto applyLoadedState = [&](const AppState& state) {
+        songTimeline.loadTimeline(state.timeline);
+        if (app.patternPanel)
+            app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
+        applyLoadedOutputs(state);
+        if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
+            app.transportOverlay->setSelection(state.transport);
+    };
+
     // --- Transport selection ----------------------------------------------
     // One-time JACK wiring, run when the server first becomes available.
     auto activateJack = [&]() {
@@ -414,41 +446,12 @@ int main(int argc, char **argv) {
         app.startupOverlay->show();
     };
 
-    // --- NSM session management -------------------------------------------
+    // --- Session management ------------------------------------------------
+    // One SessionManager backs every save path; the mode (standalone .luv vs.
+    // NSM-managed) is chosen once, below, and the rest of the code is mode-blind.
     static NsmClient nsm;
-    std::string nsmSessionPath;
-
-    nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
-        nsmSessionPath = path;
-        AppState state;
-        if (loadAppState(path + ".luv", state)) {
-            newProject = false;
-            songTimeline.loadTimeline(state.timeline);
-            if (app.patternPanel)
-                app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
-            applyLoadedOutputs(state);
-            if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
-                app.transportOverlay->setSelection(state.transport);
-        } else {
-            // Fresh NSM session — no saved file yet; let the user pick defaults.
-            showStartupDialog();
-        }
-        return true;
-    };
-
-    nsm.onSave = [&]() -> bool {
-        if (nsmSessionPath.empty()) return false;
-        AppState state;
-        state.timeline  = songTimeline.get();
-        if (app.patternPanel) {
-            state.rootPitch = app.patternPanel->rootPitch();
-            state.chordType = app.patternPanel->chordType();
-            state.sharp     = app.patternPanel->isSharp();
-        }
-        if (app.transportOverlay) state.transport = app.transportOverlay->selection();
-        collectOutputs(state);
-        return saveAppState(state, nsmSessionPath + ".luv");
-    };
+    std::unique_ptr<SessionManager> session;
+    NsmSession* nsmSession = nullptr;   // non-null only under NSM (to set the path)
 
     // Optional-GUI "eye" toggle: show/hide the window on the session manager's
     // request and report the resulting visibility back.
@@ -460,86 +463,63 @@ int main(int argc, char **argv) {
     if (slash != std::string::npos) exeName = exeName.substr(slash + 1);
 
     nsm.init("Luvie", exeName.c_str());
-
-    // --- Wire Save / Save As based on mode --------------------------------
     fprintf(stderr, "[luvie] nsm.isActive() = %d\n", (int)nsm.isActive());
+
+    // Pick the backend now that we know whether a session manager is present.
     if (nsm.isActive()) {
+        auto s = std::make_unique<NsmSession>(collectState, &nsm);
+        nsmSession = s.get();
+        session = std::move(s);
         // NSM manages the session file; Save As makes no sense here.
         app.disableSaveMenu(/*save=*/false, /*saveAs=*/true);
-        app.onSave = [&]() { if (nsm.onSave) nsm.onSave(); };
-
     } else {
-        // Standalone mode: load from CLI path if provided, then set up Save.
-
-        // Helper: shows a Save As dialog, returns chosen path (with .luv),
-        // or empty string if cancelled.
-        auto pickSavePath = [&]() -> std::string {
-            Fl_Native_File_Chooser fc;
-            fc.title("Save Project As");
-            fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
-            fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
-            fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
-            if (!LuvieApp::lastFileDir.empty()) fc.directory(LuvieApp::lastFileDir.c_str());
-            if (fc.show() != 0) return {};
-            std::string p = fc.filename();
-            if (p.size() < 4 || p.substr(p.size() - 4) != ".luv") p += ".luv";
-            LuvieApp::lastFileDir = std::filesystem::path(p).parent_path().string();
-            return p;
-        };
-
-        // Helper: writes the current session to path.
-        auto saveToPath = [&](const std::string& path) {
-            AppState state;
-            state.timeline = songTimeline.get();
-            if (app.patternPanel) {
-                state.rootPitch = app.patternPanel->rootPitch();
-                state.chordType = app.patternPanel->chordType();
-                state.sharp     = app.patternPanel->isSharp();
-            }
-            if (app.transportOverlay) state.transport = app.transportOverlay->selection();
-            collectOutputs(state);
-            saveAppState(state, path);
-        };
-
-        // Load the CLI project file if given. If it doesn't exist yet, create an
-        // empty project at that path so the user can start a new project there.
-        if (!projectPath.empty()) {
-            AppState state;
-            if (loadAppState(projectPath, state)) {
-                newProject = false;
-                songTimeline.loadTimeline(state.timeline);
-                if (app.patternPanel)
-                    app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
-                applyLoadedOutputs(state);
-                if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
-                    app.transportOverlay->setSelection(state.transport);
-            } else if (!std::filesystem::exists(projectPath)) {
-                saveToPath(projectPath);   // new project: write out the empty default
-            } else {
-                fprintf(stderr, "[luvie] invalid project file: %s\n",
-                        projectPath.c_str());
-                fl_alert("Invalid project file");
-                return 1;
-            }
-        }
-
-        app.onSaveAs = [&, pickSavePath, saveToPath]() mutable {
-            std::string p = pickSavePath();
-            if (p.empty()) return;
-            projectPath = p;
-            saveToPath(projectPath);
-        };
-
-        app.onSave = [&, pickSavePath, saveToPath]() mutable {
-            if (projectPath.empty()) {
-                // No file yet — behave as Save As.
-                std::string p = pickSavePath();
-                if (p.empty()) return;
-                projectPath = p;
-            }
-            saveToPath(projectPath);
-        };
+        session = std::make_unique<StandaloneSession>(collectState, projectPath);
     }
+
+    // Forward every edit to the session (NSM emits is_dirty; standalone notes
+    // it). Loads also fire onTimelineChanged(), so they suppress the tracker.
+    DirtyTracker dirtyTracker(session.get());
+    songTimeline.addObserver(&dirtyTracker);
+
+    // NSM open: load the session file (if any) and remember the session path.
+    nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
+        AppState state;
+        if (loadAppState(path + ".luv", state)) {
+            newProject = false;
+            dirtyTracker.setSuppressed(true);
+            applyLoadedState(state);
+            dirtyTracker.setSuppressed(false);
+        } else {
+            // Fresh NSM session — no saved file yet; let the user pick defaults.
+            showStartupDialog();
+        }
+        if (nsmSession) nsmSession->setSessionPath(path);
+        return true;
+    };
+    nsm.onSave = [&]() -> bool { return session->save(); };
+
+    // Standalone: load the CLI project file if given. If it doesn't exist yet,
+    // create an empty project at that path so the user can start a new one there.
+    if (!nsm.isActive() && !projectPath.empty()) {
+        AppState state;
+        if (loadAppState(projectPath, state)) {
+            newProject = false;
+            dirtyTracker.setSuppressed(true);
+            applyLoadedState(state);
+            dirtyTracker.setSuppressed(false);
+        } else if (!std::filesystem::exists(projectPath)) {
+            session->save();   // new project: write out the empty default
+        } else {
+            fprintf(stderr, "[luvie] invalid project file: %s\n", projectPath.c_str());
+            fl_alert("Invalid project file");
+            return 1;
+        }
+    }
+
+    // Save / Save As route through the session in every mode (NSM's saveAs is a
+    // no-op and its menu item is disabled above).
+    app.onSave   = [&]() { session->save(); };
+    app.onSaveAs = [&]() { session->saveAs(); };
 
     // On window close, prompt whether to save before quitting. The window
     // callback must be a plain function pointer, so the bits it needs are bundled
@@ -550,10 +530,7 @@ int main(int argc, char **argv) {
     };
     CloseCtx closeCtx;
     closeCtx.nsm  = &nsm;
-    closeCtx.save = [&]() {
-        if (nsm.isActive()) { if (nsm.onSave) nsm.onSave(); }
-        else if (app.onSave) app.onSave();
-    };
+    closeCtx.save = [&]() { session->save(); };
 
     window.callback([](Fl_Widget* w, void* data) {
         auto* ctx = static_cast<CloseCtx*>(data);

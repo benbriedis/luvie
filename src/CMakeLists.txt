@@ -18,6 +18,7 @@ add_library(luvie_core STATIC
     outputs/jackPort.cpp
     outputs/rtMidiPort.cpp outputs/debugPort.cpp outputs/portRegistry.cpp jackShim.cpp
     patternEditors/noteAuditioner.cpp
+    session/standaloneSession.cpp session/nsmSession.cpp
 )
 
 target_include_directories(luvie_core PUBLIC

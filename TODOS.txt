@@ -213,10 +213,6 @@ When I start up in standalone mode (with -v) and close the application (using th
    that allow for rubber bands on a range of parameters.
 
 
-TEST Luvie as plugin, NSM and standalone again
-
-
-
 Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
 ....
@@ -304,6 +300,8 @@ Connect up to ALSA midi rather than Jack?
 
 //////////////////////////////////////
 
+Loop Editor: patterns should be of a set size.
+
 FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
 
 BUG: noticed once - showing the Luvie plugin UI from the Carla icon - the GUI didn't
@@ -313,16 +311,8 @@ ISSUE: too easy to accidently add a marker to a ruler
 
 MINOR BUG: clicking on Instrument selector highlights it as if it were a text field
 
-Outputs/Instruments - Add a select for Jack|Alsa?  Or require all to be one or the other...
+Maybe indicate which patterns are pianorolls (NB name could indicate)
 
-"Alsa" options should only be included for platforms that support it.
-    Other platform would have their own "native" options, 
-    and could maybe almost use the "native" keyword instead
-    (might be OK if native defaulted to the most standard driver).
-
-BUG: loop mode notes don't sound unless song has played first?
-  
-Found a bug: In "Loop" mode notes sometimes stop playing
 
 -------------------------------------------
 
@@ -342,9 +332,6 @@ Loop editor -
 	Allow instrument names to be editted from here?
  
 ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
-
-Pattern editors:
-  Make softly played notes lighter in colour
 
 Stacked:
   Maybe colour tracks differently
@@ -399,15 +386,24 @@ RaySession:
 	- LOST ability to add notes
 	- context menus popping up in weird places
 	- losing connections (possibly a RaySession thing)
+	- looks like the startup menu might appear each time it is started and stopped?  
+	- Maybe add a Dirty asterisk to Luvie?
+
+Standalone
+	- Maybe add a Dirty asterisk to Luvie?
 
 Carla:
-	- some odd behaviour here too.
+	- some odd behaviour here too. Test further.
 
 Create my own license...
+	Also are NSM or Jack licenses required?
 
 Add luvie --version
-  Coordinate with git tags
-  
-TODO test song parameters via Alsa and Jack
-
+  Coordinate with git tags. Show git hash if no tag. 
+  Dont want a branch name (but what if no commit?) May use last commit in the branch. 
+ 
+Automated tests for integrations:
+	NSM
+	Jack
+	LV2
 

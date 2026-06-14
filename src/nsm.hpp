@@ -44,6 +44,12 @@ public:
     // reply arrives, in case this raced ahead of the server registering us.
     void setGuiVisible(bool visible);
 
+    // Report whether the document has unsaved changes (the ":dirty:" capability).
+    // The session manager uses this to show modified state and to prompt on quit;
+    // it still drives the actual save via /nsm/client/save.
+    void sendDirty();
+    void sendClean();
+
     // Service incoming OSC directly, blocking up to timeoutMs for the first
     // message then draining the rest. Needed when no FLTK window is shown, since
     // FLTK's event loop (and thus our Fl::add_fd watch) goes idle then.

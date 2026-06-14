@@ -67,8 +67,8 @@ bool NsmClient::init(const char* appName, const char* exe) {
     lo_send_from(addr, srv, LO_TT_IMMEDIATE,
         "/nsm/server/announce",
         "sssiii",
-        appName,          // human-readable name
-        ":optional-gui:", // capabilities (show/hide GUI from the session manager)
+        appName,                // human-readable name
+        ":optional-gui:dirty:", // capabilities: show/hide GUI + report unsaved changes
         exe,              // executable name
         1,                // API major version
         2,                // API minor version
@@ -112,6 +112,18 @@ void NsmClient::sendGuiState() {
     if (!nsmAddr_ || !server_) return;
     lo_send_from((lo_address)nsmAddr_, (lo_server)server_, LO_TT_IMMEDIATE,
         guiVisible_ ? "/nsm/client/gui_is_shown" : "/nsm/client/gui_is_hidden", "");
+}
+
+void NsmClient::sendDirty() {
+    if (!nsmAddr_ || !server_) return;
+    lo_send_from((lo_address)nsmAddr_, (lo_server)server_, LO_TT_IMMEDIATE,
+        "/nsm/client/is_dirty", "");
+}
+
+void NsmClient::sendClean() {
+    if (!nsmAddr_ || !server_) return;
+    lo_send_from((lo_address)nsmAddr_, (lo_server)server_, LO_TT_IMMEDIATE,
+        "/nsm/client/is_clean", "");
 }
 
 void NsmClient::setGuiVisible(bool visible) {
