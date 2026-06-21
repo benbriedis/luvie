@@ -38,6 +38,31 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 /* File used to pass state between DSP restore and UI open, and between UI sessions */
 static std::string g_stateFilePath;
 
+/* Plugin-mode transport: the playhead position and play state are *displayed* from
+   the DSP-fed SimpleTransport, while transport *commands* (play / pause / rewind /
+   seek) are sent to the JACK control client. Giving every UI widget a single
+   ITransport that splits these two roles is what lets a UI seek actually relocate
+   JACK/Ardour — otherwise the seek lands only in the display transport and the next
+   DSP time:Position snaps it straight back. command is null while JACK is unavailable
+   (commands become no-ops; the buttons are disabled separately). */
+class HostTransport : public ITransport {
+public:
+    explicit HostTransport(ITransport* display) : display(display) {}
+    void setCommand(ITransport* c) { command = c; }
+
+    void  play()           override { if (command) command->play(); }
+    void  pause()          override { if (command) command->pause(); }
+    void  rewind()         override { if (command) command->rewind(); }
+    void  seek(float bars) override { if (command) command->seek(bars); }
+    float position()  const override { return display ? display->position()  : 0.0f; }
+    bool  isPlaying() const override { return display ? display->isPlaying() : false; }
+    void  setLoopMode(bool m) override { if (command) command->setLoopMode(m); }
+
+private:
+    ITransport* display = nullptr;
+    ITransport* command = nullptr;
+};
+
 /* -----------------------------------------------------------------------
    Forward declarations
    ----------------------------------------------------------------------- */
@@ -77,6 +102,10 @@ struct LuvieUI {
     ObservableInstrument* instruments    = nullptr;
     SimpleTransport*      simpleTransport= nullptr;
 
+    /* Single transport handed to all UI widgets: displays the DSP position, routes
+       commands (incl. playhead seeks) to jackControl. See HostTransport above. */
+    HostTransport*       hostTransport   = nullptr;
+
     /* Transport-only JACK client: drives the JACK transport (start/stop/locate) so a
        host following JACK transport rolls. Used ONLY to send commands — the playhead
        position still comes from the DSP via notify_out. jackObserver polls for the
@@ -99,6 +128,7 @@ struct LuvieUI {
         /* app destructor removes timeline observers */
         /* Widgets are owned by window (added via add()), deleted with window */
         delete window;
+        delete hostTransport;
         delete simpleTransport;
         delete pattern;
         delete instruments;
@@ -310,6 +340,7 @@ static LV2UI_Handle instantiate(
     /* build() seeds default instruments + their tracks for an empty session. */
     ui->simpleTransport = new SimpleTransport;
     ui->simpleTransport->setTimeline(ui->song);
+    ui->hostTransport = new HostTransport(ui->simpleTransport);
 
     /* ---- LuvieApp callbacks ---- */
     ui->app.disableTransportButtons = true;
@@ -333,7 +364,7 @@ static LV2UI_Handle instantiate(
        default-seeding write here would clobber it before the restore block below
        reads it back. */
     ui->restoringState = true;
-    ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->simpleTransport);
+    ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->hostTransport);
     ui->app.disableSaveMenu(/*saveAs=*/true);
 
     /* ---- JACK transport control (Issue #2) ----
@@ -354,10 +385,12 @@ static LV2UI_Handle instantiate(
         Transport* bp = ui->app.bottomPane;
         if (!bp) return;
         if (s == JackObserver::State::Up) {
-            bp->setControlTransport(ui->jackControl);   // enables + routes the buttons
+            ui->hostTransport->setCommand(ui->jackControl);   // route commands to JACK
+            bp->enableButtons();
             bp->setAlerts({});
             bp->syncPlayState();
         } else {
+            ui->hostTransport->setCommand(nullptr);           // commands become no-ops
             bp->disableButtons();
             bp->setAlerts({"JACK unavailable — transport control disabled"});
         }

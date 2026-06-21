@@ -21,8 +21,8 @@ THE PROBLEMS:
     Host ==========>  DSP =======================> UI
 
 	When Jack available:
-
-	UI =======>
+         position
+	UI ============>  Jack ===> Host ===> DSP ====> [UI?]
 
 PROPER SETTINGS:
 	Start Jack - either before, or as part of Ardour startup.
