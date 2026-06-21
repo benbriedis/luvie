@@ -2,8 +2,6 @@
 USE AS AN LV2 PLUGIN
 ====================
 
-
-
 TESTING: 
 Test in Ardour or zynjacku (/lv2rack) rather than Carla as Carla wraps Jack functionality 
 around all its plugins - its like running a jalv around each one individually.
@@ -28,11 +26,22 @@ PROPER SETTINGS:
 	Start Jack - either before, or as part of Ardour startup.
 
 	Window > Audio MIDI/Setup > Audio System = Jack
+	  (NB if MTC is selected in the transport switch (below) you will not be able to select Jack)
 
 	Top left of UI is a transport switch that needs to be set to Jack. It needs to be green.
 
 	Session > Properties > Timecode > JACK Transport/Time Settings > Ardour is JACK Time master (provides Bar|Beat|Tick and other information to Jack)
-	Does it matter? What is it effect?
+		Note this keeps Jack and other applications in the loop re timing: BPM and beats per bar, current bar.
+		Need to support it if other apps require BPMs.
+
+		Not sure if it has much of an effect in reality.
+		The sequencer should be be in control of this I guess... the DSP is sending notifications out its port. Ardour would presumably listen to this
+		and forward it on.  
+		SUGGESTS this setting should be ticked.
+		TO TEST maybe look at bar numbers in QJackCtl... (eg set beats per bar differently)
+		TO REALLY make this work MAY need to have the DSP communicate to Jack directly,
+		   in addition to the UI's connection [THINK ABOUT]
+
 
 	Window > Transport Masters > Select Jack   I think.  Jack might need to be ON first.
 
@@ -137,3 +146,29 @@ Keep MMC in mind as a possible backend solution in future, but would require ins
    before seeking can work correctly. Play/stop needs nothing extra.
 
 
+
+Missing first note problem 
+==========================
+When using Ardour + Jack Ardour appears to add a latency or synchronization correction to the plugin.
+When we rewind the transport we end up with a frame >  0. If there is note there it won't play.
+
+Ideally I guess we'd have Luvie make its own latency adjustment, adding an invisible 5136 or so frames
+on to the start. If we do this how would we calculate it? Options: 
+1. Just add a blank bar to the start of a song.
+   Could also have a 'song start' marker and rewind back to that.
+2. When we get a reposition event with bar=0 use the beat value to calculate the frame offset.
+   A bit problematic, but likely to work 99.9% of the time and would be of minimum fuss to implement.
+   We'd need to the DSP to pass the info on the the UI I guess.
+3. We could give the DSP its own Jack connection and obtain the information that way.
+   Probably using jack_port_get_latency_range(port, JackPlaybackLatency, …) or jack_transport_query().
+   WATCH OUT: I still want to use LV2 to actually provide the current transport position.
+   A bit annoying as I feel its the LV2 host's job to give us this info, or not cause it in the first place.
+   Still this is probably the most correct solution, if a bit heavyweight.
+4. One could rewind and measure the latency. Possibly a bit too Ardour-specific a solution.
+
+
+but not when using Jack via standalone or Ardour with internal transport.
+Occurs when using Ardour & Jack, but not when using Jack via standalone or Ardour with internal transport.
+
+There is a latency correction thing happening, so the report frame is always > 0 when rewinding.
+We don't actually know what the true frame is.

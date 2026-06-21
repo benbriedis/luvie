@@ -73,4 +73,4 @@ target_include_directories(jack_headers INTERFACE ${JACK_INCLUDE_DIRS})
 # RtMidi, which finds and links libasound itself.
 
 add_subdirectory(src)
-add_subdirectory(lv2)
+add_subdirectory(src/lv2)
