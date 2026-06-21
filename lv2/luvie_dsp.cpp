@@ -171,8 +171,9 @@ struct Plugin {
     URIs           uris{};
 
     const LV2_Atom_Sequence* controlIn = nullptr;
-    LV2_Atom_Sequence*       notifyOut = nullptr;
-    LV2_Atom_Sequence*       midiOut   = nullptr;
+    /* Single atom output: MIDI events (host -> instrument) plus our own
+       time:Position (UI playhead) and state:StateChanged (host dirty flag). */
+    LV2_Atom_Sequence*       out       = nullptr;
 
     ObservableSong* song   = nullptr;
     Lv2Engine*      engine = nullptr;
@@ -365,8 +366,7 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
     Plugin* p = (Plugin*)instance;
     switch (port) {
         case PORT_CONTROL_IN: p->controlIn = (const LV2_Atom_Sequence*)data; break;
-        case PORT_NOTIFY_OUT: p->notifyOut = (LV2_Atom_Sequence*)data;       break;
-        case PORT_MIDI_OUT:   p->midiOut   = (LV2_Atom_Sequence*)data;       break;
+        case PORT_OUT:        p->out       = (LV2_Atom_Sequence*)data;       break;
     }
 }
 
@@ -418,15 +418,20 @@ static void run(LV2_Handle instance, uint32_t sample_count)
             p->playing = ((const LV2_Atom_Float*)speedAtom)->body != 0.0f;
     }
 
-    /* ── Notify port: send the UI our own time:Position + state-dirty signal ──── */
-    const bool hasNotify = (p->notifyOut != nullptr);
-    if (hasNotify) {
-        LV2_Atom_Forge_Frame notifyFrame;
-        const uint32_t cap = p->notifyOut->atom.size;
-        lv2_atom_sequence_clear(p->notifyOut);
-        p->notifyOut->atom.type = uris->atom_Sequence;
-        lv2_atom_forge_set_buffer(&p->forge, (uint8_t*)p->notifyOut, cap);
-        lv2_atom_forge_sequence_head(&p->forge, &notifyFrame, 0);
+    /* ── Single output port: one atom sequence carrying, in frame order:
+         1. our own time:Position (frame 0) for the UI playhead,
+         2. state:StateChanged (frame 0) for the host dirty flag,
+         3. this cycle's MIDI events (frame >= 0) for the host -> instrument.
+       Hosts route the MIDI to the instrument and ignore the rest; the UI reads the
+       Position and ignores the MIDI. Events stay in non-decreasing frame order
+       because the frame-0 objects are written before the (>= 0) MIDI events. ──── */
+    if (p->out) {
+        LV2_Atom_Forge_Frame seqFrame;
+        const uint32_t cap = p->out->atom.size;
+        lv2_atom_sequence_clear(p->out);
+        p->out->atom.type = uris->atom_Sequence;
+        lv2_atom_forge_set_buffer(&p->forge, (uint8_t*)p->out, cap);
+        lv2_atom_forge_sequence_head(&p->forge, &seqFrame, 0);
 
         /* Author our own Position from the DSP's authoritative state (curFrame +
            Luvie's tempo map) rather than forwarding the host's object: this keeps the
@@ -458,22 +463,10 @@ static void run(LV2_Handle instance, uint32_t sample_count)
             lv2_atom_forge_pop(&p->forge, &objFrame);
         }
 
-        lv2_atom_forge_pop(&p->forge, &notifyFrame);
-    }
-
-    /* ── MIDI port: generate this cycle's notes/params ────────────────────────── */
-    if (p->midiOut) {
-        LV2_Atom_Forge_Frame midiFrame;
-        const uint32_t cap = p->midiOut->atom.size;
-        lv2_atom_sequence_clear(p->midiOut);
-        p->midiOut->atom.type = uris->atom_Sequence;
-        lv2_atom_forge_set_buffer(&p->forge, (uint8_t*)p->midiOut, cap);
-        lv2_atom_forge_sequence_head(&p->forge, &midiFrame, 0);
-
         double startSecs = (double)p->curFrame / (double)p->engine->sampleRateHz();
         p->engine->process(&p->forge, uris, startSecs, sample_count, p->playing, jumped);
 
-        lv2_atom_forge_pop(&p->forge, &midiFrame);
+        lv2_atom_forge_pop(&p->forge, &seqFrame);
     }
 
     /* Advance our own frame cursor while playing (host only sends position on change). */
@@ -486,10 +479,10 @@ static void run(LV2_Handle instance, uint32_t sample_count)
         int emitted = p->engine ? p->engine->lastEmittedCount() : 0;
         if (emitted > 0 || dbgAccum >= (int)p->engine->sampleRateHz()) {
             fprintf(stderr, "[luvie] run: ctrlIn=%s ctrlEvents=%d gotPos=%d playing=%d "
-                    "frame=%ld emitted=%d midiOut=%s\n",
+                    "frame=%ld emitted=%d out=%s\n",
                     p->controlIn ? "connected" : "NULL", ctrlEvents,
                     lastPos != nullptr, p->playing, (long)p->curFrame, emitted,
-                    p->midiOut ? "connected" : "NULL");
+                    p->out ? "connected" : "NULL");
             dbgAccum = 0;
         }
     }

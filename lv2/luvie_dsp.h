@@ -15,11 +15,16 @@
 
 #define LUVIE_DSP_URI "https://github.com/benbriedis/luvie/luvie_dsp"
 
-/* Port indices */
+/* Port indices.
+
+   A single atom output port carries everything: MIDI events (for the host to
+   route to the instrument), plus a time:Position (for the UI playhead) and
+   state:StateChanged (for the host). One output port — like a normal MIDI
+   generator — is what hosts (Ardour) reliably route; a separate notify/atom
+   output sitting ahead of the MIDI port confused Ardour's MIDI routing. */
 enum {
-    PORT_CONTROL_IN  = 0,
-    PORT_NOTIFY_OUT  = 1,
-    PORT_MIDI_OUT    = 2
+    PORT_CONTROL_IN = 0,
+    PORT_OUT        = 1
 };
 
 typedef struct {

@@ -108,7 +108,7 @@ struct LuvieUI {
 
     /* Transport-only JACK client: drives the JACK transport (start/stop/locate) so a
        host following JACK transport rolls. Used ONLY to send commands — the playhead
-       position still comes from the DSP via notify_out. jackObserver polls for the
+       position still comes from the DSP via the output port. jackObserver polls for the
        JACK server appearing/disappearing and enables/disables the UI buttons. */
     JackTransport*       jackControl     = nullptr;
     JackObserver*        jackObserver    = nullptr;
@@ -477,13 +477,15 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
                        const void* buffer)
 {
     LuvieUI* ui = reinterpret_cast<LuvieUI*>(handle);
-    if (port_index != PORT_NOTIFY_OUT)
+    if (port_index != PORT_OUT)
         return;
 
     const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);
 
-    /* The DSP forwards host time:Position here (for the playhead display) and emits
-       state:StateChanged (for the host) — only the former concerns the UI. */
+    /* The single output port carries time:Position (for the playhead), the MIDI
+       events going to the instrument, and state:StateChanged (for the host). Only
+       the Position concerns the UI; MIDI and StateChanged atoms fall through the
+       type checks below and are ignored. */
     if ((atom->type != ui->atom_Object && atom->type != ui->atom_Blank) ||
         !ui->simpleTransport)
         return;
