@@ -18,7 +18,8 @@
 /* Port indices */
 enum {
     PORT_CONTROL_IN  = 0,
-    PORT_NOTIFY_OUT  = 1
+    PORT_NOTIFY_OUT  = 1,
+    PORT_MIDI_OUT    = 2
 };
 
 typedef struct {
@@ -32,6 +33,11 @@ typedef struct {
     LV2_URID time_beatsPerBar;
     LV2_URID time_beatsPerMinute;
     LV2_URID time_speed;
+    LV2_URID time_frame;          /* sample-frame transport position */
+    LV2_URID atom_Long;
+    LV2_URID atom_Int;
+    LV2_URID atom_Float;
+    LV2_URID midi_MidiEvent;      /* MIDI event atom type (for midi_out) */
     LV2_URID atom_Chunk;
     LV2_URID luvie_state;         /* full JSON state blob */
     LV2_URID state_StateChanged;  /* notify host that state is dirty */

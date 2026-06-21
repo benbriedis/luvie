@@ -23,6 +23,8 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "appWindow.hpp"
 #include "transport.hpp"
 #include "simpleTransport.hpp"
+#include "jackTransport.hpp"
+#include "jackObserver.hpp"
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
 #include "observableInstrument.hpp"
@@ -75,6 +77,13 @@ struct LuvieUI {
     ObservableInstrument* instruments    = nullptr;
     SimpleTransport*      simpleTransport= nullptr;
 
+    /* Transport-only JACK client: drives the JACK transport (start/stop/locate) so a
+       host following JACK transport rolls. Used ONLY to send commands — the playhead
+       position still comes from the DSP via notify_out. jackObserver polls for the
+       JACK server appearing/disappearing and enables/disables the UI buttons. */
+    JackTransport*       jackControl     = nullptr;
+    JackObserver*        jackObserver    = nullptr;
+
     /* UI layout (owns FLTK widgets via window) */
     LuvieApp            app;
 
@@ -82,6 +91,11 @@ struct LuvieUI {
     bool restoringState = false;
 
     ~LuvieUI() {
+        /* Stop the JACK poll (cancels its FLTK timeout) before tearing down; the
+           observer references jackControl, so destroy it first. */
+        if (jackObserver) jackObserver->stop();
+        delete jackObserver;
+        delete jackControl;
         /* app destructor removes timeline observers */
         /* Widgets are owned by window (added via add()), deleted with window */
         delete window;
@@ -321,6 +335,34 @@ static LV2UI_Handle instantiate(
     ui->restoringState = true;
     ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->simpleTransport);
     ui->app.disableSaveMenu(/*saveAs=*/true);
+
+    /* ---- JACK transport control (Issue #2) ----
+       The transport buttons start disabled (disableTransportButtons above). When a
+       JACK server is available, route them through a transport-only JACK client so
+       pressing Play here starts the JACK transport — a host set to follow JACK
+       transport then rolls and, via its time:Position, the DSP plays. The buttons are
+       re-disabled (with an alert) whenever JACK is unavailable. The poll runs on the
+       FLTK timer pumped by ui_run()'s Fl::check(). */
+    JackTransport::silenceLogging();
+    ui->jackControl = new JackTransport;
+    ui->jackControl->setTimeline(ui->song);                 // for seek() bar->frame
+    ui->jackControl->awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
+    ui->jackControl->onShutdown = [ui]() { ui->jackObserver->serverLost(); };
+
+    ui->jackObserver = new JackObserver(ui->jackControl);
+    ui->jackObserver->addListener([ui](JackObserver::State s) {
+        Transport* bp = ui->app.bottomPane;
+        if (!bp) return;
+        if (s == JackObserver::State::Up) {
+            bp->setControlTransport(ui->jackControl);   // enables + routes the buttons
+            bp->setAlerts({});
+            bp->syncPlayState();
+        } else {
+            bp->disableButtons();
+            bp->setAlerts({"JACK unavailable — transport control disabled"});
+        }
+    });
+    ui->jackObserver->start();
 
     /* ---- Wire port management ---- */
     if (auto* overlay = ui->app.outputsOverlay) {

@@ -1,43 +1,45 @@
 /* -----------------------------------------------------------------------------
    Luvie LV2 DSP plugin.
 
-   The real-time MIDI engine (a JackTransport with its own JACK client, MIDI
-   output ports and sequencing) lives HERE, in the DSP plugin, not in the UI.
-   The DSP's lifetime is the plugin's lifetime in the host, so the JACK node and
-   its MIDI output persist whether or not the editor window is open — closing the
-   editor no longer stops playback or makes the node vanish from the JACK graph.
+   MIDI is produced as a proper LV2 plugin: the DSP has an atom MIDI output port
+   (midi_out) and generates MIDI in run(), driven by the host's transport via the
+   time:Position atoms on control_in. The host therefore sees the MIDI (meter,
+   in-session routing) and playback follows the host's transport whether or not
+   the host drives the JACK transport — so it works in Ardour, Carla, Qtractor,
+   etc. (The standalone / NSM app keeps its own JACK/native ports via the same
+   Sequencer core; only the *output backend* differs.)
 
-   How state reaches the engine without touching the real-time thread:
-     - The UI writes the full project as JSON to a per-process state file
-       (/tmp/luvie_state_<pid>.json) atomically on every change.
-     - A background poll thread here watches that file and, when it changes,
-       parses it and applies it to the engine (loadTimeline / port registration /
-       instrument routing). All of that allocates and calls JACK setup functions,
-       so it must stay off both real-time threads:
-         * the LV2 run() audio thread (Carla's), and
-         * the JACK process callback (which only consumes the lock-free snapshot).
-     - run() therefore does no engine work; it just forwards host time:Position to
-       the UI and emits state:StateChanged when the poll thread flags a change.
+   Why the host time and not jack_transport_query(): a normal LV2 host (Ardour)
+   runs its own transport and need not roll the JACK transport at all, so the old
+   private-JACK-client engine never saw "rolling" and stayed silent even while the
+   GUI playhead (fed from time:Position) moved. Driving from time:Position fixes
+   that and removes the side-channel JACK client entirely.
 
-   Transport sync needs no code: JackTransport::process() reads the transport via
-   jack_transport_query(), so the engine follows whatever drives JACK transport
-   (Carla, in JACK-transport mode) automatically.
+   The sequencer uses Luvie's *own* tempo map: time:Position's sample `frame` is
+   tempo-independent, so we map frame -> seconds -> Luvie bars through the snapshot,
+   exactly as the JACK backend mapped pos.frame. The host's bpm/beat fields are not
+   used for note timing.
+
+   State path (unchanged): the UI writes the full project as JSON to a per-process
+   state file; a background poll thread parses it and applies it to the engine
+   (timeline / instrument routing). All allocation/parse stays off the audio thread;
+   run() only reads the lock-free snapshot.
    ----------------------------------------------------------------------------- */
 
 #include "luvie_dsp.h"
 #include <lv2/state/state.h>
 
-#include "jackTransport.hpp"
+#include "sequencer.hpp"
 #include "observableSong.hpp"
 #include "timelineIO.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
-#include <set>
 #include <string>
 #include <thread>
 #include <unistd.h>
@@ -47,12 +49,122 @@
 
 namespace fs = std::filesystem;
 
+/* Opt-in diagnostics: run the host with LUVIE_DEBUG=1 to trace state application
+   and per-second transport/MIDI activity on stderr. */
+static bool luvieDebug()
+{
+    static const bool on = [] {
+        const char* e = getenv("LUVIE_DEBUG");
+        return e && *e && strcmp(e, "0") != 0;
+    }();
+    return on;
+}
+
+/* -----------------------------------------------------------------------
+   Lv2Engine — Sequencer whose emit() forges MIDI into the LV2 midi_out port.
+
+   There is a single output port, so port names are irrelevant here (routing is
+   by MIDI channel, which the snapshot already carries). Like the JACK backend it
+   collects the cycle's events and sorts them by frame before writing, because the
+   atom forge (and consumers) require non-decreasing event times.
+   ----------------------------------------------------------------------- */
+class Lv2Engine : public Sequencer {
+public:
+    explicit Lv2Engine(double sr) : sampleRate(sr) { evs.reserve(4096); }
+
+    void   setSampleRate(double sr) { sampleRate = sr; }
+    double sampleRateHz() const     { return sampleRate; }
+
+    /* Generate this cycle's MIDI into an already-opened forge sequence.
+       startSecs is the cycle's start position on Luvie's timeline (frame/sr). */
+    void process(LV2_Atom_Forge* fg, const URIs* u,
+                 double startSecs, uint32_t nf, bool nowPlaying, bool jumped)
+    {
+        forge = fg;
+        uris  = u;
+        cycleStartSecs = startSecs;
+        nframes = nf;
+        evs.clear();
+
+        float prevBars = snapSecondsToBar(startSecs);
+        float curBars  = snapSecondsToBar(startSecs + (double)nf / sampleRate);
+
+        bool ran = renderWindow(nowPlaying, jumped, prevBars, curBars);
+
+        std::sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) {
+            if (a.frame != b.frame) return a.frame < b.frame;
+            return a.seq < b.seq;
+        });
+        for (const Ev& e : evs) {
+            lv2_atom_forge_frame_time(forge, e.frame);
+            lv2_atom_forge_atom(forge, e.len, uris->midi_MidiEvent);
+            lv2_atom_forge_write(forge, e.data, e.len);
+        }
+        lastEmitted = (int)evs.size();
+
+        if (ran) wasPlaying = nowPlaying;
+    }
+
+    int  lastEmittedCount() const { return lastEmitted; }
+
+    /* Fill bar / barBeat / beatsPerBar for a position on Luvie's own timeline, so
+       the UI playhead can be driven from the DSP's authoritative tempo map (the same
+       map that times the notes) rather than the host's bar fields. RT-safe: reads the
+       snapshot under a try_lock and returns false if a rebuild is in progress (the
+       caller then skips authoring a Position this cycle). */
+    bool barInfo(double secs, int64_t& bar, float& barBeat, float& bpb)
+    {
+        if (!snapMutex.try_lock())
+            return false;
+        float beatsPerBar = 4.0f;
+        float barsTotal   = 0.0f;
+        if (!snap.segs.empty()) {
+            const TimeSegment* seg = &snap.segs.back();
+            for (size_t i = 0; i + 1 < snap.segs.size(); i++)
+                if (secs < snap.segs[i + 1].startSecs) { seg = &snap.segs[i]; break; }
+            double secsPerBar = seg->beatsPerBar * 60.0 / seg->bpm;
+            barsTotal   = seg->bar + (float)((secs - seg->startSecs) / secsPerBar);
+            beatsPerBar = (float)seg->beatsPerBar;
+        }
+        snapMutex.unlock();
+        if (barsTotal < 0.0f) barsTotal = 0.0f;
+        bar     = (int64_t)barsTotal;
+        barBeat = (barsTotal - (float)bar) * beatsPerBar;
+        bpb     = beatsPerBar;
+        return true;
+    }
+
+protected:
+    void emit(const std::string& /*port*/, float bar,
+              const uint8_t* data, int len) override
+    {
+        long off = static_cast<long>((snapBarToSeconds(bar) - cycleStartSecs) * sampleRate);
+        if (off < 0) off = 0;
+        if (nframes > 0 && off > static_cast<long>(nframes) - 1)
+            off = static_cast<long>(nframes) - 1;
+
+        Ev e{static_cast<uint32_t>(off), static_cast<uint32_t>(evs.size()), {}, len};
+        for (int i = 0; i < len && i < 3; ++i) e.data[i] = data[i];
+        evs.push_back(e);
+    }
+
+private:
+    LV2_Atom_Forge* forge = nullptr;
+    const URIs*     uris  = nullptr;
+    double          sampleRate     = 48000.0;
+    double          cycleStartSecs = 0.0;
+    uint32_t        nframes        = 0;
+    int             lastEmitted    = 0;
+
+    struct Ev { uint32_t frame; uint32_t seq; uint8_t data[3]; int len; };
+    std::vector<Ev> evs;   // reused across cycles; pre-reserved in ctor
+};
+
 /* -----------------------------------------------------------------------
    Plugin instance
    ----------------------------------------------------------------------- */
 
 struct Plugin {
-    /* LV2 boilerplate */
     LV2_URID_Map*  map = nullptr;
     LV2_Log_Logger logger{};
     LV2_Atom_Forge forge{};
@@ -60,19 +172,23 @@ struct Plugin {
 
     const LV2_Atom_Sequence* controlIn = nullptr;
     LV2_Atom_Sequence*       notifyOut = nullptr;
+    LV2_Atom_Sequence*       midiOut   = nullptr;
 
-    /* Real-time MIDI engine — owns its own JACK client + output ports. */
     ObservableSong* song   = nullptr;
-    JackTransport*  engine = nullptr;
+    Lv2Engine*      engine = nullptr;
+
+    /* Transport position tracking. The host sends time:Position only on transport
+       changes, so between updates we advance curFrame ourselves while playing. */
+    int64_t curFrame = 0;
+    bool    playing  = false;
 
     /* Background poll thread: watches the state file and applies it to the engine.
-       It is the ONLY thread that mutates song/engine state (single writer), which
-       is the threading contract JackTransport's UI-thread setters expect. */
+       The ONLY thread that mutates song/engine state (single writer). */
     std::thread       pollThread;
     std::atomic<bool> stopPoll{false};
 
-    /* Set by the poll thread after it applies a new state; read+cleared by run()
-       to emit a state:StateChanged so the host marks its project dirty. */
+    /* Set by the poll thread after applying state; read+cleared by run() to emit a
+       state:StateChanged so the host marks its project dirty. */
     std::atomic<bool> stateDirty{false};
 
     /* JSON state for LV2 save/restore. Guarded because dsp_save (host thread) and
@@ -83,10 +199,9 @@ struct Plugin {
     std::string stateFilePath;
 
     /* Poll-thread-only bookkeeping. */
-    std::set<std::string> registeredPorts;   // JACK MIDI ports currently registered
-    fs::file_time_type    lastWrite{};
-    uintmax_t             lastSize = 0;
-    bool                  haveLast = false;
+    fs::file_time_type lastWrite{};
+    uintmax_t          lastSize = 0;
+    bool               haveLast = false;
 };
 
 /* -----------------------------------------------------------------------
@@ -100,30 +215,25 @@ static void applyState(Plugin* p, const std::string& json)
         return;
     /* A valid session always has at least one track; an empty timeline is a
        stale/uninitialised file and applying it would wipe the engine. */
-    if (st.timeline.tracks.empty())
+    if (st.timeline.tracks.empty()) {
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] applyState: ignoring state with 0 tracks\n");
         return;
-
-    /* Reconcile JACK MIDI output ports. In plugin mode every output is JACK-backed
-       (the UI defaults new ports to the Jack backend); ignore any others. */
-    std::set<std::string> desired;
-    for (const auto& o : st.jackOutputs)
-        if (o.backend == MidiBackend::Jack && !o.portName.empty())
-            desired.insert(o.portName);
-
-    for (auto it = p->registeredPorts.begin(); it != p->registeredPorts.end(); ) {
-        if (!desired.count(*it)) {
-            p->engine->removeMidiPort(*it);
-            it = p->registeredPorts.erase(it);
-        } else {
-            ++it;
-        }
     }
-    for (const auto& name : desired)
-        if (!p->registeredPorts.count(name) && p->engine->addMidiPort(name))
-            p->registeredPorts.insert(name);
 
-    /* Instrument routing (id → port + channel + program/bank). */
-    std::vector<JackTransport::InstrumentRouting> routings;
+    if (luvieDebug()) {
+        size_t notes = 0;
+        for (const auto& pat : st.timeline.patterns)
+            notes += pat.notes.size() + pat.drumNotes.size();
+        fprintf(stderr, "[luvie] applyState: %zu tracks, %zu patterns, %zu notes, "
+                "%zu instruments\n", st.timeline.tracks.size(),
+                st.timeline.patterns.size(), notes, st.jackInstruments.size());
+    }
+
+    /* Instrument routing (id -> channel + program/bank). Port names are kept for
+       parity with the standalone routing but are irrelevant on the single LV2
+       MIDI port; output is routed purely by MIDI channel. */
+    std::vector<Sequencer::InstrumentRouting> routings;
     routings.reserve(st.jackInstruments.size());
     for (const auto& ci : st.jackInstruments)
         routings.push_back({ci.id, ci.portName, ci.midiChannel,
@@ -164,20 +274,6 @@ static void pollLoop(Plugin* p)
 {
     using namespace std::chrono_literals;
     while (!p->stopPoll.load()) {
-        /* Try to bring the engine up if a JACK server is (now) available. This also
-           covers reconnect after the server went away: close() frees the zombie
-           client and drops its (now-invalid) ports, and we clear our own port
-           bookkeeping so the forced reload below re-registers everything on the
-           fresh client. */
-        if (!p->engine->isOpen()) {
-            p->engine->close();
-            p->registeredPorts.clear();
-            if (p->engine->open("Luvie", /*enableMidi=*/true)) {
-                p->engine->setTimeline(p->song);
-                p->haveLast = false;   // force re-apply to register ports
-            }
-        }
-
         std::error_code ec;
         if (fs::exists(p->stateFilePath, ec)) {
             auto when = fs::last_write_time(p->stateFilePath, ec);
@@ -192,7 +288,6 @@ static void pollLoop(Plugin* p)
                 }
             }
         }
-
         std::this_thread::sleep_for(100ms);
     }
 }
@@ -208,12 +303,17 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->atom_Sequence      = map->map(map->handle, LV2_ATOM__Sequence);
     uris->atom_URID          = map->map(map->handle, LV2_ATOM__URID);
     uris->atom_Chunk         = map->map(map->handle, LV2_ATOM__Chunk);
+    uris->atom_Long          = map->map(map->handle, LV2_ATOM__Long);
+    uris->atom_Int           = map->map(map->handle, LV2_ATOM__Int);
+    uris->atom_Float         = map->map(map->handle, LV2_ATOM__Float);
     uris->time_Position      = map->map(map->handle, LV2_TIME__Position);
     uris->time_bar           = map->map(map->handle, LV2_TIME__bar);
     uris->time_barBeat       = map->map(map->handle, LV2_TIME__barBeat);
     uris->time_beatsPerBar   = map->map(map->handle, LV2_TIME__beatsPerBar);
     uris->time_beatsPerMinute= map->map(map->handle, LV2_TIME__beatsPerMinute);
     uris->time_speed         = map->map(map->handle, LV2_TIME__speed);
+    uris->time_frame         = map->map(map->handle, LV2_TIME__frame);
+    uris->midi_MidiEvent     = map->map(map->handle, LV2_MIDI__MidiEvent);
     uris->luvie_state        = map->map(map->handle, LUVIE_STATE_URI);
     uris->state_StateChanged = map->map(map->handle, LV2_STATE__StateChanged);
 }
@@ -224,7 +324,7 @@ static LV2_Handle instantiate(
     const char* bundlePath,
     const LV2_Feature* const* features)
 {
-    (void)descriptor; (void)bundlePath; (void)sampleRate;
+    (void)descriptor; (void)bundlePath;
 
     Plugin* p = new (std::nothrow) Plugin;
     if (!p)
@@ -250,11 +350,9 @@ static LV2_Handle instantiate(
     snprintf(buf, sizeof(buf), "/tmp/luvie_state_%d.json", (int)getpid());
     p->stateFilePath = buf;
 
-    /* Engine. JackTransport::open() is attempted on the poll thread (it polls for
-       a JACK server), so the plugin instantiates fine even if JACK isn't up yet. */
     p->song   = new ObservableSong(120.0f, 4, 4);
-    p->engine = new JackTransport();
-    JackTransport::silenceLogging();   /* keep the host's console clean */
+    p->engine = new Lv2Engine(sampleRate);
+    p->engine->setTimeline(p->song);
 
     p->stopPoll.store(false);
     p->pollThread = std::thread(pollLoop, p);
@@ -268,59 +366,133 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
     switch (port) {
         case PORT_CONTROL_IN: p->controlIn = (const LV2_Atom_Sequence*)data; break;
         case PORT_NOTIFY_OUT: p->notifyOut = (LV2_Atom_Sequence*)data;       break;
+        case PORT_MIDI_OUT:   p->midiOut   = (LV2_Atom_Sequence*)data;       break;
     }
 }
 
 static void activate(LV2_Handle instance)   { (void)instance; }
 static void deactivate(LV2_Handle instance) { (void)instance; }
 
+/* Read an integer-valued atom (Int or Long) into out; returns true if recognised. */
+static bool atomToI64(const URIs* uris, const LV2_Atom* a, int64_t& out)
+{
+    if (!a) return false;
+    if (a->type == uris->atom_Long) { out = ((const LV2_Atom_Long*)a)->body; return true; }
+    if (a->type == uris->atom_Int)  { out = ((const LV2_Atom_Int*)a)->body;  return true; }
+    return false;
+}
+
 static void run(LV2_Handle instance, uint32_t sample_count)
 {
-    (void)sample_count;
     Plugin* p = (Plugin*)instance;
     const URIs* uris = &p->uris;
 
-    /* Set up the forge to write into notifyOut. */
-    const bool hasNotify = (p->notifyOut != nullptr);
-    LV2_Atom_Forge_Frame notifyFrame;
-    if (hasNotify) {
-        const uint32_t notifyCapacity = p->notifyOut->atom.size;
-        lv2_atom_sequence_clear(p->notifyOut);
-        p->notifyOut->atom.type = uris->atom_Sequence;
-        lv2_atom_forge_set_buffer(&p->forge,
-                                  (uint8_t*)p->notifyOut,
-                                  sizeof(LV2_Atom) + notifyCapacity);
-        lv2_atom_forge_sequence_head(&p->forge, &notifyFrame, 0);
-    }
-
-    /* Forward host time:Position atoms to the UI (for its playhead display). The
-       engine itself follows JACK transport directly and needs nothing from here. */
+    /* ── Read host transport from the latest time:Position on control_in ──────── */
+    bool jumped = false;
+    const LV2_Atom_Object* lastPos = nullptr;
+    int ctrlEvents = 0;   // raw events seen on control_in this cycle (diagnostics)
     if (p->controlIn) {
         LV2_ATOM_SEQUENCE_FOREACH(p->controlIn, ev) {
-            if ((ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank)
-                && hasNotify) {
+            ctrlEvents++;
+            if ((ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank)) {
                 const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
-                if (obj->body.otype == uris->time_Position) {
-                    lv2_atom_forge_frame_time(&p->forge, ev->time.frames);
-                    lv2_atom_forge_write(&p->forge, &ev->body,
-                                         sizeof(LV2_Atom) + ev->body.size);
-                }
+                if (obj->body.otype == uris->time_Position)
+                    lastPos = obj;
             }
         }
     }
+    if (lastPos) {
+        const LV2_Atom* frameAtom = nullptr;
+        const LV2_Atom* speedAtom = nullptr;
+        lv2_atom_object_get(lastPos,
+            uris->time_frame, &frameAtom,
+            uris->time_speed, &speedAtom,
+            0);
 
-    /* The poll thread applied a fresh project state; tell the host once so it
-       marks the project dirty and re-saves us. The body-less object's type is the
-       signal. */
-    if (hasNotify && p->stateDirty.exchange(false)) {
-        LV2_Atom_Forge_Frame objFrame;
-        lv2_atom_forge_frame_time(&p->forge, 0);
-        lv2_atom_forge_object(&p->forge, &objFrame, 0, uris->state_StateChanged);
-        lv2_atom_forge_pop(&p->forge, &objFrame);
+        int64_t hostFrame = p->curFrame;
+        if (atomToI64(uris, frameAtom, hostFrame)) {
+            if (hostFrame != p->curFrame) jumped = true;   // relocate
+            p->curFrame = hostFrame;
+        }
+        if (speedAtom && speedAtom->type == uris->atom_Float)
+            p->playing = ((const LV2_Atom_Float*)speedAtom)->body != 0.0f;
     }
 
-    if (hasNotify)
+    /* ── Notify port: send the UI our own time:Position + state-dirty signal ──── */
+    const bool hasNotify = (p->notifyOut != nullptr);
+    if (hasNotify) {
+        LV2_Atom_Forge_Frame notifyFrame;
+        const uint32_t cap = p->notifyOut->atom.size;
+        lv2_atom_sequence_clear(p->notifyOut);
+        p->notifyOut->atom.type = uris->atom_Sequence;
+        lv2_atom_forge_set_buffer(&p->forge, (uint8_t*)p->notifyOut, cap);
+        lv2_atom_forge_sequence_head(&p->forge, &notifyFrame, 0);
+
+        /* Author our own Position from the DSP's authoritative state (curFrame +
+           Luvie's tempo map) rather than forwarding the host's object: this keeps the
+           UI playhead in lock-step with the notes, and always carries bar/barBeat so
+           the UI never has to depend on which fields the host happened to populate. */
+        int64_t bar = 0; float barBeat = 0.0f, bpb = 4.0f;
+        double posSecs = (double)p->curFrame / (double)p->engine->sampleRateHz();
+        if (p->engine->barInfo(posSecs, bar, barBeat, bpb)) {
+            LV2_Atom_Forge_Frame posFrame;
+            lv2_atom_forge_frame_time(&p->forge, 0);
+            lv2_atom_forge_object(&p->forge, &posFrame, 0, uris->time_Position);
+            lv2_atom_forge_key(&p->forge, uris->time_frame);
+            lv2_atom_forge_long(&p->forge, p->curFrame);
+            lv2_atom_forge_key(&p->forge, uris->time_speed);
+            lv2_atom_forge_float(&p->forge, p->playing ? 1.0f : 0.0f);
+            lv2_atom_forge_key(&p->forge, uris->time_bar);
+            lv2_atom_forge_long(&p->forge, bar);
+            lv2_atom_forge_key(&p->forge, uris->time_barBeat);
+            lv2_atom_forge_float(&p->forge, barBeat);
+            lv2_atom_forge_key(&p->forge, uris->time_beatsPerBar);
+            lv2_atom_forge_float(&p->forge, bpb);
+            lv2_atom_forge_pop(&p->forge, &posFrame);
+        }
+
+        if (p->stateDirty.exchange(false)) {
+            LV2_Atom_Forge_Frame objFrame;
+            lv2_atom_forge_frame_time(&p->forge, 0);
+            lv2_atom_forge_object(&p->forge, &objFrame, 0, uris->state_StateChanged);
+            lv2_atom_forge_pop(&p->forge, &objFrame);
+        }
+
         lv2_atom_forge_pop(&p->forge, &notifyFrame);
+    }
+
+    /* ── MIDI port: generate this cycle's notes/params ────────────────────────── */
+    if (p->midiOut) {
+        LV2_Atom_Forge_Frame midiFrame;
+        const uint32_t cap = p->midiOut->atom.size;
+        lv2_atom_sequence_clear(p->midiOut);
+        p->midiOut->atom.type = uris->atom_Sequence;
+        lv2_atom_forge_set_buffer(&p->forge, (uint8_t*)p->midiOut, cap);
+        lv2_atom_forge_sequence_head(&p->forge, &midiFrame, 0);
+
+        double startSecs = (double)p->curFrame / (double)p->engine->sampleRateHz();
+        p->engine->process(&p->forge, uris, startSecs, sample_count, p->playing, jumped);
+
+        lv2_atom_forge_pop(&p->forge, &midiFrame);
+    }
+
+    /* Advance our own frame cursor while playing (host only sends position on change). */
+    if (p->playing)
+        p->curFrame += sample_count;
+
+    if (luvieDebug()) {
+        static int dbgAccum = 0;
+        dbgAccum += (int)sample_count;
+        int emitted = p->engine ? p->engine->lastEmittedCount() : 0;
+        if (emitted > 0 || dbgAccum >= (int)p->engine->sampleRateHz()) {
+            fprintf(stderr, "[luvie] run: ctrlIn=%s ctrlEvents=%d gotPos=%d playing=%d "
+                    "frame=%ld emitted=%d midiOut=%s\n",
+                    p->controlIn ? "connected" : "NULL", ctrlEvents,
+                    lastPos != nullptr, p->playing, (long)p->curFrame, emitted,
+                    p->midiOut ? "connected" : "NULL");
+            dbgAccum = 0;
+        }
+    }
 }
 
 static void cleanup(LV2_Handle instance)
@@ -331,7 +503,7 @@ static void cleanup(LV2_Handle instance)
     if (p->pollThread.joinable())
         p->pollThread.join();
 
-    delete p->engine;   /* closes the JACK client + drops its MIDI ports */
+    delete p->engine;
     delete p->song;
     delete p;
 }

@@ -431,8 +431,44 @@ Add luvie --version
   Coordinate with git tags. Show git hash if no tag. 
   Dont want a branch name (but what if no commit?) May use last commit in the branch. 
  
-Automated tests for integrations:
+Automated tests for integrations?
 	NSM
 	Jack
 	LV2
+=====================
+
+
+Song parameter pitch bend + pattern pitch bend - get a warbling effect. Probably should multiply the values together (with appropriate normalisation) and output once.
+
+TODO test isDirty in NSM now
+
+The Settings menu font would be better the same as for the context popups.
+   The menu nav when displayed can end up floating above other applications.
+   
+   
+POLLING?:
+  - luvie_dsp.c → luvie_dsp.cpp: owns an ObservableSong + JackTransport, opens the JACK client in a background poll 
+  thread, and closes it in cleanup(). The poll thread (100 ms) watches the existing /tmp/luvie_state_<pid>.json file and
+  applies each change to the engine (loadTimeline / port registration / instrument routing / note params).
+  - Why a poll thread + file: LV2 run() is the RT audio thread (CLAUDE.md forbids allocation there), and JSON parsing /
+  loadTimeline / jack_port_register / snapshot rebuild all allocate. The poll thread is the single writer of engine
+  state, and MIDI generation already runs on JACK's own process callback — so run() does no engine work.
+   
+  Two deliberate trade-offs worth flagging:
+  - UI seeks no longer move playback in plugin mode (host drives transport; the next time:Position resyncs the playhead
+  display anyway).
+TOFIX: can we send a msg from the UI and get it to send messages to Jack to control the transport?
+  - Multiple instances in one host still collide on the single /tmp/luvie_state_<pid>.json file — that's a pre-existing
+  getpid() limitation I left as-is rather than expanding scope.
+   
+-------------------------
+
+Carla - Jack transport is disabled   
+Ardour - Jack transport is disabled   
+Ardour - cannot see any MIDI events being generated.
+
+NOTE 
+Carla is NOT a "proper" LV2 host. Rather is like a whole bunch of 'jalv' wrappers - one around each plugin.
+
+Add to alerts: in Ardour if not connected to Jack so we can control the transport
 

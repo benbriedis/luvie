@@ -3,22 +3,22 @@ set(SRC "${CMAKE_SOURCE_DIR}/src")
 
 find_package(Threads REQUIRED)
 
-# DSP: now owns the real-time MIDI engine, so it compiles the FLTK-free engine
-# sources directly (NOT via luvie_core, which drags in FLTK). JACK is reached
-# through the same dlopen shim the app uses (jackShim.cpp); nlohmann/json is a
-# system header. Compiling these into the module (rather than linking an archive)
-# means -fvisibility=hidden below governs their symbols.
+# DSP: owns the real-time MIDI engine, so it compiles the FLTK-free engine sources
+# directly (NOT via luvie_core, which drags in FLTK). As an LV2 plugin it emits MIDI
+# through its atom output port (no JACK), so it compiles only the backend-agnostic
+# Sequencer core — not jackTransport / the JACK shim. nlohmann/json is a system
+# header. Compiling these into the module (rather than linking an archive) means
+# -fvisibility=hidden below governs their symbols.
 add_library(luvie_dsp MODULE
     luvie_dsp.cpp
-    ${SRC}/transports/jackTransport.cpp
+    ${SRC}/transports/sequencer.cpp
     ${SRC}/songEditor/observableSong.cpp
     ${SRC}/songEditor/timelineIO.cpp
-    ${SRC}/activePatternSet.cpp
-    ${SRC}/jackShim.cpp)
+    ${SRC}/activePatternSet.cpp)
 target_include_directories(luvie_dsp PRIVATE
     ${SRC} ${SRC}/transports ${SRC}/patternEditors ${SRC}/outputs ${SRC}/songEditor)
 target_link_libraries(luvie_dsp PRIVATE
-    m lv2_headers jack_headers Threads::Threads ${CMAKE_DL_LIBS})
+    m lv2_headers Threads::Threads ${CMAKE_DL_LIBS})
 
 # UI (links the shared core; LV2 headers; FLTK/jack come via luvie_core)
 add_library(luvie_ui MODULE luvie_ui.cpp)

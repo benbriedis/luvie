@@ -5,7 +5,7 @@ add_library(luvie_core STATIC
     patternEditors/patternGrid.cpp songEditor/trackLabels.cpp
     songEditor/trackControls.cpp patternEditors/noteContextPopup.cpp songEditor/patternInstanceContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
-    transports/simpleTransport.cpp transports/jackTransport.cpp
+    transports/simpleTransport.cpp transports/sequencer.cpp transports/jackTransport.cpp
     transports/jackObserver.cpp transports/playhead.cpp songEditor/markerPopup.cpp
     songEditor/markerRuler.cpp songEditor/observableSong.cpp songEditor/observablePattern.cpp
     outputs/observableInstrument.cpp activePatternSet.cpp patternEditors/patternPanel.cpp
