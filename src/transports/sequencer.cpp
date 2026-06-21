@@ -107,11 +107,14 @@ void Sequencer::rebuildSnapshot()
     }
 
     // Build per-track note data.
-    auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx) {
+    auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx, int trackInstrument) {
         is.portName    = "";
         is.midiChannel = trackIdx % 16;
-        if (pat->instrumentId != 0) {
-            auto it = instrumentMap_.find(pat->instrumentId);
+        // A pattern's own instrument is authoritative; fall back to the track's
+        // instrument when unset (0) so patterns placed on a track still route.
+        int instrId = pat->instrumentId != 0 ? pat->instrumentId : trackInstrument;
+        if (instrId != 0) {
+            auto it = instrumentMap_.find(instrId);
             if (it != instrumentMap_.end()) {
                 is.portName    = it->second.portName;
                 is.midiChannel = it->second.midiChannel - 1;
@@ -159,8 +162,12 @@ void Sequencer::rebuildSnapshot()
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
-            int lanePatId = track.lanes.empty() ? 0 : track.lanes[0].patternId;
-            if (!track.mute && (!anySolo || track.solo) && actives.count(lanePatId)) {
+            // Each stacked lane loops its own displayed pattern independently when
+            // that pattern is active; layer them all on the track's instrument.
+            if (!track.mute && (!anySolo || track.solo))
+            for (const Lane& laneRef : track.lanes) {
+                int lanePatId = laneRef.patternId;
+                if (!actives.count(lanePatId)) continue;
                 float anchorBar = actives.at(lanePatId);
                 const Pattern* pat = nullptr;
                 for (const auto& p : tl.patterns)
@@ -175,7 +182,7 @@ void Sequencer::rebuildSnapshot()
                     int top, bot;
                     timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
                     is.beatsPerBar = (float)top;
-                    buildNotes(is, pat, trackIdx);
+                    buildNotes(is, pat, trackIdx, track.instrumentId);
 
                     // Param lanes for this active pattern. Build BEFORE moving
                     // `is` below — moving leaves is.portName empty.
@@ -214,7 +221,10 @@ void Sequencer::rebuildSnapshot()
                 continue;
             }
             if (track.lanes.empty()) { newSnap.tracks.push_back(std::move(ts)); ++trackIdx; continue; }
-            for (const PatternInstance& inst : track.lanes[0].patterns) {
+            // Iterate every lane: a track can have stacked lanes that layer
+            // independent patterns on the same instrument simultaneously.
+            for (const Lane& lane : track.lanes)
+            for (const PatternInstance& inst : lane.patterns) {
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;
 
@@ -226,7 +236,7 @@ void Sequencer::rebuildSnapshot()
                 int top, bot;
                 timeline->timeSigAt((int)inst.startBar, top, bot);
                 is.beatsPerBar = (float)top;
-                buildNotes(is, pat, trackIdx);
+                buildNotes(is, pat, trackIdx, track.instrumentId);
 
                 // Param lanes for this pattern instance. Build BEFORE moving `is`
                 // into ts.instances below — moving leaves is.portName empty.

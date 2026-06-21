@@ -10,8 +10,9 @@ FUTURE FUNCTIONALITY
 
 - Allow the Luvie DSP to send BPM and time signature changes to Jack (ie be a time master).
   Require the DSP to have its own Jack client connection.
-  Make sure its only being use to SEND BPM and time signature changes, plus maybe measure that 
-  latency/sync thing at the start of the song that causes notes right at the start of a song to go missing.
+  Make sure its ONLY being used to send BPM and time signature changes, plus maybe measure that 
+     latency/sync thing at the start of the song that causes notes right at the start of a song to go missing.
+  The Luvie UI should maintain its own separate Jack connection for sending transport messages (ONLY).
 
 - Linear ramping of tempos...
 

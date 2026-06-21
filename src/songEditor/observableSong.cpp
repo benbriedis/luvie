@@ -911,7 +911,11 @@ void ObservableSong::addPattern(int trackIndex, float startBar, float length, fl
     int patId = 0;
     if (patternBeats > 0.0f) {
         patId = nextId++;
-        data.patterns.push_back({patId, patternBeats});
+        Pattern newPat;
+        newPat.id           = patId;
+        newPat.lengthBeats  = patternBeats;
+        newPat.instrumentId = data.tracks[trackIndex].instrumentId;  // route to the track's instrument
+        data.patterns.push_back(std::move(newPat));
     }
     data.tracks[trackIndex].lanes[0].patterns.push_back({nextId++, patId, startBar, length});
     notify();

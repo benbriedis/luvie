@@ -13,6 +13,18 @@
 static constexpr Fl_Color headColor     = 0xEF444400;  // red
 static constexpr Fl_Color headColorDim  = 0xD1D5DB00;  // light grey
 
+// Instrument of the track that holds an instance of `patId`. Used as the routing
+// fallback for patterns with no instrument of their own (instrumentId 0).
+static int trackInstrumentForPattern(const Timeline& tl, int patId)
+{
+	for (const auto& track : tl.tracks)
+		for (const auto& lane : track.lanes)
+			for (const auto& inst : lane.patterns)
+				if (inst.patternId == patId)
+					return track.instrumentId;
+	return 0;
+}
+
 Playhead::Playhead(int numCols, int colWidth)
 	: numCols(numCols), colWidth(colWidth)
 {}
@@ -125,12 +137,14 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 			if (p.id == patId) { pat = &p; break; }
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
 		if (pat->notes.empty() && pat->drumNotes.empty() && pat->paramLanes.empty()) continue;
-		for (const auto& track : tl.tracks)
-			if (!track.lanes.empty() && track.lanes[0].patternId == patId) {
-				label = tl.instrumentName(track.instrumentId);
-				instrumentId = track.instrumentId;
-				break;
-			}
+		// Route by the pattern's own instrument (matches Sequencer). A lane can hold
+		// instances of several patterns, so matching lanes[0].patternId would miss
+		// every placed pattern except the one shown in the editor. Fall back to the
+		// owning track's instrument when the pattern has none assigned (id 0).
+		instrumentId = pat->instrumentId;
+		if (instrumentId == 0)
+			instrumentId = trackInstrumentForPattern(tl, patId);
+		label = tl.instrumentName(instrumentId);
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
@@ -303,12 +317,11 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 		for (const auto& p : tl.patterns)
 			if (p.id == patId) { pat = &p; break; }
 		if (!pat || pat->lengthBeats <= 0.0f) continue;
-		for (const auto& track : tl.tracks)
-			if (!track.lanes.empty() && track.lanes[0].patternId == patId) {
-				label = tl.instrumentName(track.instrumentId);
-				instrumentId = track.instrumentId;
-				break;
-			}
+		// Route by the pattern's own instrument (matches Sequencer); see checkVerboseNotes.
+		instrumentId = pat->instrumentId;
+		if (instrumentId == 0)
+			instrumentId = trackInstrumentForPattern(tl, patId);
+		label = tl.instrumentName(instrumentId);
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
