@@ -7,6 +7,12 @@ Add extra using:
 
 FUTURE FUNCTIONALITY
 ====================
+
+- Allow the Luvie DSP to send BPM and time signature changes to Jack (ie be a time master).
+  Require the DSP to have its own Jack client connection.
+  Make sure its only being use to SEND BPM and time signature changes, plus maybe measure that 
+  latency/sync thing at the start of the song that causes notes right at the start of a song to go missing.
+
 - Linear ramping of tempos...
 
 - Could provide input triggers for patterns when in loop mode (useful to Ableton-style pads).
@@ -20,7 +26,12 @@ FUTURE FUNCTIONALITY
 
 - cf Is pitch randomisation possible for drums?
 
-- cf make install (required for RaySession) may be Linux specific...
+- Maybe add some "basic backups" - see DESIGN_DECISIONS.txt
+
+- In standalone implement "Recent projects" menu.
+	Probably use FL_Preferences (part of FLTK) to make it cross-platform compatible.
+
+- Unit tests?
 
 LIMITATION
 ==========
@@ -64,30 +75,6 @@ Probably could/should leave to later. (+ seek advice)
 	79 	Metronome Rate 
 	ETC...
 
-TO TEST
-=======
-1. If multiple midi plugins get called in same cycle and emit notes, are multiple notes outputted successfully?
-
-
-BACKUPS AND VERSIONING
-======================
-- Generally Ardour and NSM should look after these.
-
-- In standalone mode it reasonable I think for the external programs and the user to 
-  look after most of this. 'Export' and 'Import' is enough. Some people use Git.
-
-- Nice to have though: some basic backups.
-  - Can store versions INSIDE the project file for convenience.
-    MAYBE just in standalone? If in NSM or Ardour code cause confusion.
-  - Could save the last few exit states (not saves)
-	  + A copy at least an hour old
-	  + A copy at least a day old
-	  + Maybe a copy at least 3 days old
-  - Then need to be able to swap to using the old version and saving the current version.
-
-RECENT PROJECTS etc 
-===================
-Probably use FL_Preferences (part of FLTK) to make it cross-platform compatible.
 
 
 DISTRO TO DOS?
@@ -103,11 +90,6 @@ Nice if we had an install script that installed everything locally (FLTK, JSON, 
 
 - Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
 
-
-
-TODOs
-=====
-Unit tests?
 
 
 8/3/26
@@ -138,11 +120,22 @@ Maybe put horizontal scrollbar lower?
    Lighter theme scrollbar?
 
 
-Look in future for any polling loops it may have added in.
-
 ======================
 
+Alternate plugin architectures:
 
+1. Use the Ardour plugin (LV2 or Clap) primarily/entirely for saving the session.
+   Communicate back using Jack.
+   Would it sit in a separate process?
+   Would ports look the same?
+   Negative: requires Jack.
+   
+2. Clap apparantly supports transport commands. 
+   May be able to remove Jack dependencies when used within a plugin.
+   DONT THINK Ardour supports.
+   
+3. Extend LV2 to support transport commands.
+   That way removes advantages Clap might have.
 
 ------------------------------TODOs---------------------------
 
@@ -165,20 +158,6 @@ Look in future for any polling loops it may have added in.
 	   the "proper" way.
 	)
 
-
-Loop mode: maybe remove rewind button and position labels in the transports
-
-In song mode maybe have loop editor show what's currently playing 
-   (in which case preserve the loop state) 
-   
-May need vertical scroll in loop editor
-  
-cf moving transport outside tabs
-
-When in loop mode disable song playhead?? Or let run - may be useful to recording in Ardour or something
-
-cf Removing Time from Loop Editor?  Put in Pattern Editor?? Remove line or make dotted?
-   Or use initial time or put into settings?
 
 
 ISSUE: In RaySession our transport does not seem to update (OK in Ardour)
@@ -242,6 +221,8 @@ When I start up in standalone mode (with -v) and close the application (using th
 
 Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
+BUG: Not rewinding right to start (Ardour + Jack). See TRANSPORTS.txt.
+
 ....
 
 Did I put a version number in the session files? [THINK IT MIGHT BE THERE - TO CHECK]
@@ -296,40 +277,16 @@ TEST
 
 --------
 
-Wider initial app (so we can fit in pattern editor controls at start)
-
-Loop editor: BPM should be a spinner.  Change so dragging up and down spins, not left and right + reduce the sensitivity
-
-Add more chords and scales?
-	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
-
-BUG: left clicking in left of rulers creates extra markers
-FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
-         allow it to be editted.
-
-Drum pattern editor - should probably disallow putting notes on the final vertical grid (look at other pattern editors too)
-
 
 Create a shortcut mechanism and menu...  (cf dividing by editor type) 
    cf start/stop    - map to space
       open pattern  - eg map to <Enter>
       open context? - eg context button  (currently not working)
       solo? mute?
+   Generally prefer to have 1 good set of bindings though...
       
 
-Connect up to ALSA midi rather than Jack?
-  - cf flag to use internal transport + 
-  -    flag to enable/add ALSA ports 
-       (maybe harder to identify but note that a2jmidid does OK. 
-			Or auto-add if ALSA present... 
-			not on Windows etc. Maybe not desirable within Ardour.)
-
-
 //////////////////////////////////////
-
-Loop Editor: patterns should be of a set size.
-
-FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
 
 BUG: noticed once - showing the Luvie plugin UI from the Carla icon - the GUI didn't
      restore properly. Wrong cursor, couldn't do anything.
@@ -338,46 +295,17 @@ ISSUE: too easy to accidently add a marker to a ruler
 
 MINOR BUG: clicking on Instrument selector highlights it as if it were a text field
 
-Maybe indicate which patterns are pianorolls (NB name could indicate)
-
 
 -------------------------------------------
 
-
-Solo & Mute options
-1. Leave as is
-2. Just place on top track
-3. Deal with patterns separately
-- Solution needs to work for stacked and unstacked.
-
-LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
- 
-Loop editor - 
-	Add scrollbars. 
-	Constant width and heights. 
-	Allow reordering.
-	Allow instrument names to be editted from here?
- 
-ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
-
-Stacked:
-  Maybe colour tracks differently
-  Add some border around instrument name row so consecutive ones don't run together
-     
-Unstacked:  
-  Maybe remove vertical lines through the instrument headers? Or fade them there.
 
 
 * Q: Is it ever really worth it to mix ALSA and Jack connections?
      Would seem that going "native" if Jack is used would be best regarded as exceptional.
 
-
 cf master volume rubberband control? Or any other global parameters?
 
 
-Q: do we want the option to be the transport master? 
-   We change BPM and thats a Master thing I think...
-   
 Pipewire:
  - I think its working in "bridge mode" on top of Jack.
  - cf using pw-jack qjackctl instead ?  / pipewire-jack
@@ -388,8 +316,6 @@ Pipewire:
 Error window when starting (invalid project file) is old fashioned.
 
 
-TODO test setup window in NSM and check plugin version (should use Jack outputs) 
-  
 Distro and Build:
 	- Probably build .deb, .rpm, maybe .aur for Linux. 
 	  AppImage is a possibility, but not that interested personally (going to need a build process for Windows and Mac eventually anyway).
@@ -399,12 +325,7 @@ Distro and Build:
 	- macOS: "CPack DragNDrop (.dmg) for the app; plugin as luvie.lv2 containing a .dylib, codesigned + notarized."
 	- Windows: "CPack NSIS (or WiX) installer for the app; plugin .dll in a .lv2 bundle."
 
-cf if no Jack is available making transport and default port options use 'internal' and 'native'.
   
-cf Auto-save? NSM does this already I think. Do plugins?
-    - Probably REMOVE 'save' altogether.
-    - Exit on save on closing window is old fashioned. (Probably remove this too, just do a final save if required instead)
-
 RaySession: 
 	- Unit test again some API?
 		See https://github.com/jackaudio/new-session-manager
@@ -420,23 +341,20 @@ RaySession:
 Standalone
 	- Maybe add a Dirty asterisk to Luvie?
 
-Carla:
-	- some odd behaviour here too. Test further.
-
 Create my own license...
 	Also are NSM or Jack licenses required?
 	JSON library. Others?
 
-Add luvie --version
-  Coordinate with git tags. Show git hash if no tag. 
-  Dont want a branch name (but what if no commit?) May use last commit in the branch. 
- 
-Automated tests for integrations?
-	NSM
-	Jack
-	LV2
 =====================
 
+Should we put the internal transport in a separate RT thread?
+
+Wider initial app (so we can fit in pattern editor controls at start)
+
+Loop editor: BPM should be a spinner.  Change so dragging up and down spins, not left and right + reduce the sensitivity
+
+FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
+         allow it to be editted.
 
 Song parameter pitch bend + pattern pitch bend - get a warbling effect. Probably should multiply the values together (with appropriate normalisation) and output once.
 
@@ -445,30 +363,44 @@ TODO test isDirty in NSM now
 The Settings menu font would be better the same as for the context popups.
    The menu nav when displayed can end up floating above other applications.
    
+Add luvie --version
+  Coordinate with git tags. Show git hash if no tag. 
+  Dont want a branch name (but what if no commit?) May use last commit in the branch. 
+  Start with tag 0.1  - don't really need backward compitibility until v1.
+ 
+Add more chords and scales?
+	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
+
+Drum pattern editor - should probably disallow putting notes on the final vertical grid (look at other pattern editors too)
+
+Maybe indicate which patterns are pianorolls (NB name could indicate)
+
+Solo & Mute options
+1. Leave as is
+2. Just place on top track
+3. Deal with patterns separately
+- Solution needs to work for stacked and unstacked.
+
+ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
+
+LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
+ 
+Loop editor - 
+	Add scrollbars. 
+	Constant width and heights. 
+	Allow reordering.
+	Allow instrument names to be editted from here?
+
+Stacked:
+  Maybe colour tracks differently
+  Add some border around instrument name row so consecutive ones don't run together
+     
+Unstacked:  
+  Maybe remove vertical lines through the instrument headers? Or fade them there.
+
+FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
+
+
+MAJOR BUG: pattern 3 not playing anything? (Ardour + Jack)
+           The playhead is active/inactive at the wrong times too.
    
-POLLING?:
-  - luvie_dsp.c → luvie_dsp.cpp: owns an ObservableSong + JackTransport, opens the JACK client in a background poll 
-  thread, and closes it in cleanup(). The poll thread (100 ms) watches the existing /tmp/luvie_state_<pid>.json file and
-  applies each change to the engine (loadTimeline / port registration / instrument routing / note params).
-  - Why a poll thread + file: LV2 run() is the RT audio thread (CLAUDE.md forbids allocation there), and JSON parsing /
-  loadTimeline / jack_port_register / snapshot rebuild all allocate. The poll thread is the single writer of engine
-  state, and MIDI generation already runs on JACK's own process callback — so run() does no engine work.
-   
-  Two deliberate trade-offs worth flagging:
-  - UI seeks no longer move playback in plugin mode (host drives transport; the next time:Position resyncs the playhead
-  display anyway).
-TOFIX: can we send a msg from the UI and get it to send messages to Jack to control the transport?
-  - Multiple instances in one host still collide on the single /tmp/luvie_state_<pid>.json file — that's a pre-existing
-  getpid() limitation I left as-is rather than expanding scope.
-   
--------------------------
-
-Carla - Jack transport is disabled   
-Ardour - Jack transport is disabled   
-Ardour - cannot see any MIDI events being generated.
-
-NOTE 
-Carla is NOT a "proper" LV2 host. Rather is like a whole bunch of 'jalv' wrappers - one around each plugin.
-
-Add to alerts: in Ardour if not connected to Jack so we can control the transport
-

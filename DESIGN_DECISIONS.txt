@@ -45,3 +45,19 @@ Is GPL so I'm not including. Therefore building code requires Jack.
 Could provide similar functionality ourselves.
 
 
+BACKUPS AND VERSIONING
+======================
+- Generally Ardour and NSM should look after these.
+
+- In standalone mode it reasonable I think for the external programs and the user to 
+  look after most of this. 'Export' and 'Import' is enough. Some people use Git.
+
+- Nice to have though: some basic backups.
+  - Can store versions INSIDE the project file for convenience.
+    MAYBE just in standalone? If in NSM or Ardour code cause confusion.
+  - Could save the last few exit states (not saves)
+	  + A copy at least an hour old
+	  + A copy at least a day old
+	  + Maybe a copy at least 3 days old
+  - Then need to be able to swap to using the old version and saving the current version.
+

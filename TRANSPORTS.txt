@@ -22,6 +22,11 @@ THE PROBLEMS:
          position
 	UI ============>  Jack ===> Host ===> DSP ====> [UI?]
 
+
+           beat info (BPM, time signature)
+	DSP ===================================> Jack ==> Host
+
+
 PROPER SETTINGS:
 	Start Jack - either before, or as part of Ardour startup.
 
@@ -32,15 +37,16 @@ PROPER SETTINGS:
 
 	Session > Properties > Timecode > JACK Transport/Time Settings > Ardour is JACK Time master (provides Bar|Beat|Tick and other information to Jack)
 		Note this keeps Jack and other applications in the loop re timing: BPM and beats per bar, current bar.
-		Need to support it if other apps require BPMs.
+		Need to support it if other apps require BPMs. (PROBABLY NOT REQUIRED THAT OFTEN)
 
-		Not sure if it has much of an effect in reality.
-		The sequencer should be be in control of this I guess... the DSP is sending notifications out its port. Ardour would presumably listen to this
-		and forward it on.  
-		SUGGESTS this setting should be ticked.
-		TO TEST maybe look at bar numbers in QJackCtl... (eg set beats per bar differently)
-		TO REALLY make this work MAY need to have the DSP communicate to Jack directly,
-		   in addition to the UI's connection [THINK ABOUT]
+		SUGGESTS:
+		Luvie should have "Time master" option to tick or untick.
+		When Luvie is in Loop mode any time changes will be externally driven.
+		When in Song Mode I'd expect Luvie to be the time master.
+		TODO:
+		If the Luvie DSP if to have its own Jack client connection make sure its only being use to SEND 
+		   BPM and time signature changes, and maybe measure that latency/sync thing at the start of the song (see below).
+
 
 
 	Window > Transport Masters > Select Jack   I think.  Jack might need to be ON first.

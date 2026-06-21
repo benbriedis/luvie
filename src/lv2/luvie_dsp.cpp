@@ -20,14 +20,23 @@
    exactly as the JACK backend mapped pos.frame. The host's bpm/beat fields are not
    used for note timing.
 
-   State path (unchanged): the UI writes the full project as JSON to a per-process
-   state file; a background poll thread parses it and applies it to the engine
-   (timeline / instrument routing). All allocation/parse stays off the audio thread;
-   run() only reads the lock-free snapshot.
+   State path: the UI sends the full project as one or more luvie_state atoms to
+   control_in (chunked so a session bigger than a host buffer still gets through; see
+   LuvieStateChunk). run() never parses on the audio thread — it just forwards each
+   chunk to the LV2 Worker (work:schedule), and the host runs work() on a non-RT
+   thread to reassemble, parse, and apply it to the engine (timeline / instrument
+   routing). The worker is the single writer of the snapshot; run() only reads the
+   lock-free snapshot. There is no background poll thread and no state-file polling.
+
+   The per-process state file remains only as a one-shot handoff for project
+   load/restore: dsp_restore writes it so the UI can repaint the restored project
+   when its editor is next opened, and the UI writes it on close for the next open.
+   It is never polled.
    ----------------------------------------------------------------------------- */
 
 #include "luvie_dsp.h"
 #include <lv2/state/state.h>
+#include <lv2/worker/worker.h>
 
 #include "sequencer.hpp"
 #include "observableSong.hpp"
@@ -35,19 +44,14 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <filesystem>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <unistd.h>
 #include <vector>
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
-
-namespace fs = std::filesystem;
 
 /* Opt-in diagnostics: run the host with LUVIE_DEBUG=1 to trace state application
    and per-second transport/MIDI activity on stderr. */
@@ -183,30 +187,34 @@ struct Plugin {
     int64_t curFrame = 0;
     bool    playing  = false;
 
-    /* Background poll thread: watches the state file and applies it to the engine.
-       The ONLY thread that mutates song/engine state (single writer). */
-    std::thread       pollThread;
-    std::atomic<bool> stopPoll{false};
+    /* LV2 Worker: run() hands the incoming JSON blob to schedule_work(); the host
+       runs work() on a non-RT thread, which parses it and applies it to the engine.
+       The worker thread is the ONLY thread that mutates song/engine state (single
+       writer), exactly as the old poll thread was. */
+    LV2_Worker_Schedule* schedule = nullptr;
 
-    /* Set by the poll thread after applying state; read+cleared by run() to emit a
+    /* Set by the worker after applying state; read+cleared by run() to emit a
        state:StateChanged so the host marks its project dirty. */
     std::atomic<bool> stateDirty{false};
 
     /* JSON state for LV2 save/restore. Guarded because dsp_save (host thread) and
-       the poll thread / dsp_restore both touch it. Includes a trailing '\0'. */
+       the worker / dsp_restore both touch it. */
     std::mutex  stateMutex;
     std::string stateJson;
 
     std::string stateFilePath;
 
-    /* Poll-thread-only bookkeeping. */
-    fs::file_time_type lastWrite{};
-    uintmax_t          lastSize = 0;
-    bool               haveLast = false;
+    /* Chunk reassembly — worker-thread-only state. run() forwards each incoming
+       luvie_state chunk to the worker in order; work() appends payloads here until a
+       message is complete, then applies it. */
+    std::string rxAccum;
+    uint32_t    rxMsgId         = 0;
+    uint32_t    rxExpectedOffset = 0;
+    bool        rxActive        = false;
 };
 
 /* -----------------------------------------------------------------------
-   State application (poll thread only)
+   State application (worker thread, or the host thread during dsp_restore)
    ----------------------------------------------------------------------- */
 
 static void applyState(Plugin* p, const std::string& json)
@@ -253,44 +261,59 @@ static void applyState(Plugin* p, const std::string& json)
     p->stateDirty.store(true);
 }
 
-/* Read the whole state file into a string; returns false if it can't be read. */
-static bool readFile(const std::string& path, std::string& out)
-{
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f)
-        return false;
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    bool ok = false;
-    if (sz > 0) {
-        out.resize((size_t)sz);
-        ok = fread(out.data(), 1, (size_t)sz, f) == (size_t)sz;
-    }
-    fclose(f);
-    return ok;
-}
+/* -----------------------------------------------------------------------
+   LV2 Worker: parse + apply state off the audio thread
+   ----------------------------------------------------------------------- */
 
-static void pollLoop(Plugin* p)
+/* Runs on the host's non-RT worker thread, once per chunk run() scheduled, in order.
+   `data` is a LuvieStateChunk header + payload that the host has already copied, so
+   reassembling/parsing/allocating here is safe and run() is never blocked. Chunks
+   are accumulated until the message is complete; applyState() then rebuilds the
+   snapshot under its own lock and flags stateDirty for run() to emit StateChanged.
+
+   A gap (a dropped chunk → msgId/offset mismatch) resets reassembly and waits for
+   the next message's first chunk (offset 0); this is safe because every UI edit
+   sends the complete current project, so the next send recovers. */
+static LV2_Worker_Status work(
+    LV2_Handle                  instance,
+    LV2_Worker_Respond_Function /*respond*/,
+    LV2_Worker_Respond_Handle   /*handle*/,
+    uint32_t                    size,
+    const void*                 data)
 {
-    using namespace std::chrono_literals;
-    while (!p->stopPoll.load()) {
-        std::error_code ec;
-        if (fs::exists(p->stateFilePath, ec)) {
-            auto when = fs::last_write_time(p->stateFilePath, ec);
-            auto size = fs::file_size(p->stateFilePath, ec);
-            if (!ec && (!p->haveLast || when != p->lastWrite || size != p->lastSize)) {
-                std::string json;
-                if (readFile(p->stateFilePath, json)) {
-                    applyState(p, json);
-                    p->lastWrite = when;
-                    p->lastSize  = size;
-                    p->haveLast  = true;
-                }
-            }
-        }
-        std::this_thread::sleep_for(100ms);
+    Plugin* p = (Plugin*)instance;
+    if (!data || size < sizeof(LuvieStateChunk))
+        return LV2_WORKER_SUCCESS;
+
+    LuvieStateChunk hdr;
+    std::memcpy(&hdr, data, sizeof(hdr));   // data may be unaligned
+    const char* payload = (const char*)data + sizeof(LuvieStateChunk);
+    uint32_t avail = size - (uint32_t)sizeof(LuvieStateChunk);
+    uint32_t chunkSize = hdr.chunkSize < avail ? hdr.chunkSize : avail;
+
+    if (hdr.offset == 0) {
+        /* First chunk of a new message: start fresh. */
+        p->rxMsgId          = hdr.msgId;
+        p->rxExpectedOffset = 0;
+        p->rxActive         = true;
+        p->rxAccum.clear();
+        p->rxAccum.reserve(hdr.totalSize);
     }
+    if (!p->rxActive || hdr.msgId != p->rxMsgId || hdr.offset != p->rxExpectedOffset) {
+        p->rxActive = false;                // out of sync; wait for next message
+        return LV2_WORKER_SUCCESS;
+    }
+
+    p->rxAccum.append(payload, chunkSize);
+    p->rxExpectedOffset += chunkSize;
+
+    if (p->rxExpectedOffset >= hdr.totalSize) {
+        applyState(p, p->rxAccum);
+        p->rxActive = false;
+        p->rxAccum.clear();
+        p->rxAccum.shrink_to_fit();         // don't hold a whole session between edits
+    }
+    return LV2_WORKER_SUCCESS;
 }
 
 /* -----------------------------------------------------------------------
@@ -333,8 +356,9 @@ static LV2_Handle instantiate(
 
     const char* missing = lv2_features_query(
         features,
-        LV2_LOG__log,  &p->logger.log, false,
-        LV2_URID__map, &p->map,        true,
+        LV2_LOG__log,        &p->logger.log, false,
+        LV2_URID__map,       &p->map,        true,
+        LV2_WORKER__schedule, &p->schedule,  true,
         NULL);
     lv2_log_logger_set_map(&p->logger, p->map);
     if (missing) {
@@ -346,7 +370,8 @@ static LV2_Handle instantiate(
     mapURIs(p->map, &p->uris);
     lv2_atom_forge_init(&p->forge, p->map);
 
-    /* Same per-process path the UI writes to (same PID — both load into the host). */
+    /* Per-process path: the one-shot load/restore handoff to the UI (same PID — both
+       load into the host). Never polled; see file header. */
     char buf[256];
     snprintf(buf, sizeof(buf), "/tmp/luvie_state_%d.json", (int)getpid());
     p->stateFilePath = buf;
@@ -354,9 +379,6 @@ static LV2_Handle instantiate(
     p->song   = new ObservableSong(120.0f, 4, 4);
     p->engine = new Lv2Engine(sampleRate);
     p->engine->setTimeline(p->song);
-
-    p->stopPoll.store(false);
-    p->pollThread = std::thread(pollLoop, p);
 
     return (LV2_Handle)p;
 }
@@ -387,14 +409,26 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     Plugin* p = (Plugin*)instance;
     const URIs* uris = &p->uris;
 
-    /* ── Read host transport from the latest time:Position on control_in ──────── */
+    /* ── Read host transport + UI state chunks from control_in ───────────────────
+       time:Position coalesces to the latest (only the newest matters); luvie_state
+       chunks must each be forwarded to the worker, in order, so it can reassemble a
+       multi-chunk project. We never parse on this (RT) thread. */
     bool jumped = false;
     const LV2_Atom_Object* lastPos = nullptr;
     int ctrlEvents = 0;   // raw events seen on control_in this cycle (diagnostics)
     if (p->controlIn) {
         LV2_ATOM_SEQUENCE_FOREACH(p->controlIn, ev) {
             ctrlEvents++;
-            if ((ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank)) {
+            if (ev->body.type == uris->luvie_state) {
+                if (p->schedule) {
+                    LV2_Worker_Status ws = p->schedule->schedule_work(
+                        p->schedule->handle, ev->body.size, LV2_ATOM_BODY_CONST(&ev->body));
+                    if (ws != LV2_WORKER_SUCCESS && luvieDebug())
+                        fprintf(stderr, "[luvie] schedule_work rejected %u-byte chunk "
+                                "(status %d); host worker buffer too small?\n",
+                                ev->body.size, (int)ws);
+                }
+            } else if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
                 const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
                 if (obj->body.otype == uris->time_Position)
                     lastPos = obj;
@@ -491,11 +525,6 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 static void cleanup(LV2_Handle instance)
 {
     Plugin* p = (Plugin*)instance;
-
-    p->stopPoll.store(true);
-    if (p->pollThread.joinable())
-        p->pollThread.join();
-
     delete p->engine;
     delete p->song;
     delete p;
@@ -547,14 +576,13 @@ static LV2_State_Status dsp_restore(
 
     /* The stored value carries a trailing '\0'; the JSON is size-1 bytes. */
     size_t jsonLen = size > 0 ? size - 1 : 0;
-    {
-        std::lock_guard<std::mutex> lk(p->stateMutex);
-        p->stateJson.assign((const char*)data, jsonLen);
-    }
 
-    /* Write the JSON to the state file so the poll thread applies it to the engine
-       and the UI restores from it when it next opens. Restore runs at load time
-       with no concurrent writer, so a plain write is sufficient. */
+    /* Restore runs on the host thread at load time with no concurrent worker, so
+       apply directly (applyState also stores stateJson for a later dsp_save). */
+    applyState(p, std::string((const char*)data, jsonLen));
+
+    /* Also write the JSON to the state file so the UI repaints this project when its
+       editor is next opened. A plain write is fine: no concurrent writer at load. */
     if (FILE* f = fopen(p->stateFilePath.c_str(), "wb")) {
         fwrite(data, 1, jsonLen, f);
         fclose(f);
@@ -565,9 +593,12 @@ static LV2_State_Status dsp_restore(
 
 static const void* extension_data(const char* uri)
 {
-    static const LV2_State_Interface state_iface = { dsp_save, dsp_restore };
+    static const LV2_State_Interface  state_iface  = { dsp_save, dsp_restore };
+    static const LV2_Worker_Interface worker_iface = { work, nullptr, nullptr };
     if (!strcmp(uri, LV2_STATE__interface))
         return &state_iface;
+    if (!strcmp(uri, LV2_WORKER__interface))
+        return &worker_iface;
     return nullptr;
 }
 

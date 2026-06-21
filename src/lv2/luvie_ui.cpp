@@ -69,7 +69,7 @@ private:
 
 struct LuvieUI;
 static std::string serializeStateToString(LuvieUI* ui);
-static void writeStateFile(LuvieUI* ui);
+static void sendState(LuvieUI* ui);
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size);
 
 /* -----------------------------------------------------------------------
@@ -118,6 +118,10 @@ struct LuvieUI {
 
     /* Set during state restore to suppress re-sending while rebuilding */
     bool restoringState = false;
+
+    /* Incremented per full sendState() so the DSP worker can tell consecutive
+       (chunked) messages apart and detect a dropped chunk. */
+    uint32_t stateMsgId = 0;
 
     ~LuvieUI() {
         /* Stop the JACK poll (cancels its FLTK timeout) before tearing down; the
@@ -199,16 +203,45 @@ static std::string serializeStateToString(LuvieUI* ui)
     return appStateToJsonString(state);
 }
 
-/* Persist the full project to the per-process state file. The DSP plugin's poll
-   thread watches this file and applies each change to the real-time engine, so
-   this — not an atom write — is how UI edits reach playback. saveAppState writes
-   atomically (temp file + rename) so the poll thread never sees a partial file. */
-static void writeStateFile(LuvieUI* ui)
+/* Send the full project to the DSP as one or more luvie_state atoms on control_in.
+   The JSON is split into fixed-size chunks (each a LuvieStateChunk header + payload
+   slice) so a session larger than a host buffer still gets through; the DSP's run()
+   forwards each chunk to the LV2 Worker, which reassembles, parses, and applies it
+   to the real-time engine — this is how UI edits reach playback. (The per-process
+   state file is only a load/restore handoff now; it is no longer written on every
+   edit and the DSP no longer polls it.) */
+static void sendState(LuvieUI* ui)
 {
-    if (g_stateFilePath.empty()) return;
-    AppState state;
-    if (!buildAppState(ui, state)) return;
-    saveAppState(state, g_stateFilePath);
+    if (!ui->writeFunc || !ui->luvie_state_urid || !ui->atom_eventTransfer)
+        return;
+    std::string json = serializeStateToString(ui);
+    if (json.empty()) return;
+
+    /* Conservative payload size: small enough to fit any reasonable host atom-port
+       and worker buffer, so chunking — not buffer size — is what bounds a session. */
+    constexpr uint32_t kChunkPayload = 8192;
+    const uint32_t total = static_cast<uint32_t>(json.size());
+    const uint32_t msgId = ++ui->stateMsgId;
+
+    std::vector<uint8_t> buf;
+    for (uint32_t offset = 0; offset < total; offset += kChunkPayload) {
+        const uint32_t chunkSize = std::min(kChunkPayload, total - offset);
+
+        /* eventTransfer payload is a complete atom: header + (LuvieStateChunk + slice). */
+        buf.resize(sizeof(LV2_Atom) + sizeof(LuvieStateChunk) + chunkSize);
+        auto* atom = reinterpret_cast<LV2_Atom*>(buf.data());
+        atom->size = static_cast<uint32_t>(sizeof(LuvieStateChunk) + chunkSize);
+        atom->type = ui->luvie_state_urid;
+
+        LuvieStateChunk hdr{ msgId, total, offset, chunkSize };
+        std::memcpy(buf.data() + sizeof(LV2_Atom), &hdr, sizeof(hdr));
+        std::memcpy(buf.data() + sizeof(LV2_Atom) + sizeof(LuvieStateChunk),
+                    json.data() + offset, chunkSize);
+
+        ui->writeFunc(ui->controller, PORT_CONTROL_IN,
+                      static_cast<uint32_t>(buf.size()),
+                      ui->atom_eventTransfer, buf.data());
+    }
 }
 
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
@@ -234,9 +267,9 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->song->loadTimeline(state.timeline);
     applyOverlayOutputs(ui, state);
     ui->restoringState = false;
-    /* No writeStateFile() here: this is called from the restore path, where the
-       state file already holds exactly this content (the DSP wrote it in
-       dsp_restore). Rewriting it would only churn the DSP poll thread. */
+    /* No sendState() here: this is called from the restore path, where the DSP
+       already applied exactly this content in dsp_restore. Re-sending it would only
+       schedule a redundant worker parse. */
 }
 
 /* -----------------------------------------------------------------------
@@ -347,7 +380,7 @@ static LV2UI_Handle instantiate(
     ui->app.pluginMode              = true;
 
     ui->app.onExtraTimelineChange = [ui]() {
-        if (!ui->restoringState) writeStateFile(ui);
+        if (!ui->restoringState) sendState(ui);
     };
 
     /* Transport is host-driven in plugin mode (the engine follows JACK transport),
@@ -355,7 +388,7 @@ static LV2UI_Handle instantiate(
        resyncs the playhead display anyway. */
 
     ui->app.onExtraParamsChanged = [ui]() {
-        if (!ui->restoringState) writeStateFile(ui);
+        if (!ui->restoringState) sendState(ui);
     };
 
     /* ---- Build all shared UI ---- */
@@ -400,17 +433,17 @@ static LV2UI_Handle instantiate(
     /* ---- Wire port management ---- */
     if (auto* overlay = ui->app.outputsOverlay) {
         /* No new-project dialog in the plugin; default MIDI output is Jack. The DSP
-           engine reconciles its JACK ports from the state file, so every change just
-           rewrites the file. */
+           engine reconciles its JACK ports from the project state, so every change
+           just re-sends the current state atom. */
         overlay->setDefaultBackend(MidiBackend::Jack);
-        overlay->onPortAdded   = [ui](const std::string&) { if (!ui->restoringState) writeStateFile(ui); };
-        overlay->onPortRemoved = [ui](const std::string&) { if (!ui->restoringState) writeStateFile(ui); };
-        overlay->onPortRenamed = [ui](const std::string&, const std::string&) { if (!ui->restoringState) writeStateFile(ui); };
+        overlay->onPortAdded   = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };
+        overlay->onPortRemoved = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };
+        overlay->onPortRenamed = [ui](const std::string&, const std::string&) { if (!ui->restoringState) sendState(ui); };
     }
 
     /* ---- Persist instrument-routing changes for the DSP engine ---- */
     ui->app.onInstrumentsChanged = [ui]() {
-        if (!ui->restoringState) writeStateFile(ui);
+        if (!ui->restoringState) sendState(ui);
     };
 
     /* ---- Let File/Import and File/Export carry the outputs section ---- */
@@ -419,7 +452,7 @@ static LV2UI_Handle instantiate(
         ui->restoringState = true;
         applyOverlayOutputs(ui, state);
         ui->restoringState = false;
-        writeStateFile(ui);
+        sendState(ui);
     };
 
     /* ---- Restore from file if available ---- */
@@ -439,10 +472,10 @@ static LV2UI_Handle instantiate(
     }
 
     /* Done restoring (deserializeFullState clears this too, but not when there was
-       no file). Then write the file once so the DSP engine's poll thread picks up
-       the current project — whether restored or freshly seeded defaults. */
+       no file). Then send the current project once so the DSP engine picks it up —
+       whether restored or freshly seeded defaults. */
     ui->restoringState = false;
-    writeStateFile(ui);
+    sendState(ui);
 
     /* Return the widget pointer as the LV2UI handle */
     *widget = &ui->widget;

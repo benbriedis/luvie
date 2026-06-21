@@ -26,7 +26,8 @@
  *
  * Thread model (identical to the old JackTransport):
  *   - All setters (setTimeline/setInstruments/...) run on the owner thread that is
- *     the single writer of the snapshot (UI thread standalone; poll thread in LV2).
+ *     the single writer of the snapshot (UI thread standalone; LV2 worker thread in
+ *     the plugin).
  *   - renderWindow() runs on the real-time thread. It try_locks snapMutex; on
  *     failure it does nothing and returns false so the caller leaves wasPlaying
  *     untouched (the missed stop/jump is handled next cycle).

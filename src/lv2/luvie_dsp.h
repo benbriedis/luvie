@@ -27,6 +27,24 @@ enum {
     PORT_OUT        = 1
 };
 
+/* The UI sends the project JSON to control_in as one or more `luvie_state` atoms.
+   Each atom body is this fixed 16-byte header followed by `chunkSize` JSON bytes, so
+   a session larger than a single host buffer (atom port or worker ring) can be split
+   across several atoms and reassembled on the worker thread. All four fields are
+   uint32_t, giving a naturally-packed header with no padding.
+
+     msgId      identifies one complete message; it changes for every full send, so a
+                dropped chunk is detected when the next message starts (offset 0).
+     totalSize  total JSON byte count across all chunks of this message.
+     offset     byte offset of this chunk within the JSON.
+     chunkSize  JSON bytes in this chunk (== atom body size - sizeof(LuvieStateChunk)). */
+typedef struct {
+    uint32_t msgId;
+    uint32_t totalSize;
+    uint32_t offset;
+    uint32_t chunkSize;
+} LuvieStateChunk;
+
 typedef struct {
     LV2_URID atom_Blank;
     LV2_URID atom_Object;
