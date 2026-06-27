@@ -26,14 +26,16 @@ class SongEditor : public Editor, public ITimelineObserver {
     GridScrollPane*    scrollbar      = nullptr;
     ITransport*        transport      = nullptr;
     ObservableSong*    timeline       = nullptr;
-    int                numVisibleRows;
-    int                rowOffset      = 0;
+    int                scrollPx       = 0;   // absolute vertical scroll, in pixels
     int                colOffset      = 0;
     int                baseX          = 0;
     bool               wasPlaying     = false;
 
+    static constexpr int wheelStepPx = 24;   // pixels per mouse-wheel notch
+
     void updateScrollBounds();
-    void setRowOffset(int offset);
+    void setScrollPx(int px);
+    void pushScroll(int availH);
     void setColOffset(int offset);
     void drawRulerLabels() override;
     int  computeNumCols() const;

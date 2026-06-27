@@ -32,7 +32,7 @@ bool SongGrid::isInstrHeaderVR(int vr) const
 
 int SongGrid::rowY(int r) const
 {
-    int py = 0;
+    int py = -pixelOffset;
     for (int i = 0; i < r; i++)
         py += isInstrHeaderVR(i) ? instrNameRowH : rowHeight;
     return py;
@@ -45,7 +45,7 @@ int SongGrid::rowH(int r) const
 
 int SongGrid::rowAtPixelY(int py) const
 {
-    int cumY = 0;
+    int cumY = -pixelOffset;
     for (int r = 0; r < numRows; r++) {
         int rh = rowH(r);
         if (py < cumY + rh) return r;
@@ -59,6 +59,53 @@ int SongGrid::totalPixelH() const
     int h = 0;
     for (int r = 0; r < numRows; r++) h += rowH(r);
     return h;
+}
+
+// Height of an absolute rowOrder entry, independent of the current rowOffset.
+int SongGrid::absRowHeight(int absRow) const
+{
+    if (!timeline) return rowHeight;
+    const auto& ro = timeline->get().rowOrder;
+    if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Header)
+        return instrNameRowH;
+    return rowHeight;
+}
+
+int SongGrid::fullContentHeight() const
+{
+    if (!timeline) return 0;
+    int total = (int)timeline->get().rowOrder.size();
+    int h = 0;
+    for (int r = 0; r < total; r++) h += absRowHeight(r);
+    return h;
+}
+
+void SongGrid::scrollPxToRow(int scrollPx, int& rowOff, int& pxOff) const
+{
+    rowOff = 0;
+    pxOff  = 0;
+    if (!timeline) return;
+    int total = (int)timeline->get().rowOrder.size();
+    int cum = 0;
+    for (int r = 0; r < total; r++) {
+        int rh = absRowHeight(r);
+        if (cum + rh > scrollPx) { rowOff = r; pxOff = scrollPx - cum; return; }
+        cum += rh;
+    }
+    rowOff = std::max(0, total - 1);
+}
+
+int SongGrid::rowsToRender(int rowOff, int pxOff, int availH) const
+{
+    if (!timeline) return 1;
+    int total = (int)timeline->get().rowOrder.size();
+    int used = -pxOff, count = 0;
+    for (int r = rowOff; r < total; r++) {
+        used += absRowHeight(r);
+        count++;
+        if (used >= availH) break;
+    }
+    return std::max(1, count);
 }
 
 void SongGrid::drawNoteBlock(const Note& /*note*/, int x0, int y0, int width, int rh)
@@ -676,9 +723,10 @@ void SongGrid::rebuildNotes()
     clampSelection();
 }
 
-void SongGrid::setRowOffset(int offset)
+void SongGrid::setScroll(int rowOff, int pxOff)
 {
-    rowOffset = offset;
+    rowOffset   = rowOff;
+    pixelOffset = pxOff;
     if (timeline) { rebuildNotes(); redraw(); }
 }
 

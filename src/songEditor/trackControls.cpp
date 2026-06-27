@@ -33,9 +33,10 @@ void TrackControls::setTimeline(ObservableSong* tl)
     redraw();
 }
 
-void TrackControls::setRowOffset(int offset)
+void TrackControls::setScroll(int rowOff, int pxOff)
 {
-    rowOffset = offset;
+    rowOffset   = rowOff;
+    pixelOffset = pxOff;
     redraw();
 }
 
@@ -47,15 +48,15 @@ static int rowHFor(const Timeline* tl, int absRow, int rowHeight) {
     return rowHeight;
 }
 
-static int rowYInPanel(const Timeline* tl, int rowOffset, int absRow, int rowHeight) {
-    int py = 0;
+static int rowYInPanel(const Timeline* tl, int rowOffset, int pixelOffset, int absRow, int rowHeight) {
+    int py = -pixelOffset;
     for (int i = rowOffset; i < absRow; i++)
         py += rowHFor(tl, i, rowHeight);
     return py;
 }
 
-static int absRowAtPanelY(const Timeline* tl, int rowOffset, int numVisibleRows, int py, int rowHeight) {
-    int cumY = 0;
+static int absRowAtPanelY(const Timeline* tl, int rowOffset, int pixelOffset, int numVisibleRows, int py, int rowHeight) {
+    int cumY = -pixelOffset;
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         int rh = rowHFor(tl, i, rowHeight);
         if (py < cumY + rh) return i;
@@ -70,9 +71,10 @@ void TrackControls::draw()
     int pad  = 1;
     const Timeline* tl_ = timeline ? &timeline->get() : nullptr;
 
+    fl_push_clip(x(), y(), w(), h());   // partial top/bottom rows must not overdraw neighbours
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         int rh = rowHFor(tl_, i, rowHeight);
-        int ry = y() + rowYInPanel(tl_, rowOffset, i, rowHeight);
+        int ry = y() + rowYInPanel(tl_, rowOffset, pixelOffset, i, rowHeight);
 
         bool isInstrHeader = false;
         bool isTrack       = false;
@@ -152,6 +154,7 @@ void TrackControls::draw()
         fl_color(mute ? colTextOn : colTextOff);
         fl_draw("M", bx, ry + btnH + pad, bw, btnH - 2 * pad, FL_ALIGN_CENTER);
     }
+    fl_pop_clip();
 }
 
 int TrackControls::handle(int event)
@@ -166,13 +169,13 @@ int TrackControls::handle(int event)
     if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE && timeline) {
         int localY = Fl::event_y() - y();
         const Timeline* tl_ = &timeline->get();
-        int row    = absRowAtPanelY(tl_, rowOffset, numVisibleRows, localY, rowHeight);
+        int row    = absRowAtPanelY(tl_, rowOffset, pixelOffset, numVisibleRows, localY, rowHeight);
         const auto& tl = timeline->get();
         const auto& ro = tl.rowOrder;
         if (row < 0 || row >= (int)ro.size() || ro[row].kind != RowKind::Lane)
             return 1;
 
-        int rowPY   = rowYInPanel(tl_, rowOffset, row, rowHeight);
+        int rowPY   = rowYInPanel(tl_, rowOffset, pixelOffset, row, rowHeight);
         int rowH_   = rowHFor(tl_, row, rowHeight);
         int trackId = timeline->trackIdForLaneId(ro[row].id);
         bool isSolo = (localY - rowPY) < rowH_ / 2;

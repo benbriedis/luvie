@@ -22,7 +22,8 @@ class SongGrid : public Grid, public ITimelineObserver {
     float               tickBarPos        = 0.0f;
     float               dragStartOffset   = 0.0f;
     int                 dragBeatsPerBar   = 4;
-    int                 rowOffset         = 0;
+    int                 rowOffset         = 0;   // first partially-visible absolute row
+    int                 pixelOffset       = 0;   // pixels of rowOffset scrolled off the top
 
     std::vector<ParamLaneLocal>  localParamLanes;
     ParamState                   paramState;
@@ -41,9 +42,15 @@ class SongGrid : public Grid, public ITimelineObserver {
     int rowY(int r) const override;
     int rowH(int r) const override;
     int rowAtPixelY(int py) const override;
+    int absRowHeight(int absRow) const;   // pixel height of an absolute rowOrder entry
 
 public:
     int totalPixelH() const;
+    int fullContentHeight() const;             // total pixel height of every row
+    // Map an absolute pixel scroll position to (first visible row, pixels into it).
+    void scrollPxToRow(int scrollPx, int& rowOff, int& pxOff) const;
+    // Number of rows to render to cover availH starting at rowOff with pxOff scrolled off.
+    int  rowsToRender(int rowOff, int pxOff, int availH) const;
 
 protected:
     void draw() override;
@@ -76,7 +83,7 @@ public:
 
     void setTimeline(ObservableSong* tl);
     void setTrackView(int trackFilter, bool beatResolution);
-    void setRowOffset(int offset);
+    void setScroll(int rowOff, int pxOff);
     void onTimelineChanged() override;
 };
 

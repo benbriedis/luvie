@@ -62,7 +62,7 @@ int TrackLabels::rowHFor(int absRow) const
 
 int TrackLabels::rowYInPanel(int absRow) const
 {
-    int py = 0;
+    int py = -pixelOffset;
     for (int i = rowOffset; i < absRow; i++)
         py += rowHFor(i);
     return py;
@@ -70,7 +70,7 @@ int TrackLabels::rowYInPanel(int absRow) const
 
 int TrackLabels::absRowAtPanelY(int py) const
 {
-    int cumY = 0;
+    int cumY = -pixelOffset;
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         int rh = rowHFor(i);
         if (py < cumY + rh) return i;
@@ -79,9 +79,10 @@ int TrackLabels::absRowAtPanelY(int py) const
     return rowOffset + numVisibleRows;
 }
 
-void TrackLabels::setRowOffset(int offset)
+void TrackLabels::setScroll(int rowOff, int pxOff)
 {
-    rowOffset = offset;
+    rowOffset   = rowOff;
+    pixelOffset = pxOff;
     redraw();
 }
 
@@ -306,6 +307,7 @@ void TrackLabels::draw()
         return {};
     };
 
+    fl_push_clip(x(), y(), w(), h());   // partial top/bottom rows must not overdraw neighbours
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
         if (i == editingAbsRow && editingPatId < 0) continue;  // track-label input draws the whole row itself
@@ -424,6 +426,7 @@ void TrackLabels::draw()
         fl_line_style(0);
     }
 
+    fl_pop_clip();
     draw_children();
 }
 

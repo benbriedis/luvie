@@ -17,6 +17,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     int                  numVisibleRows;
     int                  rowHeight;
     int                  rowOffset         = 0;
+    int                  pixelOffset       = 0;
     InlineInput          input;
     int                  editingAbsRow = -1;
     int                  editingPatId  = -1;  // >= 0 when editing a pattern name (not track label)
@@ -56,7 +57,7 @@ public:
     void setPattern(ObservablePattern* p) { patternObs = p; }
     void setContextPopup(TrackContextPopup* p) { contextPopup = p; }
     void setParamLaneContextPopup(ParamLaneContextPopup* p) { paramLanePopup = p; }
-    void setRowOffset(int offset);
+    void setScroll(int rowOff, int pxOff);
     void setNumVisibleRows(int n) { numVisibleRows = n; }
     void onTimelineChanged() override { redraw(); }
 

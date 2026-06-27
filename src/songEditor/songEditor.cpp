@@ -13,8 +13,7 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
       trackControls(x + labelW, y + rulerH, controlsW, numRows, rowHeight),
-      songGrid(numRows, numCols, rowHeight, colWidth, snap, popup),
-      numVisibleRows(numRows)
+      songGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     baseX        = x;
     rulerOffsetX = labelW + controlsW;  // no scrollbar initially
@@ -22,11 +21,11 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     const int gridH = numRows * rowHeight;
 
     scrollbar = new GridScrollPane(x, y + rulerH, scrollbarW, gridH);
-    scrollbar->linesize(1);
+    scrollbar->linesize(wheelStepPx);
     scrollbar->callback([](Fl_Widget* w, void* d) {
         auto* self = static_cast<SongEditor*>(d);
         auto* sb   = static_cast<GridScrollPane*>(w);
-        self->setRowOffset((int)sb->value());
+        self->setScrollPx((int)sb->value());
     }, this);
     scrollbar->hide();
 
@@ -154,23 +153,21 @@ void SongEditor::updateScrollBounds()
         if (onNumColsChanged) onNumColsChanged(newNumCols);
     }
     if (!timeline || !scrollbar) return;
-    int total    = (int)timeline->get().rowOrder.size();
-    int visRows  = std::min(total, numVisibleRows);
-    // Compute gridH using variable row heights; temporarily set numRows so totalPixelH() is correct
-    songGrid.numRows = visRows;
-    int gridH    = std::max(songGrid.totalPixelH(), 1);
-    int maxOff   = std::max(0, total - numVisibleRows);
-    rowOffset    = std::clamp(rowOffset, 0, maxOff);
+    int availH = std::max(1, h() - rulerH - hScrollH);
 
-    bool needsScroll = (total > numVisibleRows);
+    // Rows have variable heights (instrument-header rows are shorter), so scroll
+    // by pixels rather than by row count. scrollPx is the absolute pixel offset.
+    int fullH        = songGrid.fullContentHeight();
+    int maxScroll    = std::max(0, fullH - availH);
+    bool needsScroll = fullH > availH;
     int  sbW         = needsScroll ? scrollbarW : 0;
+    scrollPx = std::clamp(scrollPx, 0, maxScroll);
 
-    // Reposition / resize scrollbar
+    // Reposition / resize scrollbar (fixed body height; thumb measured in pixels)
     scrollbar->position(baseX, scrollbar->y());
-    scrollbar->size(scrollbarW, gridH);
+    scrollbar->size(scrollbarW, availH);
     if (needsScroll) {
-        int shown = std::max(total, numVisibleRows);
-        scrollbar->value(rowOffset, numVisibleRows, 0, shown);
+        scrollbar->value(scrollPx, availH, 0, fullH);
         scrollbar->show();
     } else {
         scrollbar->hide();
@@ -196,7 +193,7 @@ void SongEditor::updateScrollBounds()
         colOffset = 0;
         hScrollbar->hide();
     }
-    hScrollbar->position(baseX + sbW + labelW + controlsW, y() + rulerH + gridH);
+    hScrollbar->position(baseX + sbW + labelW + controlsW, y() + rulerH + availH);
     hScrollbar->size(visibleGridW, hScrollH);
 
     hScrollPixel = colOffset * songGrid.colWidth;
@@ -204,33 +201,42 @@ void SongEditor::updateScrollBounds()
 
     if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
 
-    // Resize children to match actual track count (up to numVisibleRows)
-    songGrid.numRows = visRows;
-    songGrid.size(visibleGridW, gridH);
-    trackLabels.setNumVisibleRows(visRows);
-    trackLabels.size(trackLabels.w(), gridH);
-    trackControls.setNumVisibleRows(visRows);
-    trackControls.size(trackControls.w(), gridH);
+    // The grid body and both side panels share the fixed body height; partial
+    // rows at the top/bottom are clipped by each widget's bounds.
+    songGrid.size(visibleGridW, availH);
+    trackLabels.size(trackLabels.w(), availH);
+    trackControls.size(trackControls.w(), availH);
 
-    songGrid.setRowOffset(rowOffset);
-    trackLabels.setRowOffset(rowOffset);
-    trackControls.setRowOffset(rowOffset);
+    pushScroll(availH);
     redraw();
 }
 
-void SongEditor::setRowOffset(int offset)
+// Translate the current scrollPx into (rowOffset, pixelOffset, render count) and
+// push it to the grid and both side panels.
+void SongEditor::pushScroll(int availH)
+{
+    int rowOff, pxOff;
+    songGrid.scrollPxToRow(scrollPx, rowOff, pxOff);
+    int renderCount = songGrid.rowsToRender(rowOff, pxOff, availH);
+
+    songGrid.numRows = renderCount;
+    songGrid.setScroll(rowOff, pxOff);
+    trackLabels.setNumVisibleRows(renderCount);
+    trackLabels.setScroll(rowOff, pxOff);
+    trackControls.setNumVisibleRows(renderCount);
+    trackControls.setScroll(rowOff, pxOff);
+}
+
+void SongEditor::setScrollPx(int px)
 {
     if (!timeline || !scrollbar) return;
-    int total = (int)timeline->get().rowOrder.size();
-    int maxOff = std::max(0, total - numVisibleRows);
-    rowOffset  = std::clamp(offset, 0, maxOff);
-    if (total > numVisibleRows) {
-        int shown = std::max(total, numVisibleRows);
-        scrollbar->value(rowOffset, numVisibleRows, 0, shown);
-    }
-    songGrid.setRowOffset(rowOffset);
-    trackLabels.setRowOffset(rowOffset);
-    trackControls.setRowOffset(rowOffset);
+    int availH    = std::max(1, h() - rulerH - hScrollH);
+    int fullH     = songGrid.fullContentHeight();
+    int maxScroll = std::max(0, fullH - availH);
+    scrollPx = std::clamp(px, 0, maxScroll);
+    if (fullH > availH)
+        scrollbar->value(scrollPx, availH, 0, fullH);
+    pushScroll(availH);
 }
 
 void SongEditor::setColOffset(int offset)
@@ -275,7 +281,6 @@ void SongEditor::resize(int x, int /*y*/, int w, int h)
 {
     Fl_Widget::resize(x, y(), w, h);
     baseX          = x;
-    numVisibleRows = std::max(1, (h - rulerH - hScrollH) / songGrid.rowHeight);
     updateScrollBounds();
 }
 
@@ -285,7 +290,7 @@ int SongEditor::handle(int event)
         if (Fl::event_dx() != 0)
             setColOffset(colOffset + Fl::event_dx());
         else
-            setRowOffset(rowOffset + Fl::event_dy());
+            setScrollPx(scrollPx + Fl::event_dy() * wheelStepPx);
         return 1;
     }
     return Editor::handle(event);

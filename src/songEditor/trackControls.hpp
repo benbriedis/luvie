@@ -8,13 +8,14 @@ class TrackControls : public Fl_Widget, public ITimelineObserver {
     int             numVisibleRows;
     int             rowHeight;
     int             rowOffset      = 0;
+    int             pixelOffset    = 0;
 
 public:
     TrackControls(int x, int y, int w, int numVisibleRows, int rowHeight);
     ~TrackControls();
 
     void setTimeline(ObservableSong* tl);
-    void setRowOffset(int offset);
+    void setScroll(int rowOff, int pxOff);
     void setNumVisibleRows(int n) { numVisibleRows = n; }
     void onTimelineChanged() override { redraw(); }
 
