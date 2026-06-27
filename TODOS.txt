@@ -316,6 +316,8 @@ Create my own license...
 
 =====================
 
+Add Start & End markers in Song Editor and a looping function
+
 Loop Editor maybe show a mini version of the patterns, similar to Seq24
 
 Should we put the internal transport in a separate RT thread?
@@ -334,7 +336,7 @@ TODO test isDirty in RaySession now
 Add luvie --version
   Coordinate with git tags. Show git hash if no tag. 
   Dont want a branch name (but what if no commit?) May use last commit in the branch. 
-  Start with tag 0.1  - don't really need backward compitibility until v1.
+
  
 Add more chords and scales?
 	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
