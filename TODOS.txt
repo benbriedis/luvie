@@ -333,10 +333,6 @@ Song parameter pitch bend + pattern pitch bend - get a warbling effect. Probably
 
 TODO test isDirty in RaySession now
 
-Add luvie --version
-  Coordinate with git tags. Show git hash if no tag. 
-  Dont want a branch name (but what if no commit?) May use last commit in the branch. 
-
  
 Add more chords and scales?
 	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?

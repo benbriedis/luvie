@@ -186,6 +186,11 @@ int DrumGrid::handle(int evt)
             float newBeat = d->origBeat + (float)(ex - (d->grabX - x())) / colWidth;
             newBeat = std::max(0.0f, std::min((float)numCols, newBeat));
             if (snap > 0.0f) newBeat = std::round(newBeat / snap) * snap;
+            // Keep the note off the final vertical line (end of pattern):
+            // pull it back to the last valid position, matching createNote().
+            if (newBeat >= (float)numCols)
+                newBeat = snap > 0.0f ? (float)numCols - snap
+                                      : std::nextafter((float)numCols, 0.0f);
 
             // Vertical: update MIDI note
             int rowDelta = (ey - (d->grabY - y())) / rowHeight;
@@ -281,6 +286,9 @@ void DrumGrid::createNote()
     int   vr       = ey / rowHeight;
     float beat     = (float)ex / colWidth + colOffset;
     if (snap > 0.0f) beat = std::round(beat / snap) * snap;
+    // Don't place a note on the final vertical line: it's the end of the
+    // pattern and visually identical to placing one at the start (beat 0).
+    if (beat >= (float)numCols) return;
     int   midiNote = rowOffset + numRows - 1 - vr;
     if (midiNote < 0 || midiNote > 127) return;
     if (!pattern || patternId < 0) return;
