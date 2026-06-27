@@ -34,6 +34,8 @@ FUTURE FUNCTIONALITY
 
 - Unit tests?
 
+- Add a dark theme
+
 LIMITATION
 ==========
 Currently only one Luvie instance per Ardour will work. 
@@ -402,6 +404,3 @@ Unstacked:
 FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
 
 
-MAJOR BUG: pattern 3 not playing anything? (Ardour + Jack)
-           The playhead is active/inactive at the wrong times too.
-   

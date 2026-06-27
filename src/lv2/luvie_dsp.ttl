@@ -1,5 +1,6 @@
 @prefix atom:  <http://lv2plug.in/ns/ext/atom#> .
 @prefix doap:  <http://usefulinc.com/ns/doap#> .
+@prefix foaf:  <http://xmlns.com/foaf/0.1/> .
 @prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
 @prefix midi:  <http://lv2plug.in/ns/ext/midi#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
@@ -11,8 +12,11 @@
 @prefix work:  <http://lv2plug.in/ns/ext/worker#> .
 
 <https://github.com/benbriedis/luvie/luvie_dsp>
-    a lv2:Plugin ;
+    a lv2:Plugin , lv2:MIDIPlugin ;
     doap:name "Luvie" ;
+    doap:maintainer [
+        foaf:name "Ben Briedis"
+    ] ;
 
     lv2:requiredFeature urid:map , work:schedule ;
     lv2:optionalFeature lv2:hardRTCapable ;

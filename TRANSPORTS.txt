@@ -3,7 +3,7 @@ USE AS AN LV2 PLUGIN
 ====================
 
 TESTING: 
-Test in Ardour or zynjacku (/lv2rack) rather than Carla as Carla wraps Jack functionality 
+Test in Ardour or Carla-rack rather than Carla-multi as Carla-multi wraps Jack functionality 
 around all its plugins - its like running a jalv around each one individually.
 
 THE PROBLEMS:
@@ -157,6 +157,7 @@ Missing first note problem
 ==========================
 When using Ardour + Jack Ardour appears to add a latency or synchronization correction to the plugin.
 When we rewind the transport we end up with a frame >  0. If there is note there it won't play.
+NOTE same problem occurs using Carla-rack, presumably for similar reasons.
 
 Ideally I guess we'd have Luvie make its own latency adjustment, adding an invisible 5136 or so frames
 on to the start. If we do this how would we calculate it? Options: 
