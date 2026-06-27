@@ -204,21 +204,30 @@ void BasePatternEditor::updateParamScrollbar()
 void BasePatternEditor::relayout()
 {
     const int bx = x(), gy = y(), bw = w(), bh = h();
-    const int lanes      = paramGrid.numLanes();
-    const int visRows    = std::min(lanes, kMaxVisParams);
-    const int paramAreaH = visRows * kParamRowH;
-    const int lw         = labelsWidth();
-
-    const int newNumRows   = std::max(1, (bh - rulerH - paramAreaH - hScrollH) / gridRowHeight());
+    const int lanes        = paramGrid.numLanes();
+    const int visRows      = std::min(lanes, kMaxVisParams);
+    const int paramAreaH   = visRows * kParamRowH;
+    const int lw           = labelsWidth();
     const int visibleGridW = std::max(1, bw - scrollbarW - lw);
-    const int gridH        = newNumRows * gridRowHeight();
-    const int paramY       = gy + rulerH + gridH;
 
-    scrollbar->resize(bx, gy + rulerH, scrollbarW, gridH);
+    // Only reserve a row for the horizontal scrollbar when it is actually shown.
+    const bool hbarShown = gridNumCols() * gridColWidth() > visibleGridW;
+    const int  hbarH     = hbarShown ? hScrollH : 0;
+
+    // The note scrollbar, labels and grid share one height that fills the area
+    // down to the param lanes / horizontal scrollbar / control bar. Only whole
+    // rows are interactive; the sub-row remainder shows as background below the
+    // last row rather than leaving a gap above the control bar.
+    const int noteAreaH  = std::max(gridRowHeight(), bh - rulerH - paramAreaH - hbarH);
+    const int newNumRows = std::max(1, noteAreaH / gridRowHeight());
+    const int noteTop    = gy + rulerH;
+    const int paramY     = noteTop + noteAreaH;
+
+    scrollbar->resize(bx, noteTop, scrollbarW, noteAreaH);
     labelsSetNumRows(newNumRows);
-    labelsResize(bx + scrollbarW, gy + rulerH, lw, gridH);
+    labelsResize(bx + scrollbarW, noteTop, lw, noteAreaH);
     gridSetNumRows(newNumRows);
-    gridResize(bx + scrollbarW + lw, gy + rulerH, visibleGridW, gridH);
+    gridResize(bx + scrollbarW + lw, noteTop, visibleGridW, noteAreaH);
 
     if (paramAreaH > 0) {
         paramLabels.resize(bx + scrollbarW, paramY, lw, paramAreaH);

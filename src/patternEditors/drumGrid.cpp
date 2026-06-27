@@ -116,7 +116,7 @@ void DrumGrid::draw()
             isBar = (i % 4 == 0);
         }
         fl_color(isBar ? kBarCol : kBeatCol);
-        fl_line(x0, y(), x0, y() + numRows * rowHeight);
+        fl_line(x0, y(), x0, y() + h());
     }
 
     // Draw drum notes as filled circles at the beat position (not cell center)

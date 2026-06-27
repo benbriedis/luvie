@@ -221,6 +221,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tab2->add(pianorollEd);
     pianorollEd->hide();
 
+    // Stretch the editors down to the control panel so their vertical
+    // scrollbars meet it (this resize also forces a relayout that fills them).
+    const int patEditorH = tabsH - tabBarH - panelH;
+    patternEd->resize(0, off + tabBarH, winW, patEditorH);
+    drumEd->resize(0, off + tabBarH, winW, patEditorH);
+    pianorollEd->resize(0, off + tabBarH, winW, patEditorH);
+
     patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
     patternPanel->setPattern(pattern);
     tab2->add(patternPanel);
