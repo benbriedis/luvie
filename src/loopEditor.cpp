@@ -1,6 +1,7 @@
 #include "loopEditor.hpp"
 #include "panelStyle.hpp"
 #include "appWindow.hpp"
+#include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -602,7 +603,13 @@ void LoopEditor::draw()
 
 int LoopEditor::handle(int event)
 {
-    if (Fl_Group::handle(event)) return 1;
+    // Let child widgets (scrollbars, Flip button) handle events first. This
+    // also drives their enter/leave + hover state for FL_MOVE. But
+    // Fl_Group::handle() ALWAYS returns 1 for FL_MOVE (it claims belowmouse),
+    // so we must not let that short-circuit our own hover/cursor handling over
+    // the drawn grid cells — fall through to the switch for FL_MOVE.
+    bool childHandled = Fl_Group::handle(event);
+    if (event != FL_MOVE && childHandled) return 1;
 
     int mx = Fl::event_x(), my = Fl::event_y();
 
@@ -612,9 +619,14 @@ int LoopEditor::handle(int event)
     case FL_MOVE: {
         int ti = -1, li = -1;
         int newCol = -1, newRow = -1;
-        if (cellAt(mx, my, ti, li)) {
+        bool overCell = cellAt(mx, my, ti, li);
+        if (overCell) {
             newCol = tracksAsColumns ? ti : li;
             newRow = tracksAsColumns ? li : ti;
+        }
+        if (window()) {
+            if (overCell) window()->cursor(contextMenuCursorImage(), 0, 0);
+            else          window()->cursor(FL_CURSOR_DEFAULT);
         }
         if (newCol != hoveredCol || newRow != hoveredRow) {
             hoveredCol = newCol;
@@ -624,6 +636,7 @@ int LoopEditor::handle(int event)
         return 1;
     }
     case FL_LEAVE:
+        if (window()) window()->cursor(FL_CURSOR_DEFAULT);
         if (hoveredCol != -1 || hoveredRow != -1) {
             hoveredCol = hoveredRow = -1;
             redraw();
