@@ -125,7 +125,7 @@ void PatternParamGrid::draw()
 {
     fl_push_clip(x(), y(), w() + 1, h() + 1);
 
-    int gridRight = std::min(w(), (numCols_ - colOffset_) * colWidth_);
+    int gridRight = std::min(w(), padX_ + (numCols_ - colOffset_) * colWidth_);
     const int visRows = h() / kParamRowH;
 
     // Row backgrounds
@@ -148,7 +148,7 @@ void PatternParamGrid::draw()
     }
     int endCol = colOffset_ + w() / colWidth_ + 2;
     for (int i = colOffset_; i <= std::min(endCol, numCols_); i++) {
-        int x0 = x() + (i - colOffset_) * colWidth_;
+        int x0 = x() + padX_ + (i - colOffset_) * colWidth_;
         bool isBar = timeSigTop > 0 && i % timeSigTop == 0;
         fl_color(isBar ? (Fl_Color)0x00660000 : (Fl_Color)0x00EE0000);
         fl_line(x0, y(), x0, y() + h());
@@ -182,14 +182,14 @@ void PatternParamGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
         bool draw = predIdx >= 0;
         if (draw) {
             for (const auto& pt : lane.points) {
-                int dotX = x() + (int)((pt.beat - colOffset_) * colWidth_);
-                if (std::abs(dotX - x()) < 2 * dotR) { draw = false; break; }
+                int dotX = x() + padX_ + (int)((pt.beat - colOffset_) * colWidth_);
+                if (std::abs(dotX - (x() + padX_)) < 2 * dotR) { draw = false; break; }
             }
         }
         if (draw) {
             int vdotY = dotYFor(lane.points[predIdx].value);
             fl_color(0xFF999900);
-            fl_pie(x() - dotR, vdotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
+            fl_pie(x() + padX_ - dotR, vdotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
         }
     }
 
@@ -198,20 +198,20 @@ void PatternParamGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
     for (int i = 0; i + 1 < (int)lane.points.size(); i++) {
         const auto& a = lane.points[i];
         const auto& b = lane.points[i + 1];
-        fl_line(x() + (int)((a.beat - colOffset_) * colWidth_), dotYFor(a.value),
-                x() + (int)((b.beat - colOffset_) * colWidth_), dotYFor(b.value));
+        fl_line(x() + padX_ + (int)((a.beat - colOffset_) * colWidth_), dotYFor(a.value),
+                x() + padX_ + (int)((b.beat - colOffset_) * colWidth_), dotYFor(b.value));
     }
 
     if (!lane.points.empty()) {
         const auto& last = lane.points.back();
-        int lastX = x() + (int)((last.beat - colOffset_) * colWidth_);
+        int lastX = x() + padX_ + (int)((last.beat - colOffset_) * colWidth_);
         int lastY = dotYFor(last.value);
         if (lastX < x() + gridRight)
             fl_line(lastX, lastY, x() + gridRight, lastY);
     }
 
     for (const auto& pt : lane.points) {
-        int dotX = x() + (int)((pt.beat - colOffset_) * colWidth_);
+        int dotX = x() + padX_ + (int)((pt.beat - colOffset_) * colWidth_);
         if (dotX + dotR < x() || dotX - dotR > x() + w()) continue;
         int dotY = dotYFor(pt.value);
         fl_color(kParamDotFill);
@@ -236,7 +236,7 @@ int PatternParamGrid::findParamPointAtCursor(int laneIdx, int rowY) const
     const int maxVal = laneMaxValue(localLanes[laneIdx].type);
     for (int i = 0; i < (int)localLanes[laneIdx].points.size(); i++) {
         const auto& pt = localLanes[laneIdx].points[i];
-        int dotX = x() + (int)((pt.beat - colOffset_) * colWidth_);
+        int dotX = x() + padX_ + (int)((pt.beat - colOffset_) * colWidth_);
         int dotY = rowY + dotR + (totalRange > 0 ? (int)((maxVal - pt.value) * totalRange / (float)maxVal) : 0);
         float dx = (float)(ex - dotX);
         float dy = (float)(ey - dotY);
@@ -280,7 +280,7 @@ int PatternParamGrid::handle(int event)
     int laneIdx = vr + laneOffset;
     bool overLane = laneIdx < (int)localLanes.size();
 
-    int gridRight = std::min(w(), (numCols_ - colOffset_) * colWidth_);
+    int gridRight = std::min(w(), padX_ + (numCols_ - colOffset_) * colWidth_);
 
     auto dotYForRow = [&](int li, int rowY, int value) {
         int mv = laneMaxValue(li < (int)localLanes.size() ? localLanes[li].type : std::string{});
@@ -294,8 +294,8 @@ int PatternParamGrid::handle(int event)
 
     auto isVirtualOverlapped = [&](int li) {
         for (const auto& pt : localLanes[li].points) {
-            int dotX = x() + (int)((pt.beat - colOffset_) * colWidth_);
-            if (std::abs(dotX - x()) < 2 * dotR) return true;
+            int dotX = x() + padX_ + (int)((pt.beat - colOffset_) * colWidth_);
+            if (std::abs(dotX - (x() + padX_)) < 2 * dotR) return true;
         }
         return false;
     };
@@ -321,7 +321,7 @@ int PatternParamGrid::handle(int event)
                 int ex = Fl::event_x() - x();
                 bool isAnchor = localLanes[d->laneIdx].points[d->ptIdx].anchor;
 
-                float newBeat = (float)ex / colWidth_ + colOffset_;
+                float newBeat = (float)(ex - padX_) / colWidth_ + colOffset_;
                 if (snap_ > 0.0f) newBeat = std::round(newBeat / snap_) * snap_;
                 newBeat = std::max(0.0f, std::min((float)numCols_, newBeat));
                 if (isAnchor) {
@@ -423,7 +423,7 @@ int PatternParamGrid::handle(int event)
             int predIdx = findPrecedingDotIdx(laneIdx);
             if (predIdx >= 0 && !isVirtualOverlapped(laneIdx)) {
                 int vdotY = virtualDotY(laneIdx, predIdx);
-                float dx = (float)(Fl::event_x() - x());
+                float dx = (float)(Fl::event_x() - (x() + padX_));
                 float dy = (float)(Fl::event_y() - vdotY);
                 if (std::sqrt(dx * dx + dy * dy) <= (float)hitR) {
                     paramState = ParamVirtualDrag{laneIdx, predIdx,
@@ -434,7 +434,7 @@ int PatternParamGrid::handle(int event)
             }
             if (!hitVirtual) {
                 int maxVal  = laneMaxValue(laneIdx < (int)localLanes.size() ? localLanes[laneIdx].type : std::string{});
-                float beat  = (float)ex / colWidth_ + colOffset_;
+                float beat  = (float)(ex - padX_) / colWidth_ + colOffset_;
                 if (snap_ > 0.0f) beat = std::round(beat / snap_) * snap_;
                 beat = std::max(0.0f, beat);
                 int eyInRow = ey - vr * kParamRowH;
@@ -455,7 +455,7 @@ int PatternParamGrid::handle(int event)
                 int predIdx = findPrecedingDotIdx(laneIdx);
                 if (predIdx >= 0 && !isVirtualOverlapped(laneIdx)) {
                     int vdotY = virtualDotY(laneIdx, predIdx);
-                    float dx = (float)(Fl::event_x() - x());
+                    float dx = (float)(Fl::event_x() - (x() + padX_));
                     float dy = (float)(Fl::event_y() - vdotY);
                     useHand = std::sqrt(dx * dx + dy * dy) <= (float)hitR;
                 }

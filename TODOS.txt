@@ -313,6 +313,7 @@ Distro and Build:
 Create my own license...
 	Also are NSM or Jack licenses required?
 	JSON library. Others?
+	What is Carla using? It aims to be similarly free I think...
 
 =====================
 
@@ -337,8 +338,6 @@ TODO test isDirty in RaySession now
 Add more chords and scales?
 	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
 
-Drum pattern editor - should probably disallow putting notes on the final vertical grid (look at other pattern editors too)
-
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
 Solo & Mute options
@@ -352,8 +351,6 @@ ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled p
 LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
  
 Loop editor - 
-	Add scrollbars. 
-	Constant width and heights. 
 	Allow reordering.
 	Allow instrument names to be editted from here?
 

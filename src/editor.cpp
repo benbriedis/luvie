@@ -16,7 +16,7 @@ void Editor::draw()
     fl_color(rulerBorder);
     fl_line(x(), y() + rulerH - 1, x() + w() - 1, y() + rulerH - 1);
     drawRulerLabels();
-    playhead.drawTriangle(x() + rulerOffsetX - hScrollPixel, y(), rulerH);
+    playhead.drawTriangle(x() + rulerOffsetX + gridPadX - hScrollPixel, y(), rulerH);
     draw_children();
 }
 
@@ -28,7 +28,7 @@ int Editor::handle(int event)
     case FL_PUSH:
         if (inGridRuler && Fl::event_button() == FL_LEFT_MOUSE && seekingEnabled) {
             rulerDragging = true;
-            playhead.seek(Fl::event_x(), x() + rulerOffsetX - hScrollPixel);
+            playhead.seek(Fl::event_x(), x() + rulerOffsetX + gridPadX - hScrollPixel);
             if (onSeek) onSeek();
             redraw();
             return 1;
@@ -36,7 +36,7 @@ int Editor::handle(int event)
         break;
     case FL_DRAG:
         if (rulerDragging && seekingEnabled) {
-            playhead.seek(Fl::event_x(), x() + rulerOffsetX - hScrollPixel);
+            playhead.seek(Fl::event_x(), x() + rulerOffsetX + gridPadX - hScrollPixel);
             if (onSeek) onSeek();
             redraw();
             return 1;
@@ -49,7 +49,7 @@ int Editor::handle(int event)
         if (inRuler) {
             if (seekingEnabled && inGridRuler) {
                 const int grabZone = 8;
-                int dist = std::abs(Fl::event_x() - (x() + rulerOffsetX - hScrollPixel + playhead.xOffset()));
+                int dist = std::abs(Fl::event_x() - (x() + rulerOffsetX + gridPadX - hScrollPixel + playhead.xOffset()));
                 window()->cursor(dist <= grabZone ? FL_CURSOR_WE : FL_CURSOR_CROSS);
             } else {
                 window()->cursor(FL_CURSOR_DEFAULT);

@@ -31,6 +31,8 @@ class DrumGrid : public Fl_Box, public ITimelineObserver {
     int                 patternId = -1;
     int                 rowOffset = 0;   // MIDI note at the bottom visual row
     int                 colOffset = 0;
+    int                 padX      = 0;   // left margin (px) before beat 0, so the
+                                         // leftmost note circle isn't clipped
     float               snap;
 
     NoteContextPopup&     popup;
@@ -74,6 +76,7 @@ public:
     void onTimelineChanged()   override;
 
     int getRowOffset() const { return rowOffset; }
+    int getPadX() const { return padX; }
 };
 
 #endif

@@ -47,6 +47,7 @@ class PatternParamGrid : public Fl_Widget {
     int                 colOffset_ = 0;
     int                 numCols_   = 8;
     int                 colWidth_;
+    int                 padX_      = 0;   // left margin (px) before beat 0; matches the drum grid
     float               snap_;
     int                 laneOffset = 0;
     ParamDotPopup*      dotPopup   = nullptr;
@@ -71,6 +72,7 @@ public:
     void update(ObservablePattern* tl, int patId);   // respects active drag
     void setColOffset(int off) { colOffset_ = off; redraw(); }
     void setNumCols(int n)     { numCols_   = n;   redraw(); }
+    void setPadX(int p)        { padX_      = p;   redraw(); }
     void setLaneOffset(int off){ laneOffset = off; rebuildLanes(); redraw(); }
     void setParamDotPopup(ParamDotPopup* p) { dotPopup = p; }
     void setSnap(float s)      { snap_ = s; }

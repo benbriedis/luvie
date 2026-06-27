@@ -181,6 +181,11 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     drumGrid.size(visibleGridW, gridH);
     drumGrid.setPlayhead(&playhead);
 
+    // Align the ruler triangle/seek and the param lanes with the grid's left
+    // margin before beat 0.
+    gridPadX = drumGrid.getPadX();
+    paramGrid.setPadX(drumGrid.getPadX());
+
     drumLabels.onRowDoubleClicked = [this](int midiNote, int rowY, int rh) {
         startDrumLabelEdit(midiNote, rowY, rh);
     };

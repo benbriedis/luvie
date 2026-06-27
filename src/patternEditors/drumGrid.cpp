@@ -19,6 +19,9 @@ DrumGrid::DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float 
       numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth)
 {
     box(FL_NO_BOX);
+    // Margin before beat 0: full dot radius plus a little breathing room, so a
+    // note on beat 1 shows its whole circle and is easy to click.
+    padX = std::max(2, rowHeight / 3) + 3;
 }
 
 DrumGrid::~DrumGrid()
@@ -77,7 +80,7 @@ int DrumGrid::findNoteAtCursor() const
 
     for (int i = 0; i < (int)notes.size(); i++) {
         if (notes[i].note != midiNote) continue;
-        float dotX = (notes[i].beat - colOffset) * colWidth;
+        float dotX = padX + (notes[i].beat - colOffset) * colWidth;
         float dist = std::abs((float)ex - dotX);
         if (dist < bestDist) { bestDist = dist; bestIdx = i; }
     }
@@ -92,7 +95,7 @@ void DrumGrid::draw()
     fl_color(bgColor);
     fl_rectf(x(), y(), w(), h());
 
-    int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+    int gridRight = std::min(w(), padX + (numCols - colOffset) * colWidth);
 
     // Horizontal row lines — uniform (no octave colouring)
     for (int i = 0; i <= numRows; i++) {
@@ -103,7 +106,7 @@ void DrumGrid::draw()
     // Vertical column lines
     int endCol = colOffset + w() / colWidth + 2;
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
-        int x0 = x() + (i - colOffset) * colWidth;
+        int x0 = x() + padX + (i - colOffset) * colWidth;
         bool isBar = false;
         if (pattern) {
             int top, bottom;
@@ -122,7 +125,7 @@ void DrumGrid::draw()
         const auto& n = notes[i];
         int vr = rowOffset + numRows - 1 - n.note;
         if (vr < 0 || vr >= numRows) continue;
-        int dotX = x() + (int)((n.beat - colOffset) * colWidth);
+        int dotX = x() + padX + (int)((n.beat - colOffset) * colWidth);
         int dotY = y() + vr * rowHeight + rowHeight / 2;
         if (dotX + dotR < x() || dotX - dotR > x() + w()) continue;
         fl_color(velocityFill(n.velocity));
@@ -132,7 +135,7 @@ void DrumGrid::draw()
     }
 
     if (playhead)
-        playhead->drawLine(x() - colOffset * colWidth, y(), numRows * rowHeight);
+        playhead->drawLine(x() + padX - colOffset * colWidth, y(), numRows * rowHeight);
 
     fl_pop_clip();
 }
@@ -151,7 +154,7 @@ int DrumGrid::handle(int evt)
                 // Open context popup for this drum note
                 const auto& n = notes[idx];
                 int vr   = rowOffset + numRows - 1 - n.note;
-                int dotX = x() + (int)((n.beat - colOffset) * colWidth);
+                int dotX = x() + padX + (int)((n.beat - colOffset) * colWidth);
                 int dotY = y() + vr * rowHeight + rowHeight / 2;
                 int id   = n.id;
                 popup.openForDot(dotX, dotY, this, rowHeight, n.velocity,
@@ -280,12 +283,14 @@ void DrumGrid::createNote()
 {
     int   ex       = Fl::event_x() - x();
     int   ey       = Fl::event_y() - y();
-    int   gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+    int   gridRight = std::min(w(), padX + (numCols - colOffset) * colWidth);
     if (ex >= gridRight) return;
 
     int   vr       = ey / rowHeight;
-    float beat     = (float)ex / colWidth + colOffset;
+    float beat     = (float)(ex - padX) / colWidth + colOffset;
     if (snap > 0.0f) beat = std::round(beat / snap) * snap;
+    // A click in the left margin (before beat 0) shouldn't create a note.
+    if (beat < 0.0f) return;
     // Don't place a note on the final vertical line: it's the end of the
     // pattern and visually identical to placing one at the start (beat 0).
     if (beat >= (float)numCols) return;

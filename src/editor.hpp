@@ -24,6 +24,7 @@ protected:
     bool            seekingEnabled = true;
     int             rulerOffsetX   = 0;   // x offset of grid area within editor (e.g. label panel width)
     int             hScrollPixel   = 0;   // horizontal scroll offset in pixels
+    int             gridPadX       = 0;   // extra left margin before beat 0 inside the grid (drum editor)
 
     virtual void drawRulerLabels() {}
     void draw() override;
