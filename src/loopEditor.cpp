@@ -169,9 +169,29 @@ LoopEditor::LoopEditor(int x, int y, int w, int h)
     axisToggleBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<LoopEditor*>(d);
         self->tracksAsColumns = !self->tracksAsColumns;
+        self->scrollX = self->scrollY = 0;
         self->positionToggleBtn();
+        self->updateScrollbars();
         self->redraw();
     }, this);
+
+    hScroll = new GridScrollPane(x, y, scrollW, scrollW, GridScrollPane::HORIZONTAL);
+    hScroll->linesize(cellW + btnGap);
+    hScroll->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<LoopEditor*>(d);
+        self->scrollX = static_cast<GridScrollPane*>(w)->value();
+        self->redraw();
+    }, this);
+    hScroll->hide();
+
+    vScroll = new GridScrollPane(x, y, scrollW, scrollW, GridScrollPane::VERTICAL);
+    vScroll->linesize(cellH + btnGap);
+    vScroll->callback([](Fl_Widget* w, void* d) {
+        auto* self = static_cast<LoopEditor*>(d);
+        self->scrollY = static_cast<GridScrollPane*>(w)->value();
+        self->redraw();
+    }, this);
+    vScroll->hide();
 
     end();
     positionToggleBtn();
@@ -264,28 +284,79 @@ int LoopEditor::leftStripW() const
 
 void LoopEditor::btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const
 {
-    int nc = numCols();
-    int nr = numRows();
+    int gx = x() + padX + leftStripW();
+    int gy = y() + padY + topStripH();
+
+    bw = cellW;
+    bh = cellH;
+    bx = gx + col * (cellW + btnGap) - scrollX;
+    by = gy + row * (cellH + btnGap) - scrollY;
+}
+
+LoopEditor::Layout LoopEditor::computeLayout() const
+{
+    Layout L{};
+    int nc  = numCols();
+    int nr  = numRows();
     int lsw = leftStripW();
     int tsh = topStripH();
 
-    int gx = x() + padX + lsw;
-    int gy = y() + padY + tsh;
+    L.contentW = nc > 0 ? nc * cellW + (nc - 1) * btnGap : 0;
+    L.contentH = nr > 0 ? nr * cellH + (nr - 1) * btnGap : 0;
 
-    int availW = w() - 2 * padX - lsw;
-    int availH = gridAreaH() - 2 * padY - tsh;
+    int areaX = x() + padX + lsw;
+    int areaY = y() + padY + tsh;
+    int areaW = w() - 2 * padX - lsw;
+    int areaH = gridAreaH() - 2 * padY - tsh;
 
-    bw = nc > 0 ? (availW - (nc - 1) * btnGap) / nc : availW;
-    int rawH = nr > 0 ? (availH - (nr - 1) * btnGap) / nr : availH;
-    bh = std::max(40, std::min(btnH, rawH));
+    // Each scrollbar steals space from the other axis, so resolve mutually.
+    bool needV = L.contentH > areaH;
+    bool needH = L.contentW > areaW;
+    if (needV && !needH) needH = L.contentW > (areaW - scrollW);
+    if (needH && !needV) needV = L.contentH > (areaH - scrollW);
 
-    bx = gx + col * (bw + btnGap);
-    by = gy + row * (bh + btnGap);
+    L.needV = needV;
+    L.needH = needH;
+    L.vpX = areaX;
+    L.vpY = areaY;
+    L.vpW = areaW - (needV ? scrollW : 0);
+    L.vpH = areaH - (needH ? scrollW : 0);
+    L.maxScrollX = std::max(0, L.contentW - L.vpW);
+    L.maxScrollY = std::max(0, L.contentH - L.vpH);
+    return L;
+}
+
+void LoopEditor::updateScrollbars()
+{
+    if (!hScroll || !vScroll) return;
+    Layout L = computeLayout();
+
+    scrollX = std::clamp(scrollX, 0, L.maxScrollX);
+    scrollY = std::clamp(scrollY, 0, L.maxScrollY);
+
+    if (L.needH) {
+        hScroll->resize(L.vpX, L.vpY + L.vpH, L.vpW, scrollW);
+        hScroll->value(scrollX, L.vpW, 0, L.contentW);
+        hScroll->show();
+    } else {
+        hScroll->hide();
+    }
+
+    if (L.needV) {
+        vScroll->resize(L.vpX + L.vpW, L.vpY, scrollW, L.vpH);
+        vScroll->value(scrollY, L.vpH, 0, L.contentH);
+        vScroll->show();
+    } else {
+        vScroll->hide();
+    }
 }
 
 bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx) const
 {
     if (!timeline) return false;
+    Layout L = computeLayout();
+    if (mx < L.vpX || mx >= L.vpX + L.vpW || my < L.vpY || my >= L.vpY + L.vpH)
+        return false;
     const auto& tracks = timeline->get().tracks;
     int nc = numCols();
     int nr = numRows();
@@ -293,7 +364,6 @@ bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx) const
         for (int row = 0; row < nr; row++) {
             int bx, by, bw, bh;
             btnRect(col, row, bx, by, bw, bh);
-            if (by + bh > y() + gridAreaH()) continue;
             if (mx < bx || mx >= bx + bw) continue;
             if (my < by || my >= by + bh) continue;
             // Convert (col, row) → (trackIdx, laneIdx)
@@ -373,6 +443,7 @@ void LoopEditor::setContextPopup(TrackContextPopup* popup)
 void LoopEditor::onTimelineChanged()
 {
     positionToggleBtn();
+    updateScrollbars();
     redraw();
 }
 
@@ -391,7 +462,7 @@ void LoopEditor::draw()
     fl_color(0x0F172A00);  // dark navy
     fl_rectf(x(), y(), w(), gridAreaH());
 
-    fl_push_clip(x(), y(), w(), gridAreaH());
+    Layout L = computeLayout();
 
     if (timeline) {
         const auto& tl     = timeline->get();
@@ -401,10 +472,11 @@ void LoopEditor::draw()
         int lsw  = leftStripW();
         int tsh  = topStripH();
 
-        // ---- Column headers (top strip) ----
+        // ---- Column headers (top strip) — frozen vertically, scroll horizontally ----
         if (tsh > 0) {
+            fl_push_clip(L.vpX, y() + padY, L.vpW, tsh);
             fl_color(headerBg);
-            fl_rectf(x() + padX + lsw, y() + padY, w() - 2 * padX - lsw - toggleBtnW - 4, tsh);
+            fl_rectf(L.vpX, y() + padY, L.vpW, tsh);
 
             fl_font(FL_HELVETICA_BOLD, 11);
             fl_color(headerText);
@@ -431,12 +503,14 @@ void LoopEditor::draw()
                 if (label)
                     fl_draw(label, hx, hy, hw, hh, FL_ALIGN_CENTER | FL_ALIGN_CLIP);
             }
+            fl_pop_clip();
         }
 
-        // ---- Row labels (left strip) ----
+        // ---- Row labels (left strip) — frozen horizontally, scroll vertically ----
         if (lsw > 0) {
+            fl_push_clip(x() + padX, L.vpY, lsw, L.vpH);
             fl_color(headerBg);
-            fl_rectf(x() + padX, y() + padY + tsh, lsw - 2, gridAreaH() - 2 * padY - tsh);
+            fl_rectf(x() + padX, L.vpY, lsw - 2, L.vpH);
 
             fl_font(FL_HELVETICA_BOLD, 11);
             fl_color(headerText);
@@ -463,16 +537,17 @@ void LoopEditor::draw()
                 if (label)
                     fl_draw(label, lx, ly, lw, lh, FL_ALIGN_CENTER | FL_ALIGN_CLIP);
             }
+            fl_pop_clip();
         }
 
-        // ---- Grid cells ----
+        // ---- Grid cells — clipped to the scrollable viewport ----
+        fl_push_clip(L.vpX, L.vpY, L.vpW, L.vpH);
         fl_font(FL_HELVETICA_BOLD, 13);
 
         for (int col = 0; col < nc; col++) {
             for (int row = 0; row < nr; row++) {
                 int bx, by, bw, bh;
                 btnRect(col, row, bx, by, bw, bh);
-                if (by + bh > y() + gridAreaH()) continue;
 
                 int ti = tracksAsColumns ? col : row;
                 int li = tracksAsColumns ? row : col;
@@ -521,9 +596,9 @@ void LoopEditor::draw()
                 fl_line_style(0);
             }
         }
+        fl_pop_clip();
     }
 
-    fl_pop_clip();
     draw_children();
 }
 
@@ -622,4 +697,5 @@ void LoopEditor::resize(int x, int y, int w, int h)
     Fl_Group::resize(x, y, w, h);
     if (panel) panel->resize(x, y + h - panelH, w, panelH);
     positionToggleBtn();
+    updateScrollbars();
 }

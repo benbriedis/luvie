@@ -4,6 +4,23 @@ Add extra using:
 	ASan (AddressSanitizer): Flags out-of-bounds array usage and use-after-free errors instantly.
 	UBSan (UndefinedBehaviorSanitizer): Flags integer overflows, null pointer dereferences, and other illegal operations.
 
+Suggestions for Carla (install newest first)
+=====================
+1. Double click on rack or item in canvas to display custom UI if one exists.
+   Failing that, raise the Custom UI to the top of the context UI.
+
+2. Canvas - simplify somehow.
+   Possible algoorithm - reduce its size by creating a binding box around current items and 
+   adding 200px to each sides.
+
+3. Improve filters in plugins: too easy to check something and forget its been checked. 
+   Even remembers across sessions I think. Might be OK if were to drop filters when closing window.
+   Alt: list the current filters under the search box?
+
+Suggestions for RaySession (install newest first)
+==========================
+1. The true Close/stop button for the session is too small and hard to find.
+
 
 FUTURE FUNCTIONALITY
 ====================

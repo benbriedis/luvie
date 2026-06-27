@@ -9,6 +9,7 @@
 #include "trackContextPopup.hpp"
 #include "itransport.hpp"
 #include "inlineInput.hpp"
+#include "gridScrollPane.hpp"
 #include "modern/modernButton.hpp"
 
 // Dark control bar at the bottom of the Loop Editor
@@ -44,7 +45,9 @@ public:
     static constexpr int panelH = 50;
 
 private:
-    static constexpr int btnH         = 80;
+    static constexpr int cellW        = 150; // fixed pattern-block width
+    static constexpr int cellH        = 64;  // fixed pattern-block height (80% of former 80)
+    static constexpr int scrollW      = 14;  // scrollbar thickness
     static constexpr int btnGap       = 8;
     static constexpr int padX         = 12;
     static constexpr int padY         = 10;
@@ -62,12 +65,26 @@ private:
     ITransport*        transport    = nullptr;
     LoopPanel*         panel        = nullptr;
     ModernButton*      axisToggleBtn = nullptr;
+    GridScrollPane*    hScroll      = nullptr;
+    GridScrollPane*    vScroll      = nullptr;
 
     bool tracksAsColumns = true;  // true: tracks=cols, lanes=rows; false: tracks=rows, lanes=cols
     int  hoveredCol      = -1;
     int  hoveredRow      = -1;
+    int  scrollX         = 0;     // horizontal scroll offset in px
+    int  scrollY         = 0;     // vertical scroll offset in px
 
     static void timerCb(void* data);
+
+    // Computed geometry of the scrollable cell area.
+    struct Layout {
+        int  vpX, vpY, vpW, vpH;   // cell viewport (excludes header strips + scrollbars)
+        int  contentW, contentH;   // total size of all cells
+        bool needH, needV;         // whether each scrollbar is required
+        int  maxScrollX, maxScrollY;
+    };
+    Layout computeLayout() const;
+    void   updateScrollbars();
 
     int  gridAreaH()  const { return h() - panelH; }
     int  maxLanes()   const;
