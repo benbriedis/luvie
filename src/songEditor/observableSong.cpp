@@ -348,6 +348,46 @@ int ObservableSong::trackIdForLaneId(int laneId) const
     return -1;
 }
 
+int ObservableSong::instrumentIdForTrack(int trackId) const
+{
+    for (const auto& t : data.tracks)
+        if (t.id == trackId) return t.instrumentId;
+    return 0;
+}
+
+ObservableSong::TrackMenuFlags ObservableSong::trackMenuFlags(int trackId) const
+{
+    TrackMenuFlags flags;
+    for (const auto& t : data.tracks) {
+        if (t.id != trackId) continue;
+        flags.canRemoveLane  = !t.stackedLanes && !t.lanes.empty();
+        flags.canOpenPattern = !t.stackedLanes && !t.lanes.empty();
+        if (!t.lanes.empty()) {
+            int patId = t.lanes[0].patternId;
+            for (const auto& p : data.patterns)
+                if (p.id == patId) { flags.isDrumTrack = (p.type == PatternType::DRUM); break; }
+        }
+        break;
+    }
+    return flags;
+}
+
+int ObservableSong::paramLaneInsertIndex(int trackId) const
+{
+    // Insert after the last visible lane row belonging to this track.
+    for (const auto& t : data.tracks) {
+        if (t.id != trackId || t.lanes.empty()) continue;
+        for (int li = (int)t.lanes.size() - 1; li >= 0; li--) {
+            int laneId = t.lanes[li].id;
+            for (int i = (int)data.rowOrder.size() - 1; i >= 0; i--)
+                if (data.rowOrder[i].kind == RowKind::Lane && data.rowOrder[i].id == laneId)
+                    return i + 1;
+        }
+        break;
+    }
+    return -1;
+}
+
 void ObservableSong::moveRow(int from, int toGap)
 {
     auto& ro = data.rowOrder;

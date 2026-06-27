@@ -12,7 +12,7 @@ add_library(luvie_core STATIC
     modern/inlineEditDispatch.cpp patternEditors/noteLabels.cpp songEditor/trackContextPopup.cpp
     patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp
-    loopEditor.cpp
+    loopEditor.cpp loopContextPopup.cpp
     luvieApp.cpp nsm.cpp songEditor/timelineIO.cpp modern/overlayWindow.cpp
     outputs/outputsOverlay.cpp paramDotPopup.cpp patternEditors/patternParamGrid.cpp
     outputs/jackPort.cpp

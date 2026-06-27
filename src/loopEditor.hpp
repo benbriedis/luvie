@@ -6,7 +6,7 @@
 #include <vector>
 #include "observableSong.hpp"
 #include "activePatternSet.hpp"
-#include "trackContextPopup.hpp"
+#include "loopContextPopup.hpp"
 #include "itransport.hpp"
 #include "inlineInput.hpp"
 #include "gridScrollPane.hpp"
@@ -61,7 +61,7 @@ private:
     ObservableSong*    timeline     = nullptr;
     ObservablePattern* patternObs   = nullptr;
     ActivePatternSet*  aps          = nullptr;
-    TrackContextPopup* contextPopup = nullptr;
+    LoopContextPopup*  contextPopup = nullptr;
     ITransport*        transport    = nullptr;
     LoopPanel*         panel        = nullptr;
     ModernButton*      axisToggleBtn = nullptr;
@@ -113,7 +113,7 @@ public:
     void setPattern(ObservablePattern* p) { patternObs = p; }
     void setActivePatterns(ActivePatternSet* a);
     void setTransport(ITransport* t);
-    void setContextPopup(TrackContextPopup* popup);
+    void setContextPopup(LoopContextPopup* popup);
     bool isEnabled(int trackIdx, int laneIdx) const;
     void onTimelineChanged()       override;
     void onActivePatternsChanged() override;

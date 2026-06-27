@@ -57,6 +57,17 @@ public:
     int  trackIndexForId(int trackId) const;
     int  trackIndexForLaneId(int laneId) const;
     int  trackIdForLaneId(int laneId) const;
+    int  instrumentIdForTrack(int trackId) const;
+
+    // Which context-menu items apply to a given track (greyed-out state).
+    struct TrackMenuFlags {
+        bool canOpenPattern = false;
+        bool canRemoveLane  = false;
+        bool isDrumTrack    = false;
+    };
+    TrackMenuFlags trackMenuFlags(int trackId) const;
+    // rowOrder insertion index for a new param lane belonging to this track.
+    int  paramLaneInsertIndex(int trackId) const;
     void moveRow(int fromRowIdx, int toGapIdx);
     void moveTrack(int trackId, int insertBeforeTrackId);
     void rebuildInstrumentHeaders();

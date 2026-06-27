@@ -1,39 +1,36 @@
-#ifndef TRACK_CONTEXT_POPUP_HPP
-#define TRACK_CONTEXT_POPUP_HPP
+#ifndef LOOP_CONTEXT_POPUP_HPP
+#define LOOP_CONTEXT_POPUP_HPP
 
 #include "modern/contextMenuPopup.hpp"
 #include "observablePattern.hpp"
-#include "parameterSubmenu.hpp"
 #include <functional>
 
-class TrackContextPopup : public ContextMenuPopup {
+// Context menu shown when right-clicking a pattern block in the Loop Editor.
+// Kept deliberately thin: the buttons delegate to ObservableSong helpers so the
+// menu carries no significant logic of its own. It started as a copy of
+// TrackContextPopup and may diverge from it as the Loop Editor needs differ.
+class LoopContextPopup : public ContextMenuPopup {
 public:
-    static constexpr int popW  = 150;
+    static constexpr int popW = 150;
 
 private:
-
     ModernButton*       openPatternBtn;
-    ModernButton*       showInstrumentsBtn;
-    ModernButton*       addParamBtn;
     ModernButton*       addLaneBtn;
     ModernButton*       addPianorollLaneBtn;
     ModernButton*       removeLaneBtn;
+    ModernButton*       showInstrumentsBtn;
     ObservablePattern*  timeline      = nullptr;
     int                 targetTrackId = -1;
     int                 targetLaneId  = -1;
 
-    int  targetInstrumentId() const;
     void doOpenPattern();
     void doShowInstruments();
-    void doShowParamSubmenu();
     void doAddLane();
     void doAddPianorollLane();
     void doRemoveLane();
 
 public:
-    ParameterSubmenu*                    paramSubmenu = nullptr;
-
-    TrackContextPopup();
+    LoopContextPopup();
 
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
     std::function<void()>                           onShowInstruments;

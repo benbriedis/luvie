@@ -437,7 +437,7 @@ float LoopEditor::beatProgress(int trackIdx, int laneIdx) const
     return virtualBeat / pat->lengthBeats;
 }
 
-void LoopEditor::setContextPopup(TrackContextPopup* popup)
+void LoopEditor::setContextPopup(LoopContextPopup* popup)
 {
     contextPopup = popup;
 }

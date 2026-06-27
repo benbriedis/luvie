@@ -18,6 +18,7 @@
 #include "markerRuler.hpp"
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
+#include "loopContextPopup.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
 #include "pianorollEditor.hpp"
@@ -131,6 +132,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
+    auto* loopCtxPop = new LoopContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
@@ -282,7 +284,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     loopEd->setTimeline(song);
     loopEd->setPattern(pattern);
     loopEd->setTransport(transport);
-    loopEd->setContextPopup(ctxPop);
+    loopEd->setContextPopup(loopCtxPop);
+    loopCtxPop->onOpenPattern     = openPatternTab;
+    loopCtxPop->onShowInstruments = [this]() {
+        if (outputsOverlay) outputsOverlay->show();
+    };
 
     tabs->onModeChanged = [og2, transport, this](bool isLoop) {
         aps.clear();
@@ -344,6 +350,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
+    window->add(loopCtxPop); window->registerPopup(loopCtxPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);
     window->add(pdPop);  window->registerPopup(pdPop);
