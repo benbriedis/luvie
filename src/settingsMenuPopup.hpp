@@ -17,7 +17,7 @@ class SettingsMenuPopup : public ContextMenuPopup {
     }
 
 public:
-    static constexpr int popW = 150;
+    static constexpr int popW = 190;
 
     std::function<void()> onSaveAs;
     std::function<void()> onImport;
@@ -32,7 +32,7 @@ public:
         auto* importBtn   = addItem(1, "Import");
         auto* exportBtn   = addItem(2, "Export");
         auto* transportBtn= addItem(3, "Transport");
-        auto* outputsBtn  = addItem(4, "Outputs");
+        auto* outputsBtn  = addItem(4, "Instruments & Outputs");
 
         // Separate the file items (Save As/Import/Export) from the view items
         // (Transport/Outputs), as the old menu's divider did: nudge the view

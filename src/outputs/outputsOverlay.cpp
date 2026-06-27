@@ -154,7 +154,7 @@ public:
 // ── Constructor ───────────────────────────────────────────────────────────────
 
 OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
-    : OverlayWindow(x, y, w, h, "Outputs")
+    : OverlayWindow(x, y, w, h, "Instruments & Outputs")
 {
     begin();
 
