@@ -34,6 +34,7 @@
 #include "session/standaloneSession.hpp"
 #include "session/nsmSession.hpp"
 #include "session/dirtyTracker.hpp"
+#include "luvieVersion.hpp"
 #include <memory>
 
 int main(int argc, char **argv) {
@@ -60,11 +61,15 @@ int main(int argc, char **argv) {
                    "  --verbose        Print notes and parameter changes during playback\n"
                    "  --test           Use internal transport and debug MIDI output;\n"
                    "                   skip JACK (implies --verbose; no project file allowed)\n"
-                   "  -h, --help       Show this help message\n\n"
+                   "  -h, --help       Show this help message\n"
+                   "  --version        Show version information\n\n"
                    "Arguments:\n"
                    "  project-file     Path to a .luv project file to open on startup\n\n"
                    "Environment:\n"
                    "  NSM_URL          Connect to a Non Session Manager at this OSC address\n");
+            return 0;
+        } else if (arg == "--version") {
+            printf("luvie %s\n", LUVIE_VERSION);
             return 0;
         } else if (arg == "--verbose")
             verbose = true;

@@ -39,7 +39,24 @@ target_link_libraries(luvie_core PUBLIC
     PkgConfig::LO
 )
 
+# ---- Version header generated from git at build time ----
+# A custom target re-runs the script every build so the embedded version stays
+# current as commits/tags change; the script itself only rewrites the header
+# when the version string differs, so main.cpp isn't needlessly recompiled.
+set(LUVIE_VERSION_HEADER ${CMAKE_CURRENT_BINARY_DIR}/luvieVersion.hpp)
+add_custom_target(luvie_version ALL
+    BYPRODUCTS ${LUVIE_VERSION_HEADER}
+    COMMAND ${CMAKE_COMMAND}
+            -DSRC_DIR=${CMAKE_SOURCE_DIR}
+            -DOUT_FILE=${LUVIE_VERSION_HEADER}
+            -P ${CMAKE_SOURCE_DIR}/cmake/GitVersion.cmake
+    COMMENT "Generating luvieVersion.hpp from git"
+    VERBATIM
+)
+
 add_executable(luvie main.cpp)
+add_dependencies(luvie luvie_version)
+target_include_directories(luvie PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(luvie PRIVATE luvie_core)
 
 # Install the standalone app + desktop integration (was the src/Makefile
