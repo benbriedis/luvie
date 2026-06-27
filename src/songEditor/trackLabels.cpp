@@ -6,6 +6,7 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
+#include <algorithm>
 #include <set>
 #include <vector>
 
@@ -82,6 +83,48 @@ void TrackLabels::setRowOffset(int offset)
 {
     rowOffset = offset;
     redraw();
+}
+
+bool TrackLabels::trackIsDrum(int trackId) const
+{
+    if (!timeline || trackId < 0) return false;
+    return timeline->get().instrumentIsDrum(timeline->instrumentIdForTrack(trackId));
+}
+
+// Drum and non-drum instruments aren't interchangeable, so a track may only be
+// dropped where it stays adjacent to a track of its own kind. Reordering within
+// the drum group or within the non-drum group is allowed; crossing the boundary
+// (so the dragged track would land between two tracks of the other kind) is not.
+bool TrackLabels::trackDropAllowed() const
+{
+    if (!timeline || dragTrackId < 0) return true;
+    if (dropTrackId == dragTrackId) return true;  // dropping in place is a no-op
+
+    // Ordered list of unique track IDs in display order.
+    std::vector<int> order;
+    std::set<int> seen;
+    for (const auto& r : timeline->get().rowOrder) {
+        int tid = -1;
+        if (r.kind == RowKind::Header) tid = r.id;
+        else if (r.kind == RowKind::Lane) tid = timeline->trackIdForLaneId(r.id);
+        if (tid >= 0 && seen.insert(tid).second) order.push_back(tid);
+    }
+
+    // Remove the dragged track, then locate the insertion point.
+    order.erase(std::remove(order.begin(), order.end(), dragTrackId), order.end());
+    int pos = (int)order.size();
+    if (dropTrackId >= 0)
+        for (int i = 0; i < (int)order.size(); i++)
+            if (order[i] == dropTrackId) { pos = i; break; }
+
+    bool dragDrum = trackIsDrum(dragTrackId);
+    int prev = pos > 0                 ? order[pos - 1] : -1;
+    int next = pos < (int)order.size() ? order[pos]     : -1;
+    // Only forbid wedging the track between two tracks of the opposite kind (that
+    // interleaves the groups). Landing at an edge of the other group is fine.
+    bool prevOpposite = prev >= 0 && trackIsDrum(prev) != dragDrum;
+    bool nextOpposite = next >= 0 && trackIsDrum(next) != dragDrum;
+    return !(prevOpposite && nextOpposite);
 }
 
 void TrackLabels::startInstrumentEdit(int absRow)
@@ -370,8 +413,9 @@ void TrackLabels::draw()
         }
     }
 
-    // Drop indicator line (suppressed when track-dragging over itself)
-    if (dragging && dropRow >= 0 && !(isTrackDrag && dropTrackId == dragTrackId)) {
+    // Drop indicator line (suppressed when track-dragging over itself or when the
+    // drop is forbidden by drum/non-drum compatibility)
+    if (dragging && dropRow >= 0 && !dropForbidden && !(isTrackDrag && dropTrackId == dragTrackId)) {
         int lineY = y() + rowYInPanel(dropRow);
         lineY = std::clamp(lineY, y(), y() + h());
         fl_color(0x00BFFFFF);  // cyan
@@ -456,9 +500,10 @@ int TrackLabels::handle(int event)
                 dragging     = false;
                 dragRow      = -1;
                 dropRow      = -1;
-                isTrackDrag  = true;
-                dragTrackId  = ro[row].id;
-                dropTrackId  = -1;
+                isTrackDrag   = true;
+                dragTrackId   = ro[row].id;
+                dropTrackId   = -1;
+                dropForbidden = false;
                 return 1;
             }
 
@@ -533,6 +578,11 @@ int TrackLabels::handle(int event)
                         if (ro[i].kind == RowKind::Lane && dropLaneIds.count(ro[i].id)) { dropRow = i; break; }
                     }
                 }
+
+                // Forbid dropping between drum and non-drum instruments.
+                dropForbidden = !trackDropAllowed();
+                window()->cursor(dropForbidden ? forbiddenCursorImage()
+                                               : contextMenuCursorImage(), 0, 0);
             } else {
                 int cumY = 0;
                 int gap = rowOffset;
@@ -544,6 +594,19 @@ int TrackLabels::handle(int event)
                     gap = i + 1;
                 }
                 dropRow = std::clamp(gap, 0, (int)ro.size());
+
+                // Forbid transferring a lane to an instrument of the opposite kind
+                // (drum vs non-drum). Pure reordering within a track is fine.
+                dropForbidden = false;
+                if (dragRow >= 0 && dragRow < (int)ro.size() && ro[dragRow].kind == RowKind::Lane) {
+                    int srcTrack  = timeline->trackIdForLaneId(ro[dragRow].id);
+                    int destTrack = timeline->predictRowDropTrack(dragRow, dropRow);
+                    if (srcTrack >= 0 && destTrack >= 0 && destTrack != srcTrack &&
+                        trackIsDrum(srcTrack) != trackIsDrum(destTrack))
+                        dropForbidden = true;
+                }
+                window()->cursor(dropForbidden ? forbiddenCursorImage()
+                                               : contextMenuCursorImage(), 0, 0);
             }
             redraw();
         }
@@ -553,18 +616,20 @@ int TrackLabels::handle(int event)
     if (event == FL_RELEASE) {
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             if (dragging) {
-                if (timeline && dragRow >= 0 && dropRow >= 0) {
+                // A forbidden drop reverts: leave the row where it was.
+                if (timeline && dragRow >= 0 && dropRow >= 0 && !dropForbidden) {
                     if (isTrackDrag)
                         timeline->moveTrack(dragTrackId, dropTrackId);
                     else
                         timeline->moveRow(dragRow, dropRow);
                 }
-                dragging     = false;
-                dragRow      = -1;
-                dropRow      = -1;
-                isTrackDrag  = false;
-                dragTrackId  = -1;
-                dropTrackId  = -1;
+                dragging      = false;
+                dragRow       = -1;
+                dropRow       = -1;
+                isTrackDrag   = false;
+                dragTrackId   = -1;
+                dropTrackId   = -1;
+                dropForbidden = false;
             } else if (dragStartRow >= 0 && timeline) {
                 // Pure single click: select lane (skip instrument header rows)
                 const auto& ro = timeline->get().rowOrder;
@@ -574,10 +639,11 @@ int TrackLabels::handle(int event)
                     if (trackIdx >= 0) timeline->selectLane(trackIdx, laneId);
                 }
             }
-            dragStartRow = -1;
-            isTrackDrag  = false;
-            dragTrackId  = -1;
-            dropTrackId  = -1;
+            dragStartRow  = -1;
+            isTrackDrag   = false;
+            dragTrackId   = -1;
+            dropTrackId   = -1;
+            dropForbidden = false;
             return 1;
         }
     }

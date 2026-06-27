@@ -71,6 +71,10 @@ public:
     void moveRow(int fromRowIdx, int toGapIdx);
     void moveTrack(int trackId, int insertBeforeTrackId);
     void rebuildInstrumentHeaders();
+    // Predict which track a lane/param row at `from` would belong to if dropped at
+    // `toGap`, without mutating. Returns -1 if it cannot be determined. Mirrors the
+    // destination resolution inside moveRow so callers can validate a drop first.
+    int  predictRowDropTrack(int from, int toGap) const;
 
     // Pattern lifecycle helpers (not note editing)
     int nextTrackNumberForType(PatternType type) const;

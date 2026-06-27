@@ -488,6 +488,33 @@ void ObservableSong::moveRow(int from, int toGap)
     notify();
 }
 
+int ObservableSong::predictRowDropTrack(int from, int toGap) const
+{
+    const auto& ro = data.rowOrder;
+    int n = (int)ro.size();
+    if (from < 0 || from >= n || toGap < 0 || toGap > n) return -1;
+    RowRef ref = ro[from];
+    if (ref.kind != RowKind::Lane && ref.kind != RowKind::Param) return -1;
+
+    // Simulate moveRow's erase + insert.
+    std::vector<RowRef> tmp(ro.begin(), ro.end());
+    tmp.erase(tmp.begin() + from);
+    int insertAt = (toGap > from) ? toGap - 1 : toGap;
+    insertAt = std::clamp(insertAt, 0, (int)tmp.size());
+    tmp.insert(tmp.begin() + insertAt, ref);
+
+    // Same scan moveRow uses: backward to the nearest lane/header (header = boundary),
+    // then forward as a fallback.
+    int destTrackId = -1;
+    for (int i = insertAt - 1; i >= 0 && destTrackId < 0; i--) {
+        if (tmp[i].kind == RowKind::Lane) destTrackId = trackIdForLaneId(tmp[i].id);
+        else if (tmp[i].kind == RowKind::Header) { destTrackId = tmp[i].id; break; }
+    }
+    for (int i = insertAt + 1; i < (int)tmp.size() && destTrackId < 0; i++)
+        if (tmp[i].kind == RowKind::Lane) destTrackId = trackIdForLaneId(tmp[i].id);
+    return destTrackId;
+}
+
 void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
 {
     if (trackId == insertBeforeTrackId) return;

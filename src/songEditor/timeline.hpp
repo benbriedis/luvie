@@ -80,6 +80,12 @@ struct Timeline {
 		return {};
 	}
 
+	bool instrumentIsDrum(int id) const {
+		for (const auto& i : instruments)
+			if (i.id == id) return i.isDrum;
+		return false;
+	}
+
 	int patternIdForSelectedLane() const {
 		if (selectedTrackIndex < 0 || selectedTrackIndex >= (int)tracks.size()) return 0;
 		const auto& track = tracks[selectedTrackIndex];

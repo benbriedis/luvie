@@ -30,7 +30,11 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     bool isTrackDrag  = false;  // true when dragging an instrument header (whole track)
     int  dragTrackId  = -1;
     int  dropTrackId  = -1;     // track to insert before; -1 = append at end
+    bool dropForbidden = false; // current track-drag drop would mix drum/non-drum
     static constexpr int dragThreshold = 4;
+
+    bool trackIsDrum(int trackId) const;
+    bool trackDropAllowed() const;  // is the current dragTrackId→dropTrackId move compatible?
 
     void startInstrumentEdit(int absRow);
     void startPatternEdit(int absRow);

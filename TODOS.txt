@@ -351,8 +351,10 @@ ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled p
 LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
  
 Loop editor - 
-	Allow reordering.
+	Allow reordering of instruments and patterns of the same type.
 	Allow instrument names to be editted from here?
+Song Editor
+    Restrict orordering of patterns to those of the same type
 
 Stacked:
   Maybe colour tracks differently
