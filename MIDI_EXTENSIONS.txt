@@ -1,0 +1,42 @@
+
+MIDI 2.0 and other MIDI extensions
+==================================
+Currently Ardour doesn't appear to support Midi2 very well, although it is coming.
+LV2 can with extensions.
+Probably could/should leave to later. (+ seek advice)
+
+NOTE There are a bunch of other MIDI extensions - see Wikipedia. 
+     Hopefully we can largely ignore them and concentrate on MIDI 2.0.
+
+	Re drum mapping 
+	---------------
+	MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
+	- Doesn't look like DrumGizmo supports this yet
+
+	( Proprietary SysEx (System Exclusive) Messages: Many drum machines use SysEx messages to transmit their 
+	  entire internal patch state, including custom drum mappings, to a sequencer to be saved as a data dump )
+
+
+	Other parameters:
+	-----------------
+		0,0 Pitch bend range
+		1,0 Channel Fine tuning
+		2,0 Channel Coarse tuning
+	portamento, sostenuto, soft pedal (cc#65-67), sustain.
+	CC 	Default function
+	70 	Sound Variation
+	71 	Timbre/Harmonic Intensity (filter resonance)
+	72 	Release Time
+	73 	Attack Time
+	74 	Brightness (cutoff frequency)
+		
+	CC 	Default function
+	75 	Decay Time
+	76 	Vibrato Rate
+	77 	Vibrato Depth
+	78 	Vibrato Delay
+	79 	Metronome Rate 
+	ETC...
+
+
+

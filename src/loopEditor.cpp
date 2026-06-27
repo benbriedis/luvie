@@ -149,7 +149,6 @@ static constexpr Fl_Color btnActiveHover = 0x5B92FF00;
 static constexpr Fl_Color btnBorder      = 0xCBD5E100;
 static constexpr Fl_Color headerBg       = 0x1E293B00;
 static constexpr Fl_Color headerText     = 0xCBD5E100;
-static constexpr Fl_Color emptyCell      = 0x1E293B00;
 
 // ======================================================
 // LoopEditor
@@ -382,9 +381,11 @@ bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx) const
 void LoopEditor::positionToggleBtn()
 {
     if (!axisToggleBtn) return;
-    int tsh = topStripH();
-    int ty  = y() + padY + (tsh > 0 ? (tsh - toggleBtnH) / 2 : 0);
-    int tx  = x() + w() - padX - toggleBtnW;
+    // Sit in the control bar at the bottom, on the right-hand side,
+    // vertically centred to line up with the BPM/time-signature controls.
+    int panelTop = y() + h() - panelH;
+    int ty = panelTop + (panelH - toggleBtnH) / 2;
+    int tx = x() + w() - lpPad - toggleBtnW;
     axisToggleBtn->resize(tx, ty, toggleBtnW, toggleBtnH);
 }
 
@@ -552,16 +553,9 @@ void LoopEditor::draw()
                 int ti = tracksAsColumns ? col : row;
                 int li = tracksAsColumns ? row : col;
 
-                // Empty cell — track has no lane at this index
-                if (ti >= (int)tracks.size() || li >= (int)tracks[ti].lanes.size()) {
-                    fl_color(emptyCell);
-                    fl_rectf(bx, by, bw, bh);
-                    fl_color(btnBorder);
-                    fl_line_style(FL_DASH, 1);
-                    fl_rect(bx, by, bw, bh);
-                    fl_line_style(0);
+                // Empty cell — track has no lane at this index; draw nothing.
+                if (ti >= (int)tracks.size() || li >= (int)tracks[ti].lanes.size())
                     continue;
-                }
 
                 int patId    = tracks[ti].lanes[li].patternId;
                 bool isOn    = aps && aps->isPatternActive(patId);

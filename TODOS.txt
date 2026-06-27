@@ -53,47 +53,13 @@ FUTURE FUNCTIONALITY
 
 - Add a dark theme
 
+- More MIDI parameters and features - see MIDI_EXTENSIONS.txt
+
 LIMITATION
 ==========
 Currently only one Luvie instance per Ardour will work. 
    cf checking to see if any others exist.
    Otherwise options exist I think. Look a bit involved.
-
-MIDI 2.0 and other MIDI extensions
-==================================
-Currently Ardour doesn't appear to support Midi2 very well, although it is coming.
-LV2 can with extensions.
-Probably could/should leave to later. (+ seek advice)
-
-	Re drum mapping 
-	---------------
-	MIDI 2.0:  MIDI-CI (Capability Inquiry) Profiles  - to look at in time
-	- Doesn't look like DrumGizmo supports this yet
-
-	( Proprietary SysEx (System Exclusive) Messages: Many drum machines use SysEx messages to transmit their 
-	  entire internal patch state, including custom drum mappings, to a sequencer to be saved as a data dump )
-
-
-	Other parameters:
-	-----------------
-		0,0 Pitch bend range
-		1,0 Channel Fine tuning
-		2,0 Channel Coarse tuning
-	portamento, sostenuto, soft pedal (cc#65-67), sustain.
-	CC 	Default function
-	70 	Sound Variation
-	71 	Timbre/Harmonic Intensity (filter resonance)
-	72 	Release Time
-	73 	Attack Time
-	74 	Brightness (cutoff frequency)
-		
-	CC 	Default function
-	75 	Decay Time
-	76 	Vibrato Rate
-	77 	Vibrato Depth
-	78 	Vibrato Delay
-	79 	Metronome Rate 
-	ETC...
 
 
 
@@ -255,8 +221,6 @@ When 2 patterns share a channel and parameter maybe highlight in red and have a 
 
 MINOR FEATURE: maybe a clear all button (or context menu options) for mute and/or solo buttons? (song editor, pattern editor)
 
-
-TODO check MIDI parameters are saved and restored OK - both for the song editor and patterns
 
 cf looping and repositioning:  [NOTE there isn't necessary a problem here. Maybe ask AI.]
 	using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
