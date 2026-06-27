@@ -16,6 +16,7 @@ class ObservableInstrument;
 class AppWindow;
 class ModernTabs;
 class SettingsButton;
+class SettingsMenuPopup;
 class SongEditor;
 class PortRegistry;
 class PatternEditor;
@@ -88,7 +89,8 @@ public:
     NoteAuditioner auditioner;
 
     // Widgets — valid after build()
-    SettingsButton*    settingsMenu = nullptr;
+    SettingsButton*    settingsButton = nullptr;
+    SettingsMenuPopup* settingsMenu   = nullptr;
     ModernTabs*        tabs         = nullptr;
     Fl_Group*          patternTab   = nullptr;
     PatternEditor*     patternEd    = nullptr;

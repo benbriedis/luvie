@@ -310,26 +310,13 @@ Distro and Build:
 	- Windows: "CPack NSIS (or WiX) installer for the app; plugin .dll in a .lv2 bundle."
 
   
-RaySession: 
-	- Unit test again some API?
-		See https://github.com/jackaudio/new-session-manager
-	- Some odd behaviour restoring projects? Sometime the apps just disappear altogether.
-	- LOST ability to add notes
-	- context menus popping up in weird places
-	- losing connections (possibly a RaySession thing)
-	- looks like the startup menu might appear each time it is started and stopped?  
-	- Maybe add a Dirty asterisk to Luvie?
-	- When view in the application list Luvie lacks an icon. Is present on the desktop.
-	  PROBABLY really a RaySession error. Note too that Linux uses SVGs for icons I think.
-
-Standalone
-	- Maybe add a Dirty asterisk to Luvie?
-
 Create my own license...
 	Also are NSM or Jack licenses required?
 	JSON library. Others?
 
 =====================
+
+Loop Editor maybe show a mini version of the patterns, similar to Seq24
 
 Should we put the internal transport in a separate RT thread?
 
@@ -342,11 +329,8 @@ FEATURE: when the last time signature or tempo is off screen show it on the far 
 
 Song parameter pitch bend + pattern pitch bend - get a warbling effect. Probably should multiply the values together (with appropriate normalisation) and output once.
 
-TODO test isDirty in NSM now
+TODO test isDirty in RaySession now
 
-The Settings menu font would be better the same as for the context popups.
-   The menu nav when displayed can end up floating above other applications.
-   
 Add luvie --version
   Coordinate with git tags. Show git hash if no tag. 
   Dont want a branch name (but what if no commit?) May use last commit in the branch. 
@@ -381,7 +365,5 @@ Stacked:
      
 Unstacked:  
   Maybe remove vertical lines through the instrument headers? Or fade them there.
-
-FEATURE: right clicking anywhere in Loop Editor should show 'Add pattern'
 
 

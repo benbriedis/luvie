@@ -2,18 +2,16 @@
 #define SETTINGS_BUTTON_HPP
 
 #include <FL/Fl.H>
-#include <FL/Fl_Menu_Button.H>
-#include <FL/Fl_Menu_Item.H>
+#include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
-#include <FL/fl_utf8.h>
 #include <algorithm>
 #include <cmath>
-#include <cstring>
+#include <functional>
 
-// Square gear button that drops the Settings menu. Sits at the right end of the
-// tab bar, in line with the editor tabs. Subclasses Fl_Menu_Button so a click
-// pops up the attached menu and item shortcuts (e.g. Cmd+S) keep working.
-class SettingsButton : public Fl_Menu_Button {
+// Square gear button at the right end of the tab bar, in line with the editor
+// tabs. A left-click fires onClick; the owner pops up a context-menu-style
+// SettingsMenuPopup in response (see settingsMenuPopup.hpp).
+class SettingsButton : public Fl_Box {
     bool hovered = false;
 
     void drawGear() {
@@ -65,61 +63,22 @@ class SettingsButton : public Fl_Menu_Button {
         drawGear();
     }
 
-    // Pixel width FLTK will give the popped-up menu window. Mirrors the layout
-    // math in Fl_Menu.cxx (item label + toggle/checkbox column, plus the
-    // shortcut and modifier columns and the window border) so we can right-align
-    // the menu precisely against the window edge.
-    int menuPixelWidth() const {
-        const Fl_Menu_Item* m = menu();
-        if (!m) return 0;
-        fl_font(textfont(), textsize());
-        int W = 0, shortcutsW = 0, modifiersW = 0, hh = 0;
-        for (const Fl_Menu_Item* it = m; it && it->text; it = it->next()) {
-            int w1 = it->measure(&hh, this);
-            if (w1 > W) W = w1;
-            if (it->shortcut_) {
-                const char* k;
-                const char* s = fl_shortcut_label(it->shortcut_, &k);
-                if (fl_utf_nb_char((const unsigned char*)k, (int)strlen(k)) <= 4) {
-                    int a = (int)fl_width(s, (int)(k - s));
-                    if (a > modifiersW) modifiersW = a;
-                    int b = (int)fl_width(k) + 4;
-                    if (b > shortcutsW) shortcutsW = b;
-                } else {
-                    int a = (int)fl_width(s) + 4;
-                    if (a > modifiersW + shortcutsW) modifiersW = a - shortcutsW;
-                }
-            }
-        }
-        return W + shortcutsW + modifiersW + 2 * Fl::box_dx(FL_UP_BOX) + 7;
-    }
-
-    // Drop the menu from directly below the gear, right-aligned so it stays
-    // inside the app window instead of popping up at the cursor (which would
-    // spill past the window's right edge at this top-right position).
-    void openMenu() {
-        const Fl_Menu_Item* m = menu();
-        if (!m) return;
-        int mx = std::max(0, x() + w() - menuPixelWidth());
-        const Fl_Menu_Item* sel = m->popup(mx, y() + h(), nullptr, nullptr, this);
-        picked(sel);
-    }
-
     int handle(int event) override {
         if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
-        // Fl_Menu_Button only auto-pops on right-click when it has no box, so
-        // drop the menu on a left-click ourselves. Ignore other buttons.
         if (event == FL_PUSH) {
-            if (Fl::event_button() == FL_LEFT_MOUSE) openMenu();
+            if (Fl::event_button() == FL_LEFT_MOUSE && onClick) onClick();
             return 1;
         }
-        return Fl_Menu_Button::handle(event);
+        return Fl_Box::handle(event);
     }
 
 public:
+    // Fired on left-click; the owner opens the settings menu in response.
+    std::function<void()> onClick;
+
     SettingsButton(int x, int y, int w, int h)
-        : Fl_Menu_Button(x, y, w, h, nullptr) {
+        : Fl_Box(x, y, w, h) {
         box(FL_NO_BOX);
         color(FL_WHITE);
     }

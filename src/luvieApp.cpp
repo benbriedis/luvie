@@ -13,6 +13,7 @@
 #include "patternInstanceContextPopup.hpp"
 #include "modernTabs.hpp"
 #include "settingsButton.hpp"
+#include "settingsMenuPopup.hpp"
 #include "transport.hpp"
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
@@ -136,6 +137,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
+    auto* settingsPop = new SettingsMenuPopup;
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -152,15 +154,22 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Settings gear (right end of the tab bar) ----
     // Square, tab-bar height; drops a menu carrying the former File/View items.
     constexpr int gearSize = tabBarH;
-    settingsMenu = new SettingsButton(winW - gearSize, off, gearSize, gearSize);
-    settingsMenu->textsize(13);
-    settingsMenu->add("Save As",   0,                saveAsCb,    this, 0);
-    settingsMenu->add("Import",    0,                importCb,    this, 0);
-    settingsMenu->add("Export",    0,                exportCb,    this, FL_MENU_DIVIDER);
-    settingsMenu->add("Transport", 0,                transportCb, this, 0);
-    settingsMenu->add("Outputs",   0,                outputsCb,   this, 0);
-    window->add(settingsMenu);
-    tabs->setRightWidget(settingsMenu, gearSize);
+    settingsButton = new SettingsButton(winW - gearSize, off, gearSize, gearSize);
+    settingsButton->onClick = [this, settingsPop] {
+        // Drop the menu from below the gear, right-aligned so it stays inside
+        // the window rather than spilling past its right edge.
+        int mx = settingsButton->x() + settingsButton->w() - SettingsMenuPopup::popW;
+        settingsPop->open(std::max(0, mx), settingsButton->y() + settingsButton->h());
+    };
+    window->add(settingsButton);
+    tabs->setRightWidget(settingsButton, gearSize);
+
+    settingsMenu = settingsPop;
+    settingsPop->onSaveAs    = [this] { saveAsCb   (nullptr, this); };
+    settingsPop->onImport    = [this] { importCb   (nullptr, this); };
+    settingsPop->onExport    = [this] { exportCb   (nullptr, this); };
+    settingsPop->onTransport = [this] { transportCb(nullptr, this); };
+    settingsPop->onOutputs   = [this] { outputsCb  (nullptr, this); };
 
     // ---- Song Editor tab ----
     auto* tab1 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Song Editor");
@@ -356,6 +365,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(pdPop);  window->registerPopup(pdPop);
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
+    window->add(settingsPop); window->registerPopup(settingsPop);
     // Hover popup: a positioned sub-window, but NOT registered — registering
     // would route mouse-moves through AppWindow's click-away logic and break the
     // indicator's enter/leave tracking.
@@ -439,10 +449,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
 void LuvieApp::disableSaveMenu(bool saveAs) {
     if (!settingsMenu) return;
-    auto* item = const_cast<Fl_Menu_Item*>(settingsMenu->find_item("Save As"));
-    if (!item) return;
-    if (saveAs) item->deactivate(); else item->activate();
-    settingsMenu->redraw();
+    settingsMenu->setSaveAsEnabled(!saveAs);
 }
 
 void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
