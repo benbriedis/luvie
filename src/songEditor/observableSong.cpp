@@ -80,6 +80,7 @@ void ObservableSong::loadTimeline(const Timeline& tl)
     }
     rebuildInstrumentHeaders();
     reconcileLoopOrder();  // backfill loopOrder for old saves; prune stale IDs
+    reconcileLoopLanes();  // backfill per-track loopLanes for old saves
     notify();
 }
 
@@ -149,6 +150,140 @@ void ObservableSong::moveLoopInstrument(int trackId, int insertBeforeTrackId)
         : std::find(order.begin(), order.end(), insertBeforeTrackId);
     order.insert(dst, trackId);
     notify();
+}
+
+void ObservableSong::reconcileLoopLanes()
+{
+    for (auto& t : data.tracks) {
+        std::set<int> laneIds;
+        for (const auto& l : t.lanes) laneIds.insert(l.id);
+
+        // Drop IDs that no longer reference a lane in this track.
+        t.loopLanes.erase(
+            std::remove_if(t.loopLanes.begin(), t.loopLanes.end(),
+                [&laneIds](int id) { return !laneIds.count(id); }),
+            t.loopLanes.end());
+
+        // Append any lane missing from loopLanes, in current lane order.
+        std::set<int> present(t.loopLanes.begin(), t.loopLanes.end());
+        for (const auto& l : t.lanes)
+            if (!present.count(l.id)) t.loopLanes.push_back(l.id);
+    }
+}
+
+bool ObservableSong::canMoveLaneToTrack(int laneId, int destTrackId) const
+{
+    // Resolve the lane's source track and pattern drum-ness.
+    int patId = -1, srcTrackId = -1, srcLaneCount = 0;
+    for (const auto& t : data.tracks)
+        for (const auto& l : t.lanes)
+            if (l.id == laneId) {
+                patId = l.patternId; srcTrackId = t.id; srcLaneCount = (int)t.lanes.size();
+            }
+    if (patId < 0) return false;
+
+    // An instrument must keep at least one pattern: refuse moving the last lane
+    // out of its track (same-track reorders are unaffected).
+    if (destTrackId != srcTrackId && srcLaneCount <= 1) return false;
+
+    bool patIsDrum = false;
+    for (const auto& p : data.patterns)
+        if (p.id == patId) { patIsDrum = (p.type == PatternType::DRUM); break; }
+
+    int destInstr = 0;
+    for (const auto& t : data.tracks)
+        if (t.id == destTrackId) { destInstr = t.instrumentId; break; }
+    return patIsDrum == data.instrumentIsDrum(destInstr);
+}
+
+bool ObservableSong::moveLoopPattern(int laneId, int destTrackId, int beforeLaneId)
+{
+    // Locate the source track owning this lane.
+    Track* srcTrack = nullptr;
+    for (auto& t : data.tracks)
+        for (const auto& l : t.lanes)
+            if (l.id == laneId) { srcTrack = &t; break; }
+    if (!srcTrack) return false;
+
+    Track* destTrack = nullptr;
+    for (auto& t : data.tracks)
+        if (t.id == destTrackId) { destTrack = &t; break; }
+    if (!destTrack) return false;
+
+    if (!canMoveLaneToTrack(laneId, destTrackId)) return false;
+
+    // ---- Same instrument: reorder this track's loop-lane order only. ----
+    if (srcTrack->id == destTrackId) {
+        reconcileLoopLanes();
+        auto& order = srcTrack->loopLanes;
+        auto src = std::find(order.begin(), order.end(), laneId);
+        if (src == order.end()) return false;
+        if (beforeLaneId == laneId) return false;  // dropping onto itself
+        order.erase(src);
+        auto dst = (beforeLaneId < 0)
+            ? order.end()
+            : std::find(order.begin(), order.end(), beforeLaneId);
+        order.insert(dst, laneId);
+        notify();
+        return true;
+    }
+
+    // ---- Different instrument: reparent the lane. ----
+    // canMoveLaneToTrack already guarantees the source keeps at least one lane.
+    auto it = std::find_if(srcTrack->lanes.begin(), srcTrack->lanes.end(),
+        [laneId](const Lane& l) { return l.id == laneId; });
+    if (it == srcTrack->lanes.end()) return false;
+    Lane lane = std::move(*it);
+    srcTrack->lanes.erase(it);
+
+    // Re-route the lane's pattern to the destination instrument.
+    int destInstr = destTrack->instrumentId;
+    for (auto& p : data.patterns)
+        if (p.id == lane.patternId) { p.instrumentId = destInstr; break; }
+
+    // rowOrder: remove the moved lane, then reinsert after the dest track's last
+    // lane row so it shows up last under that instrument in the song editor.
+    data.rowOrder.erase(
+        std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+            [laneId](const RowRef& r) { return r.kind == RowKind::Lane && r.id == laneId; }),
+        data.rowOrder.end());
+
+    std::set<int> destLaneIds;
+    for (const auto& l : destTrack->lanes) destLaneIds.insert(l.id);
+    int insertAt = (int)data.rowOrder.size();
+    for (int i = (int)data.rowOrder.size() - 1; i >= 0; i--)
+        if (data.rowOrder[i].kind == RowKind::Lane && destLaneIds.count(data.rowOrder[i].id))
+            { insertAt = i + 1; break; }
+    if (destTrack->lanes.empty()) {
+        // Dest track had no lanes — anchor right after its header row.
+        for (int i = 0; i < (int)data.rowOrder.size(); i++)
+            if (data.rowOrder[i].kind == RowKind::Header && data.rowOrder[i].id == destTrackId)
+                { insertAt = i + 1; break; }
+    }
+    data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{RowKind::Lane, lane.id});
+
+    destTrack->lanes.push_back(std::move(lane));
+
+    // Loop order: drop from source, insert at the drop position in dest.
+    srcTrack->loopLanes.erase(
+        std::remove(srcTrack->loopLanes.begin(), srcTrack->loopLanes.end(), laneId),
+        srcTrack->loopLanes.end());
+    {
+        auto& order = destTrack->loopLanes;
+        auto dst = (beforeLaneId < 0)
+            ? order.end()
+            : std::find(order.begin(), order.end(), beforeLaneId);
+        order.insert(dst, laneId);
+    }
+
+    // Keep selection valid: if the moved lane was selected, follow it.
+    if (data.selectedLaneId == laneId)
+        data.selectedTrackIndex = trackIndexForId(destTrackId);
+
+    rebuildInstrumentHeaders();
+    reconcileLoopLanes();
+    notify();
+    return true;
 }
 
 void ObservableSong::sortBpms()
@@ -357,6 +492,7 @@ int ObservableSong::addTrack(int instrumentId, int patternId, int atIndex)
         data.rowOrder.push_back(ref);
     rebuildInstrumentHeaders();
     reconcileLoopOrder();
+    reconcileLoopLanes();
     notify();
     return id;
 }
@@ -482,6 +618,21 @@ void ObservableSong::moveRow(int from, int toGap)
                     if (dst.id == destTrackId) { dst.lanes.push_back(std::move(lane)); break; }
                 break;
             }
+
+            // Re-route the moved lane's pattern to the destination instrument
+            // (parity with the loop editor's cross-instrument move). Only when the
+            // lane actually landed in the dest track — the stacked-lane guard above
+            // can refuse the move.
+            int destInstr = 0, patId = -1;
+            for (const auto& t : data.tracks)
+                if (t.id == destTrackId) {
+                    destInstr = t.instrumentId;
+                    for (const auto& l : t.lanes)
+                        if (l.id == ref.id) { patId = l.patternId; break; }
+                    break;
+                }
+            for (auto& p : data.patterns)
+                if (p.id == patId) { p.instrumentId = destInstr; break; }
         }
 
         // Sync the affected track's lanes[] order to match the new rowOrder sequence.
@@ -521,6 +672,7 @@ void ObservableSong::moveRow(int from, int toGap)
     }
 
     rebuildInstrumentHeaders();
+    reconcileLoopLanes();  // follow lane reparenting in the loop-editor order
     notify();
 }
 
@@ -719,6 +871,7 @@ int ObservableSong::addLane(int trackId)
             data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{RowKind::Lane, laneId});
         }
         rebuildInstrumentHeaders();
+        reconcileLoopLanes();
         notify();
         return laneId;
     }
@@ -770,6 +923,7 @@ int ObservableSong::addPianorollLane(int trackId)
             data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{RowKind::Lane, laneId});
         }
         rebuildInstrumentHeaders();
+        reconcileLoopLanes();
         notify();
         return laneId;
     }
@@ -867,6 +1021,7 @@ void ObservableSong::removeLane(int trackId, int laneId)
             }
         }
         rebuildInstrumentHeaders();
+        reconcileLoopLanes();
         notify();
         return;
     }

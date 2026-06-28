@@ -83,6 +83,19 @@ private:
     int  dragStartY    = 0;
     int  dropGap       = -1;
 
+    // Drag-to-reorder of a pattern cell (a lane). dragLaneId>=0 marks a pending
+    // cell press; patternDragging flips once the move passes the threshold (a
+    // plain press+release with no drag toggles the pattern instead of moving it).
+    bool patternDragging = false;
+    int  dragLaneId      = -1;
+    int  dragSrcTrackIdx = -1;
+    int  dragSrcLaneIdx  = -1;
+    int  dragCellStartX  = 0;
+    int  dragCellStartY  = 0;
+    int  dropTrackIdx    = -1;   // tracks-vector index of the drop instrument
+    int  dropSlot        = -1;   // insertion slot along the lane axis
+    bool dropForbidden   = false;
+
     static void timerCb(void* data);
 
     // Computed geometry of the scrollable cell area.
@@ -108,10 +121,17 @@ private:
 
     // Map an instrument-axis slot to the real index into tracks via loopOrder.
     int   trackForAxis(int axisIdx) const;
+    // Map a pattern-axis slot to the real index into tracks[trackVecIdx].lanes
+    // via that track's loopLanes order. Returns -1 if the slot is empty.
+    int   laneForSlot(int trackVecIdx, int slot) const;
     // Hit-test the instrument-name strip; returns the axis slot under the cursor.
     bool  instrLabelAt(int mx, int my, int& axisIdx) const;
     // Insertion slot (0..numTracks) for the current drag position.
     int   computeDropGap(int mx, int my) const;
+    // Toggle a pattern cell's active state (deferred from press to release).
+    void  togglePattern(int trackIdx, int laneIdx);
+    // Resolve the drop instrument + lane slot for the current pattern drag.
+    void  computePatternDrop(int mx, int my);
 
     void draw()   override;
     int  handle(int event) override;

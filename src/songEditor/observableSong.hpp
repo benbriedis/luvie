@@ -73,6 +73,12 @@ public:
     // Loop editor instrument ordering (independent of the song editor's rowOrder).
     // loopOrder holds track IDs; insertBeforeTrackId < 0 appends at the end.
     void moveLoopInstrument(int trackId, int insertBeforeTrackId);
+    // Loop editor pattern (lane) ordering, independent of rowOrder per track.
+    // True when laneId's pattern drum-ness matches destTrackId's instrument.
+    bool canMoveLaneToTrack(int laneId, int destTrackId) const;
+    // Reorder within an instrument (destTrackId == lane's track) or move to another;
+    // beforeLaneId < 0 appends. Returns false if the move is forbidden/not possible.
+    bool moveLoopPattern(int laneId, int destTrackId, int beforeLaneId);
     void rebuildInstrumentHeaders();
     // Predict which track a lane/param row at `from` would belong to if dropped at
     // `toGap`, without mutating. Returns -1 if it cannot be determined. Mirrors the
@@ -136,6 +142,8 @@ private:
     void notify();
     // Drop stale track IDs from loopOrder and append any missing tracks.
     void reconcileLoopOrder();
+    // Per track: drop stale lane IDs from loopLanes and append any missing lanes.
+    void reconcileLoopLanes();
     void sortBpms();
     void sortTimeSigs();
     void removeParamLanesForInstrument(int instrumentId);

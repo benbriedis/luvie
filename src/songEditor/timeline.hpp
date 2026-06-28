@@ -49,6 +49,7 @@ struct Track {
 	bool mute            = false;
 	bool stackedLanes    = false;
 	std::vector<Lane> lanes;
+	std::vector<int>  loopLanes;  // lane IDs in loop-editor order (independent of lanes[])
 };
 
 // Discriminates the three kinds of visible row in the song grid.

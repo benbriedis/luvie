@@ -290,6 +290,19 @@ int LoopEditor::trackForAxis(int axisIdx) const
     return timeline->trackIndexForId(lo[axisIdx]);
 }
 
+int LoopEditor::laneForSlot(int trackVecIdx, int slot) const
+{
+    if (!timeline) return -1;
+    const auto& tracks = timeline->get().tracks;
+    if (trackVecIdx < 0 || trackVecIdx >= (int)tracks.size()) return -1;
+    const auto& t = tracks[trackVecIdx];
+    if (slot < 0 || slot >= (int)t.loopLanes.size()) return -1;
+    int laneId = t.loopLanes[slot];
+    for (int i = 0; i < (int)t.lanes.size(); i++)
+        if (t.lanes[i].id == laneId) return i;
+    return -1;
+}
+
 void LoopEditor::btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const
 {
     int gx = x() + padX + leftStripW();
@@ -365,7 +378,6 @@ bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx, int& col, i
     Layout L = computeLayout();
     if (mx < L.vpX || mx >= L.vpX + L.vpW || my < L.vpY || my >= L.vpY + L.vpH)
         return false;
-    const auto& tracks = timeline->get().tracks;
     int nc = numCols();
     int nr = numRows();
     for (int c = 0; c < nc; c++) {
@@ -376,9 +388,8 @@ bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx, int& col, i
             if (my < by || my >= by + bh) continue;
             // Convert (col, row) → real (trackIdx, laneIdx)
             int ti = trackForAxis(tracksAsColumns ? c : r);
-            int li = tracksAsColumns ? r : c;
-            if (ti < 0) return false;
-            if (li >= (int)tracks[ti].lanes.size()) return false;
+            int li = laneForSlot(ti, tracksAsColumns ? r : c);
+            if (ti < 0 || li < 0) return false;
             trackIdx = ti;
             laneIdx  = li;
             col      = c;
@@ -427,6 +438,68 @@ int LoopEditor::computeDropGap(int mx, int my) const
         int gap    = (int)std::lround((double)(my - gy + scrollY) / stride);
         return std::clamp(gap, 0, numTracks);
     }
+}
+
+void LoopEditor::computePatternDrop(int mx, int my)
+{
+    dropTrackIdx  = -1;
+    dropSlot      = -1;
+    dropForbidden = true;
+    if (!timeline) return;
+
+    int gx = x() + padX + leftStripW();
+    int gy = y() + padY + topStripH();
+    int numInstr = (int)timeline->get().loopOrder.size();
+
+    // Track axis = columns (mode A) / rows (mode B); lane axis is the other one.
+    int axisTrack, slot;
+    if (tracksAsColumns) {
+        axisTrack = (int)std::floor((double)(mx - gx + scrollX) / (cellW + btnGap));
+        slot      = (int)std::lround((double)(my - gy + scrollY) / (cellH + btnGap));
+    } else {
+        axisTrack = (int)std::floor((double)(my - gy + scrollY) / (cellH + btnGap));
+        slot      = (int)std::lround((double)(mx - gx + scrollX) / (cellW + btnGap));
+    }
+    axisTrack = std::clamp(axisTrack, 0, std::max(0, numInstr - 1));
+
+    int ti = trackForAxis(axisTrack);
+    if (ti < 0) return;
+    const auto& dt = timeline->get().tracks[ti];
+    dropTrackIdx  = ti;
+    dropSlot      = std::clamp(slot, 0, (int)dt.loopLanes.size());
+    dropForbidden = !timeline->canMoveLaneToTrack(dragLaneId, dt.id);
+}
+
+void LoopEditor::togglePattern(int trackIdx, int laneIdx)
+{
+    if (!timeline || !aps) return;
+    const auto& tracks = timeline->get().tracks;
+    if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return;
+    if (laneIdx < 0 || laneIdx >= (int)tracks[trackIdx].lanes.size()) return;
+
+    int   patId = tracks[trackIdx].lanes[laneIdx].patternId;
+    float bar   = transport ? transport->position() : 0.0f;
+    if (aps->isPatternActive(patId)) {
+        aps->deactivate(patId);
+    } else {
+        float anchorBar = bar;
+        if (transport && transport->isPlaying()) {
+            const Pattern* pat = nullptr;
+            for (const auto& p : timeline->get().patterns)
+                if (p.id == patId) { pat = &p; break; }
+            if (pat && pat->lengthBeats > 0.0f) {
+                int top, bottom;
+                timeline->timeSigAt((int)std::max(0.0f, bar), top, bottom);
+                float beatsToNext = (std::floor(bar) + 1.0f - bar) * (float)top;
+                float virtualBeat = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
+                if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
+                anchorBar = bar - virtualBeat / (float)top;
+            }
+        }
+        aps->activate(patId, anchorBar);
+    }
+    redraw();
+    if (onToggleChanged) onToggleChanged();
 }
 
 void LoopEditor::positionToggleBtn()
@@ -601,11 +674,12 @@ void LoopEditor::draw()
                 int bx, by, bw, bh;
                 btnRect(col, row, bx, by, bw, bh);
 
-                int ti = trackForAxis(tracksAsColumns ? col : row);
-                int li = tracksAsColumns ? row : col;
+                int ti   = trackForAxis(tracksAsColumns ? col : row);
+                int slot = tracksAsColumns ? row : col;
+                int li   = laneForSlot(ti, slot);
 
-                // Empty cell — track has no lane at this index; draw nothing.
-                if (ti < 0 || li >= (int)tracks[ti].lanes.size())
+                // Empty cell — track has no lane at this slot; draw nothing.
+                if (ti < 0 || li < 0)
                     continue;
 
                 int patId    = tracks[ti].lanes[li].patternId;
@@ -660,6 +734,34 @@ void LoopEditor::draw()
             }
             fl_line_style(0);
         }
+
+        // ---- Drop indicator while moving a pattern (lane) ----
+        if (patternDragging && !dropForbidden && dropTrackIdx >= 0) {
+            // Axis position of the destination instrument.
+            int destAxis = -1;
+            for (int a = 0; a < (int)tl.loopOrder.size(); a++)
+                if (trackForAxis(a) == dropTrackIdx) { destAxis = a; break; }
+            if (destAxis >= 0) {
+                fl_push_clip(L.vpX, L.vpY, L.vpW, L.vpH);
+                fl_color(0xFBBF2400);  // amber
+                fl_line_style(FL_SOLID, 2);
+                if (tracksAsColumns) {
+                    int bx, by, bw, bh;
+                    btnRect(destAxis, 0, bx, by, bw, bh);
+                    int gy = y() + padY + topStripH();
+                    int lineY = gy + dropSlot * (cellH + btnGap) - scrollY - btnGap / 2;
+                    fl_line(bx, lineY, bx + bw, lineY);
+                } else {
+                    int bx, by, bw, bh;
+                    btnRect(0, destAxis, bx, by, bw, bh);
+                    int gx = x() + padX + leftStripW();
+                    int lineX = gx + dropSlot * (cellW + btnGap) - scrollX - btnGap / 2;
+                    fl_line(lineX, by, lineX, by + bh);
+                }
+                fl_line_style(0);
+                fl_pop_clip();
+            }
+        }
     }
 
     draw_children();
@@ -676,7 +778,8 @@ int LoopEditor::handle(int event)
     // While an instrument-reorder drag is in progress, own all drag/release
     // events ourselves rather than letting a child (e.g. a scrollbar passed
     // under the cursor) swallow the commit.
-    bool ownDrag = dragAxisFrom >= 0 && (event == FL_DRAG || event == FL_RELEASE);
+    bool ownDrag = (dragAxisFrom >= 0 || dragLaneId >= 0)
+                && (event == FL_DRAG || event == FL_RELEASE);
 
     // Let child widgets (scrollbars, Flip button) handle events first. This
     // also drives their enter/leave + hover state for FL_MOVE. But
@@ -741,34 +844,19 @@ int LoopEditor::handle(int event)
         take_focus();
 
         if (Fl::event_button() == FL_LEFT_MOUSE) {
-            if (timeline && aps) {
-                const auto& tracks = timeline->get().tracks;
-                if (trackIdx < (int)tracks.size() && laneIdx < (int)tracks[trackIdx].lanes.size()) {
-                    int   patId = tracks[trackIdx].lanes[laneIdx].patternId;
-                    float bar   = transport ? transport->position() : 0.0f;
-                    if (aps->isPatternActive(patId)) {
-                        aps->deactivate(patId);
-                    } else {
-                        float anchorBar = bar;
-                        if (transport && transport->isPlaying()) {
-                            const Pattern* pat = nullptr;
-                            for (const auto& p : timeline->get().patterns)
-                                if (p.id == patId) { pat = &p; break; }
-                            if (pat && pat->lengthBeats > 0.0f) {
-                                int top, bottom;
-                                timeline->timeSigAt((int)std::max(0.0f, bar), top, bottom);
-                                float beatsToNext = (std::floor(bar) + 1.0f - bar) * (float)top;
-                                float virtualBeat = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
-                                if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
-                                anchorBar = bar - virtualBeat / (float)top;
-                            }
-                        }
-                        aps->activate(patId, anchorBar);
-                    }
-                }
+            // Record a drag candidate. The toggle is deferred to FL_RELEASE so a
+            // drag doesn't also toggle; a plain click (no drag) toggles there.
+            if (timeline && trackIdx < (int)timeline->get().tracks.size()) {
+                dragLaneId      = timeline->get().tracks[trackIdx].lanes[laneIdx].id;
+                dragSrcTrackIdx = trackIdx;
+                dragSrcLaneIdx  = laneIdx;
+                dragCellStartX  = mx;
+                dragCellStartY  = my;
+                patternDragging = false;
+                dropTrackIdx    = -1;
+                dropSlot        = -1;
+                dropForbidden   = false;
             }
-            redraw();
-            if (onToggleChanged) onToggleChanged();
             return 1;
         }
         if (Fl::event_button() == FL_RIGHT_MOUSE && contextPopup && patternObs) {
@@ -784,31 +872,69 @@ int LoopEditor::handle(int event)
         return 0;
     }
     case FL_DRAG: {
-        if (dragAxisFrom < 0) return 0;
-        if (!draggingInstr) {
-            int d = tracksAsColumns ? std::abs(mx - dragStartX)
-                                    : std::abs(my - dragStartY);
-            if (d > dragThreshold) draggingInstr = true;
+        if (dragAxisFrom >= 0) {  // instrument-label drag
+            if (!draggingInstr) {
+                int d = tracksAsColumns ? std::abs(mx - dragStartX)
+                                        : std::abs(my - dragStartY);
+                if (d > dragThreshold) draggingInstr = true;
+            }
+            if (draggingInstr) {
+                dropGap = computeDropGap(mx, my);
+                if (window()) window()->cursor(FL_CURSOR_MOVE);
+                redraw();
+            }
+            return 1;
         }
-        if (draggingInstr) {
-            dropGap = computeDropGap(mx, my);
-            if (window()) window()->cursor(FL_CURSOR_MOVE);
-            redraw();
+        if (dragLaneId >= 0) {  // pattern-cell drag
+            if (!patternDragging) {
+                if (std::abs(mx - dragCellStartX) > dragThreshold ||
+                    std::abs(my - dragCellStartY) > dragThreshold)
+                    patternDragging = true;
+            }
+            if (patternDragging) {
+                computePatternDrop(mx, my);
+                if (window()) {
+                    if (dropForbidden) window()->cursor(forbiddenCursorImage(), 0, 0);
+                    else               window()->cursor(FL_CURSOR_MOVE);
+                }
+                redraw();
+            }
+            return 1;
         }
-        return 1;
+        return 0;
     }
     case FL_RELEASE: {
-        if (dragAxisFrom < 0) return 0;
-        if (draggingInstr && timeline && dropGap >= 0) {
-            const auto& lo = timeline->get().loopOrder;
-            int insertBefore = (dropGap < (int)lo.size()) ? lo[dropGap] : -1;
-            timeline->moveLoopInstrument(dragTrackId, insertBefore);
+        if (dragAxisFrom >= 0) {  // instrument-label drag
+            if (draggingInstr && timeline && dropGap >= 0) {
+                const auto& lo = timeline->get().loopOrder;
+                int insertBefore = (dropGap < (int)lo.size()) ? lo[dropGap] : -1;
+                timeline->moveLoopInstrument(dragTrackId, insertBefore);
+            }
+            dragAxisFrom  = -1;
+            draggingInstr = false;
+            dropGap       = -1;
+            redraw();
+            return 1;
         }
-        dragAxisFrom  = -1;
-        draggingInstr = false;
-        dropGap       = -1;
-        redraw();
-        return 1;
+        if (dragLaneId >= 0) {  // pattern-cell drag
+            if (!patternDragging) {
+                togglePattern(dragSrcTrackIdx, dragSrcLaneIdx);  // plain click
+            } else if (timeline && !dropForbidden && dropTrackIdx >= 0) {
+                const auto& tracks = timeline->get().tracks;
+                int destTrackId  = tracks[dropTrackIdx].id;
+                const auto& dl   = tracks[dropTrackIdx].loopLanes;
+                int beforeLaneId = (dropSlot < (int)dl.size()) ? dl[dropSlot] : -1;
+                timeline->moveLoopPattern(dragLaneId, destTrackId, beforeLaneId);
+            }
+            dragLaneId      = -1;
+            patternDragging = false;
+            dropTrackIdx    = -1;
+            dropSlot        = -1;
+            dropForbidden   = false;
+            redraw();
+            return 1;
+        }
+        return 0;
     }
     default:
         return 0;

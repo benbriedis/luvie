@@ -130,6 +130,8 @@ static json trackToJson(const Track& t) {
     json jinsts = json::array();
     if (!t.lanes.empty())
         for (const auto& inst : t.lanes[0].patterns) jinsts.push_back(instanceToJson(inst));
+    json jloopLanes = json::array();
+    for (int id : t.loopLanes) jloopLanes.push_back(id);
     return {
         {"id",           t.id},
         {"instrumentId", t.instrumentId},
@@ -139,6 +141,7 @@ static json trackToJson(const Track& t) {
         {"stackedLanes", t.stackedLanes},
         {"patterns",     jinsts},
         {"lanes",        jlanes},
+        {"loopLanes",    jloopLanes},
     };
 }
 
@@ -167,6 +170,8 @@ static Track trackFromJson(const json& j) {
             lane.patterns.push_back(instanceFromJson(jinst));
         t.lanes.push_back(std::move(lane));
     }
+    for (const auto& jl : j.value("loopLanes", json::array()))
+        t.loopLanes.push_back(jl.get<int>());
     return t;
 }
 
