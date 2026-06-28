@@ -55,13 +55,14 @@ public:
         // is nothing to remove, hide the row and shrink the popup so it doesn't
         // leave an empty-looking gap at the bottom.
         if (removeBtn) {
-            if (pendingOnRemove) {
+            // Update the inherited popH member too: ContextMenuPopup::resize()
+            // snaps the window back to popH, so size() alone won't take effect.
+            popH = (pendingOnRemove ? 2 : 1) * btnH + 2;
+            if (pendingOnRemove)
                 removeBtn->show();
-                size(popW, 2 * btnH + 2);
-            } else {
+            else
                 removeBtn->hide();
-                size(popW, 1 * btnH + 2);
-            }
+            size(popW, popH);
         }
         openAt(wx, wy);
     }
