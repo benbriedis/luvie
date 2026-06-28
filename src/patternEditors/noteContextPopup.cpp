@@ -44,7 +44,12 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(0, 0)
 	flex->margin(10,10,10,10);
 	flex->end();
 
-	resize(0,0,flex->w()+2,flex->h()+2);
+	// Size to the content. popW/popH are the fixed size the resize() override
+	// enforces, so set them here (this popup is constructed at 0x0 and sized
+	// afterwards, unlike the other context menus that pass real dimensions).
+	popW = flex->w() + 2;
+	popH = flex->h() + 2;
+	resize(0, 0, popW, popH);
 	end();
 
 	deleteItem->callback([](Fl_Widget*, void* me) {

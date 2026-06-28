@@ -246,8 +246,6 @@ MINOR BUG: when editting label text can get a danky FLTK popup appear when right
 Conversion routine to clone a regular pattern to pianoroll? 
 	The opposite way would be harder, but something could be attempted in time maybe.
 
-BUG: Size of popups sometimes goes wrong: too wide.
-
 Coding: 
 	Move to modern?  widgetCursorHandle() 
 	Chop up some long files?
@@ -283,9 +281,6 @@ MINOR BUG: clicking on Instrument selector highlights it as if it were a text fi
 -------------------------------------------
 
 
-
-* Q: Is it ever really worth it to mix ALSA and Jack connections?
-     Would seem that going "native" if Jack is used would be best regarded as exceptional.
 
 cf master volume rubberband control? Or any other global parameters?
 
@@ -351,8 +346,8 @@ ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled p
 LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
  
 Loop editor - 
-	Allow reordering of instruments and patterns of the same type.
 	Allow instrument names to be editted from here?
+
 Song Editor
     Restrict orordering of patterns to those of the same type
 

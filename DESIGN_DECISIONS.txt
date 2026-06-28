@@ -61,3 +61,11 @@ BACKUPS AND VERSIONING
 	  + Maybe a copy at least 3 days old
   - Then need to be able to swap to using the old version and saving the current version.
 
+ALSA and Jack connections?
+==========================
+Is it ever really worth mixing ALSA and Jack connections? Maybe, maybe not...
+  Nonetheless from a S/W design perspective it would seem to be cleanest and least
+  presumptive to allow them to be mixed, 
+I have added a default connection type and I specify at this startup (again, not presumptive)
+  and I'm pretty happy with this solution.
+
