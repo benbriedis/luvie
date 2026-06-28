@@ -27,6 +27,7 @@ protected:
     static constexpr int      btnH     = 30;
     static constexpr Fl_Color hoverCol = 0xDDEEFF00;
     int popW;
+    int popH;
 
     ModernButton* addItem(int idx, const char* label) {
         auto* btn = new ModernButton(1, 1 + idx * btnH, popW - 2, btnH, label);
@@ -39,6 +40,16 @@ protected:
     }
 
     void openAt(int wx, int wy) {
+        // Keep the menu fully on-screen: if it would spill past the bottom or
+        // right edge of the main window, shift it back so it displays in full
+        // (e.g. a context menu for a low track must rise above the cursor).
+        if (auto* aw = dynamic_cast<AppWindow*>(window())) {
+            const int pad = 4;
+            if (wx + w() > aw->w() - pad) wx = aw->w() - w() - pad;
+            if (wy + h() > aw->h() - pad) wy = aw->h() - h() - pad;
+            if (wx < pad) wx = pad;
+            if (wy < pad) wy = pad;
+        }
         position(wx, wy);
         if (auto* aw = dynamic_cast<AppWindow*>(window()))
             aw->openPopup(this);
@@ -54,10 +65,18 @@ protected:
 
 public:
     ContextMenuPopup(int width, int height)
-        : BasePopup(0, 0, width, height), popW(width)
+        : BasePopup(0, 0, width, height), popW(width), popH(height)
     {
         color(popupBg);
         box(FL_BORDER_BOX);
+    }
+
+    // A context menu's size is determined entirely by its contents. As a
+    // sub-window of AppWindow it would otherwise be rescaled by the parent's
+    // Fl_Group::resize() whenever the main window is resized, so ignore any
+    // incoming width/height and keep our fixed size; only honour repositioning.
+    void resize(int x, int y, int, int) override {
+        Fl_Window::resize(x, y, popW, popH);
     }
 };
 
