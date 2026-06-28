@@ -69,3 +69,20 @@ Is it ever really worth mixing ALSA and Jack connections? Maybe, maybe not...
 I have added a default connection type and I specify at this startup (again, not presumptive)
   and I'm pretty happy with this solution.
 
+
+Alternate plugin architectures
+===============================
+1. Just use the Ardour plugin (LV2 or Clap) primarily or entirely for saving the session.
+   Have Jack do the heavy lifting and communicate back using Jack.
+   Has the advantage of being more like the standalone application - which would be more independent
+       and possibly less work to maintain.
+   Would it sit in a separate process?
+   Would ports look the same?
+   A negative: requires Jack if we are to use as a plugin. One of the advantages of using a plugin 
+               is that it reduces external requirements like jack.
+	- Could try to extend LV2 to support transport commands.
+   
+2. Clap apparently supports transport commands, so may be able to remove Jack dependencies when used within a plugin.
+   DONT THINK Ardour supports Clap at the moment.
+   
+

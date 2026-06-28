@@ -1006,7 +1006,10 @@ int LoopEditor::handle(int event)
             }
             if (draggingInstr) {
                 dropGap = computeDropGap(mx, my);
-                if (window()) window()->cursor(FL_CURSOR_MOVE);
+                // Two-headed cursor along the reorder axis: left/right when
+                // instruments are columns (a row), up/down when they are rows.
+                if (window())
+                    window()->cursor(tracksAsColumns ? FL_CURSOR_WE : FL_CURSOR_NS);
                 redraw();
             }
             return 1;

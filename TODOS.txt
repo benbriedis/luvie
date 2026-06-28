@@ -1,8 +1,4 @@
 
-Add extra using:
-	Valgrind: Comprehensive but slow.
-	ASan (AddressSanitizer): Flags out-of-bounds array usage and use-after-free errors instantly.
-	UBSan (UndefinedBehaviorSanitizer): Flags integer overflows, null pointer dereferences, and other illegal operations.
 
 Suggestions for Carla (install newest first)
 =====================
@@ -21,6 +17,10 @@ Suggestions for RaySession (install newest first)
 ==========================
 1. The true Close/stop button for the session is too small and hard to find.
 
+Suggestions for LV2
+===================
+1. Add support transport commands.
+   That way removes advantages Clap might have wrt integration with Ardour.
 
 FUTURE FUNCTIONALITY
 ====================
@@ -77,6 +77,15 @@ Nice if we had an install script that installed everything locally (FLTK, JSON, 
 - Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
 
 
+Monitor preformance
+-------------------
+- How much CPU?
+- Can it sleep if not using Jack?
+- Memory growth?
+- Valgrind: Comprehensive but slow.
+  ASan (AddressSanitizer): Flags out-of-bounds array usage and use-after-free errors instantly.
+  UBSan (UndefinedBehaviorSanitizer): Flags integer overflows, null pointer dereferences, and other illegal operations.
+
 
 8/3/26
 ------
@@ -86,42 +95,13 @@ Do we get warning if deleting the plugin and notes have been added?
   In standalone probably want a warning too.
 
 
-- The O(n²) searches in ObservableTimeline — with 10-20 tracks they're negligible, and the structure
-isn't complex enough to warrant indexing yet.
-- Floating-point bar comparisons — no evidence of actual bugs from this.
-- The Point/Point2 naming — they serve genuinely different purposes.
-
-
 cf being able to select a group of notes? cf picking the tool from the context menu?
-
-Luvie (GUI) in window titlebar is odd... maybe Carla is adding it?
 
 BUG? When changing chord the position of the notes change...
 
 
-
 Shrinking pattern editor horizontally - could reorangise things a bit before resorting to cropping in smaller windows.
 
-Maybe put horizontal scrollbar lower?
-   Lighter theme scrollbar?
-
-
-======================
-
-Alternate plugin architectures:
-
-1. Use the Ardour plugin (LV2 or Clap) primarily/entirely for saving the session.
-   Communicate back using Jack.
-   Would it sit in a separate process?
-   Would ports look the same?
-   Negative: requires Jack.
-   
-2. Clap apparantly supports transport commands. 
-   May be able to remove Jack dependencies when used within a plugin.
-   DONT THINK Ardour supports.
-   
-3. Extend LV2 to support transport commands.
-   That way removes advantages Clap might have.
 
 ------------------------------TODOs---------------------------
 
@@ -146,15 +126,10 @@ Alternate plugin architectures:
 
 
 
-ISSUE: In RaySession our transport does not seem to update (OK in Ardour)
-
 cf Show recent projects - Probably need program settings to remember between runs...
    Ditto if I want to remember the last Save As / Export / Import directory.
 
-TODO review the format of the JSON file
-     cf a Zod-like description?
-	 ** May help write migrators later **
-     cf a version number?
+TODO review the format of the JSON file cf a Zod-like description? cf a version number?
 
 Allow the window close to be clicked even if a popup of menu is showing.
 
@@ -177,18 +152,9 @@ In the pattern editor reconsider the transport info
 
 Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
 
-Maybe split the pause/pause button
-
 Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
    Also allow editting (maybe not saving)
    
-In time add a BPM=crotchet, BMP=dotted crotchet, BPM=quaver option I guess.   
-FROM GOOGLE:
-	Handling Beats Per Minute (BPM) in 8/8 time is generally treated as an 8th note pulse, where each 8th note gets one beat, rather than a quarter note. Because 8/8 is often used for irregular, additive rhythms (like 3+3+2 or 3+2+3), the tempo is usually set to the 8th note (
-	) to maintain a steady pulse throughout changing groupings.
-
-	DAW/Click Setting: In a Digital Audio Workstation (DAW), you would set the tempo based on the 8th note (in DAW terms) to get an accurate, consistent pulse   
-  
 In Pattern Editor clicking away from the numerator of bar fields doesn't lose the focus and update the data.
   Also clicking #Bars and dragging the mouse left or right changes the number of bars. Dont think I want.
 
@@ -230,10 +196,6 @@ cf looping and repositioning:  [NOTE there isn't necessary a problem here. Maybe
 
 
 
-Standard pattern editor control row may be too wide? Wrap? Use < >  ?? 
-   Or just require the user to grow the page?
-   Or more an item or two down to the transport?
-
 SMALL BUG: There is still a messy cursor transition in the pattern editors when hovering over the 
            transport ruler and dropping down into the label column - cursor doesn't reliably change.
            
@@ -270,19 +232,12 @@ Create a shortcut mechanism and menu...  (cf dividing by editor type)
 
 //////////////////////////////////////
 
-BUG: noticed once - showing the Luvie plugin UI from the Carla icon - the GUI didn't
-     restore properly. Wrong cursor, couldn't do anything.
-
-ISSUE: too easy to accidently add a marker to a ruler
-
 MINOR BUG: clicking on Instrument selector highlights it as if it were a text field
 
 
 -------------------------------------------
 
 
-
-cf master volume rubberband control? Or any other global parameters?
 
 
 Pipewire:
@@ -291,9 +246,6 @@ Pipewire:
  - To launch under Pipewire... try:    pw-jack luvie
  - Polling for Jack may not be necessary on Linux in time as Pipewire should always be there.
    The same may not be true for Windows and mac.
-
-Error window when starting (invalid project file) is old fashioned.
-
 
 Distro and Build:
 	- Probably build .deb, .rpm, maybe .aur for Linux. 
@@ -312,29 +264,43 @@ Create my own license...
 
 =====================
 
-Add Start & End markers in Song Editor and a looping function
+MINOR
+-----
+Luvie (GUI) in window titlebar is odd... maybe Carla is adding it?
 
-Loop Editor maybe show a mini version of the patterns, similar to Seq24
+LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
+
+Lighter theme for scrollbars?
+
+Loop Editor: maybe show a mini version of the patterns, similar to Seq24
+
+Too easy to accidently add a marker to a ruler
 
 Should we put the internal transport in a separate RT thread?
 
-Wider initial app (so we can fit in pattern editor controls at start)
-
 Loop editor: BPM should be a spinner.  Change so dragging up and down spins, not left and right + reduce the sensitivity
+
+----------------------
+
+
+Standard pattern editor control row may be too wide? Wrap? 
+	Wider initial app (so we can fit in pattern editor controls at start)
+	Or just require the user to grow the page?  
+	    NB should show a > to indicate missing items in this case.
+		In this case why not have < > buttons?
+	Or more an item or two down to the transport?
+
 
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
 Song parameter pitch bend + pattern pitch bend - get a warbling effect. Probably should multiply the values together (with appropriate normalisation) and output once.
 
-TODO test isDirty in RaySession now
+RaySession:
+	- Our transport does not seem to update (OK in Ardour)
+    - Test isDirty in RaySession now
 
  
-Add more chords and scales?
-	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
-
-Maybe indicate which patterns are pianorolls (NB name could indicate)
-
 Solo & Mute options
 1. Leave as is
 2. Just place on top track
@@ -343,7 +309,6 @@ Solo & Mute options
 
 ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
 
-LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
  
 Stacked:
   Maybe colour tracks differently
@@ -353,3 +318,22 @@ Unstacked:
   Maybe remove vertical lines through the instrument headers? Or fade them there.
 
 
+
+
+In time add a BPM=crotchet, BMP=dotted crotchet, BPM=quaver option I guess.   
+FROM GOOGLE:
+	Handling Beats Per Minute (BPM) in 8/8 time is generally treated as an 8th note pulse, where each 8th note gets one beat, rather than a quarter note. Because 8/8 is often used for irregular, additive rhythms (like 3+3+2 or 3+2+3), the tempo is usually set to the 8th note (
+	) to maintain a steady pulse throughout changing groupings.
+
+	DAW/Click Setting: In a Digital Audio Workstation (DAW), you would set the tempo based on the 8th note (in DAW terms) to get an accurate, consistent pulse   
+  
+cf master volume rubberband control? Or any other global parameters?
+
+Add more chords and scales?
+	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
+
+Add Start & End markers in Song Editor and a looping function (toggle next to play)
+
+Maybe indicate which patterns are pianorolls (NB name could indicate)
+
+Q: do the pattern editors have a 'minimum gap' at them bottom of the note grid? If so we should remove it.
