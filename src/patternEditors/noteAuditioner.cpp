@@ -4,26 +4,37 @@
 #include <FL/Fl.H>
 #include <algorithm>
 
+void NoteAuditioner::sendOff(const Pending* p)
+{
+    if (midiSink) { midiSink(p->channel, p->pitch, 0, false); return; }
+    if (portReg)
+        if (Port* port = portReg->find(p->portName)) port->noteOff(p->channel, p->pitch);
+}
+
 NoteAuditioner::~NoteAuditioner()
 {
     for (Pending* p : pending) {
         Fl::remove_timeout(offCb, p);
-        if (portReg)
-            if (Port* port = portReg->find(p->portName)) port->noteOff(p->channel, p->pitch);
+        sendOff(p);
         delete p;
     }
 }
 
 void NoteAuditioner::play(int instrumentId, int midi, int velocity, float seconds)
 {
-    if (!portReg || !instrRoute || midi < 0 || midi > 127) return;
+    if (!instrRoute || midi < 0 || midi > 127) return;
     MidiInstrRoute r = instrRoute(instrumentId);
-    if (r.portName.empty()) return;
-    Port* port = portReg->find(r.portName);
-    if (!port) return;
-
     velocity = std::clamp(velocity, 1, 127);
-    port->noteOn(r.channel0, midi, velocity);
+
+    if (midiSink) {
+        // Plugin mode: the host emits the note (no local PortRegistry).
+        midiSink(r.channel0, midi, velocity, true);
+    } else {
+        if (!portReg || r.portName.empty()) return;
+        Port* port = portReg->find(r.portName);
+        if (!port) return;
+        port->noteOn(r.channel0, midi, velocity);
+    }
 
     auto* p = new Pending{this, r.portName, r.channel0, midi};
     pending.push_back(p);
@@ -34,8 +45,7 @@ void NoteAuditioner::offCb(void* data)
 {
     auto* p    = static_cast<Pending*>(data);
     auto* self = p->self;
-    if (self->portReg)
-        if (Port* port = self->portReg->find(p->portName)) port->noteOff(p->channel, p->pitch);
+    self->sendOff(p);
     auto& v = self->pending;
     v.erase(std::remove(v.begin(), v.end(), p), v.end());
     delete p;

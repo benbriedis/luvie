@@ -34,6 +34,7 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "timelineIO.hpp"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
+#define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
 
 /* File used to pass state between DSP restore and UI open, and between UI sessions */
 static std::string g_stateFilePath;
@@ -86,6 +87,7 @@ struct LuvieUI {
     LV2_URID_Map*           map         = nullptr;
     LV2_URID                atom_eventTransfer  = 0;
     LV2_URID                luvie_state_urid    = 0;
+    LV2_URID                luvie_midi_urid     = 0;
     LV2_URID                atom_Object         = 0;
     LV2_URID                atom_Blank          = 0;
     LV2_URID                time_Position       = 0;
@@ -244,6 +246,26 @@ static void sendState(LuvieUI* ui)
     }
 }
 
+/* Send one raw MIDI message (1-3 bytes) to the DSP as a `luvie_midi` atom on
+   control_in; the DSP re-emits it on midi_out this cycle. Used to audition a note
+   when a row label is clicked — the plugin equivalent of the standalone's direct
+   port write (there is no local PortRegistry when hosted). */
+static void sendAuditionMidi(LuvieUI* ui, const uint8_t* bytes, int len)
+{
+    if (!ui->writeFunc || !ui->luvie_midi_urid || !ui->atom_eventTransfer) return;
+    if (len < 1 || len > 3) return;
+
+    uint8_t buf[sizeof(LV2_Atom) + 3];
+    auto* atom = reinterpret_cast<LV2_Atom*>(buf);
+    atom->size = static_cast<uint32_t>(len);
+    atom->type = ui->luvie_midi_urid;
+    std::memcpy(buf + sizeof(LV2_Atom), bytes, len);
+
+    ui->writeFunc(ui->controller, PORT_CONTROL_IN,
+                  static_cast<uint32_t>(sizeof(LV2_Atom) + len),
+                  ui->atom_eventTransfer, buf);
+}
+
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
 {
     if (!ui->song || !ui->app.patternPanel || size == 0) return;
@@ -347,6 +369,7 @@ static LV2UI_Handle instantiate(
         auto m = [&](const char* uri) { return ui->map->map(ui->map->handle, uri); };
         ui->atom_eventTransfer  = m(LV2_ATOM__eventTransfer);
         ui->luvie_state_urid    = m(LUVIE_STATE_URI);
+        ui->luvie_midi_urid     = m(LUVIE_MIDI_URI);
         ui->atom_Object         = m(LV2_ATOM__Object);
         ui->atom_Blank          = m(LV2_ATOM__Blank);
         ui->time_Position       = m(LV2_TIME__Position);
@@ -379,6 +402,17 @@ static LV2UI_Handle instantiate(
     ui->app.disableTransportButtons = true;
     ui->app.pluginMode              = true;
 
+    /* Row-label auditioning: there is no local PortRegistry when hosted, so resolve
+       the clicked instrument to its MIDI channel (the overlay exists after build();
+       the lambda reads it lazily at click time) and forward the note to the DSP,
+       which emits it on midi_out. */
+    ui->app.instrRoute = [ui](int instrumentId) -> MidiInstrRoute {
+        if (auto* ov = ui->app.outputsOverlay)
+            for (const auto& ci : ov->getInstruments())
+                if (ci.id == instrumentId) return { ci.portName, ci.midiChannel - 1 };
+        return {};
+    };
+
     ui->app.onExtraTimelineChange = [ui]() {
         if (!ui->restoringState) sendState(ui);
     };
@@ -399,6 +433,16 @@ static LV2UI_Handle instantiate(
     ui->restoringState = true;
     ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->hostTransport);
     ui->app.disableSaveMenu(/*saveAs=*/true);
+
+    /* Emit auditioned notes (and their note-offs) to the DSP as raw MIDI. */
+    ui->app.auditioner.setMidiSink([ui](int ch, int midi, int vel, bool on) {
+        uint8_t m[3] = {
+            static_cast<uint8_t>((on ? 0x90 : 0x80) | (ch & 0x0F)),
+            static_cast<uint8_t>(midi & 0x7F),
+            static_cast<uint8_t>(on ? (vel & 0x7F) : 0),
+        };
+        sendAuditionMidi(ui, m, 3);
+    });
 
     /* ---- JACK transport control (Issue #2) ----
        The transport buttons start disabled (disableTransportButtons above). When a

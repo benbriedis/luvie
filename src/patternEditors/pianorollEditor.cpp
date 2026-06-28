@@ -8,6 +8,9 @@
 // PianorollLabels
 // ---------------------------------------------------------------------------
 
+static constexpr Fl_Color piFlashCol     = 0x3B82F600;   // briefly lit on click
+static constexpr double   piFlashSeconds = 0.15;
+
 static const char* piSharpNames[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 
 static std::string midiNoteName(int midiNote)
@@ -22,6 +25,23 @@ PianorollLabels::PianorollLabels(int x, int y, int w, int numRows, int rowHeight
     : Fl_Widget(x, y, w, numRows * rowHeight),
       numRows(numRows), rowHeight(rowHeight)
 {}
+
+PianorollLabels::~PianorollLabels() { Fl::remove_timeout(clearFlashCb, this); }
+
+void PianorollLabels::flash(int midi)
+{
+    flashMidi = midi;
+    Fl::remove_timeout(clearFlashCb, this);
+    Fl::add_timeout(piFlashSeconds, clearFlashCb, this);
+    redraw();
+}
+
+void PianorollLabels::clearFlashCb(void* self)
+{
+    auto* pl = static_cast<PianorollLabels*>(self);
+    pl->flashMidi = -1;
+    pl->redraw();
+}
 
 void PianorollLabels::draw()
 {
@@ -38,6 +58,10 @@ void PianorollLabels::draw()
         int midiNote = rowOffset + numRows - 1 - r;
         if (midiNote < 0 || midiNote > 127) continue;
         int ry = y() + r * rowHeight;
+        if (midiNote == flashMidi) {
+            fl_color(piFlashCol);
+            fl_rectf(x(), ry, w() - 1, rowHeight);
+        }
         fl_color(FL_WHITE);
         std::string label = midiNoteName(midiNote);
         fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
@@ -51,11 +75,14 @@ int PianorollLabels::handle(int event)
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();
-        } else if (Fl::event_button() == FL_LEFT_MOUSE && onRowClicked) {
+        } else if (Fl::event_button() == FL_LEFT_MOUSE) {
             int r = (Fl::event_y() - y()) / rowHeight;
             if (r >= 0 && r < numRows) {
                 int midiNote = rowOffset + numRows - 1 - r;
-                if (midiNote >= 0 && midiNote <= 127) onRowClicked(midiNote);
+                if (midiNote >= 0 && midiNote <= 127) {
+                    flash(midiNote);
+                    if (onRowClicked) onRowClicked(midiNote);
+                }
             }
         }
         return 1;

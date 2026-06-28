@@ -22,10 +22,13 @@ class NoteLabels : public Fl_Widget {
     int              groupSize          = 3;    // chordSize + disabledDegrees.size()
     int              chordSize          = 3;
     std::set<int>    occupiedDisabledVPos;      // virtual positions with actual disabled notes
+    int              flashVPos          = -1;   // virtual position briefly lit after a click
 
     int         computeTotalTones() const;
     std::string noteForRow(int virtualPos) const;
     int         midiForRow(int r) const;
+    void        flash(int virtualPos);
+    static void clearFlashCb(void* self);
     void        draw() override;
     int         handle(int event) override;
 
@@ -34,6 +37,7 @@ public:
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 
     NoteLabels(int x, int y, int w, int numRows, int rowHeight);
+    ~NoteLabels();
 
     void setParams(int rootPitch, int chordType, bool useSharp);
     void setRowOffset(int offset);

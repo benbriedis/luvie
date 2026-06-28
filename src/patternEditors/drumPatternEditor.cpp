@@ -10,6 +10,7 @@ static constexpr Fl_Color colSoloOn  = 0x22C55E00;
 static constexpr Fl_Color colMuteOn  = 0xEF444400;
 static constexpr Fl_Color colTextOn  = FL_WHITE;
 static constexpr Fl_Color colTextOff = 0x64748B00;
+static constexpr Fl_Color colFlash   = 0x3B82F600;   // briefly lit on click
 
 // ---------------------------------------------------------------------------
 // DrumNoteLabels
@@ -19,6 +20,23 @@ DrumNoteLabels::DrumNoteLabels(int x, int y, int w, int numRows, int rowHeight)
     : Fl_Widget(x, y, w, numRows * rowHeight),
       numRows(numRows), rowHeight(rowHeight)
 {}
+
+DrumNoteLabels::~DrumNoteLabels() { Fl::remove_timeout(clearFlashCb, this); }
+
+void DrumNoteLabels::flash(int midi)
+{
+    flashMidi = midi;
+    Fl::remove_timeout(clearFlashCb, this);
+    Fl::add_timeout(0.15, clearFlashCb, this);
+    redraw();
+}
+
+void DrumNoteLabels::clearFlashCb(void* self)
+{
+    auto* dl = static_cast<DrumNoteLabels*>(self);
+    dl->flashMidi = -1;
+    dl->redraw();
+}
 
 void DrumNoteLabels::draw()
 {
@@ -38,6 +56,10 @@ void DrumNoteLabels::draw()
         int midiNote = rowOffset + numRows - 1 - r;
         if (midiNote < 0 || midiNote > 127) continue;
         int ry = y() + r * rowHeight;
+        if (midiNote == flashMidi) {
+            fl_color(colFlash);
+            fl_rectf(x(), ry, w() - 1, rowHeight);
+        }
         fl_color(FL_WHITE);
         std::string label;
         auto it = drumMap.find(midiNote);
@@ -65,9 +87,14 @@ int DrumNoteLabels::handle(int event)
         if (r >= 0 && r < numRows) {
             int midiNote = rowOffset + numRows - 1 - r;
             if (midiNote >= 0 && midiNote <= 127) {
-                if (onRowClicked) onRowClicked(midiNote);
-                if (Fl::event_clicks() >= 1 && onRowDoubleClicked)
+                // Second click of a double-click opens the rename editor only —
+                // don't re-audition or flash behind the inline input.
+                if (Fl::event_clicks() >= 1 && onRowDoubleClicked) {
                     onRowDoubleClicked(midiNote, y() + r * rowHeight, rowHeight);
+                } else {
+                    flash(midiNote);
+                    if (onRowClicked) onRowClicked(midiNote);
+                }
             }
         }
         return 1;

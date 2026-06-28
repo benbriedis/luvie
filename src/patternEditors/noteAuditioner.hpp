@@ -19,15 +19,22 @@ public:
     void setPortRegistry(PortRegistry* r)                  { portReg = r; }
     void setInstrRoute(std::function<MidiInstrRoute(int)> r) { instrRoute = std::move(r); }
 
+    // Alternative sink used when there is no local PortRegistry (LV2 plugin mode):
+    // the note is emitted by the host instead, e.g. forwarded to the DSP's MIDI out.
+    // (ch, midi, velocity, on) — on=false is the matching note-off.
+    void setMidiSink(std::function<void(int, int, int, bool)> s) { midiSink = std::move(s); }
+
     // Note-on to the instrument's port now; note-off after `seconds`.
     void play(int instrumentId, int midi, int velocity, float seconds);
 
 private:
     struct Pending { NoteAuditioner* self; std::string portName; int channel; int pitch; };
     static void offCb(void* data);
+    void        sendOff(const Pending* p);
 
     PortRegistry*                      portReg = nullptr;
     std::function<MidiInstrRoute(int)> instrRoute;
+    std::function<void(int, int, int, bool)> midiSink;   // plugin-mode emission
     std::vector<Pending*>              pending;   // outstanding timeout payloads
 };
 

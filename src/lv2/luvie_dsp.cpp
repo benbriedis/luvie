@@ -52,6 +52,7 @@
 #include <vector>
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
+#define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
 
 /* Opt-in diagnostics: run the host with LUVIE_DEBUG=1 to trace state application
    and per-second transport/MIDI activity on stderr. */
@@ -339,6 +340,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->time_frame         = map->map(map->handle, LV2_TIME__frame);
     uris->midi_MidiEvent     = map->map(map->handle, LV2_MIDI__MidiEvent);
     uris->luvie_state        = map->map(map->handle, LUVIE_STATE_URI);
+    uris->luvie_midi         = map->map(map->handle, LUVIE_MIDI_URI);
     uris->state_StateChanged = map->map(map->handle, LV2_STATE__StateChanged);
 }
 
@@ -416,10 +418,28 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     bool jumped = false;
     const LV2_Atom_Object* lastPos = nullptr;
     int ctrlEvents = 0;   // raw events seen on control_in this cycle (diagnostics)
+
+    /* One-shot audition notes from the UI (clicking a row label): raw MIDI bytes we
+       re-emit on midi_out at frame 0 this cycle. Fixed stack buffer — run() is the RT
+       thread and must not allocate. Anything beyond the cap in a single cycle is
+       dropped (a human clicking labels never approaches it). */
+    constexpr int   kMaxAudition = 32;
+    uint8_t auditionBuf[kMaxAudition][3];
+    int     auditionLen[kMaxAudition];
+    int     auditionCount = 0;
+
     if (p->controlIn) {
         LV2_ATOM_SEQUENCE_FOREACH(p->controlIn, ev) {
             ctrlEvents++;
-            if (ev->body.type == uris->luvie_state) {
+            if (ev->body.type == uris->luvie_midi) {
+                if (auditionCount < kMaxAudition) {
+                    uint32_t n = ev->body.size; if (n > 3) n = 3;
+                    std::memcpy(auditionBuf[auditionCount],
+                                LV2_ATOM_BODY_CONST(&ev->body), n);
+                    auditionLen[auditionCount] = (int)n;
+                    auditionCount++;
+                }
+            } else if (ev->body.type == uris->luvie_state) {
                 if (p->schedule) {
                     LV2_Worker_Status ws = p->schedule->schedule_work(
                         p->schedule->handle, ev->body.size, LV2_ATOM_BODY_CONST(&ev->body));
@@ -495,6 +515,15 @@ static void run(LV2_Handle instance, uint32_t sample_count)
             lv2_atom_forge_frame_time(&p->forge, 0);
             lv2_atom_forge_object(&p->forge, &objFrame, 0, uris->state_StateChanged);
             lv2_atom_forge_pop(&p->forge, &objFrame);
+        }
+
+        /* Audition notes at frame 0 — written before the engine's events (frame >= 0)
+           so the sequence stays in non-decreasing frame order. Emitted regardless of
+           transport state, so clicking a label sounds even when stopped. */
+        for (int i = 0; i < auditionCount; i++) {
+            lv2_atom_forge_frame_time(&p->forge, 0);
+            lv2_atom_forge_atom(&p->forge, auditionLen[i], uris->midi_MidiEvent);
+            lv2_atom_forge_write(&p->forge, auditionBuf[i], auditionLen[i]);
         }
 
         double startSecs = (double)p->curFrame / (double)p->engine->sampleRateHz();

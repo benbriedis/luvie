@@ -63,6 +63,7 @@ typedef struct {
     LV2_URID midi_MidiEvent;      /* MIDI event atom type (for midi_out) */
     LV2_URID atom_Chunk;
     LV2_URID luvie_state;         /* full JSON state blob */
+    LV2_URID luvie_midi;          /* one-shot audition MIDI (raw bytes), UI -> DSP */
     LV2_URID state_StateChanged;  /* notify host that state is dirty */
 } URIs;
 

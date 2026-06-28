@@ -79,10 +79,8 @@ void BasePatternEditor::setPatternPlayhead(ITransport* t, ObservablePattern* pat
 int BasePatternEditor::currentInstrumentId() const
 {
     if (!pattern) return 0;
-    const auto& tl  = pattern->get();
-    int         sel = tl.selectedTrackIndex;
-    if (sel < 0 || sel >= (int)tl.tracks.size()) return 0;
-    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+    const auto& tl    = pattern->get();
+    int         patId = tl.patternIdForSelectedLane();
     for (const auto& p : tl.patterns)
         if (p.id == patId) return p.instrumentId;
     return 0;

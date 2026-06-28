@@ -16,13 +16,17 @@ class DrumNoteLabels : public Fl_Widget {
     int rowHeight;
     int rowOffset          = 0;
     bool fallbackNoteNames = false;
+    int flashMidi          = -1;   // MIDI pitch briefly lit after a click
     std::map<int, std::string> drumMap;
 
+    void        flash(int midi);
+    static void clearFlashCb(void* self);
     void draw() override;
     int  handle(int event) override;
 
 public:
     DrumNoteLabels(int x, int y, int w, int numRows, int rowHeight);
+    ~DrumNoteLabels();
     void setRowOffset(int offset) { rowOffset = offset; redraw(); }
     void setNumRows(int n)        { numRows   = n;       redraw(); }
     void setDrumMap(const std::map<int, std::string>& m) { drumMap = m; redraw(); }

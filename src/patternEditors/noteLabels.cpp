@@ -5,6 +5,9 @@
 #include <FL/Fl_Window.H>
 #include <algorithm>
 
+static constexpr Fl_Color flashCol     = 0x3B82F600;   // briefly lit on click
+static constexpr double   flashSeconds = 0.15;
+
 static const char* sharpNames[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 static const char* flatNames[]  = {"C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"};
 
@@ -23,6 +26,23 @@ std::string noteName(int n, int rootPitch, int chordType, bool useSharp)
 NoteLabels::NoteLabels(int x, int y, int w, int numRows, int rowHeight)
     : Fl_Widget(x, y, w, numRows * rowHeight), numRows(numRows), rowHeight(rowHeight)
 {}
+
+NoteLabels::~NoteLabels() { Fl::remove_timeout(clearFlashCb, this); }
+
+void NoteLabels::flash(int virtualPos)
+{
+    flashVPos = virtualPos;
+    Fl::remove_timeout(clearFlashCb, this);
+    Fl::add_timeout(flashSeconds, clearFlashCb, this);
+    redraw();
+}
+
+void NoteLabels::clearFlashCb(void* self)
+{
+    auto* nl = static_cast<NoteLabels*>(self);
+    nl->flashVPos = -1;
+    nl->redraw();
+}
 
 int NoteLabels::computeTotalTones() const {
     int rootSemitone = (rootPitch + 9) % 12;
@@ -121,6 +141,10 @@ void NoteLabels::draw() {
             fl_color(0xCCCCCC00);
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }
+        if (virtualPos == flashVPos) {
+            fl_color(flashCol);
+            fl_rectf(x(), ry, w() - 1, rowHeight);
+        }
 
         std::string label = noteForRow(virtualPos);
         fl_color(FL_WHITE);
@@ -135,9 +159,12 @@ int NoteLabels::handle(int event) {
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (onRightClick) onRightClick();
-        } else if (Fl::event_button() == FL_LEFT_MOUSE && onRowClicked) {
+        } else if (Fl::event_button() == FL_LEFT_MOUSE) {
             int r = (Fl::event_y() - y()) / rowHeight;
-            if (r >= 0 && r < numRows) onRowClicked(midiForRow(r));
+            if (r >= 0 && r < numRows) {
+                flash(rowOffset + (numRows - 1 - r));
+                if (onRowClicked) onRowClicked(midiForRow(r));
+            }
         }
         return 1;
     }

@@ -12,7 +12,10 @@ class PianorollLabels : public Fl_Widget {
     int numRows;
     int rowHeight;
     int rowOffset = 0;
+    int flashMidi = -1;   // MIDI pitch briefly lit after a click
 
+    void        flash(int midi);
+    static void clearFlashCb(void* self);
     void draw() override;
     int  handle(int event) override;
 
@@ -21,6 +24,7 @@ public:
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 
     PianorollLabels(int x, int y, int w, int numRows, int rowHeight);
+    ~PianorollLabels();
     void setRowOffset(int offset) { rowOffset = offset; redraw(); }
     void setNumRows(int n)        { numRows   = n;       redraw(); }
 };
