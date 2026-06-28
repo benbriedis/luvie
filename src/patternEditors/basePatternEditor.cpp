@@ -211,10 +211,12 @@ void BasePatternEditor::relayout()
     const int visibleGridW = std::max(1, bw - scrollbarW - lw);
     const int rowH         = gridRowHeight();
 
-    // Size the note area to its content and leave white space down to the control
-    // bar, mirroring the song editor. The horizontal-scrollbar strip is always
-    // reserved so the pane bottom is stable. Only whole rows are interactive.
-    const int  availNoteH   = std::max(rowH, bh - rulerH - paramAreaH - hScrollH);
+    // Reserve the horizontal-scrollbar strip only when it is actually shown
+    // (i.e. the columns overflow the visible width). When the pattern fits, the
+    // note area extends all the way down to the control bar instead of leaving a
+    // permanent empty strip. Only whole rows are interactive.
+    const int hScrollReserve = (gridNumCols() * gridColWidth() > visibleGridW) ? hScrollH : 0;
+    const int  availNoteH   = std::max(rowH, bh - rulerH - paramAreaH - hScrollReserve);
     const int  contentNoteH = totalRows() * rowH;
     const bool needsVScroll = contentNoteH > availNoteH;
     const int  noteAreaH    = std::max(rowH, needsVScroll ? (availNoteH / rowH) * rowH
@@ -248,10 +250,10 @@ void BasePatternEditor::relayout()
 
     hScrollbar->resize(bx + scrollbarW + lw, paramY + paramAreaH, visibleGridW, hScrollH);
 
-    // The scrolling body pane is sized to the content (plus the reserved
-    // horizontal-scrollbar strip); the gap below it down to the control bar is
-    // painted as clean background by Editor::draw().
-    gridPane.resize(bx, noteTop, bw, noteAreaH + paramAreaH + hScrollH);
+    // The scrolling body pane is sized to the content (plus the horizontal-scrollbar
+    // strip when one is shown); any gap below it down to the control bar is painted
+    // as clean background by Editor::draw().
+    gridPane.resize(bx, noteTop, bw, noteAreaH + paramAreaH + hScrollReserve);
 
     setRowOffset(currentRowOffset());
     setColOffset(colOffset);
