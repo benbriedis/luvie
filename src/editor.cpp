@@ -15,6 +15,10 @@ void Editor::draw()
     fl_rectf(x(), y(), w(), rulerH);
     fl_color(rulerBorder);
     fl_line(x(), y() + rulerH - 1, x() + w() - 1, y() + rulerH - 1);
+    // Fill the body so any space below the content (between a short grid and the
+    // bottom of the editor) renders as clean white space rather than stale pixels.
+    fl_color(bgColor);
+    fl_rectf(x(), y() + rulerH, w(), h() - rulerH);
     drawRulerLabels();
     playhead.drawTriangle(x() + rulerOffsetX + gridPadX - hScrollPixel, y(), rulerH);
     draw_children();

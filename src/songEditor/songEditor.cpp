@@ -11,6 +11,7 @@ SongEditor::SongEditor(int x, int y, int visibleW,
                        int numRows, int numCols, int rowHeight, int colWidth,
                        float snap, NoteContextPopup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
+      gridPane(x, y + rulerH, visibleW, numRows * rowHeight + hScrollH),
       trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
       trackControls(x + labelW, y + rulerH, controlsW, numRows, rowHeight),
       songGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
@@ -45,11 +46,14 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     songGrid.position(x + labelW + controlsW, y + rulerH);
     songGrid.setPlayhead(&playhead);
 
-    add(*scrollbar);
-    add(*hScrollbar);
-    add(trackLabels);
-    add(trackControls);
-    add(songGrid);
+    // The scrolling body — grid, side panels and both scrollbars — lives in
+    // gridPane; the editor sizes the pane to the content and leaves white space
+    // between it and the transport. (add() reparents from the editor group.)
+    gridPane.add(*scrollbar);
+    gridPane.add(trackLabels);
+    gridPane.add(trackControls);
+    gridPane.add(songGrid);
+    gridPane.add(*hScrollbar);
 
     playhead.setOwner(this);
     end();
@@ -163,9 +167,18 @@ void SongEditor::updateScrollBounds()
     int  sbW         = needsScroll ? scrollbarW : 0;
     scrollPx = std::clamp(scrollPx, 0, maxScroll);
 
+    // When the content is shorter than the body, shrink the grid/scrollbars to
+    // the content so the horizontal scrollbar sits just under the last row and
+    // the gap down to the transport is plain white space.
+    int contentBodyH = needsScroll ? availH : fullH;
+
+    // The scrolling body pane: grid + side panels + both scrollbars, sized to
+    // the content (plus the reserved horizontal-scrollbar strip).
+    gridPane.resize(baseX, y() + rulerH, w(), contentBodyH + hScrollH);
+
     // Reposition / resize scrollbar (fixed body height; thumb measured in pixels)
     scrollbar->position(baseX, scrollbar->y());
-    scrollbar->size(scrollbarW, availH);
+    scrollbar->size(scrollbarW, contentBodyH);
     if (needsScroll) {
         scrollbar->value(scrollPx, availH, 0, fullH);
         scrollbar->show();
@@ -193,7 +206,7 @@ void SongEditor::updateScrollBounds()
         colOffset = 0;
         hScrollbar->hide();
     }
-    hScrollbar->position(baseX + sbW + labelW + controlsW, y() + rulerH + availH);
+    hScrollbar->position(baseX + sbW + labelW + controlsW, y() + rulerH + contentBodyH);
     hScrollbar->size(visibleGridW, hScrollH);
 
     hScrollPixel = colOffset * songGrid.colWidth;
@@ -201,13 +214,13 @@ void SongEditor::updateScrollBounds()
 
     if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
 
-    // The grid body and both side panels share the fixed body height; partial
+    // The grid body and both side panels share the content body height; partial
     // rows at the top/bottom are clipped by each widget's bounds.
-    songGrid.size(visibleGridW, availH);
-    trackLabels.size(trackLabels.w(), availH);
-    trackControls.size(trackControls.w(), availH);
+    songGrid.size(visibleGridW, contentBodyH);
+    trackLabels.size(trackLabels.w(), contentBodyH);
+    trackControls.size(trackControls.w(), contentBodyH);
 
-    pushScroll(availH);
+    pushScroll(contentBodyH);
     redraw();
 }
 

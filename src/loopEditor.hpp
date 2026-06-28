@@ -74,6 +74,15 @@ private:
     int  scrollX         = 0;     // horizontal scroll offset in px
     int  scrollY         = 0;     // vertical scroll offset in px
 
+    // Drag-to-reorder of the instrument axis (loopOrder). dragAxisFrom is the
+    // instrument-axis slot being dragged; dropGap is the insertion slot (0..N).
+    bool draggingInstr = false;
+    int  dragAxisFrom  = -1;
+    int  dragTrackId   = -1;
+    int  dragStartX    = 0;
+    int  dragStartY    = 0;
+    int  dropGap       = -1;
+
     static void timerCb(void* data);
 
     // Computed geometry of the scrollable cell area.
@@ -95,7 +104,14 @@ private:
 
     float beatProgress(int trackIdx, int laneIdx) const;
     void  btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const;
-    bool  cellAt(int mx, int my, int& trackIdx, int& laneIdx) const;
+    bool  cellAt(int mx, int my, int& trackIdx, int& laneIdx, int& col, int& row) const;
+
+    // Map an instrument-axis slot to the real index into tracks via loopOrder.
+    int   trackForAxis(int axisIdx) const;
+    // Hit-test the instrument-name strip; returns the axis slot under the cursor.
+    bool  instrLabelAt(int mx, int my, int& axisIdx) const;
+    // Insertion slot (0..numTracks) for the current drag position.
+    int   computeDropGap(int mx, int my) const;
 
     void draw()   override;
     int  handle(int event) override;

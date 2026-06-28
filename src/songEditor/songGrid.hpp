@@ -42,6 +42,7 @@ class SongGrid : public Grid, public ITimelineObserver {
     int rowY(int r) const override;
     int rowH(int r) const override;
     int rowAtPixelY(int py) const override;
+    int gridBottom() const override { return totalPixelH(); }
     int absRowHeight(int absRow) const;   // pixel height of an absolute rowOrder entry
 
 public:

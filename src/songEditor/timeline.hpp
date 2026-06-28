@@ -70,7 +70,8 @@ struct Timeline {
 	std::vector<Track>         tracks;
 	std::vector<Instrument>    instruments;
 	std::vector<ParamLane>     paramLanes;
-	std::vector<RowRef>        rowOrder;  // interleaved display order
+	std::vector<RowRef>        rowOrder;  // interleaved display order (song editor)
+	std::vector<int>           loopOrder; // track IDs in loop editor display order
 	int                        selectedTrackIndex = -1;
 	int                        selectedLaneId     = -1;
 

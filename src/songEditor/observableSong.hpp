@@ -70,6 +70,9 @@ public:
     int  paramLaneInsertIndex(int trackId) const;
     void moveRow(int fromRowIdx, int toGapIdx);
     void moveTrack(int trackId, int insertBeforeTrackId);
+    // Loop editor instrument ordering (independent of the song editor's rowOrder).
+    // loopOrder holds track IDs; insertBeforeTrackId < 0 appends at the end.
+    void moveLoopInstrument(int trackId, int insertBeforeTrackId);
     void rebuildInstrumentHeaders();
     // Predict which track a lane/param row at `from` would belong to if dropped at
     // `toGap`, without mutating. Returns -1 if it cannot be determined. Mirrors the
@@ -131,6 +134,8 @@ private:
     bool patternStillReferenced(int patId) const;
 
     void notify();
+    // Drop stale track IDs from loopOrder and append any missing tracks.
+    void reconcileLoopOrder();
     void sortBpms();
     void sortTimeSigs();
     void removeParamLanesForInstrument(int instrumentId);

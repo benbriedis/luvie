@@ -47,10 +47,11 @@ void Grid::draw()
     }
 
     int endCol = colOffset + w() / colWidth + 2;
+    int colBottom = std::min(h(), gridBottom());
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + (i - colOffset) * colWidth;
         fl_color(columnColor(i));
-        fl_line(x0, y(), x0, y() + h());
+        fl_line(x0, y(), x0, y() + colBottom);
     }
 
     for (const Note& note : notes) {

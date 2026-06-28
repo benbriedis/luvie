@@ -71,6 +71,10 @@ protected:
     virtual int rowH(int r) const         { (void)r; return rowHeight; }
     virtual int rowAtPixelY(int py) const { return rowHeight > 0 ? py / rowHeight : 0; }
 
+    // Bottom y-extent of the drawn grid, relative to y(). Vertical column lines
+    // stop here so they don't run past the last row into empty space below.
+    virtual int gridBottom() const { return h(); }
+
     // Virtual extension hooks
     virtual bool     isRowBlocked(int visualRow) const { (void)visualRow; return false; }
     virtual Fl_Color columnColor(int col)      const { (void)col;      return 0x00EE0000; }

@@ -79,6 +79,7 @@ void ObservableSong::loadTimeline(const Timeline& tl)
             data.selectedLaneId = data.tracks[idx].lanes[0].id;
     }
     rebuildInstrumentHeaders();
+    reconcileLoopOrder();  // backfill loopOrder for old saves; prune stale IDs
     notify();
 }
 
@@ -114,6 +115,40 @@ void ObservableSong::rebuildInstrumentHeaders()
             }
         }
     }
+}
+
+void ObservableSong::reconcileLoopOrder()
+{
+    std::set<int> trackIds;
+    for (const auto& t : data.tracks) trackIds.insert(t.id);
+
+    // Drop IDs that no longer reference a track.
+    data.loopOrder.erase(
+        std::remove_if(data.loopOrder.begin(), data.loopOrder.end(),
+            [&trackIds](int id) { return !trackIds.count(id); }),
+        data.loopOrder.end());
+
+    // Append any track missing from loopOrder, in current track order.
+    std::set<int> present(data.loopOrder.begin(), data.loopOrder.end());
+    for (const auto& t : data.tracks)
+        if (!present.count(t.id)) data.loopOrder.push_back(t.id);
+}
+
+void ObservableSong::moveLoopInstrument(int trackId, int insertBeforeTrackId)
+{
+    if (trackId == insertBeforeTrackId) return;
+    reconcileLoopOrder();  // ensure loopOrder is consistent before mutating
+
+    auto& order = data.loopOrder;
+    auto src = std::find(order.begin(), order.end(), trackId);
+    if (src == order.end()) return;
+    order.erase(src);
+
+    auto dst = (insertBeforeTrackId < 0)
+        ? order.end()
+        : std::find(order.begin(), order.end(), insertBeforeTrackId);
+    order.insert(dst, trackId);
+    notify();
 }
 
 void ObservableSong::sortBpms()
@@ -321,6 +356,7 @@ int ObservableSong::addTrack(int instrumentId, int patternId, int atIndex)
     else
         data.rowOrder.push_back(ref);
     rebuildInstrumentHeaders();
+    reconcileLoopOrder();
     notify();
     return id;
 }
@@ -867,6 +903,7 @@ void ObservableSong::removeTrack(int trackId)
         else
             data.selectedLaneId = -1;
     }
+    reconcileLoopOrder();
     notify();
 }
 
@@ -914,6 +951,7 @@ void ObservableSong::removeTrackAndPattern(int trackId)
         else
             data.selectedLaneId = -1;
     }
+    reconcileLoopOrder();
     notify();
 }
 

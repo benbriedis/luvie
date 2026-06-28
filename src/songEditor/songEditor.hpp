@@ -2,6 +2,7 @@
 #define SONG_EDITOR_HPP
 
 #include "editor.hpp"
+#include "gridPane.hpp"
 #include "songGrid.hpp"
 #include "patternInstanceContextPopup.hpp"
 #include "trackLabels.hpp"
@@ -20,6 +21,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     static constexpr int controlsW = 22;
     static constexpr int scrollbarW = 14;
 
+    GridPane           gridPane;
     TrackLabels        trackLabels;
     TrackControls      trackControls;
     SongGrid           songGrid;

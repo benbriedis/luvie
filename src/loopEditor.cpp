@@ -282,6 +282,14 @@ int LoopEditor::leftStripW() const
     return tracksAsColumns ? (maxLanes() > 1 ? patLabelW : 0) : trackHeaderW;
 }
 
+int LoopEditor::trackForAxis(int axisIdx) const
+{
+    if (!timeline) return -1;
+    const auto& lo = timeline->get().loopOrder;
+    if (axisIdx < 0 || axisIdx >= (int)lo.size()) return -1;
+    return timeline->trackIndexForId(lo[axisIdx]);
+}
+
 void LoopEditor::btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const
 {
     int gx = x() + padX + leftStripW();
@@ -351,7 +359,7 @@ void LoopEditor::updateScrollbars()
     }
 }
 
-bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx) const
+bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx, int& col, int& row) const
 {
     if (!timeline) return false;
     Layout L = computeLayout();
@@ -360,23 +368,65 @@ bool LoopEditor::cellAt(int mx, int my, int& trackIdx, int& laneIdx) const
     const auto& tracks = timeline->get().tracks;
     int nc = numCols();
     int nr = numRows();
-    for (int col = 0; col < nc; col++) {
-        for (int row = 0; row < nr; row++) {
+    for (int c = 0; c < nc; c++) {
+        for (int r = 0; r < nr; r++) {
             int bx, by, bw, bh;
-            btnRect(col, row, bx, by, bw, bh);
+            btnRect(c, r, bx, by, bw, bh);
             if (mx < bx || mx >= bx + bw) continue;
             if (my < by || my >= by + bh) continue;
-            // Convert (col, row) → (trackIdx, laneIdx)
-            int ti = tracksAsColumns ? col : row;
-            int li = tracksAsColumns ? row : col;
-            if (ti >= (int)tracks.size()) return false;
+            // Convert (col, row) → real (trackIdx, laneIdx)
+            int ti = trackForAxis(tracksAsColumns ? c : r);
+            int li = tracksAsColumns ? r : c;
+            if (ti < 0) return false;
             if (li >= (int)tracks[ti].lanes.size()) return false;
             trackIdx = ti;
             laneIdx  = li;
+            col      = c;
+            row      = r;
             return true;
         }
     }
     return false;
+}
+
+bool LoopEditor::instrLabelAt(int mx, int my, int& axisIdx) const
+{
+    if (!timeline) return false;
+    Layout L = computeLayout();
+    // Instrument names live in the top strip (mode A) or left strip (mode B).
+    if (tracksAsColumns) {
+        if (my < y() + padY || my >= y() + padY + topStripH()) return false;
+        if (mx < L.vpX || mx >= L.vpX + L.vpW) return false;
+    } else {
+        if (mx < x() + padX || mx >= x() + padX + leftStripW()) return false;
+        if (my < L.vpY || my >= L.vpY + L.vpH) return false;
+    }
+    int n = numCols();  // instrument axis is columns in mode A, rows in mode B
+    int axisCount = tracksAsColumns ? n : numRows();
+    for (int a = 0; a < axisCount; a++) {
+        int bx, by, bw, bh;
+        if (tracksAsColumns) btnRect(a, 0, bx, by, bw, bh);
+        else                 btnRect(0, a, bx, by, bw, bh);
+        if (tracksAsColumns) { if (mx >= bx && mx < bx + bw) { axisIdx = a; return true; } }
+        else                 { if (my >= by && my < by + bh) { axisIdx = a; return true; } }
+    }
+    return false;
+}
+
+int LoopEditor::computeDropGap(int mx, int my) const
+{
+    int numTracks = timeline ? (int)timeline->get().loopOrder.size() : 0;
+    if (tracksAsColumns) {
+        int gx     = x() + padX + leftStripW();
+        int stride = cellW + btnGap;
+        int gap    = (int)std::lround((double)(mx - gx + scrollX) / stride);
+        return std::clamp(gap, 0, numTracks);
+    } else {
+        int gy     = y() + padY + topStripH();
+        int stride = cellH + btnGap;
+        int gap    = (int)std::lround((double)(my - gy + scrollY) / stride);
+        return std::clamp(gap, 0, numTracks);
+    }
 }
 
 void LoopEditor::positionToggleBtn()
@@ -493,8 +543,8 @@ void LoopEditor::draw()
                 std::string nameStr;
                 if (tracksAsColumns) {
                     // track name
-                    int ti = col;
-                    if (ti < (int)tracks.size())
+                    int ti = trackForAxis(col);
+                    if (ti >= 0)
                         nameStr = tl.instrumentName(tracks[ti].instrumentId);
                     label = nameStr.empty() ? nullptr : nameStr.c_str();
                 } else {
@@ -531,8 +581,8 @@ void LoopEditor::draw()
                     label = buf;
                 } else {
                     // track name
-                    int ti = row;
-                    if (ti < (int)tracks.size())
+                    int ti = trackForAxis(row);
+                    if (ti >= 0)
                         nameStr = tl.instrumentName(tracks[ti].instrumentId);
                     label = nameStr.empty() ? nullptr : nameStr.c_str();
                 }
@@ -551,11 +601,11 @@ void LoopEditor::draw()
                 int bx, by, bw, bh;
                 btnRect(col, row, bx, by, bw, bh);
 
-                int ti = tracksAsColumns ? col : row;
+                int ti = trackForAxis(tracksAsColumns ? col : row);
                 int li = tracksAsColumns ? row : col;
 
                 // Empty cell — track has no lane at this index; draw nothing.
-                if (ti >= (int)tracks.size() || li >= (int)tracks[ti].lanes.size())
+                if (ti < 0 || li >= (int)tracks[ti].lanes.size())
                     continue;
 
                 int patId    = tracks[ti].lanes[li].patternId;
@@ -592,6 +642,24 @@ void LoopEditor::draw()
             }
         }
         fl_pop_clip();
+
+        // ---- Drop indicator while reordering instruments ----
+        if (draggingInstr && dropGap >= 0) {
+            fl_color(0xFBBF2400);  // amber
+            fl_line_style(FL_SOLID, 2);
+            if (tracksAsColumns) {
+                int gx = x() + padX + leftStripW();
+                int lineX = gx + dropGap * (cellW + btnGap) - scrollX - btnGap / 2;
+                lineX = std::clamp(lineX, L.vpX, L.vpX + L.vpW);
+                fl_line(lineX, y() + padY, lineX, L.vpY + L.vpH);
+            } else {
+                int gy = y() + padY + topStripH();
+                int lineY = gy + dropGap * (cellH + btnGap) - scrollY - btnGap / 2;
+                lineY = std::clamp(lineY, L.vpY, L.vpY + L.vpH);
+                fl_line(x() + padX, lineY, L.vpX + L.vpW, lineY);
+            }
+            fl_line_style(0);
+        }
     }
 
     draw_children();
@@ -601,15 +669,24 @@ void LoopEditor::draw()
 // Handle
 // ======================================================
 
+static constexpr int dragThreshold = 4;  // px before an instrument drag begins
+
 int LoopEditor::handle(int event)
 {
+    // While an instrument-reorder drag is in progress, own all drag/release
+    // events ourselves rather than letting a child (e.g. a scrollbar passed
+    // under the cursor) swallow the commit.
+    bool ownDrag = dragAxisFrom >= 0 && (event == FL_DRAG || event == FL_RELEASE);
+
     // Let child widgets (scrollbars, Flip button) handle events first. This
     // also drives their enter/leave + hover state for FL_MOVE. But
     // Fl_Group::handle() ALWAYS returns 1 for FL_MOVE (it claims belowmouse),
     // so we must not let that short-circuit our own hover/cursor handling over
     // the drawn grid cells — fall through to the switch for FL_MOVE.
-    bool childHandled = Fl_Group::handle(event);
-    if (event != FL_MOVE && childHandled) return 1;
+    if (!ownDrag) {
+        bool childHandled = Fl_Group::handle(event);
+        if (event != FL_MOVE && childHandled) return 1;
+    }
 
     int mx = Fl::event_x(), my = Fl::event_y();
 
@@ -617,16 +694,14 @@ int LoopEditor::handle(int event)
     case FL_ENTER:
         return 1;
     case FL_MOVE: {
-        int ti = -1, li = -1;
-        int newCol = -1, newRow = -1;
-        bool overCell = cellAt(mx, my, ti, li);
-        if (overCell) {
-            newCol = tracksAsColumns ? ti : li;
-            newRow = tracksAsColumns ? li : ti;
-        }
+        int ti = -1, li = -1, newCol = -1, newRow = -1;
+        bool overCell = cellAt(mx, my, ti, li, newCol, newRow);
+        int axisIdx = -1;
+        bool overLabel = instrLabelAt(mx, my, axisIdx);
         if (window()) {
-            if (overCell) window()->cursor(contextMenuCursorImage(), 0, 0);
-            else          window()->cursor(FL_CURSOR_DEFAULT);
+            if (overLabel)     window()->cursor(FL_CURSOR_MOVE);
+            else if (overCell) window()->cursor(contextMenuCursorImage(), 0, 0);
+            else               window()->cursor(FL_CURSOR_DEFAULT);
         }
         if (newCol != hoveredCol || newRow != hoveredRow) {
             hoveredCol = newCol;
@@ -643,8 +718,26 @@ int LoopEditor::handle(int event)
         }
         return 1;
     case FL_PUSH: {
-        int trackIdx = -1, laneIdx = -1;
-        if (!cellAt(mx, my, trackIdx, laneIdx)) return 0;
+        // Begin a potential instrument-reorder drag from the name strip.
+        if (Fl::event_button() == FL_LEFT_MOUSE && timeline) {
+            int axisIdx = -1;
+            if (instrLabelAt(mx, my, axisIdx)) {
+                const auto& lo = timeline->get().loopOrder;
+                if (axisIdx < (int)lo.size()) {
+                    dragAxisFrom  = axisIdx;
+                    dragTrackId   = lo[axisIdx];
+                    dragStartX    = mx;
+                    dragStartY    = my;
+                    draggingInstr = false;
+                    dropGap       = -1;
+                    take_focus();
+                    return 1;
+                }
+            }
+        }
+
+        int trackIdx = -1, laneIdx = -1, col = -1, row = -1;
+        if (!cellAt(mx, my, trackIdx, laneIdx, col, row)) return 0;
         take_focus();
 
         if (Fl::event_button() == FL_LEFT_MOUSE) {
@@ -689,6 +782,33 @@ int LoopEditor::handle(int event)
             return 1;
         }
         return 0;
+    }
+    case FL_DRAG: {
+        if (dragAxisFrom < 0) return 0;
+        if (!draggingInstr) {
+            int d = tracksAsColumns ? std::abs(mx - dragStartX)
+                                    : std::abs(my - dragStartY);
+            if (d > dragThreshold) draggingInstr = true;
+        }
+        if (draggingInstr) {
+            dropGap = computeDropGap(mx, my);
+            if (window()) window()->cursor(FL_CURSOR_MOVE);
+            redraw();
+        }
+        return 1;
+    }
+    case FL_RELEASE: {
+        if (dragAxisFrom < 0) return 0;
+        if (draggingInstr && timeline && dropGap >= 0) {
+            const auto& lo = timeline->get().loopOrder;
+            int insertBefore = (dropGap < (int)lo.size()) ? lo[dropGap] : -1;
+            timeline->moveLoopInstrument(dragTrackId, insertBefore);
+        }
+        dragAxisFrom  = -1;
+        draggingInstr = false;
+        dropGap       = -1;
+        redraw();
+        return 1;
     }
     default:
         return 0;
