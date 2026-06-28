@@ -2,6 +2,7 @@
 #include "panelStyle.hpp"
 #include "appWindow.hpp"
 #include "cursors.hpp"
+#include "inlineEditDispatch.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -156,9 +157,22 @@ static constexpr Fl_Color headerText     = 0xCBD5E100;
 // ======================================================
 
 LoopEditor::LoopEditor(int x, int y, int w, int h)
-    : Fl_Group(x, y, w, h)
+    : Fl_Group(x, y, w, h),
+      nameInput(x, y, trackHeaderW, trackHeaderH)
 {
     box(FL_NO_BOX);
+
+    nameInput.hide();
+    nameInput.box(FL_FLAT_BOX);
+    nameInput.color(0x37415100);
+    nameInput.textcolor(headerText);
+    nameInput.cursor_color(headerText);
+    nameInput.when(FL_WHEN_ENTER_KEY);
+    nameInput.callback([](Fl_Widget*, void* d) {
+        static_cast<LoopEditor*>(d)->commitInstrumentEdit();
+    }, this);
+    nameInput.onUnfocus([this]() { commitInstrumentEdit(); });
+
     panel = new LoopPanel(x, y + h - panelH, w, panelH);
 
     axisToggleBtn = new ModernButton(0, 0, toggleBtnW, toggleBtnH, "Flip");
@@ -422,6 +436,85 @@ bool LoopEditor::instrLabelAt(int mx, int my, int& axisIdx) const
         else                 { if (my >= by && my < by + bh) { axisIdx = a; return true; } }
     }
     return false;
+}
+
+bool LoopEditor::instrLabelRect(int axisIdx, int& lx, int& ly, int& lw, int& lh) const
+{
+    if (!timeline) return false;
+    int axisCount = tracksAsColumns ? numCols() : numRows();
+    if (axisIdx < 0 || axisIdx >= axisCount) return false;
+    int bx, by, bw, bh;
+    if (tracksAsColumns) {
+        btnRect(axisIdx, 0, bx, by, bw, bh);
+        lx = bx; ly = y() + padY; lw = bw; lh = topStripH();
+    } else {
+        btnRect(0, axisIdx, bx, by, bw, bh);
+        lx = x() + padX; ly = by; lw = leftStripW() - 2; lh = bh;
+    }
+    return true;
+}
+
+void LoopEditor::startInstrumentEdit(int axisIdx)
+{
+    if (!timeline) return;
+    int ti = trackForAxis(axisIdx);
+    if (ti < 0) return;
+    int lx, ly, lw, lh;
+    if (!instrLabelRect(axisIdx, lx, ly, lw, lh)) return;
+
+    editingAxisIdx = axisIdx;
+    editingInstrId = timeline->get().tracks[ti].instrumentId;
+    originalName   = timeline->get().instrumentName(editingInstrId);
+
+    nameInput.resize(lx, ly, lw, lh);
+    nameInput.value(originalName.c_str());
+    nameInput.textcolor(headerText);
+    nameInput.show();
+    nameInput.take_focus();
+    nameInput.position(nameInput.size(), 0);
+    nameInput.onChange([this]() { checkDuplicateName(); });
+    InlineEditDispatch::install(this, [this]() { commitInstrumentEdit(); });
+    redraw();
+}
+
+void LoopEditor::checkDuplicateName()
+{
+    if (!timeline || editingInstrId < 0) return;
+    std::string cur = nameInput.value();
+    bool dup = false;
+    for (const auto& instr : timeline->get().instruments)
+        if (instr.id != editingInstrId && instr.name == cur) { dup = true; break; }
+    nameInput.textcolor(dup ? FL_RED : headerText);
+    nameInput.redraw();
+}
+
+void LoopEditor::commitInstrumentEdit()
+{
+    if (editingInstrId < 0) return;
+    int instrId    = editingInstrId;
+    editingInstrId = -1;
+    editingAxisIdx = -1;
+    InlineEditDispatch::uninstall();
+    std::string newName = nameInput.value();
+    nameInput.hide();
+    if (timeline) {
+        // A duplicate name reverts to the original, matching the Song Editor.
+        bool dup = false;
+        for (const auto& instr : timeline->get().instruments)
+            if (instr.id != instrId && instr.name == newName) { dup = true; break; }
+        timeline->renameInstrument(instrId, dup ? originalName : newName);
+    }
+    redraw();
+}
+
+void LoopEditor::cancelInstrumentEdit()
+{
+    if (editingInstrId < 0) return;
+    editingInstrId = -1;
+    editingAxisIdx = -1;
+    InlineEditDispatch::uninstall();
+    nameInput.hide();
+    redraw();
 }
 
 int LoopEditor::computeDropGap(int mx, int my) const
@@ -775,6 +868,13 @@ static constexpr int dragThreshold = 4;  // px before an instrument drag begins
 
 int LoopEditor::handle(int event)
 {
+    // Escape abandons an in-progress rename (the focused input ignores it, so it
+    // bubbles up to here).
+    if (event == FL_KEYBOARD && editingInstrId >= 0 && Fl::event_key() == FL_Escape) {
+        cancelInstrumentEdit();
+        return 1;
+    }
+
     // While an instrument-reorder drag is in progress, own all drag/release
     // events ourselves rather than letting a child (e.g. a scrollbar passed
     // under the cursor) swallow the commit.
@@ -821,10 +921,23 @@ int LoopEditor::handle(int event)
         }
         return 1;
     case FL_PUSH: {
+        int labelAxis = -1;
+        bool overLabel = instrLabelAt(mx, my, labelAxis);
+
+        // Double-click an instrument name → inline rename.
+        if (Fl::event_button() == FL_LEFT_MOUSE && timeline && overLabel
+            && Fl::event_clicks() > 0) {
+            startInstrumentEdit(labelAxis);
+            return 1;
+        }
+        // Any other press commits an in-progress rename before doing its thing.
+        if (editingInstrId >= 0)
+            commitInstrumentEdit();
+
         // Begin a potential instrument-reorder drag from the name strip.
-        if (Fl::event_button() == FL_LEFT_MOUSE && timeline) {
-            int axisIdx = -1;
-            if (instrLabelAt(mx, my, axisIdx)) {
+        if (Fl::event_button() == FL_LEFT_MOUSE && timeline && overLabel) {
+            int axisIdx = labelAxis;
+            {
                 const auto& lo = timeline->get().loopOrder;
                 if (axisIdx < (int)lo.size()) {
                     dragAxisFrom  = axisIdx;

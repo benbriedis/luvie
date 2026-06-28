@@ -74,6 +74,13 @@ private:
     int  scrollX         = 0;     // horizontal scroll offset in px
     int  scrollY         = 0;     // vertical scroll offset in px
 
+    // Inline rename of an instrument name (double-click the name strip), mirroring
+    // the Song Editor's TrackLabels. editingInstrId>=0 while an edit is active.
+    InlineInput nameInput;
+    int         editingInstrId = -1;
+    int         editingAxisIdx = -1;
+    std::string originalName;
+
     // Drag-to-reorder of the instrument axis (loopOrder). dragAxisFrom is the
     // instrument-axis slot being dragged; dropGap is the insertion slot (0..N).
     bool draggingInstr = false;
@@ -126,6 +133,13 @@ private:
     int   laneForSlot(int trackVecIdx, int slot) const;
     // Hit-test the instrument-name strip; returns the axis slot under the cursor.
     bool  instrLabelAt(int mx, int my, int& axisIdx) const;
+    // Screen rect of the instrument name for an axis slot (where the input sits).
+    bool  instrLabelRect(int axisIdx, int& lx, int& ly, int& lw, int& lh) const;
+    // Inline-rename lifecycle for the instrument under the given axis slot.
+    void  startInstrumentEdit(int axisIdx);
+    void  commitInstrumentEdit();
+    void  cancelInstrumentEdit();
+    void  checkDuplicateName();
     // Insertion slot (0..numTracks) for the current drag position.
     int   computeDropGap(int mx, int my) const;
     // Toggle a pattern cell's active state (deferred from press to release).
