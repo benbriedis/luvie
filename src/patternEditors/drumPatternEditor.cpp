@@ -285,7 +285,7 @@ void DrumPatternEditor::startDrumLabelEdit(int midiNote, int rowY, int rowH)
     drumLabelInput.show();
     drumLabelInput.take_focus();
     drumLabelInput.insert_position(drumLabelInput.size(), 0);
-    InlineEditDispatch::install(this, [this]() { commitDrumLabelEdit(); });
+    InlineEditDispatch::install(&drumLabelInput, [this]() { commitDrumLabelEdit(); });
 }
 
 void DrumPatternEditor::commitDrumLabelEdit()

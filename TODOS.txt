@@ -337,3 +337,4 @@ Add Start & End markers in Song Editor and a looping function (toggle next to pl
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
 Q: do the pattern editors have a 'minimum gap' at them bottom of the note grid? If so we should remove it.
+
