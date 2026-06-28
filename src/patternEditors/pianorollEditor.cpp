@@ -81,10 +81,10 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
     grid.size(visibleGridW, gridH);
     grid.setPlayhead(&playhead);
 
-    add(labels);
-    add(grid);
-    add(paramLabels);
-    add(paramGrid);
+    gridPane.add(labels);
+    gridPane.add(grid);
+    gridPane.add(paramLabels);
+    gridPane.add(paramGrid);
 
     playhead.setOwner(this);
 

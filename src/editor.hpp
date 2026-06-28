@@ -30,9 +30,19 @@ protected:
     void draw() override;
     int  handle(int event) override;
 
+    // Lay the scrolling body out for the current size. Subclasses implement the
+    // concrete layout; Editor::resize() and child setup call it.
+    virtual void layoutBody() = 0;
+
+    // Mouse-wheel hooks dispatched by Editor::handle(); default to no-ops.
+    virtual void onWheelX(int dCols)  {}
+    virtual void onWheelY(int dSteps) {}
+
     Editor(int x, int y, int w, int h, int numCols, int colWidth);
 
 public:
+    void resize(int x, int y, int w, int h) override;
+
     std::function<void()> onEndReached;
     std::function<void()> onSeek;
 

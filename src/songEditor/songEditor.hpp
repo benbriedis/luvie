@@ -40,6 +40,9 @@ class SongEditor : public Editor, public ITimelineObserver {
     void pushScroll(int availH);
     void setColOffset(int offset);
     void drawRulerLabels() override;
+    void layoutBody() override { updateScrollBounds(); }
+    void onWheelX(int d) override { setColOffset(colOffset + d); }
+    void onWheelY(int d) override { setScrollPx(scrollPx + d * wheelStepPx); }
     int  computeNumCols() const;
     void followPlayhead();
 
@@ -64,8 +67,6 @@ public:
     void setTrackView(int trackIndex, bool beatResolution);
 
     void onTimelineChanged() override;
-    void resize(int x, int y, int w, int h) override;
-    int  handle(int event) override;
 };
 
 #endif

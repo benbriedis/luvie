@@ -201,12 +201,12 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     }, this);
     drumLabelInput.onUnfocus([this]() { commitDrumLabelEdit(); });
 
-    add(drumLabels);
-    add(drumRowControls);
-    add(drumGrid);
-    add(drumLabelInput);
-    add(paramLabels);
-    add(paramGrid);
+    gridPane.add(drumLabels);
+    gridPane.add(drumRowControls);
+    gridPane.add(drumGrid);
+    gridPane.add(drumLabelInput);
+    gridPane.add(paramLabels);
+    gridPane.add(paramGrid);
 
     playhead.setOwner(this);
 
@@ -328,11 +328,10 @@ void DrumPatternEditor::afterTimelineChanged(int patId)
     drumRowControls.setPattern(patId >= 0 ? pattern : nullptr, patId);
 }
 
-void DrumPatternEditor::resize(int x, int /*y*/, int w, int h)
+void DrumPatternEditor::resize(int x, int y, int w, int h)
 {
     if (editingMidiNote >= 0) cancelDrumLabelEdit();
-    Fl_Widget::resize(x, y(), w, h);
-    relayout();
+    Editor::resize(x, y, w, h);
 }
 
 int DrumPatternEditor::handle(int event)
@@ -341,5 +340,5 @@ int DrumPatternEditor::handle(int event)
         cancelDrumLabelEdit();
         return 1;
     }
-    return BasePatternEditor::handle(event);
+    return Editor::handle(event);
 }

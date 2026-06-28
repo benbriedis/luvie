@@ -6,6 +6,7 @@
 BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                                      int rowHeight, int colWidth, float snap, int lw)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
+      gridPane(x, y + rulerH, visibleW, numRows * rowHeight + hScrollH),
       paramLabels(x + scrollbarW, y + rulerH + numRows * rowHeight, lw),
       paramGrid(x + scrollbarW + lw, y + rulerH + numRows * rowHeight,
                 visibleW - scrollbarW - lw, colWidth, snap)
@@ -56,10 +57,11 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
     paramGrid.hide();
     paramGrid.setNumCols(numCols);
 
-    // Establish child ordering; subclass ctors append their own widgets after these
-    add(*scrollbar);
-    add(*paramScrollbar);
-    add(*hScrollbar);
+    // The scrolling body lives in gridPane (sized to content in relayout()).
+    // Establish child ordering; subclass ctors append their own widgets after these.
+    gridPane.add(*scrollbar);
+    gridPane.add(*paramScrollbar);
+    gridPane.add(*hScrollbar);
 }
 
 BasePatternEditor::~BasePatternEditor()
@@ -209,17 +211,17 @@ void BasePatternEditor::relayout()
     const int paramAreaH   = visRows * kParamRowH;
     const int lw           = labelsWidth();
     const int visibleGridW = std::max(1, bw - scrollbarW - lw);
+    const int rowH         = gridRowHeight();
 
-    // Only reserve a row for the horizontal scrollbar when it is actually shown.
-    const bool hbarShown = gridNumCols() * gridColWidth() > visibleGridW;
-    const int  hbarH     = hbarShown ? hScrollH : 0;
-
-    // The note scrollbar, labels and grid share one height that fills the area
-    // down to the param lanes / horizontal scrollbar / control bar. Only whole
-    // rows are interactive; the sub-row remainder shows as background below the
-    // last row rather than leaving a gap above the control bar.
-    const int noteAreaH  = std::max(gridRowHeight(), bh - rulerH - paramAreaH - hbarH);
-    const int newNumRows = std::max(1, noteAreaH / gridRowHeight());
+    // Size the note area to its content and leave white space down to the control
+    // bar, mirroring the song editor. The horizontal-scrollbar strip is always
+    // reserved so the pane bottom is stable. Only whole rows are interactive.
+    const int  availNoteH   = std::max(rowH, bh - rulerH - paramAreaH - hScrollH);
+    const int  contentNoteH = totalRows() * rowH;
+    const bool needsVScroll = contentNoteH > availNoteH;
+    const int  noteAreaH    = std::max(rowH, needsVScroll ? (availNoteH / rowH) * rowH
+                                                          : contentNoteH);
+    const int newNumRows = std::max(1, noteAreaH / rowH);
     const int noteTop    = gy + rulerH;
     const int paramY     = noteTop + noteAreaH;
 
@@ -248,24 +250,11 @@ void BasePatternEditor::relayout()
 
     hScrollbar->resize(bx + scrollbarW + lw, paramY + paramAreaH, visibleGridW, hScrollH);
 
+    // The scrolling body pane is sized to the content (plus the reserved
+    // horizontal-scrollbar strip); the gap below it down to the control bar is
+    // painted as clean background by Editor::draw().
+    gridPane.resize(bx, noteTop, bw, noteAreaH + paramAreaH + hScrollH);
+
     setRowOffset(currentRowOffset());
     setColOffset(colOffset);
-}
-
-void BasePatternEditor::resize(int x, int /*y*/, int w, int h)
-{
-    Fl_Widget::resize(x, y(), w, h);
-    relayout();
-}
-
-int BasePatternEditor::handle(int event)
-{
-    if (event == FL_MOUSEWHEEL) {
-        if (Fl::event_dx() != 0)
-            setColOffset(colOffset + Fl::event_dx());
-        else
-            setRowOffset(currentRowOffset() - Fl::event_dy());
-        return 1;
-    }
-    return Editor::handle(event);
 }

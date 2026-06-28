@@ -151,6 +151,7 @@ int SongEditor::computeNumCols() const
 
 void SongEditor::updateScrollBounds()
 {
+    baseX = x();
     int newNumCols = computeNumCols();
     if (newNumCols != songGrid.numCols) {
         songGrid.numCols = newNumCols;
@@ -290,21 +291,3 @@ void SongEditor::followPlayhead()
     wasPlaying = playing;
 }
 
-void SongEditor::resize(int x, int /*y*/, int w, int h)
-{
-    Fl_Widget::resize(x, y(), w, h);
-    baseX          = x;
-    updateScrollBounds();
-}
-
-int SongEditor::handle(int event)
-{
-    if (event == FL_MOUSEWHEEL) {
-        if (Fl::event_dx() != 0)
-            setColOffset(colOffset + Fl::event_dx());
-        else
-            setScrollPx(scrollPx + Fl::event_dy() * wheelStepPx);
-        return 1;
-    }
-    return Editor::handle(event);
-}

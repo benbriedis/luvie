@@ -2,6 +2,7 @@
 #define BASE_PATTERN_EDITOR_HPP
 
 #include "editor.hpp"
+#include "gridPane.hpp"
 #include "patternParamGrid.hpp"
 #include "noteLabelsContextPopup.hpp"
 #include "paramDotPopup.hpp"
@@ -16,6 +17,7 @@ class BasePatternEditor : public Editor, public ITimelineObserver {
 protected:
     static constexpr int scrollbarW = 14;
 
+    GridPane           gridPane;
     GridScrollPane*    scrollbar      = nullptr;
     GridScrollPane*    paramScrollbar = nullptr;
     PatternParamLabels paramLabels;
@@ -58,7 +60,9 @@ protected:
     void setColOffset(int offset);
     void updateParamScrollbar();
     void relayout();
-    int  handle(int event) override;
+    void layoutBody() override { relayout(); }
+    void onWheelX(int d) override { setColOffset(colOffset + d); }
+    void onWheelY(int d) override { setRowOffset(currentRowOffset() - d); }
 
     BasePatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                       int rowHeight, int colWidth, float snap, int lw);
@@ -73,7 +77,6 @@ public:
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
-    void resize(int x, int y, int w, int h) override;
     void onTimelineChanged() override;
 };
 

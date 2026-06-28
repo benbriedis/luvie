@@ -19,10 +19,10 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
     patternGrid.size(visibleGridW, gridH);
     patternGrid.setPlayhead(&playhead);
 
-    add(noteLabels);
-    add(patternGrid);
-    add(paramLabels);
-    add(paramGrid);
+    gridPane.add(noteLabels);
+    gridPane.add(patternGrid);
+    gridPane.add(paramLabels);
+    gridPane.add(paramGrid);
 
     playhead.setOwner(this);
 

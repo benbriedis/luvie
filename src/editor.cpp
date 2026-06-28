@@ -24,11 +24,21 @@ void Editor::draw()
     draw_children();
 }
 
+void Editor::resize(int x, int /*y*/, int w, int h)
+{
+    Fl_Widget::resize(x, y(), w, h);   // top is pinned; subclass lays out the body
+    layoutBody();
+}
+
 int Editor::handle(int event)
 {
     bool inRuler     = Fl::event_y() >= y() && Fl::event_y() < y() + rulerH;
     bool inGridRuler = inRuler && Fl::event_x() >= x() + rulerOffsetX;
     switch (event) {
+    case FL_MOUSEWHEEL:
+        if (Fl::event_dx() != 0) onWheelX(Fl::event_dx());
+        else                     onWheelY(Fl::event_dy());
+        return 1;
     case FL_PUSH:
         if (inGridRuler && Fl::event_button() == FL_LEFT_MOUSE && seekingEnabled) {
             rulerDragging = true;
