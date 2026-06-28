@@ -31,7 +31,8 @@ LoopContextPopup::LoopContextPopup()
     hide();
 }
 
-void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy)
+void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy,
+                            bool fromLabel)
 {
     timeline      = tl;
     targetTrackId = trackId;
@@ -39,9 +40,12 @@ void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int 
 
     auto flags = tl ? tl->song()->trackMenuFlags(trackId)
                     : ObservableSong::TrackMenuFlags{};
-    flags.canOpenPattern ? openPatternBtn->activate()      : openPatternBtn->deactivate();
-    flags.canRemoveLane  ? removeLaneBtn->activate()       : removeLaneBtn->deactivate();
-    flags.isDrumTrack    ? addPianorollLaneBtn->deactivate(): addPianorollLaneBtn->activate();
+    // From a label there is no specific pattern to open or remove.
+    bool canOpen   = flags.canOpenPattern && !fromLabel;
+    bool canRemove = flags.canRemoveLane  && !fromLabel;
+    canOpen   ? openPatternBtn->activate()  : openPatternBtn->deactivate();
+    canRemove ? removeLaneBtn->activate()   : removeLaneBtn->deactivate();
+    flags.isDrumTrack ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
 
     openAt(wx, wy);
 }

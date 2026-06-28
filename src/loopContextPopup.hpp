@@ -35,7 +35,11 @@ public:
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
     std::function<void()>                           onShowInstruments;
 
-    void open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy);
+    // fromLabel: opened by right-clicking an instrument label (a whole row/column)
+    // rather than a specific pattern cell, so the pattern-specific actions
+    // ('Open Pattern' / 'Remove Pattern') are disabled.
+    void open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy,
+              bool fromLabel = false);
 };
 
 #endif

@@ -902,9 +902,10 @@ int LoopEditor::handle(int event)
         int axisIdx = -1;
         bool overLabel = instrLabelAt(mx, my, axisIdx);
         if (window()) {
-            if (overLabel)     window()->cursor(FL_CURSOR_MOVE);
-            else if (overCell) window()->cursor(contextMenuCursorImage(), 0, 0);
-            else               window()->cursor(FL_CURSOR_DEFAULT);
+            // Labels and cells both get the context cursor; the move cursor is
+            // shown only while actually dragging an instrument (see FL_DRAG).
+            if (overLabel || overCell) window()->cursor(contextMenuCursorImage(), 0, 0);
+            else                       window()->cursor(FL_CURSOR_DEFAULT);
         }
         if (newCol != hoveredCol || newRow != hoveredRow) {
             hoveredCol = newCol;
@@ -928,6 +929,18 @@ int LoopEditor::handle(int event)
         if (Fl::event_button() == FL_LEFT_MOUSE && timeline && overLabel
             && Fl::event_clicks() > 0) {
             startInstrumentEdit(labelAxis);
+            return 1;
+        }
+        // Right-click an instrument label → the same context menu as a pattern
+        // cell, but for the whole instrument (no specific pattern).
+        if (Fl::event_button() == FL_RIGHT_MOUSE && overLabel
+            && contextPopup && patternObs && timeline) {
+            int ti = trackForAxis(labelAxis);
+            if (ti >= 0) {
+                int trackId = timeline->get().tracks[ti].id;
+                contextPopup->open(trackId, -1, patternObs,
+                                   Fl::event_x(), Fl::event_y(), true);
+            }
             return 1;
         }
         // Any other press commits an in-progress rename before doing its thing.
