@@ -153,6 +153,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 		float prevBeats   = (prevPos - anchorBar) * beatsPerBar;
 		float curBeats    = (curPos  - anchorBar) * beatsPerBar;
 
+		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
 			if (note.disabled) continue;
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
@@ -166,7 +167,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 				}
 				if (rowToMidi)
-					emitSoftNoteOn(instrumentId, rowToMidi(note.row, pat->rootPitch, pat->chordType), note.velocity,
+					emitSoftNoteOn(instrumentId, rowToMidi(note.row, pat->rootPitch, chordIndex), note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});
 		}
@@ -330,6 +331,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 		float prevBeats   = (prevPos - anchorBar) * beatsPerBar;
 		float curBeats    = (curPos  - anchorBar) * beatsPerBar;
 
+		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
 			if (note.disabled) continue;
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
@@ -342,7 +344,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 				}
 				if (rowToMidi)
-					emitSoftNoteOn(instrumentId, rowToMidi(note.row, pat->rootPitch, pat->chordType), note.velocity,
+					emitSoftNoteOn(instrumentId, rowToMidi(note.row, pat->rootPitch, chordIndex), note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});
 		}

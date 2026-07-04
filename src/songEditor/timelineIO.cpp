@@ -76,7 +76,7 @@ static json patternToJson(const Pattern& p) {
         {"timeSigTop",   p.timeSigTop},
         {"timeSigBottom",p.timeSigBottom},
         {"rootPitch",    p.rootPitch},
-        {"chordType",    p.chordType},
+        {"chordHash",    p.chordHash},
         {"useSharp",     p.useSharp},
         {"snap",         p.snap},
     };
@@ -92,7 +92,7 @@ static Pattern patternFromJson(const json& j) {
     p.timeSigTop   = j.value("timeSigTop",    4);
     p.timeSigBottom= j.value("timeSigBottom", 4);
     p.rootPitch    = j.value("rootPitch", 0);
-    p.chordType    = j.value("chordType", 0);
+    p.chordHash    = j.value("chordHash", std::string{});
     p.useSharp     = j.value("useSharp",  false);
     p.snap         = j.value("snap",      2);
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));

@@ -50,7 +50,7 @@ public:
     // Pattern properties
     void setPatternTimeSig(int patId, int top, int bottom);
     void setPatternLength(int patId, float lengthBeats);
-    void setPatternHarmony(int patId, int root, int chord, bool sharp);
+    void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp);
     void setPatternSnap(int patId, int snap);
     void setPatternInstrument(int patId, int instrumentId);
 

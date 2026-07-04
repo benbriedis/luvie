@@ -458,13 +458,13 @@ void PatternPanel::populateChordChoice()
     cc.redraw();
 }
 
-void PatternPanel::setParams(int root, int chord, bool sharp)
+void PatternPanel::setParams(int root, std::string_view chordHash, bool sharp)
 {
     useSharp = sharp;
     harmonyControls.keySec.sharpFlatBtn.set(sharp);
     updateRootChoiceLabels(root);
 
-    if (chord < 0 || chord >= numChordDefs) chord = 0;
+    int chord = chordIndexForHash(chordHash);
     showScale = chordDefs[chord].isScale;
     harmonyControls.chordSec.chordScaleBtn.set(!showScale);
     populateChordChoice();
@@ -572,12 +572,15 @@ void PatternPanel::commitHarmony()
     if (patId != 0 && pattern) {
         // Capture the pattern's current chord before overwriting it: an interactive
         // chord change to a different size must remap this pattern's notes to fit.
-        int oldChord = 0;
+        std::string oldHash;
         for (const auto& p : pattern->get().patterns)
-            if (p.id == patId) { oldChord = p.chordType; break; }
-        pattern->setPatternHarmony(patId, rootPitch(), chordType(), useSharp);
-        if (chordDefs[oldChord].size != chordDefs[chordType()].size)
-            pattern->remapPatternNotes(patId, chordDefs[oldChord].size, chordDefs[chordType()].size);
+            if (p.id == patId) { oldHash = p.chordHash; break; }
+        std::string newHash = chordHash();
+        pattern->setPatternHarmony(patId, rootPitch(), newHash, useSharp);
+        int oldSize = chordDefForHash(oldHash).size;
+        int newSize = chordDefForHash(newHash).size;
+        if (oldSize != newSize)
+            pattern->remapPatternNotes(patId, oldSize, newSize);
     }
     if (onParamsChanged) onParamsChanged();
 }
@@ -588,7 +591,7 @@ void PatternPanel::refreshHarmony()
     int patId = selectedPatternId();
     for (const auto& p : pattern->get().patterns) {
         if (p.id != patId) continue;
-        setParams(p.rootPitch, p.chordType, p.useSharp);
+        setParams(p.rootPitch, p.chordHash, p.useSharp);
         return;
     }
 }

@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     if (verbose) {
         app.getPitchName = [&](int pitch) {
             return noteName(pitch, app.patternPanel->rootPitch(),
-                                   app.patternPanel->chordType(),
+                                   chordIndexForHash(app.patternPanel->chordHash()),
                                    app.patternPanel->isSharp());
         };
     }

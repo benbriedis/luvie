@@ -11,12 +11,12 @@ static constexpr double   flashSeconds = 0.15;
 static const char* sharpNames[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 static const char* flatNames[]  = {"C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"};
 
-std::string noteName(int n, int rootPitch, int chordType, bool useSharp)
+std::string noteName(int n, int rootPitch, int chordIndex, bool useSharp)
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = rootSemitone;
-    int size         = chordDefs[chordType].size;
-    int midi         = rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
+    int size         = chordDefs[chordIndex].size;
+    int midi         = rootMidi0 + chordDefs[chordIndex].intervals[n % size] + (n / size) * 12;
     int noteOct      = midi / 12 - 1;
     int semitone     = midi % 12;
     const char* name = useSharp ? sharpNames[semitone] : flatNames[semitone];
@@ -47,10 +47,10 @@ void NoteLabels::clearFlashCb(void* self)
 int NoteLabels::computeTotalTones() const {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = rootSemitone;
-    int size         = chordDefs[chordType].size;
+    int size         = chordDefs[chordIndex].size;
     int enabledTotal = 0;
     for (int n = 0; n < 10 * size; n++) {
-        int midi = rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
+        int midi = rootMidi0 + chordDefs[chordIndex].intervals[n % size] + (n / size) * 12;
         if (midi > 127) break;
         enabledTotal++;
     }
@@ -59,10 +59,10 @@ int NoteLabels::computeTotalTones() const {
     return numOctaves * groupSize;
 }
 
-void NoteLabels::setParams(int root, int chord, bool sharp) {
+void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
     rootPitch  = root;
-    chordType  = chord;
-    chordSize  = chordDefs[chord].size;
+    chordIndex = chordIndexForHash(chordHash);
+    chordSize  = chordDefs[chordIndex].size;
     useSharp   = sharp;
     totalTones = computeTotalTones();
     redraw();
@@ -93,11 +93,11 @@ std::string NoteLabels::noteForRow(int virtualPos) const {
         int degree = disabledDegrees[ddIdx];
         int octave = virtualPos / gs;
         int n      = octave * chordSize + degree;
-        return noteName(n, rootPitch, chordType, useSharp);
+        return noteName(n, rootPitch, chordIndex, useSharp);
     }
     int octave = virtualPos / gs;
     int n      = octave * chordSize + pos;
-    return noteName(n, rootPitch, chordType, useSharp);
+    return noteName(n, rootPitch, chordIndex, useSharp);
 }
 
 // visual row → MIDI pitch (canonical rowToMidi, matching playback); -1 if empty
@@ -116,7 +116,7 @@ int NoteLabels::midiForRow(int r) const {
     } else {
         n = octave * chordSize + pos;
     }
-    return rowToMidi(n, rootPitch, chordType);
+    return rowToMidi(n, rootPitch, chordIndex);
 }
 
 void NoteLabels::draw() {

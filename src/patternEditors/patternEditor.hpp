@@ -14,7 +14,7 @@ class PatternEditor : public BasePatternEditor {
     PatternGrid patternGrid;
     float       lastLengthBeats = -1.0f;
     int         rootPitch       = 0;
-    int         chordType       = 0;
+    int         chordIndex      = 0;   // resolved from the pattern's chord hash
 
     int  computeDefaultOffset(int patId) const;
 
@@ -44,7 +44,7 @@ public:
                   int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PatternEditor();
 
-    void setNoteParams(int rootPitch, int chordType, bool useSharp);
+    void setNoteParams(int rootPitch, std::string_view chordHash, bool useSharp);
     int  numPatternBeats() const { return patternGrid.numCols; }
     void focusPattern() override;
     void setSnap(float s) override { patternGrid.setSnap(s); BasePatternEditor::setSnap(s); }

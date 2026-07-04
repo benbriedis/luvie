@@ -42,12 +42,12 @@ PatternEditor::~PatternEditor() = default;
 // remapping on a chord-size change is an interactive edit handled in
 // PatternPanel::commitHarmony, so that merely *switching* to a pattern with a
 // different-size chord does not corrupt that pattern's stored notes.
-void PatternEditor::setNoteParams(int root, int chord, bool sharp)
+void PatternEditor::setNoteParams(int root, std::string_view chordHash, bool sharp)
 {
-    rootPitch = root;
-    chordType = chord;
-    noteLabels.setParams(root, chord, sharp);
-    patternGrid.setChordSize(chordDefs[chord].size);
+    rootPitch  = root;
+    chordIndex = chordIndexForHash(chordHash);
+    noteLabels.setParams(root, chordHash, sharp);
+    patternGrid.setChordSize(chordDefs[chordIndex].size);
 
     int patId = -1;
     if (pattern && lastSelectedTrack >= 0) {
@@ -63,11 +63,11 @@ int PatternEditor::computeDefaultOffset(int patId) const
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = 12 + rootSemitone;
-    int size         = chordDefs[chordType].size;
+    int size         = chordDefs[chordIndex].size;
     int total        = noteLabels.getTotalTones();
 
     auto midiForTone = [&](int n) {
-        return rootMidi0 + chordDefs[chordType].intervals[n % size] + (n / size) * 12;
+        return rootMidi0 + chordDefs[chordIndex].intervals[n % size] + (n / size) * 12;
     };
 
     std::vector<Note> allNotes;

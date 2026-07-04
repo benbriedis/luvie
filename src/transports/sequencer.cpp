@@ -123,9 +123,10 @@ void Sequencer::rebuildSnapshot()
                 is.notes.push_back({midi, dn.beat, drumNoteLen, dn.velocity});
             }
         } else {
+            int chordIndex = chordIndexForHash(pat->chordHash);
             for (const Note& note : pat->notes) {
                 if (note.disabled) continue;
-                int midi = rowToMidi(note.row, pat->rootPitch, pat->chordType);
+                int midi = rowToMidi(note.row, pat->rootPitch, chordIndex);
                 is.notes.push_back({midi, note.beat, note.length, note.velocity});
             }
         }

@@ -56,7 +56,7 @@ struct Pattern {
 	int timeSigTop    = 4;
 	int timeSigBottom = 4;
 	int  rootPitch = 0;      // base note index (matches rootChoice)
-	int  chordType = 0;      // index into chordDefs
+	std::string chordHash;   // stable ChordDef hash; empty = "major" (see chords.hpp)
 	bool useSharp  = false;  // #/b display spelling
 	int  snap      = 2;      // snapChoice index; 2 = 1/16 (kSnapDefault in patternPanel.cpp)
 };

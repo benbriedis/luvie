@@ -328,7 +328,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Note label / params sync ----
     auto syncNoteLabels = [this]() {
         patternEd->setNoteParams(patternPanel->rootPitch(),
-                                 patternPanel->chordType(),
+                                 patternPanel->chordHash(),
                                  patternPanel->isSharp());
         if (onExtraParamsChanged) onExtraParamsChanged();
     };

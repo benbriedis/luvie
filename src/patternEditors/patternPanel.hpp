@@ -15,7 +15,9 @@
 #include "modernChoice.hpp"
 #include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
+#include "chords.hpp"
 #include <string>
+#include <string_view>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -214,13 +216,14 @@ public:
     void commitEdit();
 
     int  rootPitch() const { return harmonyControls.keySec.rootChoice.value(); }
-    int  chordType() const {
+    std::string chordHash() const {
         int v = harmonyControls.chordSec.chordChoice.value();
-        return (v >= 0 && v < (int)chordChoiceMap.size()) ? chordChoiceMap[v] : 0;
+        int idx = (v >= 0 && v < (int)chordChoiceMap.size()) ? chordChoiceMap[v] : 0;
+        return chordDefs[idx].hash;
     }
     bool isSharp()   const { return useSharp; }
 
-    void setParams(int root, int chord, bool sharp);
+    void setParams(int root, std::string_view chordHash, bool sharp);
     void setInstruments(ObservableInstrument* instr);
 
     void setPattern(ObservablePattern* tl);
