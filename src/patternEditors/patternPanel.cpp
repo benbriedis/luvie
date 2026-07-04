@@ -154,6 +154,15 @@ void TimeControls::resize(int x, int y, int w, int h)
 
 // ---------------------------------------------------------------------------
 
+int PatternPanel::selectedPatternId() const
+{
+    if (!pattern) return 0;
+    const auto& tl = pattern->get();
+    int sel = tl.selectedTrackIndex;
+    if (sel < 0 || sel >= (int)tl.tracks.size()) return 0;
+    return tl.patternIdForSelectedLane();
+}
+
 float PatternPanel::computeSnapBeats() const
 {
     int idx = timeControls.snapSec.snapChoice.value();
@@ -242,14 +251,14 @@ void PatternPanel::initHarmonyControls()
         self->useSharp = !self->useSharp;
         ks.sharpFlatBtn.label(self->useSharp ? "#" : "b");
         self->updateRootChoiceLabels(idx);
-        if (self->onParamsChanged) self->onParamsChanged();
+        self->commitHarmony();
     }, this);
 
     updateRootChoiceLabels(0);
 
     auto paramsCb = [](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        if (self->onParamsChanged) self->onParamsChanged();
+        self->commitHarmony();
     };
     ks.rootChoice.color(HarmonyControls::kBg);
     ks.rootChoice.setBorderColor(panelCtrlBorder);
@@ -294,7 +303,7 @@ void PatternPanel::initTimeControls()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+        int patId = tl.patternIdForSelectedLane();
         int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
         self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den);
         if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
@@ -317,7 +326,7 @@ void PatternPanel::initTimeControls()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+        int patId = tl.patternIdForSelectedLane();
         int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
         int top = (int)ts.timeSigNum.value();
         for (const auto& p : tl.patterns) {
@@ -351,7 +360,7 @@ void PatternPanel::initTimeControls()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+        int patId = tl.patternIdForSelectedLane();
         int bars = std::max(1, (int)bs.barsInput.value());
         for (const auto& p : tl.patterns) {
             if (p.id != patId) continue;
@@ -372,6 +381,9 @@ void PatternPanel::initTimeControls()
     ss.snapChoice.setBorderColor(panelCtrlBorder);
     ss.snapChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
+        int patId = self->selectedPatternId();
+        if (patId != 0 && self->pattern)
+            self->pattern->setPatternSnap(patId, self->timeControls.snapSec.snapChoice.value());
         if (self->onSnapChanged)
             self->onSnapChanged(self->computeSnapBeats());
     }, this);
@@ -386,7 +398,7 @@ void PatternPanel::initOutChoice()
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+        int patId = tl.patternIdForSelectedLane();
         PatternType type = PatternType::STANDARD;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }
@@ -451,7 +463,7 @@ void PatternPanel::refreshOutChoice()
     const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { outChoice.value(0); return; }
-    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+    int patId = tl.patternIdForSelectedLane();
 
     PatternType type        = PatternType::STANDARD;
     int         currentId   = 0;
@@ -497,7 +509,7 @@ void PatternPanel::refreshBars()
     const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) { bi.value(2); return; }
-    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+    int patId = tl.patternIdForSelectedLane();
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
         bi.value(std::max(1, (int)std::round(p.lengthBeats / (float)p.timeSigTop)));
@@ -516,7 +528,7 @@ void PatternPanel::refreshTimeSig()
     if (sel < 0 || sel >= (int)tl.tracks.size()) {
         ts.timeSigNum.value(4); ts.timeSigDen.value(2); return;
     }
-    int patId = tl.tracks[sel].lanes.empty() ? 0 : tl.tracks[sel].lanes[0].patternId;
+    int patId = tl.patternIdForSelectedLane();
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
         ts.timeSigNum.value(p.timeSigTop);
@@ -525,6 +537,45 @@ void PatternPanel::refreshTimeSig()
         ts.timeSigDen.value(idx);
         ts.timeSigNum.redraw();
         ts.timeSigDen.redraw();
+        return;
+    }
+}
+
+void PatternPanel::commitHarmony()
+{
+    int patId = selectedPatternId();
+    if (patId != 0 && pattern) {
+        // Capture the pattern's current chord before overwriting it: an interactive
+        // chord change to a different size must remap this pattern's notes to fit.
+        int oldChord = 0;
+        for (const auto& p : pattern->get().patterns)
+            if (p.id == patId) { oldChord = p.chordType; break; }
+        pattern->setPatternHarmony(patId, rootPitch(), chordType(), useSharp);
+        if (chordDefs[oldChord].size != chordDefs[chordType()].size)
+            pattern->remapPatternNotes(patId, chordDefs[oldChord].size, chordDefs[chordType()].size);
+    }
+    if (onParamsChanged) onParamsChanged();
+}
+
+void PatternPanel::refreshHarmony()
+{
+    if (!pattern) return;
+    int patId = selectedPatternId();
+    for (const auto& p : pattern->get().patterns) {
+        if (p.id != patId) continue;
+        setParams(p.rootPitch, p.chordType, p.useSharp);
+        return;
+    }
+}
+
+void PatternPanel::refreshSnap()
+{
+    if (!pattern) return;
+    int patId = selectedPatternId();
+    for (const auto& p : pattern->get().patterns) {
+        if (p.id != patId) continue;
+        timeControls.snapSec.snapChoice.value(p.snap);
+        timeControls.snapSec.snapChoice.redraw();
         return;
     }
 }
@@ -613,6 +664,12 @@ void PatternPanel::onTimelineChanged()
     refreshOutChoice();
     refreshTimeSig();
     refreshBars();
+    refreshHarmony();
+    refreshSnap();
+    // Push the freshly-loaded pattern's harmony/snap to the editors so switching
+    // patterns reinterprets pitches and snapping for the newly selected pattern.
+    if (onParamsChanged) onParamsChanged();
+    if (onSnapChanged)   onSnapChanged(computeSnapBeats());
     redraw();
 }
 

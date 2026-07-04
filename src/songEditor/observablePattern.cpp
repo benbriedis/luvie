@@ -282,6 +282,10 @@ int ObservablePattern::copyPattern(int srcPatId)
     copy.id = song_->nextId++;
     copy.lengthBeats = src->lengthBeats;
     copy.type = src->type;
+    copy.rootPitch = src->rootPitch;
+    copy.chordType = src->chordType;
+    copy.useSharp  = src->useSharp;
+    copy.snap      = src->snap;
     song_->patternNames.assignDerived(copy, src->name);
     for (auto n : src->notes) {
         n.id = song_->nextId++;
@@ -339,6 +343,30 @@ void ObservablePattern::setPatternLength(int patId, float lengthBeats)
         if (p.id == patId) {
             p.lengthBeats = lengthBeats;
             truncatePatternNotes(p);
+            song_->notify();
+            return;
+        }
+    }
+}
+
+void ObservablePattern::setPatternHarmony(int patId, int root, int chord, bool sharp)
+{
+    for (auto& p : song_->data.patterns) {
+        if (p.id == patId) {
+            p.rootPitch = root;
+            p.chordType = chord;
+            p.useSharp  = sharp;
+            song_->notify();
+            return;
+        }
+    }
+}
+
+void ObservablePattern::setPatternSnap(int patId, int snap)
+{
+    for (auto& p : song_->data.patterns) {
+        if (p.id == patId) {
+            p.snap = snap;
             song_->notify();
             return;
         }

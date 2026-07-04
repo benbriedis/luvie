@@ -249,7 +249,6 @@ static void applyState(Plugin* p, const std::string& json)
         routings.push_back({ci.id, ci.portName, ci.midiChannel,
                             ci.programNumber, ci.bankMsb, ci.bankLsb});
     p->engine->setInstruments(routings);
-    p->engine->setNoteParams(st.rootPitch, st.chordType);
 
     /* Timeline last: each setter rebuilds the RT snapshot, so loading the timeline
        after the routing/params are in place gives a final snapshot with them. */

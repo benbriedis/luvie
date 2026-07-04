@@ -189,6 +189,10 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void refreshOutChoice();
     void refreshTimeSig();
     void refreshBars();
+    void refreshHarmony();
+    void refreshSnap();
+    void commitHarmony();
+    int  selectedPatternId() const;
 
     void draw() override;
     int  handle(int event) override;

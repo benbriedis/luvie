@@ -56,7 +56,7 @@ public:
     void setPlayheadHasJackPorts(bool b)                     { playhead.setHasJackPorts(b); }
     void setPlayheadJackClockActive(bool b)                  { playhead.setJackClockActive(b); }
     void playheadPanicSoftNotes()                           { playhead.panicSoftNotes(); }
-    void setPlayheadSoftRouting(std::function<int(int)> r2m,
+    void setPlayheadSoftRouting(std::function<int(int,int,int)> r2m,
                                 std::function<MidiInstrRoute(int)> ir) {
         playhead.setSoftRouting(std::move(r2m), std::move(ir));
     }

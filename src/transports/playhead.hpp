@@ -38,7 +38,7 @@ class Playhead : public ITimelineObserver {
 	bool          anyJackPort = false;   // are any Jack ports present?
 	bool          jackClock   = false;   // is the Jack RT engine the active clock?
 	bool          wasPlaying  = false;
-	std::function<int(int row)>             rowToMidi;   // pattern row → MIDI pitch
+	std::function<int(int,int,int)>         rowToMidi;   // (row, root, chord) → MIDI pitch
 	std::function<MidiInstrRoute(int)>      instrRoute;  // instrument id → port/channel
 	struct SoftActiveNote { std::string portName; int channel; int pitch; float offBar; };
 	std::vector<SoftActiveNote> softNotes;
@@ -80,7 +80,7 @@ public:
 	void setHasSoftPorts(bool b)          { anySoftPort = b; }
 	void setHasJackPorts(bool b)          { anyJackPort = b; }
 	void setJackClockActive(bool b)       { jackClock   = b; }
-	void setSoftRouting(std::function<int(int)> r2m,
+	void setSoftRouting(std::function<int(int,int,int)> r2m,
 	                    std::function<MidiInstrRoute(int)> ir) {
 		rowToMidi  = std::move(r2m);
 		instrRoute = std::move(ir);

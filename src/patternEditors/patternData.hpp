@@ -55,6 +55,10 @@ struct Pattern {
 	std::string name;                  // display name; empty = auto ("InstrumentName N")
 	int timeSigTop    = 4;
 	int timeSigBottom = 4;
+	int  rootPitch = 0;      // base note index (matches rootChoice)
+	int  chordType = 0;      // index into chordDefs
+	bool useSharp  = false;  // #/b display spelling
+	int  snap      = 2;      // snapChoice index; 2 = 1/16 (kSnapDefault in patternPanel.cpp)
 };
 
 #endif

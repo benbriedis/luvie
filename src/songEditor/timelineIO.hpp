@@ -27,9 +27,6 @@ struct JackInstrument {
 // App-level state that gets persisted to / loaded from disk.
 struct AppState {
     Timeline timeline;
-    int  rootPitch = 0;
-    int  chordType = 0;
-    bool sharp     = true;
     int  transport = -1;  // clock source: 0=Host, 1=Internal, 2=Jack; -1=unset
     MidiBackend defaultPortBackend = MidiBackend::Jack;  // type assigned to newly added ports
     std::vector<JackOutput> jackOutputs;

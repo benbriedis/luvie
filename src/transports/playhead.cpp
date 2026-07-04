@@ -166,7 +166,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 				}
 				if (rowToMidi)
-					emitSoftNoteOn(instrumentId, rowToMidi(note.row), note.velocity,
+					emitSoftNoteOn(instrumentId, rowToMidi(note.row, pat->rootPitch, pat->chordType), note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});
 		}
@@ -342,7 +342,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 				}
 				if (rowToMidi)
-					emitSoftNoteOn(instrumentId, rowToMidi(note.row), note.velocity,
+					emitSoftNoteOn(instrumentId, rowToMidi(note.row, pat->rootPitch, pat->chordType), note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});
 		}

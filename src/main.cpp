@@ -132,17 +132,11 @@ int main(int argc, char **argv) {
         };
     }
 
-    app.onExtraParamsChanged = [&]() {
-        if (jackUp)
-            jackTransport.setNoteParams(app.patternPanel->rootPitch(),
-                                        app.patternPanel->chordType());
-    };
-
     // Soft (Native/Debug) output routing for the song playhead. Lambdas read live
     // state at playback time, so they're safe to set before build() populates widgets.
     app.portRegistry = &portReg;
-    app.rowToMidi = [&app](int row) {
-        return rowToMidi(row, app.patternPanel->rootPitch(), app.patternPanel->chordType());
+    app.rowToMidi = [](int row, int root, int chord) {
+        return rowToMidi(row, root, chord);
     };
     app.instrRoute = [&app](int instrumentId) -> MidiInstrRoute {
         if (!app.outputsOverlay) return {};
@@ -296,11 +290,6 @@ int main(int argc, char **argv) {
     auto collectState = [&]() -> AppState {
         AppState state;
         state.timeline = songTimeline.get();
-        if (app.patternPanel) {
-            state.rootPitch = app.patternPanel->rootPitch();
-            state.chordType = app.patternPanel->chordType();
-            state.sharp     = app.patternPanel->isSharp();
-        }
         if (app.transportOverlay) state.transport = app.transportOverlay->selection();
         collectOutputs(state);
         return state;
@@ -311,8 +300,6 @@ int main(int argc, char **argv) {
     // loadTimeline() fires onTimelineChanged().
     auto applyLoadedState = [&](const AppState& state) {
         songTimeline.loadTimeline(state.timeline);
-        if (app.patternPanel)
-            app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
         applyLoadedOutputs(state);
         if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
             app.transportOverlay->setSelection(state.transport);
@@ -325,8 +312,6 @@ int main(int argc, char **argv) {
         jackUp = true;
         jackTransport.setTimeline(&songTimeline);
         jackTransport.setActivePatterns(&app.aps);
-        jackTransport.setNoteParams(app.patternPanel->rootPitch(),
-                                    app.patternPanel->chordType());
         jackTransport.onTransportEvent = [&]() {
             Fl::awake([](void* data) {
                 static_cast<Transport*>(data)->syncPlayState();

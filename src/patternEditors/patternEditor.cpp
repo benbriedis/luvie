@@ -38,9 +38,12 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
 
 PatternEditor::~PatternEditor() = default;
 
+// Display-only sync of the editor to a pattern's harmony. Never remaps notes:
+// remapping on a chord-size change is an interactive edit handled in
+// PatternPanel::commitHarmony, so that merely *switching* to a pattern with a
+// different-size chord does not corrupt that pattern's stored notes.
 void PatternEditor::setNoteParams(int root, int chord, bool sharp)
 {
-    int oldChordType = chordType;
     rootPitch = root;
     chordType = chord;
     noteLabels.setParams(root, chord, sharp);
@@ -52,9 +55,6 @@ void PatternEditor::setNoteParams(int root, int chord, bool sharp)
         if (lastSelectedTrack < (int)tracks.size())
             patId = tracks[lastSelectedTrack].lanes.empty() ? 0 : tracks[lastSelectedTrack].lanes[0].patternId;
     }
-
-    if (pattern && patId > 0 && chordDefs[oldChordType].size != chordDefs[chord].size)
-        pattern->remapPatternNotes(patId, chordDefs[oldChordType].size, chordDefs[chord].size);
 
     setRowOffset(computeDefaultOffset(patId));
 }

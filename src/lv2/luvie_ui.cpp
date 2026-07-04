@@ -190,9 +190,6 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
     if (!ui->song || !ui->app.patternPanel)
         return false;
     state.timeline  = ui->song->get();
-    state.rootPitch = ui->app.patternPanel->rootPitch();
-    state.chordType = ui->app.patternPanel->chordType();
-    state.sharp     = ui->app.patternPanel->isSharp();
     collectOverlayOutputs(ui, state);
     return true;
 }
@@ -285,7 +282,6 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
         return;
     }
     ui->restoringState = true;
-    ui->app.patternPanel->setParams(state.rootPitch, state.chordType, state.sharp);
     ui->song->loadTimeline(state.timeline);
     applyOverlayOutputs(ui, state);
     ui->restoringState = false;

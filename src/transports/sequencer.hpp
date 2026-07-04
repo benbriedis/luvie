@@ -50,7 +50,6 @@ public:
 
     void setTimeline(ObservableSong* tl);
     void setActivePatterns(ActivePatternSet* aps);
-    void setNoteParams(int rootPitch, int chordType);
     void setInstruments(const std::vector<InstrumentRouting>& routings);
     void setLoopMode(bool loopMode);
 
@@ -123,8 +122,6 @@ protected:
 private:
     // ── Owner-thread state ────────────────────────────────────────────────────
     ActivePatternSet*                aps       = nullptr;
-    int                              rootPitch = 0;
-    int                              chordType = 0;
     bool                             loopMode  = false;
     std::map<int, InstrumentRouting> instrumentMap_;
 

@@ -45,13 +45,6 @@ void Sequencer::setActivePatterns(ActivePatternSet* a)
     rebuildSnapshot();
 }
 
-void Sequencer::setNoteParams(int root, int chord)
-{
-    rootPitch = root;
-    chordType = chord;
-    rebuildSnapshot();
-}
-
 void Sequencer::setInstruments(const std::vector<InstrumentRouting>& routings)
 {
     instrumentMap_.clear();
@@ -132,7 +125,7 @@ void Sequencer::rebuildSnapshot()
         } else {
             for (const Note& note : pat->notes) {
                 if (note.disabled) continue;
-                int midi = rowToMidi(note.row, rootPitch, chordType);
+                int midi = rowToMidi(note.row, pat->rootPitch, pat->chordType);
                 is.notes.push_back({midi, note.beat, note.length, note.velocity});
             }
         }
