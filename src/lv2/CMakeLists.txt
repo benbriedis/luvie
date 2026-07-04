@@ -13,6 +13,7 @@ add_library(luvie_dsp MODULE
     luvie_dsp.cpp
     ${SRC}/transports/sequencer.cpp
     ${SRC}/songEditor/observableSong.cpp
+    ${SRC}/songEditor/patternNames.cpp
     ${SRC}/songEditor/timelineIO.cpp
     ${SRC}/activePatternSet.cpp)
 target_include_directories(luvie_dsp PRIVATE

@@ -17,6 +17,7 @@ private:
     ModernButton*       addParamBtn;
     ModernButton*       addLaneBtn;
     ModernButton*       addPianorollLaneBtn;
+    ModernButton*       cloneLaneBtn;
     ModernButton*       removeLaneBtn;
     ObservablePattern*  timeline      = nullptr;
     int                 targetTrackId = -1;
@@ -28,6 +29,7 @@ private:
     void doShowParamSubmenu();
     void doAddLane();
     void doAddPianorollLane();
+    void doCloneLane();
     void doRemoveLane();
 
 public:

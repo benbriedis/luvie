@@ -104,7 +104,7 @@ class OutputsOverlay : public OverlayWindow {
 
     std::string uniquePortName(const std::string& base, int excludeIdx = -1) const;
     std::string uniqueInstrName(const std::string& base, int excludeIdx = -1) const;
-    std::string nextNumberedInstrName(bool isDrum) const;
+    std::string nextDefaultInstrName(bool isDrum) const;
 
     static void inputCb            (Fl_Widget*, void*);
     static void backendChoiceCb    (Fl_Widget*, void*);

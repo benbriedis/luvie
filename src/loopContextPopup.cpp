@@ -3,13 +3,14 @@
 #include <FL/fl_draw.H>
 
 LoopContextPopup::LoopContextPopup()
-    : ContextMenuPopup(popW, 5*30+2)
+    : ContextMenuPopup(popW, 6*30+2)
 {
     openPatternBtn      = addItem(0, "Open Pattern");
     addLaneBtn          = addItem(1, "Add Pattern");
     addPianorollLaneBtn = addItem(2, "Add Pianoroll");
-    removeLaneBtn       = addItem(3, "Remove Pattern");
-    showInstrumentsBtn  = addItem(4, "Show Instruments");
+    cloneLaneBtn        = addItem(3, "Clone Pattern");
+    removeLaneBtn       = addItem(4, "Remove Pattern");
+    showInstrumentsBtn  = addItem(5, "Show Instruments");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<LoopContextPopup*>(d)->doOpenPattern();
@@ -19,6 +20,9 @@ LoopContextPopup::LoopContextPopup()
     }, this);
     addPianorollLaneBtn->callback([](Fl_Widget*, void* d) {
         static_cast<LoopContextPopup*>(d)->doAddPianorollLane();
+    }, this);
+    cloneLaneBtn->callback([](Fl_Widget*, void* d) {
+        static_cast<LoopContextPopup*>(d)->doCloneLane();
     }, this);
     removeLaneBtn->callback([](Fl_Widget*, void* d) {
         static_cast<LoopContextPopup*>(d)->doRemoveLane();
@@ -43,7 +47,11 @@ void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int 
     // From a label there is no specific pattern to open or remove.
     bool canOpen   = flags.canOpenPattern && !fromLabel;
     bool canRemove = flags.canRemoveLane  && !fromLabel;
+    // Cloning needs a specific pattern, so it follows Open Pattern (disabled
+    // from a label) rather than Remove (which is also blocked on last lane).
+    bool canClone  = flags.canOpenPattern && !fromLabel;
     canOpen   ? openPatternBtn->activate()  : openPatternBtn->deactivate();
+    canClone  ? cloneLaneBtn->activate()    : cloneLaneBtn->deactivate();
     canRemove ? removeLaneBtn->activate()   : removeLaneBtn->deactivate();
     flags.isDrumTrack ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
 
@@ -78,6 +86,14 @@ void LoopContextPopup::doAddPianorollLane()
     hide();
     if (!timeline) return;
     timeline->song()->addPianorollLane(targetTrackId);
+    if (auto* win = window()) win->redraw();
+}
+
+void LoopContextPopup::doCloneLane()
+{
+    hide();
+    if (!timeline) return;
+    timeline->song()->cloneLane(targetTrackId, targetLaneId);
     if (auto* win = window()) win->redraw();
 }
 

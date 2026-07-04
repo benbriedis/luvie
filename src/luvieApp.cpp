@@ -443,11 +443,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     if (song_->get().instruments.empty()) {
         const std::string port = outputsOverlay->getOutputs().empty()
             ? "" : outputsOverlay->getOutputs()[0];
-        int id1 = instruments_->add("Instrument 1", false);
-        int id2 = instruments_->add("Drums 1", true);
+        int id1 = instruments_->add("Instrument A", false);
+        int id2 = instruments_->add("Drums A", true);
         outputsOverlay->setInstruments({
-            {id1, "Instrument 1", port,  1, {}, false, false, -1, -1, -1, -1},
-            {id2, "Drums 1",      port, 10, {}, true,  false, -1, -1, -1, -1}
+            {id1, "Instrument A", port,  1, {}, false, false, -1, -1, -1, -1},
+            {id2, "Drums A",      port, 10, {}, true,  false, -1, -1, -1, -1}
         });
     }
     pushInstruments();
@@ -503,9 +503,8 @@ void LuvieApp::pushInstruments() {
                 if (t.instrumentId == ci.id) { found = true; break; }
             if (!found && pattern_) {
                 int patId = ci.isDrum
-                    ? pattern_->createDrumPattern(numPatternBeats)
-                    : pattern_->createPattern(numPatternBeats);
-                pattern_->setPatternInstrument(patId, ci.id);
+                    ? pattern_->createDrumPattern(numPatternBeats, ci.id)
+                    : pattern_->createPattern(numPatternBeats, ci.id);
                 song_->addTrack(ci.id, patId);
             }
         }

@@ -623,8 +623,10 @@ void PatternPanel::startEdit()
     int sel = tl.selectedTrackIndex;
     if (sel < 0 || sel >= (int)tl.tracks.size()) return;
 
-    int patId = tl.tracks[sel].lanes.empty() ? -1 : tl.tracks[sel].lanes[0].patternId;
-    if (patId < 0) return;
+    // Edit the pattern currently shown (the selected lane), not always lane 0 —
+    // this must match the id used to display the name in onTimelineChanged().
+    int patId = tl.patternIdForSelectedLane();
+    if (patId <= 0) return;
     editingPatId = patId;
     originalLabel.clear();
     for (const auto& p : tl.patterns)
@@ -642,7 +644,9 @@ void PatternPanel::startEdit()
 
 void PatternPanel::checkDuplicate()
 {
-    input.textcolor(panelText);
+    bool dup = pattern && editingPatId >= 0 &&
+               pattern->song()->patternNameCollides(editingPatId, input.value());
+    input.textcolor(dup ? FL_RED : panelText);
     input.redraw();
 }
 

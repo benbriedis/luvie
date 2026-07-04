@@ -40,8 +40,10 @@ public:
     void setDrumNoteMute(int patternId, int note, bool mute);
 
     // Pattern lifecycle (creation/copy)
-    int createPattern(float lengthBeats);
-    int createDrumPattern(float lengthBeats);
+    // instrumentId defaults to the song's default (drum) instrument when < 0.
+    // Passing it explicitly ensures the auto name reflects that instrument.
+    int createPattern(float lengthBeats, int instrumentId = -1);
+    int createDrumPattern(float lengthBeats, int instrumentId = -1);
     int createPianorollPattern(float lengthBeats);
     int copyPattern(int srcPatId);
 

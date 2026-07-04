@@ -48,7 +48,6 @@ void ObservableSong::loadTimeline(const Timeline& tl)
         }
     }
     nextId = 1;
-    nextPatternNumber = (int)data.patterns.size() + 1;
     for (const auto& instr : data.instruments)
         if (instr.id >= nextId) nextId = instr.id + 1;
     for (const auto& p : data.patterns) {
@@ -848,9 +847,9 @@ int ObservableSong::addLane(int trackId)
         Pattern newPat;
         newPat.id           = patId;
         newPat.lengthBeats  = beats;
-        newPat.name         = "Pattern " + std::to_string(nextPatternNumber++);
         newPat.type         = ptype;
         newPat.instrumentId = instrId;
+        patternNames.assignAuto(newPat);
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
@@ -901,9 +900,9 @@ int ObservableSong::addPianorollLane(int trackId)
         Pattern newPat;
         newPat.id           = patId;
         newPat.lengthBeats  = beats;
-        newPat.name         = "Pattern " + std::to_string(nextPatternNumber++);
         newPat.type         = PatternType::PIANOROLL;
         newPat.instrumentId = instrId;
+        patternNames.assignAuto(newPat);
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
@@ -930,14 +929,63 @@ int ObservableSong::addPianorollLane(int trackId)
     return -1;
 }
 
+int ObservableSong::cloneLane(int trackId, int laneId)
+{
+    for (auto& t : data.tracks) {
+        if (t.id != trackId) continue;
+
+        int srcPatId = -1;
+        for (const auto& l : t.lanes)
+            if (l.id == laneId) { srcPatId = l.patternId; break; }
+
+        const Pattern* src = nullptr;
+        for (const auto& p : data.patterns)
+            if (p.id == srcPatId) { src = &p; break; }
+        if (!src) return -1;
+
+        // Deep-copy the source pattern (notes, drums and automation) with fresh
+        // IDs so the clone is fully independent. Works for STANDARD, PIANOROLL
+        // and DRUM patterns since the whole struct is copied.
+        Pattern copy       = *src;
+        copy.id            = nextId++;
+        patternNames.assignDerived(copy, src->name);
+        for (auto& n : copy.notes)     n.id = nextId++;
+        for (auto& n : copy.drumNotes) n.id = nextId++;
+        for (auto& pl : copy.paramLanes) {
+            pl.id = nextId++;
+            for (auto& pt : pl.points) pt.id = nextId++;
+        }
+        int patId = copy.id;
+        data.patterns.push_back(std::move(copy));
+
+        std::set<int> existingLaneIds;
+        for (const auto& l : t.lanes) existingLaneIds.insert(l.id);
+
+        int newLaneId = nextId++;
+        t.lanes.push_back(Lane{newLaneId, patId, {}});
+
+        if (!t.stackedLanes || existingLaneIds.empty()) {
+            int insertAt = (int)data.rowOrder.size();
+            for (int i = (int)data.rowOrder.size() - 1; i >= 0; i--)
+                if (data.rowOrder[i].kind == RowKind::Lane && existingLaneIds.count(data.rowOrder[i].id))
+                    { insertAt = i + 1; break; }
+            data.rowOrder.insert(data.rowOrder.begin() + insertAt, RowRef{RowKind::Lane, newLaneId});
+        }
+        rebuildInstrumentHeaders();
+        reconcileLoopLanes();
+        notify();
+        return newLaneId;
+    }
+    return -1;
+}
+
 void ObservableSong::setPatternName(int patId, std::string name)
 {
-    auto first = name.find_first_not_of(" \t\r\n");
-    auto last  = name.find_last_not_of(" \t\r\n");
-    if (first == std::string::npos) return;
-    name = name.substr(first, last - first + 1);
     for (auto& p : data.patterns)
-        if (p.id == patId) { p.name = std::move(name); notify(); return; }
+        if (p.id == patId) {
+            if (patternNames.rename(p, name)) notify();
+            return;
+        }
 }
 
 void ObservableSong::setStackedLanes(int trackId, bool stacked)

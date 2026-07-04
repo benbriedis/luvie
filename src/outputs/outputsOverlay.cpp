@@ -197,7 +197,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         auto* self = static_cast<OutputsOverlay*>(d);
         const std::string portName = self->outputs_.empty()
             ? "" : self->outputs_[0].portName;
-        const std::string name = self->nextNumberedInstrName(false);
+        const std::string name = self->nextDefaultInstrName(false);
         int id = self->instrObs_ ? self->instrObs_->add(name, false) : 0;
         self->instruments_.push_back({id, name, portName, 1, {}, false});
         self->rebuildInstrumentRows();
@@ -214,7 +214,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
         auto* self = static_cast<OutputsOverlay*>(d);
         const std::string portName = self->outputs_.empty()
             ? "" : self->outputs_[0].portName;
-        const std::string name = self->nextNumberedInstrName(true);
+        const std::string name = self->nextDefaultInstrName(true);
         int id = self->instrObs_ ? self->instrObs_->add(name, true) : 0;
         self->instruments_.push_back({id, name, portName, 10, {}, true});
         self->rebuildInstrumentRows();
@@ -392,7 +392,18 @@ std::string OutputsOverlay::uniqueInstrName(const std::string& base, int exclude
     }
 }
 
-std::string OutputsOverlay::nextNumberedInstrName(bool isDrum) const {
+// 1 -> "A", 2 -> "B", ..., 26 -> "Z", 27 -> "AA", 28 -> "AB", ...
+static std::string letterSuffix(int n) {
+    std::string s;
+    while (n > 0) {
+        int rem = (n - 1) % 26;
+        s.insert(s.begin(), char('A' + rem));
+        n = (n - 1) / 26;
+    }
+    return s;
+}
+
+std::string OutputsOverlay::nextDefaultInstrName(bool isDrum) const {
     const std::string prefix = isDrum ? "Drums " : "Instrument ";
     auto inUse = [&](const std::string& name) {
         for (const auto& instr : instruments_)
@@ -400,7 +411,7 @@ std::string OutputsOverlay::nextNumberedInstrName(bool isDrum) const {
         return false;
     };
     for (int n = 1; ; n++) {
-        std::string name = prefix + std::to_string(n);
+        std::string name = prefix + letterSuffix(n);
         if (!inUse(name)) return name;
     }
 }

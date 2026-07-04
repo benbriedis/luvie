@@ -225,30 +225,31 @@ void ObservablePattern::setDrumNoteMute(int patternId, int note, bool m)
 // ---------------------------------------------------------------------------
 // Pattern lifecycle
 
-int ObservablePattern::createPattern(float lengthBeats)
+int ObservablePattern::createPattern(float lengthBeats, int instrumentId)
 {
     int id = song_->nextId++;
     Pattern p;
     p.id           = id;
     p.lengthBeats  = lengthBeats;
-    p.name         = "Pattern " + std::to_string(song_->nextPatternNumber++);
-    p.instrumentId = song_->defaultInstrumentId;
+    p.instrumentId = instrumentId >= 0 ? instrumentId : song_->defaultInstrumentId;
+    song_->patternNames.assignAuto(p);
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(p);
     song_->notify();
     return id;
 }
 
-int ObservablePattern::createDrumPattern(float lengthBeats)
+int ObservablePattern::createDrumPattern(float lengthBeats, int instrumentId)
 {
     int id = song_->nextId++;
     Pattern p;
     p.id           = id;
     p.lengthBeats  = lengthBeats;
-    p.name         = "Pattern " + std::to_string(song_->nextPatternNumber++);
     p.type         = PatternType::DRUM;
-    p.instrumentId = song_->defaultDrumInstrumentId
-        ? song_->defaultDrumInstrumentId : song_->defaultInstrumentId;
+    p.instrumentId = instrumentId >= 0 ? instrumentId
+        : (song_->defaultDrumInstrumentId
+            ? song_->defaultDrumInstrumentId : song_->defaultInstrumentId);
+    song_->patternNames.assignAuto(p);
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(std::move(p));
     song_->notify();
@@ -261,9 +262,9 @@ int ObservablePattern::createPianorollPattern(float lengthBeats)
     Pattern p;
     p.id           = id;
     p.lengthBeats  = lengthBeats;
-    p.name         = "Pattern " + std::to_string(song_->nextPatternNumber++);
     p.type         = PatternType::PIANOROLL;
     p.instrumentId = song_->defaultInstrumentId;
+    song_->patternNames.assignAuto(p);
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
     song_->data.patterns.push_back(std::move(p));
     song_->notify();
@@ -281,6 +282,7 @@ int ObservablePattern::copyPattern(int srcPatId)
     copy.id = song_->nextId++;
     copy.lengthBeats = src->lengthBeats;
     copy.type = src->type;
+    song_->patternNames.assignDerived(copy, src->name);
     for (auto n : src->notes) {
         n.id = song_->nextId++;
         copy.notes.push_back(n);

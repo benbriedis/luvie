@@ -171,6 +171,15 @@ void TrackLabels::startInstrumentEdit(int absRow)
 void TrackLabels::checkDuplicate()
 {
     if (!timeline || editingAbsRow < 0) return;
+
+    // Pattern rename: flag names that collide with another pattern.
+    if (editingPatId >= 0) {
+        bool dup = timeline->patternNameCollides(editingPatId, input.value());
+        input.textcolor(dup ? FL_RED : colText);
+        input.redraw();
+        return;
+    }
+
     const auto& ro = timeline->get().rowOrder;
     if (editingAbsRow >= (int)ro.size()) return;
     const auto& ref = ro[editingAbsRow];
@@ -242,7 +251,7 @@ void TrackLabels::startPatternEdit(int absRow)
     input.show();
     input.take_focus();
     input.position(input.size(), 0);
-    input.onChange([]() {});
+    input.onChange([this]() { checkDuplicate(); });
     InlineEditDispatch::install(this, [this]() { commitEdit(); });
     redraw();
 }

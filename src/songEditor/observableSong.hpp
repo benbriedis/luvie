@@ -3,6 +3,7 @@
 
 #include "itimelineobserver.hpp"
 #include "timeline.hpp"
+#include "patternNames.hpp"
 #include <string>
 #include <vector>
 
@@ -52,6 +53,7 @@ public:
     void selectLane(int trackIndex, int laneId);
     int  addLane(int trackId);
     int  addPianorollLane(int trackId);
+    int  cloneLane(int trackId, int laneId);
     void removeLane(int trackId, int laneId);
     void setStackedLanes(int trackId, bool stacked);
     int  trackIndexForId(int trackId) const;
@@ -96,8 +98,16 @@ public:
     int defaultInstrumentId     = 0;
     int defaultDrumInstrumentId = 0;
 
-    // Set the display name of a pattern; empty = auto ("InstrumentName N").
+    // Set the display name of a pattern. Rejected (no change) if the name is
+    // blank or duplicates another pattern; all naming is funnelled through
+    // PatternNames to keep names unique.
     void setPatternName(int patId, std::string name);
+
+    // Would renaming pattern patId to `name` collide with another pattern?
+    // Used by the editors for live duplicate feedback while typing.
+    bool patternNameCollides(int patId, const std::string& name) const {
+        return patternNames.collides(name, patId);
+    }
 
     // Pattern instance management (instances identified by stable id)
     void addPattern(int trackIndex, float startBar, float length, float patternBeats = 0.0f);
@@ -132,9 +142,10 @@ private:
     };
     std::vector<TimeSegment> buildSegments() const;
     Timeline data;
+    // Funnel for all pattern-name creation/changes; binds to data.patterns.
+    PatternNames patternNames{data};
     std::vector<ITimelineObserver*> observers;
     int nextId = 1;
-    int nextPatternNumber = 1;
 
     // True if patId is referenced by any lane's editor pattern or any placed instance.
     bool patternStillReferenced(int patId) const;

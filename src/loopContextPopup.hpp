@@ -17,6 +17,7 @@ private:
     ModernButton*       openPatternBtn;
     ModernButton*       addLaneBtn;
     ModernButton*       addPianorollLaneBtn;
+    ModernButton*       cloneLaneBtn;
     ModernButton*       removeLaneBtn;
     ModernButton*       showInstrumentsBtn;
     ObservablePattern*  timeline      = nullptr;
@@ -27,6 +28,7 @@ private:
     void doShowInstruments();
     void doAddLane();
     void doAddPianorollLane();
+    void doCloneLane();
     void doRemoveLane();
 
 public:

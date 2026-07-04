@@ -3,14 +3,15 @@
 #include <FL/fl_draw.H>
 
 TrackContextPopup::TrackContextPopup()
-    : ContextMenuPopup(popW, 6*30+2)
+    : ContextMenuPopup(popW, 7*30+2)
 {
     openPatternBtn      = addItem(0, "Open Pattern");
     addParamBtn         = addItem(1, "Add automation \xe2\x96\xb6");
     addLaneBtn          = addItem(2, "Add Pattern");
     addPianorollLaneBtn = addItem(3, "Add Pianoroll");
-    removeLaneBtn       = addItem(4, "Remove Pattern");
-    showInstrumentsBtn  = addItem(5, "Show Instruments");
+    cloneLaneBtn        = addItem(4, "Clone Pattern");
+    removeLaneBtn       = addItem(5, "Remove Pattern");
+    showInstrumentsBtn  = addItem(6, "Show Instruments");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doOpenPattern();
@@ -27,6 +28,9 @@ TrackContextPopup::TrackContextPopup()
     addPianorollLaneBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doAddPianorollLane();
     }, this);
+    cloneLaneBtn->callback([](Fl_Widget*, void* d) {
+        static_cast<TrackContextPopup*>(d)->doCloneLane();
+    }, this);
     removeLaneBtn->callback([](Fl_Widget*, void* d) {
         static_cast<TrackContextPopup*>(d)->doRemoveLane();
     }, this);
@@ -39,6 +43,7 @@ TrackContextPopup::TrackContextPopup()
     showInstrumentsBtn->onEnter  = hideSubmenuFn;
     addLaneBtn->onEnter          = hideSubmenuFn;
     addPianorollLaneBtn->onEnter = hideSubmenuFn;
+    cloneLaneBtn->onEnter        = hideSubmenuFn;
     removeLaneBtn->onEnter       = hideSubmenuFn;
 
     paramSubmenu = new ParameterSubmenu();
@@ -64,6 +69,7 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
     auto flags = tl ? tl->song()->trackMenuFlags(trackId)
                     : ObservableSong::TrackMenuFlags{};
     flags.canOpenPattern ? openPatternBtn->activate()      : openPatternBtn->deactivate();
+    flags.canOpenPattern ? cloneLaneBtn->activate()        : cloneLaneBtn->deactivate();
     flags.canRemoveLane  ? removeLaneBtn->activate()       : removeLaneBtn->deactivate();
     flags.isDrumTrack    ? addPianorollLaneBtn->deactivate(): addPianorollLaneBtn->activate();
 
@@ -109,6 +115,14 @@ void TrackContextPopup::doAddPianorollLane()
     hide();
     if (!timeline) return;
     timeline->song()->addPianorollLane(targetTrackId);
+    if (auto* win = window()) win->redraw();
+}
+
+void TrackContextPopup::doCloneLane()
+{
+    hide();
+    if (!timeline) return;
+    timeline->song()->cloneLane(targetTrackId, targetLaneId);
     if (auto* win = window()) win->redraw();
 }
 
