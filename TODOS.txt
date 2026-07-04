@@ -329,12 +329,31 @@ FROM GOOGLE:
   
 cf master volume rubberband control? Or any other global parameters?
 
-Add more chords and scales?
-	Perhaps have a scale/chord toggle for convenience of selection... alternatively create a big popup with columns?
-
 Add Start & End markers in Song Editor and a looping function (toggle next to play)
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
 Q: do the pattern editors have a 'minimum gap' at them bottom of the note grid? If so we should remove it.
+
+Add more chords and scales
+==========================
+Scales - cf
+  https://en.wikipedia.org/wiki/Octatonic_scale
+  https://en.wikipedia.org/wiki/Hungarian_minor_scale
+  https://en.wikipedia.org/wiki/Arabic_maqam
+  https://en.wikipedia.org/wiki/Byzantine_music
+  https://en.wikipedia.org/wiki/Persian_scale  (easier one to convert)
+  https://en.wikipedia.org/wiki/Jazz_scale
+  https://en.wikipedia.org/wiki/List_of_musical_scales_and_modes
+  
+Chords:
+   https://en.wikipedia.org/wiki/Petrushka_chord (+see list at bottom)
+   Jimi Hendrix chord
+
+cf custom chord and scale builder
+   - Would want to be able to export and import them.
+   - COULD have a global store of them, but think I'd prefer to manage the them manually
+     (easy for the global stuff to go wrong).
+
+
 

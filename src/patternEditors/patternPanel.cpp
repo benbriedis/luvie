@@ -40,7 +40,7 @@ static constexpr int kSnapDefault      = 2;  // 1/16
 KeySection::KeySection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       baseLabel   (0, 0, kLabelW,  h, "Base"),
-      sharpFlatBtn(0, 0, kBtnW,    h, "#"),
+      sharpFlatBtn(0, 0, kBtnW,    h, "#", "b"),
       rootChoice  (0, 0, kChoiceW, h)
 {
     gap(kGap);
@@ -52,12 +52,12 @@ KeySection::KeySection(int x, int y, int h)
 
 ChordSection::ChordSection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
-      chordLabel (0, 0, kLabelW,  h, "Chord"),
-      chordChoice(0, 0, kChoiceW, h)
+      chordScaleBtn(0, 0, kLabelW,  h, "Chord", "Scale"),
+      chordChoice  (0, 0, kChoiceW, h)
 {
     gap(kGap);
-    fixed(&chordLabel,  kLabelW);
-    fixed(&chordChoice, kChoiceW);
+    fixed(&chordScaleBtn, kLabelW);
+    fixed(&chordChoice,   kChoiceW);
     end();
 }
 
@@ -244,15 +244,12 @@ void PatternPanel::initHarmonyControls()
     ks.sharpFlatBtn.labelcolor(panelText);
     ks.sharpFlatBtn.setBorderWidth(1);
     ks.sharpFlatBtn.setBorderColor(panelCtrlBorder);
-    ks.sharpFlatBtn.callback([](Fl_Widget*, void* d) {
-        auto* self = static_cast<PatternPanel*>(d);
-        auto& ks   = self->harmonyControls.keySec;
-        int idx    = ks.rootChoice.value();
-        self->useSharp = !self->useSharp;
-        ks.sharpFlatBtn.label(self->useSharp ? "#" : "b");
-        self->updateRootChoiceLabels(idx);
-        self->commitHarmony();
-    }, this);
+    ks.sharpFlatBtn.onToggle = [this](bool sharp) {
+        int idx  = harmonyControls.keySec.rootChoice.value();
+        useSharp = sharp;
+        updateRootChoiceLabels(idx);
+        commitHarmony();
+    };
 
     updateRootChoiceLabels(0);
 
@@ -264,12 +261,18 @@ void PatternPanel::initHarmonyControls()
     ks.rootChoice.setBorderColor(panelCtrlBorder);
     ks.rootChoice.callback(paramsCb, this);
 
-    cs.chordLabel.box(FL_NO_BOX);
-    cs.chordLabel.labelcolor(panelText);
-    cs.chordLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+    cs.chordScaleBtn.color(HarmonyControls::kBg);
+    cs.chordScaleBtn.labelcolor(panelText);
+    cs.chordScaleBtn.setBorderWidth(1);
+    cs.chordScaleBtn.setBorderColor(panelCtrlBorder);
+    cs.chordScaleBtn.onToggle = [this](bool chordMode) {
+        showScale = !chordMode;
+        populateChordChoice();
+        harmonyControls.chordSec.chordChoice.value(0);
+        commitHarmony();
+    };
 
-    for (const auto& def : chordDefs)
-        cs.chordChoice.add(def.name);
+    populateChordChoice();
     cs.chordChoice.value(0);
     cs.chordChoice.color(HarmonyControls::kBg);
     cs.chordChoice.setBorderColor(panelCtrlBorder);
@@ -442,12 +445,34 @@ void PatternPanel::initInput()
     input.onUnfocus([this]() { commitEdit(); });
 }
 
+void PatternPanel::populateChordChoice()
+{
+    auto& cc = harmonyControls.chordSec.chordChoice;
+    cc.clear();
+    chordChoiceMap.clear();
+    for (int i = 0; i < numChordDefs; ++i) {
+        if (chordDefs[i].isScale != showScale) continue;
+        cc.add(chordDefs[i].name);
+        chordChoiceMap.push_back(i);
+    }
+    cc.redraw();
+}
+
 void PatternPanel::setParams(int root, int chord, bool sharp)
 {
     useSharp = sharp;
-    harmonyControls.keySec.sharpFlatBtn.label(useSharp ? "#" : "b");
+    harmonyControls.keySec.sharpFlatBtn.set(sharp);
     updateRootChoiceLabels(root);
-    harmonyControls.chordSec.chordChoice.value(chord);
+
+    if (chord < 0 || chord >= numChordDefs) chord = 0;
+    showScale = chordDefs[chord].isScale;
+    harmonyControls.chordSec.chordScaleBtn.set(!showScale);
+    populateChordChoice();
+    // Map the global chordDefs index to its position within the filtered choice.
+    int sel = 0;
+    for (int i = 0; i < (int)chordChoiceMap.size(); ++i)
+        if (chordChoiceMap[i] == chord) { sel = i; break; }
+    harmonyControls.chordSec.chordChoice.value(sel);
     redraw();
 }
 

@@ -6,18 +6,30 @@
 struct ChordDef {
     const char* name;
     int         size;
-    int         intervals[5];
+    int         intervals[7];
+    bool        isScale;   // true = shown under "Scale"; false = under "Chord"
 };
 
 inline constexpr ChordDef chordDefs[] = {
-    {"Major",        3, {0, 4, 7,  0,  0}},
-    {"Minor",        3, {0, 3, 7,  0,  0}},
-    {"Major 7",      4, {0, 4, 7, 11,  0}},
-    {"Minor 7",      4, {0, 3, 7, 10,  0}},
-    {"Major 9",      5, {0, 4, 7, 11, 14}},
-    {"Minor 9",      5, {0, 3, 7, 10, 14}},
-    {"Major Pent.",  5, {0, 2, 4,  7,  9}},
-    {"Minor Pent.",  5, {0, 3, 5,  7, 10}},
+    {"Major",             3, {0, 4, 7,  0,  0,  0,  0}, false},
+    {"Minor",             3, {0, 3, 7,  0,  0,  0,  0}, false},
+    {"Major 7",           4, {0, 4, 7, 11,  0,  0,  0}, false},
+    {"Minor 7",           4, {0, 3, 7, 10,  0,  0,  0}, false},
+    {"Major 9",           5, {0, 4, 7, 11, 14,  0,  0}, false},
+    {"Minor 9",           5, {0, 3, 7, 10, 14,  0,  0}, false},
+    {"Major Pent.",       5, {0, 2, 4,  7,  9,  0,  0}, true},
+    {"Minor Pent.",       5, {0, 3, 5,  7, 10,  0,  0}, true},
+    {"Major",             7, {0, 2, 4,  5,  7,  9, 11}, true},
+    {"Minor (asc)",       7, {0, 2, 3,  5,  7,  9, 11}, true},
+    {"Minor (desc)",      7, {0, 2, 3,  5,  7,  8, 10}, true},
+    {"Minor (harmonic)",  7, {0, 2, 3,  5,  7,  8, 11}, true},
+    {"Mixolydian",        7, {0, 2, 4,  5,  7,  9, 10}, true},
+    {"Lydian",            7, {0, 2, 4,  6,  7,  9, 11}, true},
+    {"Aeolian",           7, {0, 2, 3,  5,  7,  8, 10}, true},
+    {"Dorian",            7, {0, 2, 3,  5,  7,  9, 10}, true},
+    {"Phrygian",          7, {0, 1, 3,  5,  7,  8, 10}, true},
+    {"Locrian",           7, {0, 1, 3,  5,  6,  8, 10}, true},
+    {"Wholetone",         6, {0, 2, 4,  6,  8, 10,  0}, true},
 };
 
 inline constexpr int numChordDefs = sizeof(chordDefs) / sizeof(chordDefs[0]);

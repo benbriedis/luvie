@@ -11,6 +11,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include "modernButton.hpp"
+#include "toggleButton.hpp"
 #include "modernChoice.hpp"
 #include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
@@ -31,7 +32,7 @@ struct KeySection : Fl_Flex {
     static constexpr int kChoiceW = 52;
     static constexpr int kWidth   = kLabelW + kGap + kBtnW + kGap + kChoiceW;
     Fl_Box       baseLabel;
-    ModernButton sharpFlatBtn;
+    ToggleButton sharpFlatBtn;
     ModernChoice rootChoice;
     KeySection(int x, int y, int h);
 };
@@ -41,7 +42,7 @@ struct ChordSection : Fl_Flex {
     static constexpr int kLabelW  = 55;
     static constexpr int kChoiceW = 98;
     static constexpr int kWidth   = kLabelW + kGap + kChoiceW;
-    Fl_Box       chordLabel;
+    ToggleButton chordScaleBtn;   // toggles the choice between chords and scales
     ModernChoice chordChoice;
     ChordSection(int x, int y, int h);
 };
@@ -157,6 +158,8 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     int                 editingPatId = -1;
     std::string         originalLabel;
     bool                useSharp      = true;
+    bool                showScale     = false;  // Chord/Scale toggle state
+    std::vector<int>    chordChoiceMap;         // choice index -> chordDefs index
 
     InlineInput     input;           // direct child of PatternPanel for overlay
     Fl_Flex         controlRow;      // outer flex — all subsequent members go here
@@ -186,6 +189,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void cancelEdit();
     void checkDuplicate();
     void updateRootChoiceLabels(int preserveIndex);
+    void populateChordChoice();
     void refreshOutChoice();
     void refreshTimeSig();
     void refreshBars();
@@ -210,7 +214,10 @@ public:
     void commitEdit();
 
     int  rootPitch() const { return harmonyControls.keySec.rootChoice.value(); }
-    int  chordType() const { return harmonyControls.chordSec.chordChoice.value(); }
+    int  chordType() const {
+        int v = harmonyControls.chordSec.chordChoice.value();
+        return (v >= 0 && v < (int)chordChoiceMap.size()) ? chordChoiceMap[v] : 0;
+    }
     bool isSharp()   const { return useSharp; }
 
     void setParams(int root, int chord, bool sharp);
