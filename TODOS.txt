@@ -356,8 +356,6 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 
-2 notes right next to one another - can I ensure a second attack occurs?
-
 TOTEST: the 'disabled' notes are correct
    - cf creating a requirements document for this and/or unit tests
 
@@ -366,13 +364,12 @@ BPM - should have mouse up and/or wheel to change
 - When collapsed I think the label name is better in the grey colour.
 
    
-BUG: add some notes to scale, cover to chord. Centering button doesn't work
+BUG: (intermittent) add some notes to scale, cover to chord. Centering button doesn't work
 
-BUG: two patterns in same instrument, one block of one followed by one block of the other
-     Viewed in the pattern editor the patterns both seem to received an enabled playhead initially
-     
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
 
 cf Rapid note: just one note per column? eg show last one only?
+
+BUG: first adding note to a pattern - seems to add the note in some rando position
 
 

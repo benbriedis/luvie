@@ -265,6 +265,7 @@ void JackTransport::emit(const std::string& port, float bar,
 
     long frameAbs = static_cast<long>(snapBarToSeconds(bar) * sampleRate);
     long off      = frameAbs - static_cast<long>(curBlockStart);
+    if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
     if (off < 0) off = 0;
     if (curNframes > 0 && off > static_cast<long>(curNframes) - 1)
         off = static_cast<long>(curNframes) - 1;

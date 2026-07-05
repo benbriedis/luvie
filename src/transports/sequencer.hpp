@@ -5,10 +5,18 @@
 #include "observableSong.hpp"
 #include "activePatternSet.hpp"
 #include "timeline.hpp"
+#include <cstdint>
 #include <map>
 #include <mutex>
 #include <string>
 #include <vector>
+
+// A MIDI note-off has status nibble 0x80. Backends use this to end a note one
+// frame early (half-open interval), so a flush same-pitch note re-attacks.
+inline bool isNoteOff(const uint8_t* data, int len)
+{
+    return len >= 1 && (data[0] & 0xF0) == 0x80;
+}
 
 /*
  * Sequencer — backend-agnostic MIDI sequencing core shared by every output path.

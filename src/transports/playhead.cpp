@@ -91,8 +91,12 @@ void Playhead::tick()
 		const bool runChecks = verbose || anySoftPort || (!jackClock && anyJackPort);
 		if (playing) {
 			float curPos = transport->position();
+			// Release expiring notes BEFORE emitting this window's note-ons, so a
+			// flush same-pitch note (note1 off == note2 on) gets off-then-on and
+			// re-attacks instead of being cancelled by the stale off.
 			if (loopActive) {
 				if (curPos >= lastPosition) {
+					flushSoftNoteOffs(curPos);
 					if (runChecks && obsTl) checkLoopVerboseNotes(lastPosition, curPos);
 				} else {
 					allSoftNotesOff();   // loop wrapped — silence anything still on
@@ -100,6 +104,7 @@ void Playhead::tick()
 			} else {
 				if (aps && obsTl) aps->sync(*obsTl, curPos);
 				if (curPos >= lastPosition) {
+					flushSoftNoteOffs(curPos);
 					if (runChecks && obsTl) {
 						checkVerboseNotes(lastPosition, curPos);
 						checkVerboseSongParams(lastPosition, curPos);
@@ -112,7 +117,6 @@ void Playhead::tick()
 					if (onEndReached) onEndReached();
 				}
 			}
-			flushSoftNoteOffs(curPos);
 			lastPosition = curPos;
 		} else {
 			if (wasPlaying) allSoftNotesOff();   // stopped — release held notes

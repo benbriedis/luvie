@@ -144,6 +144,7 @@ protected:
               const uint8_t* data, int len) override
     {
         long off = static_cast<long>((snapBarToSeconds(bar) - cycleStartSecs) * sampleRate);
+        if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
         if (off < 0) off = 0;
         if (nframes > 0 && off > static_cast<long>(nframes) - 1)
             off = static_cast<long>(nframes) - 1;
