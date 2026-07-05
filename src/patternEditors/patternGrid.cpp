@@ -3,6 +3,7 @@
 #include "playhead.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
+#include <cmath>
 #include <set>
 
 PatternGrid::PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
@@ -201,18 +202,25 @@ void PatternGrid::rapidTryCreate(int visualRow, int absCol)
     if (rapidCells.count(key)) return;
     rapidCells.insert(key);
 
-    float col = float(absCol);
-    bool clear = std::none_of(notes.begin(), notes.end(),
-        [=](const Note& n) {
-            return (int)n.row == visualRow
-                && col < n.beat + n.length
-                && col + 1.0f > n.beat;
-        });
-    if (!clear || !pattern || patternId < 0) return;
+    if (!pattern || patternId < 0) return;
 
+    // Bail on a disabled/invalid slot before mutating anything.
     int virtualPos = rowOffset + numRows - 1 - visualRow;
     int abs_row    = virtualToAbsRow(virtualPos);
     if (abs_row < 0) return;
+
+    float col = float(absCol);
+
+    // Clear any other note that starts in this same column (same start time),
+    // on any row, so a column holds at most one note-start.
+    // Collect ids first: removeNote rebuilds `notes`, invalidating iterators.
+    std::vector<int> sameColumn;
+    for (const auto& n : notes) {
+        if ((int)std::floor(n.beat) == absCol)
+            sameColumn.push_back(n.id);
+    }
+    for (int id : sameColumn)
+        pattern->removeNote(id);
 
     pattern->addNote(patternId, col, abs_row, 1.0f);
 }

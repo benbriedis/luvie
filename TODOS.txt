@@ -327,13 +327,6 @@ FROM GOOGLE:
 
 	DAW/Click Setting: In a Digital Audio Workstation (DAW), you would set the tempo based on the 8th note (in DAW terms) to get an accurate, consistent pulse   
   
-cf master volume rubberband control? Or any other global parameters?
-
-Add Start & End markers in Song Editor and a looping function (toggle next to play)
-
-Maybe indicate which patterns are pianorolls (NB name could indicate)
-
-Q: do the pattern editors have a 'minimum gap' at them bottom of the note grid? If so we should remove it.
 
 Add more chords and scales
 ==========================
@@ -368,9 +361,9 @@ BUG (seen once): add some notes to scale, cover to chord. Centering button doesn
 
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
 
-cf Rapid note: just one note per column? eg show last one only?
+cf master volume rubberband control? Or any other global parameters?
 
-If in Song mode and when in Loop editor manually enable or disable loop the loop should start or 
-  stop... I'm treating this an event-based system. Clicking a loop creates an 'enable loop' event.
-  cf formalising this by forcing all pattern start and stops through a shared funnel.
+Add Start & End markers in Song Editor and a looping function (toggle next to play)
+
+Maybe indicate which patterns are pianorolls (NB name could indicate)
 
