@@ -356,4 +356,24 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 
+Overlapping notes in pattern lose the attack. Is this a synth specific thing (eg monophonic)?
+
+TOTEST: the 'disabled' notes are correct
+
+BPM - should have mouse up and/or wheel to change
+
+- When collapsed I think the label name is better in the grey colour.
+
+   
+BUG: add some notes to scale, cover to chord. Centering button doesn't work
+
+BUG: Releasing a note after dragging (in loop mode) changes the transport position
+  
+BUG: two patterns in same instrument, one block of one followed by one block of the other
+     Viewed in the pattern editor the patterns both seem to received an enabled playhead initially
+     
+BUG: maybe impossible to add and keep pattern instances when in loop mode? Pattern blocks disappear.
+
+PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
+
 

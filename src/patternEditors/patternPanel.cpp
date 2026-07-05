@@ -449,11 +449,15 @@ void PatternPanel::populateChordChoice()
 {
     auto& cc = harmonyControls.chordSec.chordChoice;
     cc.clear();
-    chordChoiceMap.clear();
     for (int i = 0; i < numChordDefs; ++i) {
         if (chordDefs[i].isScale != showScale) continue;
-        cc.add(chordDefs[i].name);
-        chordChoiceMap.push_back(i);
+        // A non-empty `submenu` nests the entry under that named submenu ("Sub/name");
+        // otherwise it sits at top level. The chordDefs index rides along as the item's
+        // user_data so the selection maps back regardless of the submenu structure.
+        const char* sub = chordDefs[i].submenu;
+        std::string path = (sub && *sub) ? std::string(sub) + "/" + chordDefs[i].name
+                                         : chordDefs[i].name;
+        cc.add(path.c_str(), 0, nullptr, (void*)(intptr_t)i);
     }
     cc.redraw();
 }
@@ -468,11 +472,17 @@ void PatternPanel::setParams(int root, std::string_view chordHash, bool sharp)
     showScale = chordDefs[chord].isScale;
     harmonyControls.chordSec.chordScaleBtn.set(!showScale);
     populateChordChoice();
-    // Map the global chordDefs index to its position within the filtered choice.
-    int sel = 0;
-    for (int i = 0; i < (int)chordChoiceMap.size(); ++i)
-        if (chordChoiceMap[i] == chord) { sel = i; break; }
-    harmonyControls.chordSec.chordChoice.value(sel);
+    // Select the menu item whose user_data carries this chordDefs index.
+    auto& cc = harmonyControls.chordSec.chordChoice;
+    cc.value(0);
+    for (int i = 0; i < cc.size(); ++i) {
+        const Fl_Menu_Item& it = cc.menu()[i];
+        if (it.label() && !(it.flags & FL_SUBMENU) &&
+            (int)(intptr_t)it.user_data() == chord) {
+            cc.value(i);
+            break;
+        }
+    }
     redraw();
 }
 

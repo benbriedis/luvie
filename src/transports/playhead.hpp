@@ -89,6 +89,7 @@ public:
 	// don't hang when a port is destroyed or changes backend.
 	void panicSoftNotes() { allSoftNotesOff(); }
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
+	bool isLoopActive() const { return loopActive; }
 	void setPatternTrack(int track) { patternTrack = track; }
 	void setNumCols(int n)        { numCols = n; }
 

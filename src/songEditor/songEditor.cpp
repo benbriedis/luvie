@@ -269,6 +269,9 @@ void SongEditor::setColOffset(int offset)
 void SongEditor::followPlayhead()
 {
     if (!transport) return;
+    // In loop mode the song grid isn't the thing being played, so don't scroll
+    // it to chase the playhead — only follow in song mode.
+    if (playhead.isLoopActive()) return;
     bool  playing = transport->isPlaying();
     float bar     = transport->position();
 

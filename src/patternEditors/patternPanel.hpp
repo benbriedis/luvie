@@ -18,6 +18,7 @@
 #include "chords.hpp"
 #include <string>
 #include <string_view>
+#include <cstdint>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -161,7 +162,6 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     std::string         originalLabel;
     bool                useSharp      = true;
     bool                showScale     = false;  // Chord/Scale toggle state
-    std::vector<int>    chordChoiceMap;         // choice index -> chordDefs index
 
     InlineInput     input;           // direct child of PatternPanel for overlay
     Fl_Flex         controlRow;      // outer flex — all subsequent members go here
@@ -217,8 +217,8 @@ public:
 
     int  rootPitch() const { return harmonyControls.keySec.rootChoice.value(); }
     std::string chordHash() const {
-        int v = harmonyControls.chordSec.chordChoice.value();
-        int idx = (v >= 0 && v < (int)chordChoiceMap.size()) ? chordChoiceMap[v] : 0;
+        const Fl_Menu_Item* m = harmonyControls.chordSec.chordChoice.mvalue();
+        int idx = m ? (int)(intptr_t)m->user_data() : 0;
         return chordDefs[idx].hash;
     }
     bool isSharp()   const { return useSharp; }
