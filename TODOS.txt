@@ -367,3 +367,10 @@ Add Start & End markers in Song Editor and a looping function (toggle next to pl
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
+
+On rewind scroll song editor to start.
+
+Rewind in song mode:  reset all loops (ie any manual changes should disappear)
+
+Playback backends: would it be easier to have a RT standalone backend - reuse LV2 and/or Jack bits?
+   Might it reduce code?
