@@ -356,9 +356,10 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 
-Overlapping notes in pattern lose the attack. Is this a synth specific thing (eg monophonic)?
+2 notes right next to one another - can I ensure a second attack occurs?
 
 TOTEST: the 'disabled' notes are correct
+   - cf creating a requirements document for this and/or unit tests
 
 BPM - should have mouse up and/or wheel to change
 
@@ -367,8 +368,6 @@ BPM - should have mouse up and/or wheel to change
    
 BUG: add some notes to scale, cover to chord. Centering button doesn't work
 
-BUG: Releasing a note after dragging (in loop mode) changes the transport position
-  
 BUG: two patterns in same instrument, one block of one followed by one block of the other
      Viewed in the pattern editor the patterns both seem to received an enabled playhead initially
      

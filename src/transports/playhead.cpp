@@ -48,7 +48,11 @@ void Playhead::onTimelineChanged()
 	if (transport) {
 		float bars    = transport->position();
 		float clamped = std::clamp(bars, 0.0f, (float)numCols);
-		if (patternTrack < 0 && clamped != bars)
+		// Only clamp playback to the song grid in song mode. In loop mode the
+		// transport free-runs (position grows unbounded, the display wraps via
+		// fmod), so seeking it back would shift the loop phase — e.g. committing
+		// a note edit after looping past the last bar would jump playback.
+		if (patternTrack < 0 && !loopActive && clamped != bars)
 			transport->seek(clamped);
 		if (aps && obsTl && patternTrack < 0 && !loopActive)
 			aps->sync(*obsTl, bars);
