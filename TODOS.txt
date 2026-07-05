@@ -364,12 +364,13 @@ BPM - should have mouse up and/or wheel to change
 - When collapsed I think the label name is better in the grey colour.
 
    
-BUG: (intermittent) add some notes to scale, cover to chord. Centering button doesn't work
+BUG (seen once): add some notes to scale, cover to chord. Centering button doesn't work
 
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
 
 cf Rapid note: just one note per column? eg show last one only?
 
-BUG: first adding note to a pattern - seems to add the note in some rando position
-
+If in Song mode and when in Loop editor manually enable or disable loop the loop should start or 
+  stop... I'm treating this an event-based system. Clicking a loop creates an 'enable loop' event.
+  cf formalising this by forcing all pattern start and stops through a shared funnel.
 

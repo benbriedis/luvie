@@ -44,10 +44,19 @@ PatternEditor::~PatternEditor() = default;
 // different-size chord does not corrupt that pattern's stored notes.
 void PatternEditor::setNoteParams(int root, std::string_view chordHash, bool sharp)
 {
+    int  newChordIndex = chordIndexForHash(chordHash);
+    bool paramsChanged = (root != rootPitch) || (newChordIndex != chordIndex);
+
     rootPitch  = root;
-    chordIndex = chordIndexForHash(chordHash);
+    chordIndex = newChordIndex;
     noteLabels.setParams(root, chordHash, sharp);
     patternGrid.setChordSize(chordDefs[chordIndex].size);
+
+    // This runs on every timeline change (via PatternPanel::onParamsChanged), so
+    // only refocus the view when the harmony genuinely changed — otherwise adding
+    // a note would recompute the default offset and scroll the grid. Pattern
+    // switches refocus independently through setGridPattern.
+    if (!paramsChanged) return;
 
     int patId = -1;
     if (pattern && lastSelectedTrack >= 0) {
