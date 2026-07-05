@@ -93,6 +93,18 @@ inline const ChordDef& chordDefForHash(std::string_view hash)
     return chordDefs[chordIndexForHash(hash)];
 }
 
+// Semitone offset above the root for the n-th tone, walking up successive
+// octave-groups. Extended chords (9ths/11ths/13ths) span more than one octave,
+// so each group must advance by a whole number of octaves large enough to clear
+// the chord's top interval — otherwise the wrap lands below the previous tone and
+// the sequence dips instead of ascending. For chords/scales that fit in an octave
+// this is just +12 per group, matching the historical behaviour.
+inline int chordToneOffset(const ChordDef& def, int n)
+{
+    int span = (def.intervals[def.size - 1] / 12 + 1) * 12;
+    return def.intervals[n % def.size] + (n / def.size) * span;
+}
+
 // Map a pattern note row → MIDI pitch for the given root/chord. Shared by the JACK
 // RT engine (jackTransport) and the soft (Playhead-driven) output path so both agree.
 // chordIndex is an already-resolved array index (see chordIndexForHash).
@@ -100,7 +112,7 @@ inline int rowToMidi(int row, int rootPitch, int chordIndex)
 {
     const ChordDef& def = chordDefs[chordIndex];
     int rootMidi0 = 12 + (rootPitch + 9) % 12;
-    int midi = rootMidi0 + def.intervals[row % def.size] + (row / def.size) * 12;
+    int midi = rootMidi0 + chordToneOffset(def, row);
     return midi < 0 ? 0 : (midi > 127 ? 127 : midi);
 }
 

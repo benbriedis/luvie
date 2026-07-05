@@ -15,8 +15,7 @@ std::string noteName(int n, int rootPitch, int chordIndex, bool useSharp)
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = rootSemitone;
-    int size         = chordDefs[chordIndex].size;
-    int midi         = rootMidi0 + chordDefs[chordIndex].intervals[n % size] + (n / size) * 12;
+    int midi         = rootMidi0 + chordToneOffset(chordDefs[chordIndex], n);
     int noteOct      = midi / 12 - 1;
     int semitone     = midi % 12;
     const char* name = useSharp ? sharpNames[semitone] : flatNames[semitone];
@@ -50,7 +49,7 @@ int NoteLabels::computeTotalTones() const {
     int size         = chordDefs[chordIndex].size;
     int enabledTotal = 0;
     for (int n = 0; n < 10 * size; n++) {
-        int midi = rootMidi0 + chordDefs[chordIndex].intervals[n % size] + (n / size) * 12;
+        int midi = rootMidi0 + chordToneOffset(chordDefs[chordIndex], n);
         if (midi > 127) break;
         enabledTotal++;
     }

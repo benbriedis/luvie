@@ -63,11 +63,10 @@ int PatternEditor::computeDefaultOffset(int patId) const
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = 12 + rootSemitone;
-    int size         = chordDefs[chordIndex].size;
     int total        = noteLabels.getTotalTones();
 
     auto midiForTone = [&](int n) {
-        return rootMidi0 + chordDefs[chordIndex].intervals[n % size] + (n / size) * 12;
+        return rootMidi0 + chordToneOffset(chordDefs[chordIndex], n);
     };
 
     std::vector<Note> allNotes;
