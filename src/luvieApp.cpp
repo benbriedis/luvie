@@ -283,11 +283,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auditioner.setInstrRoute(instrRoute);
 
     // ---- Wire up active pattern set ----
-    loopEd->setActivePatterns(&aps);
-    og2->setPlayheadActivePatterns(&aps);
-    patternEd->setPlayheadActivePatterns(&aps);
-    drumEd->setPlayheadActivePatterns(&aps);
-    pianorollEd->setPlayheadActivePatterns(&aps);
+    loopEd->setLoopManager(&loopMgr);
+    og2->setPlayheadLoopManager(&loopMgr);
+    patternEd->setPlayheadLoopManager(&loopMgr);
+    drumEd->setPlayheadLoopManager(&loopMgr);
+    pianorollEd->setPlayheadLoopManager(&loopMgr);
 
     // ---- Wire up loop editor ----
     loopEd->setTimeline(song);
@@ -300,7 +300,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
 
     tabs->onModeChanged = [og2, transport, this](bool isLoop) {
-        aps.clear();
+        loopMgr.clear();
         og2->setPlayheadLoopMode(isLoop);
         patternEd->setPlayheadLoopMode(isLoop);
         drumEd->setPlayheadLoopMode(isLoop);

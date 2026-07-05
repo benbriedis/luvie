@@ -54,8 +54,8 @@ void Playhead::onTimelineChanged()
 		// a note edit after looping past the last bar would jump playback.
 		if (patternTrack < 0 && !loopActive && clamped != bars)
 			transport->seek(clamped);
-		if (aps && obsTl && patternTrack < 0 && !loopActive)
-			aps->sync(*obsTl, bars);
+		if (loopMgr && obsTl && patternTrack < 0 && !loopActive)
+			loopMgr->sync(*obsTl, bars);
 	}
 	if (owner && owner->visible_r()) owner->redraw();
 }
@@ -102,7 +102,7 @@ void Playhead::tick()
 					allSoftNotesOff();   // loop wrapped — silence anything still on
 				}
 			} else {
-				if (aps && obsTl) aps->sync(*obsTl, curPos);
+				if (loopMgr && obsTl) loopMgr->sync(*obsTl, curPos);
 				if (curPos >= lastPosition) {
 					flushSoftNoteOffs(curPos);
 					if (runChecks && obsTl) {
@@ -121,7 +121,7 @@ void Playhead::tick()
 		} else {
 			if (wasPlaying) allSoftNotesOff();   // stopped — release held notes
 			float curPos = transport->position();
-			if (aps && obsTl && !loopActive) aps->sync(*obsTl, curPos);
+			if (loopMgr && obsTl && !loopActive) loopMgr->sync(*obsTl, curPos);
 			lastPosition = curPos;
 		}
 		wasPlaying = playing;
@@ -135,7 +135,7 @@ void Playhead::tick()
 void Playhead::checkVerboseNotes(float prevPos, float curPos)
 {
 	const Timeline& tl      = obsTl->get();
-	const auto&     actives = aps->patterns();
+	const auto&     actives = loopMgr->patterns();
 
 	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;
@@ -258,8 +258,8 @@ int Playhead::barsToPixel(float bars) const
 		int top, bottom;
 		obsTl->timeSigAt(loopActive ? 0 : (int)std::max(0.0f, bars), top, bottom);
 
-		if (aps && aps->isPatternActive(patId)) {
-			float anchor  = aps->patternAnchorBar(patId);
+		if (loopMgr && loopMgr->isPatternActive(patId)) {
+			float anchor  = loopMgr->patternAnchorBar(patId);
 			float elapsed = (bars - anchor) * (float)top;
 			float beats   = std::fmod(elapsed, (float)numCols);
 			if (beats < 0.0f) beats += numCols;
@@ -285,10 +285,10 @@ float Playhead::pixelToBars(int px) const
 
 Fl_Color Playhead::currentHeadColor() const
 {
-	if (patternTrack >= 0 && obsTl && aps) {
+	if (patternTrack >= 0 && obsTl && loopMgr) {
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack < (int)tracks.size()) {
-			if (!aps->isPatternActive(displayedPatternId()))
+			if (!loopMgr->isPatternActive(displayedPatternId()))
 				return headColorDim;
 		}
 	}
@@ -334,7 +334,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 {
 	if (!obsTl) return;
 	const Timeline& tl      = obsTl->get();
-	const auto&     actives = aps->patterns();
+	const auto&     actives = loopMgr->patterns();
 
 	for (const auto& [patId, anchorBar] : actives) {
 		const Pattern* pat = nullptr;

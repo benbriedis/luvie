@@ -5,7 +5,7 @@
 #include <FL/Fl_Box.H>
 #include <vector>
 #include "observableSong.hpp"
-#include "activePatternSet.hpp"
+#include "loopManager.hpp"
 #include "loopContextPopup.hpp"
 #include "itransport.hpp"
 #include "inlineInput.hpp"
@@ -40,7 +40,7 @@ public:
 // 2D grid of pattern toggle buttons.
 // One axis = tracks/instruments, other axis = pattern slot index (lane index).
 // The "Flip" button swaps which axis is columns vs. rows.
-class LoopEditor : public Fl_Group, public ITimelineObserver, public IActivePatternObserver {
+class LoopEditor : public Fl_Group, public ITimelineObserver, public ILoopObserver {
 public:
     static constexpr int panelH = 50;
 
@@ -60,7 +60,7 @@ private:
 
     ObservableSong*    timeline     = nullptr;
     ObservablePattern* patternObs   = nullptr;
-    ActivePatternSet*  aps          = nullptr;
+    LoopManager*  loopMgr          = nullptr;
     LoopContextPopup*  contextPopup = nullptr;
     ITransport*        transport    = nullptr;
     LoopPanel*         panel        = nullptr;
@@ -161,12 +161,12 @@ public:
 
     void setTimeline(ObservableSong* tl);
     void setPattern(ObservablePattern* p) { patternObs = p; }
-    void setActivePatterns(ActivePatternSet* a);
+    void setLoopManager(LoopManager* a);
     void setTransport(ITransport* t);
     void setContextPopup(LoopContextPopup* popup);
     bool isEnabled(int trackIdx, int laneIdx) const;
     void onTimelineChanged()       override;
-    void onActivePatternsChanged() override;
+    void onLoopsChanged() override;
 };
 
 #endif

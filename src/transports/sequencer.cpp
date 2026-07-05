@@ -23,7 +23,7 @@ Sequencer::Sequencer()
 
 Sequencer::~Sequencer()
 {
-    if (aps)      aps->removeObserver(this);
+    if (loopMgr)      loopMgr->removeObserver(this);
     if (timeline) timeline->removeObserver(this);
 }
 
@@ -37,11 +37,11 @@ void Sequencer::setTimeline(ObservableSong* tl)
     rebuildSnapshot();
 }
 
-void Sequencer::setActivePatterns(ActivePatternSet* a)
+void Sequencer::setLoopManager(LoopManager* a)
 {
-    if (aps) aps->removeObserver(this);
-    aps = a;
-    if (aps) aps->addObserver(this);
+    if (loopMgr) loopMgr->removeObserver(this);
+    loopMgr = a;
+    if (loopMgr) loopMgr->addObserver(this);
     rebuildSnapshot();
 }
 
@@ -158,7 +158,7 @@ void Sequencer::rebuildSnapshot()
 
     // Build a forever-looping instance (+ its param lanes) for an active pattern
     // and append it to `ts`. Shared by loop mode and by manual Loop-Editor
-    // switches layered over song mode, so both funnel through ActivePatternSet.
+    // switches layered over song mode, so both funnel through LoopManager.
     auto emitLoopInstance = [&](TrackSnap& ts, const Pattern* pat, float anchorBar,
                                 int trackIdx, int trackInstrument) {
         if (!pat || pat->lengthBeats <= 0.0f) return;
@@ -197,8 +197,8 @@ void Sequencer::rebuildSnapshot()
     };
 
     if (loopMode) {
-        if (!aps) return;
-        const auto& actives = aps->patterns();
+        if (!loopMgr) return;
+        const auto& actives = loopMgr->patterns();
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
@@ -231,12 +231,12 @@ void Sequencer::rebuildSnapshot()
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;
 
-                // Defer to the LoopManager (ActivePatternSet): a manual disable
+                // Defer to the LoopManager (LoopManager): a manual disable
                 // silences this pattern's song instances for the current placement,
                 // and a manual loop of the same pattern takes over entirely, so the
                 // two never double-trigger. Timeline placement still drives timing.
-                if (aps && (aps->isManuallyDisabled(inst.patternId) ||
-                            aps->isManual(inst.patternId)))
+                if (loopMgr && (loopMgr->isManuallyDisabled(inst.patternId) ||
+                            loopMgr->isManual(inst.patternId)))
                     continue;
 
                 InstanceSnap is;
@@ -273,14 +273,14 @@ void Sequencer::rebuildSnapshot()
             }
 
             // Manual Loop-Editor switches layer forever-looping patterns on top of
-            // song playback, funnelled through the same ActivePatternSet the soft
+            // song playback, funnelled through the same LoopManager the soft
             // playhead reads. Song-originated actives are already covered by the
             // timeline instances above, so only manual ones are added here.
-            if (aps)
+            if (loopMgr)
                 for (const Lane& lane : track.lanes) {
-                    if (!aps->isManual(lane.patternId)) continue;
-                    auto it = aps->patterns().find(lane.patternId);
-                    if (it == aps->patterns().end()) continue;
+                    if (!loopMgr->isManual(lane.patternId)) continue;
+                    auto it = loopMgr->patterns().find(lane.patternId);
+                    if (it == loopMgr->patterns().end()) continue;
                     emitLoopInstance(ts, findPattern(lane.patternId), it->second,
                                      trackIdx, track.instrumentId);
                 }

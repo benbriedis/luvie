@@ -1,24 +1,24 @@
-#include "activePatternSet.hpp"
+#include "loopManager.hpp"
 #include "observableSong.hpp"
 #include "timeline.hpp"
 #include <algorithm>
 
-void ActivePatternSet::notify()
+void LoopManager::notify()
 {
-	for (auto* o : observers) o->onActivePatternsChanged();
+	for (auto* o : observers) o->onLoopsChanged();
 }
 
-void ActivePatternSet::addObserver(IActivePatternObserver* o)
+void LoopManager::addObserver(ILoopObserver* o)
 {
 	observers.push_back(o);
 }
 
-void ActivePatternSet::removeObserver(IActivePatternObserver* o)
+void LoopManager::removeObserver(ILoopObserver* o)
 {
 	observers.erase(std::remove(observers.begin(), observers.end(), o), observers.end());
 }
 
-void ActivePatternSet::sync(const ObservableSong& tl, float currentBar)
+void LoopManager::sync(const ObservableSong& tl, float currentBar)
 {
 	const Timeline& data = tl.get();
 
@@ -78,7 +78,7 @@ void ActivePatternSet::sync(const ObservableSong& tl, float currentBar)
 	if (changed) notify();
 }
 
-void ActivePatternSet::activate(int patId, float anchorBar)
+void LoopManager::activate(int patId, float anchorBar)
 {
 	manuallyDisabled.erase(patId);
 	manualActive.insert(patId);
@@ -86,7 +86,7 @@ void ActivePatternSet::activate(int patId, float anchorBar)
 	notify();
 }
 
-void ActivePatternSet::deactivate(int patId)
+void LoopManager::deactivate(int patId)
 {
 	manualActive.erase(patId);
 	manuallyDisabled.insert(patId);
@@ -94,7 +94,7 @@ void ActivePatternSet::deactivate(int patId)
 		notify();
 }
 
-void ActivePatternSet::clear()
+void LoopManager::clear()
 {
 	bool hadContent = !activePats.empty() || !manualActive.empty()
 	               || !manuallyDisabled.empty();
@@ -105,12 +105,12 @@ void ActivePatternSet::clear()
 	if (hadContent) notify();
 }
 
-bool ActivePatternSet::isPatternActive(int patId) const
+bool LoopManager::isPatternActive(int patId) const
 {
 	return activePats.count(patId) > 0;
 }
 
-float ActivePatternSet::patternAnchorBar(int patId) const
+float LoopManager::patternAnchorBar(int patId) const
 {
 	auto it = activePats.find(patId);
 	return it != activePats.end() ? it->second : 0.0f;

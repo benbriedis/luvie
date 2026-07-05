@@ -3,7 +3,7 @@
 
 #include "itransport.hpp"
 #include "observableSong.hpp"
-#include "activePatternSet.hpp"
+#include "loopManager.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
 #include <string>
@@ -21,7 +21,7 @@ struct MidiInstrRoute {
 class Playhead : public ITimelineObserver {
 	ITransport*         transport    = nullptr;
 	ObservableSong* obsTl        = nullptr;
-	ActivePatternSet*   aps          = nullptr;
+	LoopManager*   loopMgr          = nullptr;
 	int                 numCols;
 	int                 colWidth;
 	Fl_Widget*          owner        = nullptr;
@@ -74,7 +74,7 @@ public:
 	~Playhead();
 
 	void setTransport(ITransport* t, ObservableSong* tl);
-	void setActivePatterns(ActivePatternSet* a) { aps = a; }
+	void setLoopManager(LoopManager* a) { loopMgr = a; }
 	void setOwner(Fl_Widget* w)   { owner   = w; }
 	void setVerbose(bool v)       { verbose = v; }
 	void setPortRegistry(PortRegistry* r) { portReg = r; }

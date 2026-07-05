@@ -311,7 +311,7 @@ int main(int argc, char **argv) {
         if (jackUp) return;
         jackUp = true;
         jackTransport.setTimeline(&songTimeline);
-        jackTransport.setActivePatterns(&app.aps);
+        jackTransport.setLoopManager(&app.loopMgr);
         jackTransport.onTransportEvent = [&]() {
             Fl::awake([](void* data) {
                 static_cast<Transport*>(data)->syncPlayState();

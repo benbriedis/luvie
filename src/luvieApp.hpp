@@ -5,7 +5,7 @@
 #include "editor.hpp"
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
-#include "activePatternSet.hpp"
+#include "loopManager.hpp"
 #include "noteAuditioner.hpp"
 
 struct AppState;
@@ -83,7 +83,7 @@ public:
     std::function<void(const AppState&)> onApplyOutputs;
 
     // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
-    ActivePatternSet aps;
+    LoopManager loopMgr;
 
     // Auditions single notes when a pattern-editor row label is clicked.
     NoteAuditioner auditioner;

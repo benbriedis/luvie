@@ -15,7 +15,7 @@ add_library(luvie_dsp MODULE
     ${SRC}/songEditor/observableSong.cpp
     ${SRC}/songEditor/patternNames.cpp
     ${SRC}/songEditor/timelineIO.cpp
-    ${SRC}/activePatternSet.cpp)
+    ${SRC}/loopManager.cpp)
 target_include_directories(luvie_dsp PRIVATE
     ${SRC} ${SRC}/transports ${SRC}/patternEditors ${SRC}/outputs ${SRC}/songEditor)
 target_link_libraries(luvie_dsp PRIVATE

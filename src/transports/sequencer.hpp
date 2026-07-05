@@ -3,7 +3,7 @@
 
 #include "itimelineobserver.hpp"
 #include "observableSong.hpp"
-#include "activePatternSet.hpp"
+#include "loopManager.hpp"
 #include "timeline.hpp"
 #include <cstdint>
 #include <map>
@@ -41,7 +41,7 @@ inline bool isNoteOff(const uint8_t* data, int len)
  *     untouched (the missed stop/jump is handled next cycle).
  *   - emit() is called only from renderWindow() (RT thread) and must not allocate.
  */
-class Sequencer : public ITimelineObserver, public IActivePatternObserver {
+class Sequencer : public ITimelineObserver, public ILoopObserver {
 public:
     Sequencer();
     ~Sequencer() override;
@@ -57,13 +57,13 @@ public:
     };
 
     void setTimeline(ObservableSong* tl);
-    void setActivePatterns(ActivePatternSet* aps);
+    void setLoopManager(LoopManager* loopMgr);
     void setInstruments(const std::vector<InstrumentRouting>& routings);
     void setLoopMode(bool loopMode);
 
-    // ITimelineObserver / IActivePatternObserver
+    // ITimelineObserver / ILoopObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
-    void onActivePatternsChanged() override { rebuildSnapshot(); }
+    void onLoopsChanged() override { rebuildSnapshot(); }
 
 protected:
     // ── Snapshot (RT-readable copy of the timeline) ───────────────────────────
@@ -129,7 +129,7 @@ protected:
 
 private:
     // ── Owner-thread state ────────────────────────────────────────────────────
-    ActivePatternSet*                aps       = nullptr;
+    LoopManager*                loopMgr       = nullptr;
     bool                             loopMode  = false;
     std::map<int, InstrumentRouting> instrumentMap_;
 
