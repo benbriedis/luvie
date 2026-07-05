@@ -150,6 +150,52 @@ void Sequencer::rebuildSnapshot()
     bool anySolo = std::any_of(tl.tracks.begin(), tl.tracks.end(),
                                [](const Track& t) { return t.solo; });
 
+    auto findPattern = [&](int patId) -> const Pattern* {
+        for (const auto& p : tl.patterns)
+            if (p.id == patId) return &p;
+        return nullptr;
+    };
+
+    // Build a forever-looping instance (+ its param lanes) for an active pattern
+    // and append it to `ts`. Shared by loop mode and by manual Loop-Editor
+    // switches layered over song mode, so both funnel through ActivePatternSet.
+    auto emitLoopInstance = [&](TrackSnap& ts, const Pattern* pat, float anchorBar,
+                                int trackIdx, int trackInstrument) {
+        if (!pat || pat->lengthBeats <= 0.0f) return;
+        InstanceSnap is;
+        is.startBar     = anchorBar;
+        is.length       = 1.0e9f;
+        is.startOffset  = 0.0f;
+        is.patternBeats = pat->lengthBeats;
+        is.loop         = true;
+        int top, bot;
+        timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
+        is.beatsPerBar = (float)top;
+        buildNotes(is, pat, trackIdx, trackInstrument);
+
+        // Param lanes. Build BEFORE moving `is` below — moving leaves portName empty.
+        for (const auto& lane : pat->paramLanes) {
+            auto evts = buildParamEvents(lane);
+            if (evts.empty()) continue;
+            ParamInstSnap pis;
+            pis.startBar     = anchorBar;
+            pis.length       = 1.0e9f;
+            pis.startOffset  = 0.0f;
+            pis.beatsPerBar  = (float)top;
+            pis.patternBeats = pat->lengthBeats;
+            pis.loop         = true;
+            pis.portName     = is.portName;
+            pis.midiChannel  = is.midiChannel;
+            pis.priority     = trackIdx + 1;
+            pis.ccNumber     = ccForType(lane.type);
+            pis.events       = std::move(evts);
+            newSnap.paramInsts.push_back(std::move(pis));
+        }
+
+        if (!is.notes.empty())
+            ts.instances.push_back(std::move(is));
+    };
+
     if (loopMode) {
         if (!aps) return;
         const auto& actives = aps->patterns();
@@ -160,47 +206,10 @@ void Sequencer::rebuildSnapshot()
             // that pattern is active; layer them all on the track's instrument.
             if (!track.mute && (!anySolo || track.solo))
             for (const Lane& laneRef : track.lanes) {
-                int lanePatId = laneRef.patternId;
-                if (!actives.count(lanePatId)) continue;
-                float anchorBar = actives.at(lanePatId);
-                const Pattern* pat = nullptr;
-                for (const auto& p : tl.patterns)
-                    if (p.id == lanePatId) { pat = &p; break; }
-                if (pat && pat->lengthBeats > 0.0f) {
-                    InstanceSnap is;
-                    is.startBar     = anchorBar;
-                    is.length       = 1.0e9f;
-                    is.startOffset  = 0.0f;
-                    is.patternBeats = pat->lengthBeats;
-                    is.loop         = true;
-                    int top, bot;
-                    timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
-                    is.beatsPerBar = (float)top;
-                    buildNotes(is, pat, trackIdx, track.instrumentId);
-
-                    // Param lanes for this active pattern. Build BEFORE moving
-                    // `is` below — moving leaves is.portName empty.
-                    for (const auto& lane : pat->paramLanes) {
-                        auto evts = buildParamEvents(lane);
-                        if (evts.empty()) continue;
-                        ParamInstSnap pis;
-                        pis.startBar     = anchorBar;
-                        pis.length       = 1.0e9f;
-                        pis.startOffset  = 0.0f;
-                        pis.beatsPerBar  = (float)top;
-                        pis.patternBeats = pat->lengthBeats;
-                        pis.loop         = true;
-                        pis.portName     = is.portName;
-                        pis.midiChannel  = is.midiChannel;
-                        pis.priority     = trackIdx + 1;
-                        pis.ccNumber     = ccForType(lane.type);
-                        pis.events       = std::move(evts);
-                        newSnap.paramInsts.push_back(std::move(pis));
-                    }
-
-                    if (!is.notes.empty())
-                        ts.instances.push_back(std::move(is));
-                }
+                auto it = actives.find(laneRef.patternId);
+                if (it == actives.end()) continue;
+                emitLoopInstance(ts, findPattern(laneRef.patternId), it->second,
+                                 trackIdx, track.instrumentId);
             }
             newSnap.tracks.push_back(std::move(ts));
             ++trackIdx;
@@ -221,6 +230,14 @@ void Sequencer::rebuildSnapshot()
             for (const PatternInstance& inst : lane.patterns) {
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;
+
+                // Defer to the LoopManager (ActivePatternSet): a manual disable
+                // silences this pattern's song instances for the current placement,
+                // and a manual loop of the same pattern takes over entirely, so the
+                // two never double-trigger. Timeline placement still drives timing.
+                if (aps && (aps->isManuallyDisabled(inst.patternId) ||
+                            aps->isManual(inst.patternId)))
+                    continue;
 
                 InstanceSnap is;
                 is.startBar     = inst.startBar;
@@ -254,6 +271,20 @@ void Sequencer::rebuildSnapshot()
                 }
                 ts.instances.push_back(std::move(is));
             }
+
+            // Manual Loop-Editor switches layer forever-looping patterns on top of
+            // song playback, funnelled through the same ActivePatternSet the soft
+            // playhead reads. Song-originated actives are already covered by the
+            // timeline instances above, so only manual ones are added here.
+            if (aps)
+                for (const Lane& lane : track.lanes) {
+                    if (!aps->isManual(lane.patternId)) continue;
+                    auto it = aps->patterns().find(lane.patternId);
+                    if (it == aps->patterns().end()) continue;
+                    emitLoopInstance(ts, findPattern(lane.patternId), it->second,
+                                     trackIdx, track.instrumentId);
+                }
+
             newSnap.tracks.push_back(std::move(ts));
             ++trackIdx;
         }

@@ -26,6 +26,13 @@ public:
 
 	bool  isPatternActive(int patId) const;
 	float patternAnchorBar(int patId) const;  // 0.0f if not active
+	// True for patterns turned on by a Loop-Editor switch (as opposed to a song
+	// pattern block). Lets consumers layer manual loops over song playback.
+	bool  isManual(int patId) const { return manualActive.count(patId) > 0; }
+	// True while a Loop-Editor switch has silenced a pattern for its current song
+	// placement. The DSP defers to this so a manual disable stops the sound, not
+	// just the UI. Cleared by sync() when the next placement of the pattern starts.
+	bool  isManuallyDisabled(int patId) const { return manuallyDisabled.count(patId) > 0; }
 	const std::unordered_map<int, float>& patterns() const { return activePats; }
 
 	void addObserver(IActivePatternObserver* o);
