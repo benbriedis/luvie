@@ -371,8 +371,8 @@ BUG: add some notes to scale, cover to chord. Centering button doesn't work
 BUG: two patterns in same instrument, one block of one followed by one block of the other
      Viewed in the pattern editor the patterns both seem to received an enabled playhead initially
      
-BUG: maybe impossible to add and keep pattern instances when in loop mode? Pattern blocks disappear.
-
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
+
+cf Rapid note: just one note per column? eg show last one only?
 
 

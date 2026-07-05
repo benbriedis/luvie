@@ -63,6 +63,7 @@ class Playhead : public ITimelineObserver {
 	int       barsToPixel(float bars) const;
 	float     pixelToBars(int px)     const;
 	Fl_Color  currentHeadColor()      const;
+	int       displayedPatternId()    const;  // pattern the editor shows for patternTrack
 
 public:
 	std::function<void()>        onEndReached;

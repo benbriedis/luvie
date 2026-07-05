@@ -224,13 +224,31 @@ bool Playhead::isInPattern(float /*bars*/) const
 	return true;
 }
 
+// The pattern the editor is showing for patternTrack. A track can hold several
+// lanes (e.g. an instrument's second pattern in loop mode), so lane 0 is not
+// necessarily the one on screen — key off the selected lane, matching
+// Timeline::patternIdForSelectedLane(), else the playhead reads the wrong
+// pattern's active state and renders dimmed at the virtual position.
+int Playhead::displayedPatternId() const
+{
+	if (!obsTl) return 0;
+	const Timeline& tl = obsTl->get();
+	if (patternTrack < 0 || patternTrack >= (int)tl.tracks.size()) return 0;
+	const auto& track = tl.tracks[patternTrack];
+	if (track.lanes.empty()) return 0;
+	if (patternTrack == tl.selectedTrackIndex)
+		for (const auto& l : track.lanes)
+			if (l.id == tl.selectedLaneId) return l.patternId;
+	return track.lanes[0].patternId;
+}
+
 int Playhead::barsToPixel(float bars) const
 {
 	if (patternTrack >= 0) {
 		if (!obsTl) return 0;
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack >= (int)tracks.size()) return 0;
-		int patId = tracks[patternTrack].lanes.empty() ? 0 : tracks[patternTrack].lanes[0].patternId;
+		int patId = displayedPatternId();
 
 		// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
 		int top, bottom;
@@ -266,8 +284,7 @@ Fl_Color Playhead::currentHeadColor() const
 	if (patternTrack >= 0 && obsTl && aps) {
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack < (int)tracks.size()) {
-			int patId = tracks[patternTrack].lanes.empty() ? 0 : tracks[patternTrack].lanes[0].patternId;
-			if (!aps->isPatternActive(patId))
+			if (!aps->isPatternActive(displayedPatternId()))
 				return headColorDim;
 		}
 	}
