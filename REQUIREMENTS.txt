@@ -1,0 +1,6 @@
+
+On swapping between Song and Loop mode...
+=========================================
+
+Swapping from Loop-mode to Song-mode or visa versa should keep the current loops playing until they are turned
+off by someone (the user or the song) - currently this is not happening in either direction. When swapping from Song to Loop I would like the song playhead to still be present in the Song Editor disabled and not moving (fixed in its last position). When moving from Loop to Song I would like play to recommence where the song playhead left off.  Now going from Loop to Song is likely to lead to a slight jump in the position of the loops. I think the best way to handle this is to introduce a transitional period of less than a bar. The plain looper would keep playing until the current bar lines up with the bar beat of the song playhead, whereupon we enter song mode and the playhead in the Song Editor starts moving again. It would be helpful to change the colour of the Song/Loop mode button to a different colour while in transition (say yellow). It can continue to have the "Loop" label during this period.

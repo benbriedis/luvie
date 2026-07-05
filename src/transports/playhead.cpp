@@ -84,6 +84,13 @@ void Playhead::setLoopActive(bool a, std::function<bool(int)> enabledFn)
 	if (owner) owner->redraw();
 }
 
+void Playhead::setFrozen(bool f, float bar)
+{
+	frozen    = f;
+	frozenBar = bar;
+	if (owner) owner->redraw();
+}
+
 void Playhead::tick()
 {
 	if (patternTrack < 0 && transport) {
@@ -285,6 +292,8 @@ float Playhead::pixelToBars(int px) const
 
 Fl_Color Playhead::currentHeadColor() const
 {
+	if (frozen && patternTrack < 0)
+		return headColorDim;   // greyed while the song is frozen in loop mode
 	if (patternTrack >= 0 && obsTl && loopMgr) {
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack < (int)tracks.size()) {
@@ -298,8 +307,8 @@ Fl_Color Playhead::currentHeadColor() const
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
 	if (!transport) return;
-	if (loopActive && patternTrack < 0) return;
-	float bars = transport->position();
+	if (patternTrack < 0 && loopActive && !frozen) return;  // loop mode, no frozen bar: hide
+	float bars = (frozen && patternTrack < 0) ? frozenBar : transport->position();
 	if (!isInPattern(bars)) return;
 	int px  = rulerX + barsToPixel(bars);
 	int tw  = 11;
@@ -312,8 +321,8 @@ void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 void Playhead::drawLine(int gridX, int gridY, int gridH)
 {
 	if (!transport) return;
-	if (loopActive && patternTrack < 0) return;
-	float bars = transport->position();
+	if (patternTrack < 0 && loopActive && !frozen) return;  // loop mode, no frozen bar: hide
+	float bars = (frozen && patternTrack < 0) ? frozenBar : transport->position();
 	if (!isInPattern(bars)) return;
 	int px = gridX + barsToPixel(bars);
 	fl_color(currentHeadColor());

@@ -44,9 +44,16 @@ int ModernTabs::tabBarH() const {
 	return children() > 0 ? child(0)->y() - y() : 30;
 }
 
+void ModernTabs::setModeVisual(ModeVisual v)
+{
+	modeIsLoop    = (v != ModeVisual::Song);   // Loop and Transitioning both read as "loop"
+	transitioning = (v == ModeVisual::Transitioning);
+	redraw();
+}
+
 void ModernTabs::drawModeToggle(int tbH)
 {
-	Fl_Color col = modeIsLoop ? loopColor : songColor;
+	Fl_Color col = transitioning ? transitionColor : (modeIsLoop ? loopColor : songColor);
 	if (toggleHovered)
 		col = fl_color_average(col, FL_WHITE, 0.8f);
 
@@ -55,7 +62,8 @@ void ModernTabs::drawModeToggle(int tbH)
 
 	fl_font(FL_HELVETICA_BOLD, labelsize());
 	fl_color(FL_WHITE);
-	fl_draw(modeIsLoop ? "Loop" : "Song", x(), y(), toggleW, tbH, FL_ALIGN_CENTER);
+	// Keep the "Loop" label through the transition; only a settled Song state reads "Song".
+	fl_draw((transitioning || modeIsLoop) ? "Loop" : "Song", x(), y(), toggleW, tbH, FL_ALIGN_CENTER);
 
 	// Separator
 	fl_color(separator);
@@ -163,9 +171,9 @@ int ModernTabs::handle(int event) {
 			return 1;
 		}
 		if (event == FL_PUSH) {
-			modeIsLoop = !modeIsLoop;
-			redraw();
-			if (onModeChanged) onModeChanged(modeIsLoop);
+			// Only *request* the opposite mode; the controller commits the visual
+			// (possibly after an async transition) via setModeVisual().
+			if (onModeChanged) onModeChanged(!modeIsLoop);
 			return 1;
 		}
 		return 1;

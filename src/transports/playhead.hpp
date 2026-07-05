@@ -29,6 +29,8 @@ class Playhead : public ITimelineObserver {
 
 	bool  verbose      = false;
 	bool  loopActive   = false;
+	bool  frozen       = false;   // song view: draw a greyed, fixed playhead at frozenBar
+	float frozenBar    = 0.0f;
 	float lastPosition = 0.0f;
 	std::function<bool(int)> loopEnabledFn;
 
@@ -91,6 +93,9 @@ public:
 	void panicSoftNotes() { allSoftNotesOff(); }
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
 	bool isLoopActive() const { return loopActive; }
+	// Song view only: freeze the playhead greyed at `bar` (Song→Loop) instead of
+	// tracking the transport; clear to resume tracking (Loop→Song).
+	void setFrozen(bool f, float bar = 0.0f);
 	void setPatternTrack(int track) { patternTrack = track; }
 	void setNumCols(int n)        { numCols = n; }
 

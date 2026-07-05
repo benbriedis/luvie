@@ -6,6 +6,7 @@
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
 #include "loopManager.hpp"
+#include "loopModeController.hpp"
 #include "noteAuditioner.hpp"
 
 struct AppState;
@@ -84,6 +85,10 @@ public:
 
     // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
     LoopManager loopMgr;
+
+    // Drives the Song/Loop mode toggle: freezes the song playhead in loop mode and
+    // performs the bar-aligned hand-off back to song mode. Wired in build().
+    LoopModeController modeController;
 
     // Auditions single notes when a pattern-editor row label is clicked.
     NoteAuditioner auditioner;

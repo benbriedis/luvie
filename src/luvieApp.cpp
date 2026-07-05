@@ -299,14 +299,16 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (outputsOverlay) outputsOverlay->show();
     };
 
-    tabs->onModeChanged = [og2, transport, this](bool isLoop) {
-        loopMgr.clear();
-        og2->setPlayheadLoopMode(isLoop);
-        patternEd->setPlayheadLoopMode(isLoop);
-        drumEd->setPlayheadLoopMode(isLoop);
-        pianorollEd->setPlayheadLoopMode(isLoop);
-        transport->setLoopMode(isLoop);
-    };
+    // The mode toggle keeps the currently-sounding loops alive across a switch: it
+    // no longer clears loopMgr. The controller freezes the song playhead on
+    // Song→Loop and does the bar-aligned seek-back on Loop→Song.
+    modeController.init(transport, tabs, og2, [this](bool loop) {
+        songEd->setPlayheadLoopMode(loop);
+        patternEd->setPlayheadLoopMode(loop);
+        drumEd->setPlayheadLoopMode(loop);
+        pianorollEd->setPlayheadLoopMode(loop);
+    });
+    tabs->onModeChanged = [this](bool isLoop) { modeController.requestMode(isLoop); };
 
     // ---- Wire up pattern editors ----
     patternEd->setPatternPlayhead(transport, pattern, 0);

@@ -9,7 +9,7 @@ add_library(luvie_core STATIC
     transports/jackObserver.cpp transports/playhead.cpp songEditor/markerPopup.cpp
     songEditor/markerRuler.cpp songEditor/observableSong.cpp songEditor/observablePattern.cpp
     songEditor/patternNames.cpp
-    outputs/observableInstrument.cpp loopManager.cpp patternEditors/patternPanel.cpp
+    outputs/observableInstrument.cpp loopManager.cpp loopModeController.cpp patternEditors/patternPanel.cpp
     modern/inlineEditDispatch.cpp patternEditors/noteLabels.cpp songEditor/trackContextPopup.cpp
     patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp

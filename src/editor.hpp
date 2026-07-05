@@ -49,6 +49,7 @@ public:
     void setSeekingEnabled(bool e)                           { seekingEnabled = e; }
     void setPlayheadLoopManager(LoopManager* a)      { playhead.setLoopManager(a); }
     void setPlayheadLoopMode(bool a)                         { playhead.setLoopActive(a); }
+    void setPlayheadFrozen(bool f, float bar = 0.0f)         { playhead.setFrozen(f, bar); }
     void setVerbose(bool v)                                  { playhead.setVerbose(v); }
     void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName = std::move(fn); }
     void setPlayheadPortRegistry(PortRegistry* r)            { playhead.setPortRegistry(r); }
