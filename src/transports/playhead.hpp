@@ -103,6 +103,7 @@ public:
 	void setFrozen(bool f, float bar = 0.0f);
 	void setPatternTrack(int track) { patternTrack = track; }
 	void setNumCols(int n)        { numCols = n; }
+	void setColWidth(int cw)      { colWidth = cw; }
 
 	void onTimelineChanged() override;
 

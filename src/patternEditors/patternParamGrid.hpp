@@ -71,6 +71,7 @@ public:
     void setPattern(ObservablePattern* tl, int patId);
     void update(ObservablePattern* tl, int patId);   // respects active drag
     void setColOffset(int off) { colOffset_ = off; redraw(); }
+    void setColWidth(int cw)   { colWidth_  = cw;  redraw(); }
     void setNumCols(int n)     { numCols_   = n;   redraw(); }
     void setPadX(int p)        { padX_      = p;   redraw(); }
     void setLaneOffset(int off){ laneOffset = off; rebuildLanes(); redraw(); }

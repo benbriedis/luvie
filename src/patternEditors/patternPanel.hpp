@@ -76,6 +76,16 @@ struct BarsSection : Fl_Flex {
     BarsSection(int x, int y, int h);
 };
 
+struct ZoomSection : Fl_Flex {
+    static constexpr int kGap     = 3;
+    static constexpr int kLabelW  = 40;
+    static constexpr int kChoiceW = 52;
+    static constexpr int kWidth   = kLabelW + kGap + kChoiceW;
+    Fl_Box       zoomLabel;
+    ModernChoice zoomChoice;
+    ZoomSection(int x, int y, int h);
+};
+
 struct SnapSection : Fl_Flex {
     static constexpr int kGap     = 3;
     static constexpr int kLabelW  = 40;
@@ -103,10 +113,11 @@ struct TimeControls : Fl_Flex {
     static constexpr int      kGap    = 3;
     static constexpr int      kMargin = 4;
     static constexpr int      kCtrlH  = 24;
-    static constexpr int      kWidth  = kMargin + TimeSigSection::kWidth + kGap + BarsSection::kWidth + kGap + SnapSection::kWidth + kMargin;
-    static constexpr Fl_Color kBg     = 0x894B9400; 
+    static constexpr int      kWidth  = kMargin + TimeSigSection::kWidth + kGap + BarsSection::kWidth + kGap + ZoomSection::kWidth + kGap + SnapSection::kWidth + kMargin;
+    static constexpr Fl_Color kBg     = 0x894B9400;
     TimeSigSection timeSigSec;
     BarsSection    barsSec;
+    ZoomSection    zoomSec;
     SnapSection    snapSec;
     TimeControls(int x, int y, int h);
     void draw() override;
@@ -213,6 +224,7 @@ public:
     std::function<void()>      onParamsChanged;
     std::function<void()>      onFocus;
     std::function<void(float)> onSnapChanged;
+    std::function<void(int)>   onZoomChanged;
     std::function<void(bool)>  onRapidChanged;
 
     void commitEdit();

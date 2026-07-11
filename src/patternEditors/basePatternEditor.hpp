@@ -29,6 +29,7 @@ protected:
     int                lastPatId          = -1;
     int                colOffset         = 0;
     int                paramLaneOffset   = 0;
+    int                baseColWidth      = 0;   // colWidth at zoom x1
 
     // Subclass grid geometry — all are one-liners forwarding to the concrete grid/labels
     virtual int  labelsWidth()      const = 0;
@@ -41,6 +42,7 @@ protected:
     virtual int  currentRowOffset() const = 0;  // from labels (PatternEditor) or grid (others)
     virtual void gridSetRowOffset(int offset)             = 0;
     virtual void gridSetColOffset(int offset)             = 0;
+    virtual void gridSetColWidth(int colWidth)            = 0;
     virtual void gridSetNumRows(int n)                    = 0;
     virtual void gridResize(int x, int y, int w, int h)   = 0;
     virtual void labelsSetRowOffset(int offset)           = 0;
@@ -72,6 +74,9 @@ public:
 
     virtual void focusPattern() {}
     virtual void setSnap(float s) { paramGrid.setSnap(s); }
+    // Zoom factor (1/2/4): scales column width from its x1 base; note minimum
+    // pixel widths are unaffected, so shorter notes remain creatable when zoomed.
+    void setZoom(int factor);
     void setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex);
     void setAuditioner(NoteAuditioner* a);
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);

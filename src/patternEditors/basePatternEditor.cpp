@@ -13,6 +13,7 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
 {
     rulerOffsetX = scrollbarW + lw;
     seekingEnabled = false;
+    baseColWidth   = colWidth;
 
     const int gridH        = numRows * rowHeight;
     const int paramY       = y + rulerH + gridH;
@@ -155,6 +156,17 @@ void BasePatternEditor::onTimelineChanged()
     paramLabels.setPattern(pattern, patId);
     updateParamScrollbar();
     afterTimelineChanged(patId);
+}
+
+void BasePatternEditor::setZoom(int factor)
+{
+    int cw = baseColWidth * std::max(1, factor);
+    if (cw <= 0 || cw == gridColWidth()) return;
+    gridSetColWidth(cw);
+    paramGrid.setColWidth(cw);
+    playhead.setColWidth(cw);
+    relayout();
+    redraw();
 }
 
 void BasePatternEditor::setRowOffset(int offset)

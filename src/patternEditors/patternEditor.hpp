@@ -28,6 +28,7 @@ class PatternEditor : public BasePatternEditor {
     int  currentRowOffset() const override { return noteLabels.getRowOffset(); }
     void gridSetRowOffset(int off) override { patternGrid.setRowOffset(off); }
     void gridSetColOffset(int off) override { patternGrid.setColOffset(off); }
+    void gridSetColWidth(int cw)   override { patternGrid.colWidth = cw; }
     void gridSetNumRows(int n)     override { patternGrid.setNumRows(n); }
     void gridResize(int x, int y, int w, int h) override { patternGrid.resize(x, y, w, h); }
     void labelsSetRowOffset(int off) override { noteLabels.setRowOffset(off); }

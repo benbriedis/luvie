@@ -55,6 +55,8 @@ FUTURE FUNCTIONALITY
 
 - More MIDI parameters and features - see MIDI_EXTENSIONS.txt
 
+- LATER cf 'scenes' for song/verse looping or swapping between songs
+
 LIMITATION
 ==========
 Currently only one Luvie instance per Ardour will work. 
@@ -372,12 +374,6 @@ TOTEST: the 'disabled' notes are correct
 
 Rewind when in Loop mode is a bit weird. cf disabling / not using
 
-BUG: Pattern editor - create a note and shrink its smaller than 1 column. Click in elsewhere in the column. The note disappears. Inconsistent and weird.
-
-BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
-
-BUG: Pattern editor - cannot create 2 notes in a column. Have to move extra ones in from outside. 
-
 BUG (seen once): After changing scale/chord centering button doesn't (always?) work
 
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
@@ -397,3 +393,19 @@ Add more hover over notes for controls
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
 
+BUG: Pattern editor - create a note and shrink its smaller than 1 column. Click in elsewhere in the column. The note disappears. Inconsistent and weird.
+
+BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
+
+BUG: Pattern editor - cannot create 2 notes in a column. Have to move extra ones in from outside. 
+
+When adding a new pattern default to 1 bar?
+Default to zoom x2?
+
+Maybe add a default note length
+
+Maybe add darker/lighter columns - eg
+   12/8  - group into 4
+   4/4   - split into 2 or 3 parts
+   
+Min note length - does this correspond to snap?   

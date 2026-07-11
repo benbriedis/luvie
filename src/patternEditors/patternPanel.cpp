@@ -90,6 +90,17 @@ BarsSection::BarsSection(int x, int y, int h)
     end();
 }
 
+ZoomSection::ZoomSection(int x, int y, int h)
+    : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
+      zoomLabel (0, 0, kLabelW,  h, "Zoom"),
+      zoomChoice(0, 0, kChoiceW, h)
+{
+    gap(kGap);
+    fixed(&zoomLabel,  kLabelW);
+    fixed(&zoomChoice, kChoiceW);
+    end();
+}
+
 SnapSection::SnapSection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       snapLabel (0, 0, kLabelW,  h, "Snap"),
@@ -131,12 +142,14 @@ TimeControls::TimeControls(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       timeSigSec(0, 0, h),
       barsSec   (0, 0, h),
+      zoomSec   (0, 0, h),
       snapSec   (0, 0, h)
 {
     gap(kGap);
     margin(kMargin, 0, kMargin, 0);
     fixed(&timeSigSec, TimeSigSection::kWidth);
     fixed(&barsSec,    BarsSection::kWidth);
+    fixed(&zoomSec,    ZoomSection::kWidth);
     fixed(&snapSec,    SnapSection::kWidth);
     end();
 }
@@ -381,6 +394,25 @@ void PatternPanel::initTimeControls()
             self->pattern->setPatternLength(patId, (float)(bars * p.timeSigTop));
             break;
         }
+    }, this);
+
+    auto& zs = timeControls.zoomSec;
+    zs.zoomLabel.box(FL_NO_BOX);
+    zs.zoomLabel.labelcolor(panelText);
+    zs.zoomLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    for (const char* v : {"x1", "x2", "x4"})
+        zs.zoomChoice.add(v);
+    zs.zoomChoice.value(0);   // x1 default
+    zs.zoomChoice.color(TimeControls::kBg);
+    zs.zoomChoice.labelcolor(panelText);
+    zs.zoomChoice.setBorderColor(panelCtrlBorder);
+    zs.zoomChoice.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        static constexpr int factors[] = {1, 2, 4};
+        int idx = self->timeControls.zoomSec.zoomChoice.value();
+        if (idx < 0 || idx > 2) idx = 0;
+        if (self->onZoomChanged) self->onZoomChanged(factors[idx]);
     }, this);
 
     ss.snapLabel.box(FL_NO_BOX);
@@ -659,6 +691,7 @@ void PatternPanel::configureStandardRow()
 {
     harmonyControls.show();
     rapidBtn.show();
+    timeControls.zoomSec.zoomChoice.activate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -672,6 +705,7 @@ void PatternPanel::configureDrumRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
+    timeControls.zoomSec.zoomChoice.deactivate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -685,6 +719,7 @@ void PatternPanel::configurePianorollRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
+    timeControls.zoomSec.zoomChoice.deactivate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
