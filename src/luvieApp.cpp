@@ -21,6 +21,7 @@
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
+#include "loopRulerContextPopup.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
 #include "pianorollEditor.hpp"
@@ -128,6 +129,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
     auto* loopCtxPop = new LoopContextPopup;
+    auto* loopRulerPop = new LoopRulerContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
@@ -180,6 +182,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     auto* loopRuler = new LoopRuler(0, off + tabBarH + 2*markerRulerH, winW, markerRulerH,
         60, 60);
+    loopRuler->setContextPopup(loopRulerPop);
     tab1->add(loopRuler);
 
     auto* og2 = new SongEditor(0, off + tabBarH + 3*markerRulerH, winW,
@@ -274,6 +277,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         end   = (float)loopRuler->endColumn() + 1.0f;
         return true;
     });
+    // In Song mode the rewind button jumps to the loop-ruler Start marker rather
+    // than to bar 0 (in Loop mode the song playhead is frozen, so fall back).
+    bottomPane->rewindTarget = [this, loopRuler](float& bar) -> bool {
+        if (!modeController.isSongMode()) return false;
+        bar = (float)loopRuler->startColumn();
+        return true;
+    };
     auto openPatternTab = [this, song, tab2](int trackIndex, int laneId) {
         song->selectLane(trackIndex, laneId);
         tabs->value(tab2);
@@ -384,6 +394,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);
+    window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);
     window->add(pdPop);  window->registerPopup(pdPop);

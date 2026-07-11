@@ -3,6 +3,8 @@
 
 #include <FL/Fl_Widget.H>
 
+class LoopRulerContextPopup;
+
 // A ruler strip carrying exactly two draggable markers: 'Start' (left-aligned to
 // its column) and 'End' (right-aligned, so its right edge is flush with the RHS
 // of the column it applies to). Sits between the BPM ruler and the Song Editor's
@@ -16,6 +18,13 @@ public:
 	int startColumn() const { return startBar; }
 	int endColumn()   const { return endBar; }
 
+	// Place the markers programmatically (from the context menu). Start clamps to
+	// [0, endBar]; End clamps to [startBar, numCols-1] — same rules as dragging.
+	void setStartColumn(int bar);
+	void setEndColumn(int bar);
+
+	void setContextPopup(LoopRulerContextPopup* p) { contextPopup = p; }
+
 private:
 	int numCols;
 	int colWidth;
@@ -27,6 +36,8 @@ private:
 
 	enum Grab { NONE, START, END };
 	Grab dragging = NONE;
+
+	LoopRulerContextPopup* contextPopup = nullptr;
 
 	static constexpr Fl_Color loopColor = 0x10B98100;  // emerald-500
 	static constexpr Fl_Color loopBg    = 0xECFDF500;  // emerald-50

@@ -354,7 +354,11 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		Transport* t = (Transport*)data;
 		ITransport* ct = t->controlTransport ? t->controlTransport : t->transport;
 		if (!ct) return;
-		ct->rewind();
+		float bar;
+		if (t->rewindTarget && t->rewindTarget(bar))
+			ct->seek(bar);
+		else
+			ct->rewind();
 		t->stoppedAtEnd     = false;
 		t->lastPlayingState = false;
 		t->playPauseBtn->setAlt(false);

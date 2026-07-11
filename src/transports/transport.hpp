@@ -87,6 +87,12 @@ public:
 	// Grey the loop toggle (Loop mode) without disabling it — it stays clickable.
 	void setLoopVisualDisabled(bool d);
 	std::function<void(bool loopOn)> onLoopToggled;
+
+	// Custom rewind destination. When set and it returns true, the rewind button
+	// seeks to `bar` instead of doing a plain rewind() to bar 0. Used in Song mode
+	// to jump to the loop-ruler Start marker.
+	std::function<bool(float& bar)> rewindTarget;
+
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;
 

@@ -1,4 +1,5 @@
 #include "loopRuler.hpp"
+#include "loopRulerContextPopup.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -62,6 +63,18 @@ void LoopRuler::draw()
 	fl_pop_clip();
 }
 
+void LoopRuler::setStartColumn(int bar)
+{
+	int nb = std::clamp(bar, 0, endBar);
+	if (nb != startBar) { startBar = nb; redraw(); }
+}
+
+void LoopRuler::setEndColumn(int bar)
+{
+	int nb = std::clamp(bar, startBar, numCols - 1);
+	if (nb != endBar) { endBar = nb; redraw(); }
+}
+
 int LoopRuler::pixelToBar(int px) const
 {
 	if (colWidth <= 0) return 0;
@@ -92,14 +105,25 @@ int LoopRuler::handle(int event)
 		window()->cursor(FL_CURSOR_DEFAULT);
 		return 0;
 	case FL_MOVE: {
-		if (Fl::event_x() < x() + clipLeft || markerAt(Fl::event_x()) == NONE)
+		if (Fl::event_x() < x() + clipLeft)
 			window()->cursor(FL_CURSOR_DEFAULT);
+		else if (markerAt(Fl::event_x()) != NONE)
+			window()->cursor(FL_CURSOR_WE);       // over a marker: drag to move
 		else
-			window()->cursor(FL_CURSOR_WE);
+			window()->cursor(FL_CURSOR_HAND);     // elsewhere: right-click for menu
 		return 1;
 	}
 	case FL_PUSH: {
 		if (Fl::event_x() < x() + clipLeft) return 1;
+		if (Fl::event_button() == FL_RIGHT_MOUSE) {
+			if (contextPopup) {
+				int bar = pixelToBar(Fl::event_x());
+				contextPopup->open(Fl::event_x(), Fl::event_y(),
+					[this, bar]() { setStartColumn(bar); },
+					[this, bar]() { setEndColumn(bar); });
+			}
+			return 1;
+		}
 		if (Fl::event_button() == FL_LEFT_MOUSE)
 			dragging = markerAt(Fl::event_x());
 		return 1;

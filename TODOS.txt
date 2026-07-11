@@ -366,8 +366,6 @@ cf master volume rubberband control? Or any other global parameters?
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
-Add Start & End markers in Song Editor and a looping function (toggle next to play)
-
 On rewind scroll song editor to start.
 
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)

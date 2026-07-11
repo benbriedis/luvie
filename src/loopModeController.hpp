@@ -34,6 +34,9 @@ public:
     // Wire to ModernTabs::onModeChanged. `loop` is the requested mode.
     void requestMode(bool loop);
 
+    // True while settled in Song mode (not Loop, not mid-transition-to-Song).
+    bool isSongMode() const { return state == State::Song; }
+
 private:
     enum class State { Song, Loop, TransitionToSong };
 
