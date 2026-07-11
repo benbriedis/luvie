@@ -4,7 +4,6 @@
 #include <FL/Fl_Widget.H>
 #include "observableSong.hpp"
 #include "markerPopup.hpp"
-#include "markerContextPopup.hpp"
 
 class MarkerRuler : public Fl_Widget, public ITimelineObserver {
 public:
@@ -12,8 +11,7 @@ public:
 
 	MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
 	            Kind kind, ObservableSong* timeline,
-	            MarkerPopup* tempoPopup, MarkerPopup* timeSigPopup,
-	            MarkerContextPopup* ctxPopup);
+	            MarkerPopup* tempoPopup, MarkerPopup* timeSigPopup);
 	~MarkerRuler();
 
 	void onTimelineChanged() override { redraw(); }
@@ -26,7 +24,6 @@ private:
 	ObservableSong*     timeline;
 	MarkerPopup*        tempoPopup;
 	MarkerPopup*        timeSigPopup;
-	MarkerContextPopup* ctxPopup;
 
 	int  draggingBar    = -1;
 	int  clickedBar     = -1;

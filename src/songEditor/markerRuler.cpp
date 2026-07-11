@@ -9,11 +9,10 @@
 
 MarkerRuler::MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
                          Kind kind, ObservableSong* timeline,
-                         MarkerPopup* tempoPopup, MarkerPopup* timeSigPopup,
-                         MarkerContextPopup* ctxPopup)
+                         MarkerPopup* tempoPopup, MarkerPopup* timeSigPopup)
 	: Fl_Widget(x, y, w, h),
 	  kind(kind), numCols(numCols), colWidth(colWidth), timeline(timeline),
-	  tempoPopup(tempoPopup), timeSigPopup(timeSigPopup), ctxPopup(ctxPopup)
+	  tempoPopup(tempoPopup), timeSigPopup(timeSigPopup)
 {
 	timeline->addObserver(this);
 }
@@ -202,12 +201,10 @@ int MarkerRuler::handle(int event)
 				// Right click on an existing marker of this ruler: edit it.
 				openPopupFor(kind, clickedBar, /*showDelete=*/true);
 			} else {
-				// Right click on empty space: offer to add a marker of this
-				// ruler's kind at this bar.
+				// Right click on empty space: create a marker of this ruler's
+				// kind at this bar and open its settings popup.
 				int bar = std::max(1, pixelToBar(Fl::event_x() - x()));
-				const char* label = (kind == TEMPO) ? "Add BPM" : "Add time signature";
-				ctxPopup->open(label, [this, bar]() { addMarker(kind, bar); },
-				               Fl::event_x(), Fl::event_y());
+				addMarker(kind, bar);
 			}
 			clickedBar = -1;
 		}
