@@ -276,9 +276,6 @@ Loop Editor: maybe show a mini version of the patterns, similar to Seq24
 
 Too easy to accidently add a marker to a ruler
 
-Should we put the internal transport in a separate RT thread?
-
-Loop editor: BPM should be a spinner.  Change so dragging up and down spins, not left and right + reduce the sensitivity
 
 ----------------------
 
@@ -348,11 +345,13 @@ cf custom chord and scale builder
    - COULD have a global store of them, but think I'd prefer to manage the them manually
      (easy for the global stuff to go wrong).
 
+=========================	 
+
+POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
+    Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
 
 TOTEST: the 'disabled' notes are correct
    - cf creating a requirements document for this and/or unit tests
-
-BPM - should have mouse up and/or wheel to change
 
 - When collapsed I think the label name is better in the grey colour.
 
@@ -361,16 +360,19 @@ BUG (seen once): add some notes to scale, cover to chord. Centering button doesn
 
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
 
-cf master volume rubberband control? Or any other global parameters?
 
-Add Start & End markers in Song Editor and a looping function (toggle next to play)
+Probably want a zoom for pattern editor. Many patterns will be one bar long.
+
+cf master volume rubberband control? Or any other global parameters?
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
+BPM - should have click and drag mouse up and/or wheel to change
+
+Add Start & End markers in Song Editor and a looping function (toggle next to play)
 
 On rewind scroll song editor to start.
 
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
-Playback backends: would it be easier to have a RT standalone backend - reuse LV2 and/or Jack bits?
-   Might it reduce code?
+

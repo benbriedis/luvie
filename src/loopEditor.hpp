@@ -11,13 +11,14 @@
 #include "inlineInput.hpp"
 #include "gridScrollPane.hpp"
 #include "modern/modernButton.hpp"
+#include "modern/modernSpinner.hpp"
 
 // Dark control bar at the bottom of the Loop Editor
 class LoopPanel : public Fl_Group, public ITimelineObserver {
     ObservableSong* timeline = nullptr;
 
-    Fl_Box      bpmLabel;
-    InlineInput bpmInput;
+    Fl_Box        bpmLabel;
+    ModernSpinner bpmInput;
     Fl_Box      timeSigLabel;
     InlineInput timeSigTopInput;
     Fl_Box      timeSigSlash;

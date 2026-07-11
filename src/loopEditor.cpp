@@ -17,7 +17,7 @@
 static constexpr int lpPad      = 10;
 static constexpr int lpCtrlH    = 24;
 static constexpr int lpLabelW   = 40;
-static constexpr int lpBpmW     = 60;
+static constexpr int lpBpmW     = 70;
 static constexpr int lpSmallW   = 36;
 static constexpr int lpSlashW   = 14;
 static constexpr int lpSmGap    = 4;
@@ -50,15 +50,15 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     bpmLabel.labelcolor(panelText);
     bpmLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    bpmInput.box(FL_FLAT_BOX);
-    bpmInput.color(0x37415100);
-    bpmInput.textcolor(panelText);
-    bpmInput.cursor_color(panelText);
-    bpmInput.when(FL_WHEN_ENTER_KEY);
+    bpmInput.step(1.0);              // set before type(): step() flips the input
+    bpmInput.type(FL_FLOAT_INPUT);   // numeric type back to integer when whole
+    bpmInput.format("%.1f");
+    bpmInput.range(20.0, 400.0);
+    bpmInput.wrap(0);
+    bpmInput.when(FL_WHEN_ENTER_KEY | FL_WHEN_RELEASE);
     bpmInput.callback([](Fl_Widget*, void* d) {
         static_cast<LoopPanel*>(d)->commitBpm();
     }, this);
-    bpmInput.onUnfocus([this]() { commitBpm(); });
 
     timeSigLabel.box(FL_NO_BOX);
     timeSigLabel.labelcolor(panelText);
@@ -95,21 +95,17 @@ void LoopPanel::setTimeline(ObservableSong* tl)
 void LoopPanel::commitBpm()
 {
     if (!timeline) return;
-    float bpm = std::atof(bpmInput.value());
-    if (bpm >= 20.0f && bpm <= 400.0f)
-        timeline->setBpm(0, bpm);
-    else
-        onTimelineChanged();  // revert display to current value
+    // The spinner already clamps to its [20, 400] range on every change.
+    timeline->setBpm(0, (float)bpmInput.value());
 }
 
 void LoopPanel::onTimelineChanged()
 {
     if (!timeline) return;
 
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.1f", timeline->bpmAt(0));
-    bpmInput.value(buf);
+    bpmInput.value(timeline->bpmAt(0));
 
+    char buf[32];
     int top = 4, bot = 4;
     timeline->timeSigAt(0, top, bot);
     std::snprintf(buf, sizeof(buf), "%d", top);
