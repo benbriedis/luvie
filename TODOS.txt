@@ -326,13 +326,18 @@ FROM GOOGLE:
 Add more chords and scales
 ==========================
 Scales - cf
-  https://en.wikipedia.org/wiki/Octatonic_scale
   https://en.wikipedia.org/wiki/Hungarian_minor_scale
   https://en.wikipedia.org/wiki/Arabic_maqam
   https://en.wikipedia.org/wiki/Byzantine_music
   https://en.wikipedia.org/wiki/Persian_scale  (easier one to convert)
   https://en.wikipedia.org/wiki/Jazz_scale
   https://en.wikipedia.org/wiki/List_of_musical_scales_and_modes
+
+	In https://en.wikipedia.org/wiki/Octatonic_scale see:
+	   alpha, beta and gamma shords and scales
+
+	   NOTE: The Hungarian major scale and Romanian major scale are both heptatonic subsets of the octatonic scale with one scale degree removed.
+
   
 Chords:
    https://en.wikipedia.org/wiki/Petrushka_chord (+see list at bottom)
