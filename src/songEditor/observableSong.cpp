@@ -1,9 +1,21 @@
 #include "observableSong.hpp"
 #include "paramLaneTypes.hpp"
+#include "itransport.hpp"
 #include <algorithm>
 #include <set>
 #include <unordered_map>
 #include <cmath>
+
+template <class F>
+void ObservableSong::reanchoringTempo(F&& mutate)
+{
+    const bool  playing = transport && transport->isPlaying();
+    const float posBars = playing ? transport->position() : 0.0f;
+    mutate();
+    // reanchor (not seek): keeps the playhead pinned to its pre-change bar under
+    // the new tempo without the note reset a user seek would cause.
+    if (playing) transport->reanchor(posBars);
+}
 
 ObservableSong::ObservableSong(float initBpm, int initTop, int initBottom)
 {
@@ -299,20 +311,24 @@ void ObservableSong::sortTimeSigs()
 
 void ObservableSong::setBpm(int bar, float bpm)
 {
-    for (auto& m : data.bpms) {
-        if (m.bar == bar) { m.bpm = bpm; notify(); return; }
-    }
-    data.bpms.push_back({bar, bpm});
-    sortBpms();
-    notify();
+    reanchoringTempo([&] {
+        for (auto& m : data.bpms) {
+            if (m.bar == bar) { m.bpm = bpm; notify(); return; }
+        }
+        data.bpms.push_back({bar, bpm});
+        sortBpms();
+        notify();
+    });
 }
 
 void ObservableSong::removeBpm(int bar)
 {
     if (bar == 0) return;
-    data.bpms.erase(std::remove_if(data.bpms.begin(), data.bpms.end(),
-        [bar](const BpmMarker& m) { return m.bar == bar; }), data.bpms.end());
-    notify();
+    reanchoringTempo([&] {
+        data.bpms.erase(std::remove_if(data.bpms.begin(), data.bpms.end(),
+            [bar](const BpmMarker& m) { return m.bar == bar; }), data.bpms.end());
+        notify();
+    });
 }
 
 void ObservableSong::moveBpmMarker(int fromBar, int toBar)
@@ -321,13 +337,15 @@ void ObservableSong::moveBpmMarker(int fromBar, int toBar)
     auto it = std::find_if(data.bpms.begin(), data.bpms.end(),
         [fromBar](const BpmMarker& m) { return m.bar == fromBar; });
     if (it == data.bpms.end()) return;
-    float val = it->bpm;
-    data.bpms.erase(it);
-    data.bpms.erase(std::remove_if(data.bpms.begin(), data.bpms.end(),
-        [toBar](const BpmMarker& m) { return m.bar == toBar; }), data.bpms.end());
-    data.bpms.push_back({toBar, val});
-    sortBpms();
-    notify();
+    reanchoringTempo([&] {
+        float val = it->bpm;
+        data.bpms.erase(it);
+        data.bpms.erase(std::remove_if(data.bpms.begin(), data.bpms.end(),
+            [toBar](const BpmMarker& m) { return m.bar == toBar; }), data.bpms.end());
+        data.bpms.push_back({toBar, val});
+        sortBpms();
+        notify();
+    });
 }
 
 float ObservableSong::bpmAt(int bar) const

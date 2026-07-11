@@ -96,6 +96,8 @@ void LoopPanel::commitBpm()
 {
     if (!timeline) return;
     // The spinner already clamps to its [20, 400] range on every change.
+    // ObservableSong::setBpm re-anchors the transport so the playhead keeps its
+    // musical position across the tempo change instead of scrubbing.
     timeline->setBpm(0, (float)bpmInput.value());
 }
 

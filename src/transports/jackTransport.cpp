@@ -144,21 +144,42 @@ void JackTransport::sendProgramChange(const std::string& portName, int midiCh0,
 
 void JackTransport::play()  { if (client && jackAlive.load()) jack_transport_start(client); }
 void JackTransport::pause() { if (client && jackAlive.load()) jack_transport_stop(client); }
-void JackTransport::rewind(){ if (client && jackAlive.load()) jack_transport_locate(client, 0); }
+void JackTransport::rewind(){
+    if (!client || !jackAlive.load()) return;
+    barOffset.store(0.0);
+    jack_transport_locate(client, 0);
+}
 
 void JackTransport::seek(float bars)
 {
     if (!client || !jackAlive.load() || !timeline) return;
+    // An explicit seek re-establishes the identity frame<->bar mapping: drop any
+    // accumulated tempo re-anchor offset and locate straight to the target bar.
+    barOffset.store(0.0);
     double secs  = timeline->barToSeconds(std::max(0.0f, bars));
     auto   frame = static_cast<jack_nframes_t>(secs * sampleRate);
     jack_transport_locate(client, frame);
+}
+
+void JackTransport::reanchor(float bars)
+{
+    if (!client || !jackAlive.load() || !timeline) return;
+    // A tempo-map change (anchored at bar 0) remapped every frame to a new bar,
+    // so the playhead would scrub. Instead of relocating JACK — which dips
+    // through JackTransportStarting, flickering play/pause and silencing notes —
+    // leave the frames rolling and shift our frame->bar mapping by a bar offset
+    // so the current frame still reads as `bars` (the pre-change position sampled
+    // by the caller). Future frames then advance at the new tempo. No reposition,
+    // so the RT thread sees a contiguous window and keeps its notes sounding.
+    double secs = static_cast<double>(posFrames.load()) / sampleRate;
+    barOffset.store(bars - timeline->secondsToBar(secs));
 }
 
 float JackTransport::position() const
 {
     if (!timeline) return 0.0f;
     double secs = static_cast<double>(posFrames.load()) / sampleRate;
-    return static_cast<float>(timeline->secondsToBar(secs));
+    return static_cast<float>(timeline->secondsToBar(secs) + barOffset.load());
 }
 
 // ── JACK process callback (RT thread) ────────────────────────────────────────
@@ -198,6 +219,9 @@ int JackTransport::process(jack_nframes_t nframes)
     outEvents.clear();
     curBlockStart = pos.frame;
     curNframes    = nframes;
+    // Snapshot the tempo re-anchor offset once so process() and emit() agree for
+    // the whole cycle even if the UI thread updates it mid-cycle.
+    curBarOffset  = barOffset.load();
 
     // Raw pending messages (program changes etc.) at frame 0.
     if (!namedBufs.empty() && pendingMutex_.try_lock()) {
@@ -218,9 +242,10 @@ int JackTransport::process(jack_nframes_t nframes)
     // Fire events for exactly this buffer: [pos.frame, pos.frame + nframes). JACK
     // advances pos.frame contiguously by nframes when rolling, so each cycle's
     // window abuts the previous one. emit() (below) converts each bar to a frame
-    // offset relative to curBlockStart.
-    float prevBars = snapSecondsToBar(static_cast<double>(pos.frame) / sampleRate);
-    float curBars  = snapSecondsToBar(static_cast<double>(pos.frame + nframes) / sampleRate);
+    // offset relative to curBlockStart. curBarOffset shifts frame->bar so a tempo
+    // re-anchor keeps the same bar without a reposition (see reanchor()).
+    float prevBars = snapSecondsToBar(static_cast<double>(pos.frame) / sampleRate) + curBarOffset;
+    float curBars  = snapSecondsToBar(static_cast<double>(pos.frame + nframes) / sampleRate) + curBarOffset;
 
     bool ran = renderWindow(nowPlaying, jumped, prevBars, curBars);
 
@@ -263,7 +288,9 @@ void JackTransport::emit(const std::string& port, float bar,
     void* buf = findBuf(namedBufs, port.c_str());
     if (!buf) return;
 
-    long frameAbs = static_cast<long>(snapBarToSeconds(bar) * sampleRate);
+    // Invert the frame->bar offset applied in process() so the bar lands on the
+    // right frame under the re-anchored mapping.
+    long frameAbs = static_cast<long>(snapBarToSeconds(bar - curBarOffset) * sampleRate);
     long off      = frameAbs - static_cast<long>(curBlockStart);
     if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
     if (off < 0) off = 0;

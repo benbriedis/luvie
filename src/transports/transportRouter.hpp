@@ -30,10 +30,11 @@ public:
     }
     ITransport* active() const { return active_; }
 
-    void  play()           override { if (active_) active_->play(); }
-    void  pause()          override { if (active_) active_->pause(); }
-    void  rewind()         override { if (active_) active_->rewind(); }
-    void  seek(float bars) override { if (active_) active_->seek(bars); }
+    void  play()             override { if (active_) active_->play(); }
+    void  pause()            override { if (active_) active_->pause(); }
+    void  rewind()           override { if (active_) active_->rewind(); }
+    void  seek(float bars)   override { if (active_) active_->seek(bars); }
+    void  reanchor(float b)  override { if (active_) active_->reanchor(b); }
     float position()  const override { return active_ ? active_->position()  : 0.0f; }
     bool  isPlaying() const override { return active_ ? active_->isPlaying() : false; }
     void  setLoopMode(bool loopMode) override {

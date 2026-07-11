@@ -274,8 +274,6 @@ Lighter theme for scrollbars?
 
 Loop Editor: maybe show a mini version of the patterns, similar to Seq24
 
-Too easy to accidently add a marker to a ruler
-
 
 ----------------------
 
@@ -347,6 +345,8 @@ cf custom chord and scale builder
 
 =========================	 
 
+Too easy to accidently add a marker to a ruler. cf right click instead.
+
 POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
     Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
 
@@ -359,6 +359,7 @@ TOTEST: the 'disabled' notes are correct
 BUG (seen once): add some notes to scale, cover to chord. Centering button doesn't work
 
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
+         ALT could have an octave offset. (0 default, would want to restrict to valid values. Or just -1, 0, 1)
 
 
 Probably want a zoom for pattern editor. Many patterns will be one bar long.
@@ -366,8 +367,6 @@ Probably want a zoom for pattern editor. Many patterns will be one bar long.
 cf master volume rubberband control? Or any other global parameters?
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
-
-BPM - should have click and drag mouse up and/or wheel to change
 
 Add Start & End markers in Song Editor and a looping function (toggle next to play)
 

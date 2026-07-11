@@ -61,10 +61,11 @@ public:
     void (*awakeFn)(void (*)(void*), void*) = nullptr;
 
     // ITransport — called from UI thread
-    void  play()           override;
-    void  pause()          override;
-    void  rewind()         override;
-    void  seek(float bars) override;
+    void  play()             override;
+    void  pause()            override;
+    void  rewind()           override;
+    void  seek(float bars)   override;
+    void  reanchor(float bars) override;
     float position()  const override;
     bool  isPlaying() const override { return playing_.load(); }
     void  setLoopMode(bool loopMode) override { Sequencer::setLoopMode(loopMode); }
@@ -95,10 +96,18 @@ private:
     std::atomic<jack_nframes_t> posFrames{0};
     std::atomic<bool>           playing_{false};
     std::atomic<bool>           jackAlive{false};
+    // Bar added to every frame->bar (and subtracted in bar->frame) conversion so a
+    // tempo change can pin the current bar without relocating JACK. reanchor()
+    // updates it; seek()/rewind() reset it to 0 (an explicit reposition re-establishes
+    // the identity frame<->bar mapping). Read lock-free on the RT thread.
+    std::atomic<double>         barOffset{0.0};
 
     // ── RT-thread-only state ──────────────────────────────────────────────────
     jack_nframes_t lastFrame  = 0;
     bool           firstCall  = true;
+    // barOffset snapshotted once per cycle so process() and emit() agree even if
+    // the UI thread updates barOffset mid-cycle.
+    double         curBarOffset = 0.0;
 
     // Per-cycle context for emit(): the buffers, this cycle's start frame and length.
     using NamedBuf = std::pair<const std::string*, void*>;

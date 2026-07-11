@@ -9,6 +9,7 @@
 
 class ObservablePattern;
 class ObservableInstrument;
+class ITransport;
 
 class ObservableSong {
     friend class ObservablePattern;
@@ -20,6 +21,10 @@ public:
     void removeObserver(ITimelineObserver* o);
 
     const Timeline& get() const { return data; }
+
+    // Optional transport, used only to keep the playhead musically anchored
+    // across tempo edits (see reanchoringTempo). No-op until set.
+    void setTransport(ITransport* t) { transport = t; }
 
     // BPM
     void  setBpm(int bar, float bpm);
@@ -145,7 +150,17 @@ private:
     // Funnel for all pattern-name creation/changes; binds to data.patterns.
     PatternNames patternNames{data};
     std::vector<ITimelineObserver*> observers;
+    ITransport* transport = nullptr;
     int nextId = 1;
+
+    // Run a tempo-map mutation while keeping the transport anchored to its
+    // current musical position. The transport stores its play anchor in seconds
+    // (derived from the old tempo map), so any change to that map would remap
+    // the same elapsed wall-clock time to a different bar and the playhead would
+    // scrub. We sample the position under the old map, apply the change, then
+    // re-seek so the playhead stays put and merely advances at the new rate.
+    template <class F>
+    void reanchoringTempo(F&& mutate);
 
     // True if patId is referenced by any lane's editor pattern or any placed instance.
     bool patternStillReferenced(int patId) const;

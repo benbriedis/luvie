@@ -120,6 +120,10 @@ int main(int argc, char **argv) {
     simpleTransport.setTimeline(&songTimeline);
     router.setActive(&simpleTransport);
     ITransport* transport = &router;
+    // Keep the playhead musically anchored across tempo edits (see
+    // ObservableSong::reanchoringTempo). The stable router pointer is used so
+    // re-anchoring survives clock-source swaps (Internal vs JACK).
+    songTimeline.setTransport(&router);
 
     LuvieApp app;
     app.verbose = verbose;
