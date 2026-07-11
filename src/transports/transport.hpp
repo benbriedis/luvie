@@ -44,7 +44,7 @@ public:
 
 class TransportButton : public Fl_Button {
 public:
-	enum Icon { REWIND, PLAY, PAUSE, LOOP };
+	enum Icon { REWIND, PLAY, PAUSE, LOOP, LOOP_OFF };
 
 private:
 	Icon icon;
@@ -74,6 +74,7 @@ class Transport : public Fl_Group, public ITimelineObserver {
 	ITransport*         controlTransport = nullptr;  // if set, buttons use this; otherwise transport
 	bool                stoppedAtEnd     = false;
 	bool                lastPlayingState = false;
+	bool                loopOn           = false;  // song-loop toggle state
 
 public:
 	Transport(int x, int y, int w, int h, ITransport* t);

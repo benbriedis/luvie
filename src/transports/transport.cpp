@@ -165,20 +165,27 @@ void TransportButton::drawIcon(int cx, int cy, int s, Icon icon) {
 		break;
 	}
 
-	case LOOP: {
+	case LOOP:
+	case LOOP_OFF: {
 		// A ring with a gap on the right, capped by an arrowhead, suggesting a
-		// repeating cycle.
+		// repeating cycle. LOOP_OFF adds a diagonal slash (looping disabled).
 		int rr = s;
-		fl_line_style(FL_SOLID | FL_CAP_ROUND, std::max(2, s / 2));
+		int lineW = std::max(2, s * (3 / 8));
+		fl_line_style(FL_SOLID | FL_CAP_ROUND, lineW);
 		fl_arc(cx - rr, cy - rr, rr * 2, rr * 2, 55.0, 340.0);
 		fl_line_style(0);
 		// Arrowhead at the lower end of the gap, pointing up into it.
-		int ah = std::max(3, s * 3 / 4);
+		int ah = std::max(3, s * 2 / 3);
 		int ax = cx + rr;             // ~3 o'clock, at the ring
 		int ay = cy;
 		fl_polygon(ax, ay - ah,       // tip (up, into the gap)
 		           ax - ah, ay + ah/2,
 		           ax + ah, ay + ah/2);
+		if (icon == LOOP_OFF) {
+			fl_line_style(FL_SOLID | FL_CAP_ROUND, lineW);
+			fl_line(cx - rr, cy + rr, cx + rr, cy - rr);
+			fl_line_style(0);
+		}
 		break;
 	}
 	}
@@ -293,7 +300,7 @@ void Transport::setControlTransport(ITransport* ct)
 
 bool Transport::loopEnabled() const
 {
-	return loopBtn->value() != 0;
+	return loopOn;
 }
 
 void Transport::setLoopVisualDisabled(bool d)
@@ -328,13 +335,17 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 	alertIndicator = new AlertIndicator(x + w - 10 - alertW, y + (h - indH) / 2,
 	                                    alertW, indH);
 
+	// Default state is "don't loop": the slashed LOOP_OFF icon shows; toggling to
+	// "loop" swaps in the plain LOOP icon (like play/pause swaps its glyph).
 	loopBtn = new TransportButton(bx, by, btnSize, btnSize,
-	                              TransportButton::LOOP);
-	loopBtn->type(FL_TOGGLE_BUTTON);   // persistent loop / don't-loop state
+	                              TransportButton::LOOP_OFF, TransportButton::LOOP);
 	loopBtn->callback([](Fl_Widget* w, void* data) {
-		Transport* t = (Transport*)data;
-		w->redraw();
-		if (t->onLoopToggled) t->onLoopToggled(((TransportButton*)w)->value());
+		Transport* t   = (Transport*)data;
+		auto*      btn = (TransportButton*)w;
+		t->loopOn = !t->loopOn;
+		btn->setAlt(t->loopOn);
+		btn->redraw();
+		if (t->onLoopToggled) t->onLoopToggled(t->loopOn);
 	}, this);
 
 	rewindBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
