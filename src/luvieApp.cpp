@@ -265,6 +265,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         bottomPane->notifySeek();
         if (onExtraSeek) onExtraSeek();
     };
+    // Song-loop: the playhead asks (each tick, in song mode) whether the transport
+    // loop toggle is on and, if so, for the loop region. Start is the left edge of
+    // its column; End is right-aligned, so the loop ends at that column's right edge.
+    og2->setPlayheadSongLoop([this, loopRuler](float& start, float& end) -> bool {
+        if (!bottomPane->loopEnabled()) return false;
+        start = (float)loopRuler->startColumn();
+        end   = (float)loopRuler->endColumn() + 1.0f;
+        return true;
+    });
     auto openPatternTab = [this, song, tab2](int trackIndex, int laneId) {
         song->selectLane(trackIndex, laneId);
         tabs->value(tab2);
@@ -316,7 +325,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         drumEd->setPlayheadLoopMode(loop);
         pianorollEd->setPlayheadLoopMode(loop);
     });
-    tabs->onModeChanged = [this](bool isLoop) { modeController.requestMode(isLoop); };
+    tabs->onModeChanged = [this](bool isLoop) {
+        modeController.requestMode(isLoop);
+        // The transport loop toggle only applies in Song mode; grey it (but keep it
+        // clickable) while in Loop mode.
+        bottomPane->setLoopVisualDisabled(isLoop);
+    };
 
     // ---- Wire up pattern editors ----
     patternEd->setPatternPlayhead(transport, pattern, 0);

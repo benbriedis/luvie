@@ -109,19 +109,29 @@ void Playhead::tick()
 					allSoftNotesOff();   // loop wrapped — silence anything still on
 				}
 			} else {
-				if (loopMgr && obsTl) loopMgr->sync(*obsTl, curPos);
-				if (curPos >= lastPosition) {
-					flushSoftNoteOffs(curPos);
-					if (runChecks && obsTl) {
-						checkVerboseNotes(lastPosition, curPos);
-						checkVerboseSongParams(lastPosition, curPos);
-					}
+				// Song-loop: when the transport loop toggle is on and playback
+				// reaches the End marker, jump back to Start and keep playing.
+				float loopStart, loopEnd;
+				if (songLoopRange && songLoopRange(loopStart, loopEnd) &&
+				    curPos >= loopEnd) {
+					allSoftNotesOff();
+					transport->seek(loopStart);
+					curPos = loopStart;
 				} else {
-					allSoftNotesOff();   // seeked backward
-				}
-				if (curPos >= (float)numCols) {
-					transport->pause();
-					if (onEndReached) onEndReached();
+					if (loopMgr && obsTl) loopMgr->sync(*obsTl, curPos);
+					if (curPos >= lastPosition) {
+						flushSoftNoteOffs(curPos);
+						if (runChecks && obsTl) {
+							checkVerboseNotes(lastPosition, curPos);
+							checkVerboseSongParams(lastPosition, curPos);
+						}
+					} else {
+						allSoftNotesOff();   // seeked backward
+					}
+					if (curPos >= (float)numCols) {
+						transport->pause();
+						if (onEndReached) onEndReached();
+					}
 				}
 			}
 			lastPosition = curPos;

@@ -164,12 +164,29 @@ void TransportButton::drawIcon(int cx, int cy, int s, Icon icon) {
 		           lx + barW + 2,             cy);
 		break;
 	}
+
+	case LOOP: {
+		// A ring with a gap on the right, capped by an arrowhead, suggesting a
+		// repeating cycle.
+		int rr = s;
+		fl_line_style(FL_SOLID | FL_CAP_ROUND, std::max(2, s / 2));
+		fl_arc(cx - rr, cy - rr, rr * 2, rr * 2, 55.0, 340.0);
+		fl_line_style(0);
+		// Arrowhead at the lower end of the gap, pointing up into it.
+		int ah = std::max(3, s * 3 / 4);
+		int ax = cx + rr;             // ~3 o'clock, at the ring
+		int ay = cy;
+		fl_polygon(ax, ay - ah,       // tip (up, into the gap)
+		           ax - ah, ay + ah/2,
+		           ax + ah, ay + ah/2);
+		break;
+	}
 	}
 }
 
 void TransportButton::draw() {
 	bool pressed  = value();
-	bool inactive = !active_r();
+	bool inactive = !active_r() || visualDisabled;
 	int  r  = (std::min(w(), h()) - 4) / 2;
 	int  cx = x() + w() / 2;
 	int  cy = y() + h() / 2;
@@ -213,15 +230,17 @@ void Transport::notifyEndReached() {
 void Transport::resize(int x, int y, int w, int h)
 {
 	Fl_Widget::resize(x, y, w, h);
+	const int lw     = loopBtn->w();
 	const int bw     = rewindBtn->w();
 	const int pw     = playPauseBtn->w();
 	const int gap    = 12;
-	const int totalW = bw + gap + pw;
+	const int totalW = lw + gap + bw + gap + pw;
 	int bx = x + (w - totalW) / 2;
 	bx = std::max(x + 10, bx);
 	int by = y + (h - rewindBtn->h()) / 2;
-	rewindBtn->position(bx, by);
-	playPauseBtn->position(bx + bw + gap, by);
+	loopBtn->position(bx, by);
+	rewindBtn->position(bx + lw + gap, by);
+	playPauseBtn->position(bx + lw + gap + bw + gap, by);
 
 	int ay = y + (h - alertIndicator->h()) / 2;
 	alertIndicator->position(x + w - 10 - alertIndicator->w(), ay);
@@ -272,6 +291,16 @@ void Transport::setControlTransport(ITransport* ct)
 	playPauseBtn->redraw();
 }
 
+bool Transport::loopEnabled() const
+{
+	return loopBtn->value() != 0;
+}
+
+void Transport::setLoopVisualDisabled(bool d)
+{
+	loopBtn->setVisualDisabled(d);
+}
+
 void Transport::setAlerts(const std::vector<std::string>& alerts)
 {
 	alertIndicator->setAlerts(alerts);
@@ -290,7 +319,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 
 	const int btnSize = h - 10;
 	const int gap     = 12;
-	const int totalW  = 2 * btnSize + gap;
+	const int totalW  = 3 * btnSize + 2 * gap;
 	const int bx      = x + (w - totalW) / 2;
 	const int by      = y + (h - btnSize) / 2;
 
@@ -299,7 +328,16 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 	alertIndicator = new AlertIndicator(x + w - 10 - alertW, y + (h - indH) / 2,
 	                                    alertW, indH);
 
-	rewindBtn = new TransportButton(bx, by, btnSize, btnSize,
+	loopBtn = new TransportButton(bx, by, btnSize, btnSize,
+	                              TransportButton::LOOP);
+	loopBtn->type(FL_TOGGLE_BUTTON);   // persistent loop / don't-loop state
+	loopBtn->callback([](Fl_Widget* w, void* data) {
+		Transport* t = (Transport*)data;
+		w->redraw();
+		if (t->onLoopToggled) t->onLoopToggled(((TransportButton*)w)->value());
+	}, this);
+
+	rewindBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
 	                                TransportButton::REWIND);
 	rewindBtn->callback([](Fl_Widget*, void* data) {
 		Transport* t = (Transport*)data;
@@ -312,7 +350,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		t->playPauseBtn->redraw();
 	}, this);
 
-	playPauseBtn = new TransportButton(bx + btnSize + gap, by, btnSize, btnSize,
+	playPauseBtn = new TransportButton(bx + 2 * (btnSize + gap), by, btnSize, btnSize,
 	                                   TransportButton::PLAY, TransportButton::PAUSE);
 	playPauseBtn->callback([](Fl_Widget* w, void* data) {
 		Transport* t   = (Transport*)data;

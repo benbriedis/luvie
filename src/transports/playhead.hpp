@@ -72,6 +72,11 @@ public:
 	std::function<void()>        onTick;
 	std::function<std::string(int)> pitchName;   // optional: pitch index → "E4" etc.
 
+	// Song-loop query (song mode only): fills [startBar, endBar) in transport-bar
+	// units and returns true when the transport loop toggle is on. When set and
+	// active, reaching endBar wraps playback back to startBar instead of stopping.
+	std::function<bool(float& startBar, float& endBar)> songLoopRange;
+
 	Playhead(int numCols, int colWidth);
 	~Playhead();
 

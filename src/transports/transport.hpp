@@ -44,24 +44,29 @@ public:
 
 class TransportButton : public Fl_Button {
 public:
-	enum Icon { REWIND, PLAY, PAUSE };
+	enum Icon { REWIND, PLAY, PAUSE, LOOP };
 
 private:
 	Icon icon;
 	Icon altIcon;
 	bool useAlt = false;
+	bool visualDisabled = false;   // drawn greyed but still clickable
 
 	void drawIcon(int cx, int cy, int s, Icon icon);
 
 public:
 	TransportButton(int x, int y, int w, int h, Icon icon, Icon altIcon = PLAY);
 	void setAlt(bool alt) { useAlt = alt; }
+	// Draw the button as if disabled without actually deactivating it (it stays
+	// clickable). Used for the loop toggle while the app is in Loop mode.
+	void setVisualDisabled(bool d) { visualDisabled = d; redraw(); }
 	void draw() override;
 };
 
 
 class Transport : public Fl_Group, public ITimelineObserver {
 	AlertIndicator*     alertIndicator;
+	TransportButton*    loopBtn;
 	TransportButton*    rewindBtn;
 	TransportButton*    playPauseBtn;
 
@@ -75,6 +80,12 @@ public:
 	~Transport();
 	void notifyEndReached();
 	void notifySeek() { stoppedAtEnd = false; }
+
+	// Song-loop toggle (the circular button before rewind).
+	bool loopEnabled() const;
+	// Grey the loop toggle (Loop mode) without disabling it — it stays clickable.
+	void setLoopVisualDisabled(bool d);
+	std::function<void(bool loopOn)> onLoopToggled;
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;
 
