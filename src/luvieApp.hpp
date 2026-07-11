@@ -48,7 +48,7 @@ public:
     static constexpr int bottomH         = 50;
     static constexpr int markerRulerH    = 18;
     static constexpr int winW            = 920;
-    static constexpr int numPatternBeats = 8;
+    static constexpr int numPatternBeats = 4;  // default new-pattern length: 1 bar in 4/4
     static constexpr int panelH          = 32;
     static constexpr int rowHeight       = 30;
 

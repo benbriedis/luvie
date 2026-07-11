@@ -380,8 +380,6 @@ PROBLEM: base note probably should include the octave, otherwise a pattern can d
          ALT could have an octave offset. (0 default, would want to restrict to valid values. Or just -1, 0, 1)
 
 
-Probably want a zoom for pattern editor. Many patterns will be one bar long.
-
 cf master volume rubberband control? Or any other global parameters?
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
@@ -393,19 +391,16 @@ Add more hover over notes for controls
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
 
-BUG: Pattern editor - create a note and shrink its smaller than 1 column. Click in elsewhere in the column. The note disappears. Inconsistent and weird.
 
 BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
 
 BUG: Pattern editor - cannot create 2 notes in a column. Have to move extra ones in from outside. 
-
-When adding a new pattern default to 1 bar?
-Default to zoom x2?
 
 Maybe add a default note length
 
 Maybe add darker/lighter columns - eg
    12/8  - group into 4
    4/4   - split into 2 or 3 parts
+cf relationship to BPM crotchet / dotted crotchet etc
    
 Min note length - does this correspond to snap?   

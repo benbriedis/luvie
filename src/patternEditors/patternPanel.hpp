@@ -187,6 +187,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     Fl_Box          spacer;          // flexible gap fills remaining space
 
     float computeSnapBeats() const;
+    int   computeZoomFactor() const;
 
     void initControlRowLayout();
     void initPatternName();
@@ -210,6 +211,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void refreshBars();
     void refreshHarmony();
     void refreshSnap();
+    void refreshZoom();
     void commitHarmony();
     int  selectedPatternId() const;
 

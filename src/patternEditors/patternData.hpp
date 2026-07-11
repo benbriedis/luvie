@@ -60,6 +60,7 @@ struct Pattern {
 	bool useSharp  = false;  // #/b display spelling
 	int  octaveOffset = 0;   // -1, 0 or 1; added to every note's octave at playback
 	int  snap      = 2;      // snapChoice index; 2 = 1/16 (kSnapDefault in patternPanel.cpp)
+	int  zoom      = 1;      // zoomChoice index; 1 = x2 (kZoomDefault in patternPanel.cpp)
 };
 
 #endif

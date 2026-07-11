@@ -846,7 +846,7 @@ int ObservableSong::addLane(int trackId)
         if (t.id != trackId) continue;
 
         PatternType ptype  = PatternType::STANDARD;
-        float       beats  = 8.0f;
+        float       beats  = 4.0f;   // 1 bar in 4/4 when the track has no lane to copy
         int         instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)
@@ -900,7 +900,7 @@ int ObservableSong::addPianorollLane(int trackId)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
 
-        float beats   = 8.0f;
+        float beats   = 4.0f;   // 1 bar in 4/4 when the track has no lane to copy
         int   instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)

@@ -33,6 +33,8 @@ static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
 
 static constexpr int kSnapNoteDenoms[] = { 4, 8, 16, 32, 0 };  // 0 = Free
 static constexpr int kSnapDefault      = 2;  // 1/16
+static constexpr int kZoomFactors[]    = { 1, 2, 4 };
+static constexpr int kZoomDefault      = 1;  // x2
 
 // ---------------------------------------------------------------------------
 // Section struct constructors
@@ -189,6 +191,13 @@ float PatternPanel::computeSnapBeats() const
     int tsIdx   = timeControls.timeSigSec.timeSigDen.value();
     int tsDenom = (tsIdx >= 0 && tsIdx < 6) ? denoms[tsIdx] : 4;
     return (float)tsDenom / (float)noteDenom;
+}
+
+int PatternPanel::computeZoomFactor() const
+{
+    int idx = timeControls.zoomSec.zoomChoice.value();
+    if (idx < 0 || idx >= (int)std::size(kZoomFactors)) idx = kZoomDefault;
+    return kZoomFactors[idx];
 }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
@@ -403,16 +412,16 @@ void PatternPanel::initTimeControls()
 
     for (const char* v : {"x1", "x2", "x4"})
         zs.zoomChoice.add(v);
-    zs.zoomChoice.value(0);   // x1 default
+    zs.zoomChoice.value(kZoomDefault);
     zs.zoomChoice.color(TimeControls::kBg);
     zs.zoomChoice.labelcolor(panelText);
     zs.zoomChoice.setBorderColor(panelCtrlBorder);
     zs.zoomChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        static constexpr int factors[] = {1, 2, 4};
-        int idx = self->timeControls.zoomSec.zoomChoice.value();
-        if (idx < 0 || idx > 2) idx = 0;
-        if (self->onZoomChanged) self->onZoomChanged(factors[idx]);
+        int patId = self->selectedPatternId();
+        if (patId != 0 && self->pattern)
+            self->pattern->setPatternZoom(patId, self->timeControls.zoomSec.zoomChoice.value());
+        if (self->onZoomChanged) self->onZoomChanged(self->computeZoomFactor());
     }, this);
 
     ss.snapLabel.box(FL_NO_BOX);
@@ -662,6 +671,18 @@ void PatternPanel::refreshSnap()
     }
 }
 
+void PatternPanel::refreshZoom()
+{
+    if (!pattern) return;
+    int patId = selectedPatternId();
+    for (const auto& p : pattern->get().patterns) {
+        if (p.id != patId) continue;
+        timeControls.zoomSec.zoomChoice.value(p.zoom);
+        timeControls.zoomSec.zoomChoice.redraw();
+        return;
+    }
+}
+
 void PatternPanel::updateRootChoiceLabels(int idx)
 {
     auto& rc = harmonyControls.keySec.rootChoice;
@@ -705,7 +726,7 @@ void PatternPanel::configureDrumRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
-    timeControls.zoomSec.zoomChoice.deactivate();
+    timeControls.zoomSec.zoomChoice.activate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -719,7 +740,7 @@ void PatternPanel::configurePianorollRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
-    timeControls.zoomSec.zoomChoice.deactivate();
+    timeControls.zoomSec.zoomChoice.activate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -751,10 +772,13 @@ void PatternPanel::onTimelineChanged()
     refreshBars();
     refreshHarmony();
     refreshSnap();
-    // Push the freshly-loaded pattern's harmony/snap to the editors so switching
-    // patterns reinterprets pitches and snapping for the newly selected pattern.
+    refreshZoom();
+    // Push the freshly-loaded pattern's harmony/snap/zoom to the editors so
+    // switching patterns reinterprets pitches, snapping and zoom for the newly
+    // selected pattern.
     if (onParamsChanged) onParamsChanged();
     if (onSnapChanged)   onSnapChanged(computeSnapBeats());
+    if (onZoomChanged)   onZoomChanged(computeZoomFactor());
     redraw();
 }
 

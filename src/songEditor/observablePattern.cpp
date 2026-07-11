@@ -375,6 +375,17 @@ void ObservablePattern::setPatternSnap(int patId, int snap)
     }
 }
 
+void ObservablePattern::setPatternZoom(int patId, int zoom)
+{
+    for (auto& p : song_->data.patterns) {
+        if (p.id == patId) {
+            p.zoom = zoom;
+            song_->notify();
+            return;
+        }
+    }
+}
+
 void ObservablePattern::setPatternInstrument(int patId, int instrumentId)
 {
     for (auto& p : song_->data.patterns) {

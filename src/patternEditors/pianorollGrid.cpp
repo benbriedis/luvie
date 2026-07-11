@@ -53,15 +53,20 @@ void PianorollGrid::toggleNote()
 
     int   visual_row = ey / rowHeight;
     float col        = (float)(ex / colWidth) + colOffset;
+    float fcol       = (float)ex / colWidth + colOffset;
 
     if (!pattern || patternId < 0) {
         Grid::toggleNote();
         return;
     }
 
+    // Remove a note if one starts at exactly this cell. A short note that
+    // starts at the cell start leaves empty space after it in the same cell;
+    // clicking in that space must do nothing (for now) rather than remove it.
     for (auto& n : notes) {
         if (n.row == visual_row && n.beat == col) {
-            pattern->removeNote(n.id);
+            if (fcol < n.beat + n.length)
+                pattern->removeNote(n.id);
             return;
         }
     }

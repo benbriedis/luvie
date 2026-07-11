@@ -373,7 +373,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (pianorollEd) pianorollEd->setSnap(s);
     };
     patternPanel->onZoomChanged = [this](int factor) {
-        if (patternEd) patternEd->setZoom(factor);
+        if (patternEd)   patternEd->setZoom(factor);
+        if (drumEd)      drumEd->setZoom(factor);
+        if (pianorollEd) pianorollEd->setZoom(factor);
     };
     patternPanel->onFocus = [this]() {
         if (drumEd && drumEd->visible())

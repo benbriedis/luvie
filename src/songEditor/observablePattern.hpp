@@ -52,6 +52,7 @@ public:
     void setPatternLength(int patId, float lengthBeats);
     void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp, int octaveOffset);
     void setPatternSnap(int patId, int snap);
+    void setPatternZoom(int patId, int zoom);
     void setPatternInstrument(int patId, int instrumentId);
 
     // Pattern-level param lanes
