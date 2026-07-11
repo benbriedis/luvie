@@ -66,6 +66,10 @@ public:
     void setParamLaneContextPopup(ParamLaneContextPopup* p);
     void setTrackView(int trackIndex, bool beatResolution);
 
+    // Scroll horizontally so `bar` sits at the left edge if it is currently
+    // off-screen (used on rewind while stopped, when followPlayhead does nothing).
+    void scrollPlayheadIntoView(float bar);
+
     void onTimelineChanged() override;
 };
 

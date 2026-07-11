@@ -93,6 +93,11 @@ public:
 	// to jump to the loop-ruler Start marker.
 	std::function<bool(float& bar)> rewindTarget;
 
+	// Fired after the rewind button repositions the transport, so views can scroll
+	// the (possibly off-screen) playhead into view even when stopped. The argument
+	// is the target bar (position() may lag on async transports like JACK).
+	std::function<void(float bar)> onRewind;
+
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;
 

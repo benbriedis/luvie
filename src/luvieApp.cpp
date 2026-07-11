@@ -284,6 +284,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         bar = (float)loopRuler->startColumn();
         return true;
     };
+    // After a rewind, scroll the song grid so the (now possibly off-screen)
+    // playhead is visible — followPlayhead only chases it while playing, and we
+    // want it in view when we switch back from the Loop/Pattern editor.
+    bottomPane->onRewind = [this, og2](float bar) {
+        if (modeController.isSongMode()) og2->scrollPlayheadIntoView(bar);
+    };
     auto openPatternTab = [this, song, tab2](int trackIndex, int laneId) {
         song->selectLane(trackIndex, laneId);
         tabs->value(tab2);

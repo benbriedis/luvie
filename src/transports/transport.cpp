@@ -354,7 +354,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		Transport* t = (Transport*)data;
 		ITransport* ct = t->controlTransport ? t->controlTransport : t->transport;
 		if (!ct) return;
-		float bar;
+		float bar = 0.0f;
 		if (t->rewindTarget && t->rewindTarget(bar))
 			ct->seek(bar);
 		else
@@ -363,6 +363,9 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		t->lastPlayingState = false;
 		t->playPauseBtn->setAlt(false);
 		t->playPauseBtn->redraw();
+		// Pass the target bar directly: JACK's locate is async, so position()
+		// would still read the pre-rewind value here.
+		if (t->onRewind) t->onRewind(bar);
 	}, this);
 
 	playPauseBtn = new TransportButton(bx + 2 * (btnSize + gap), by, btnSize, btnSize,

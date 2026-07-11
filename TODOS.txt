@@ -384,12 +384,9 @@ cf master volume rubberband control? Or any other global parameters?
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
-On rewind scroll song editor to start.
-
 Add more hover over notes for controls
 
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
-
 
 
 BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.

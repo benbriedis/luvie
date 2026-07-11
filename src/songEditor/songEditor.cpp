@@ -266,6 +266,19 @@ void SongEditor::setColOffset(int offset)
     redraw();
 }
 
+void SongEditor::scrollPlayheadIntoView(float bar)
+{
+    // In loop mode the song playhead is frozen and the grid isn't chasing it.
+    if (playhead.isLoopActive()) return;
+
+    int   sbW          = (scrollbar && scrollbar->visible()) ? scrollbarW : 0;
+    int   visibleGridW = std::max(1, w() - sbW - labelW - controlsW);
+    float playheadPx   = (bar - colOffset) * songGrid.colWidth;
+
+    if (playheadPx < 0.0f || playheadPx >= (float)visibleGridW)
+        setColOffset((int)bar);
+}
+
 void SongEditor::followPlayhead()
 {
     if (!transport) return;
