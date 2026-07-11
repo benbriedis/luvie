@@ -11,7 +11,7 @@ struct ChordDef {
     const char* hash;
     const char* name;
     int         size;
-    int         intervals[7];
+    int         intervals[8];
     bool        isScale;   // true = shown under "Scale"; false = under "Chord"
     const char* submenu;   // menu grouping; nullptr/"" = top level, else submenu name
 };
@@ -39,6 +39,8 @@ inline constexpr ChordDef chordDefs[] = {
     {"wjrku4", "Phrygian",          7, {0, 1, 3,  5,  7,  8, 10}, true,  nullptr},
     {"pulps0", "Locrian",           7, {0, 1, 3,  5,  6,  8, 10}, true,  nullptr},
     {"ktcanc", "Whole tone",        6, {0, 2, 4,  6,  8, 10,  0}, true,  nullptr},
+    {"oct8wh", "Whole-half",        8, {0, 2, 3,  5,  6,  8,  9, 11}, true, "Octatonic"},
+    {"oct8hw", "Half-whole",        8, {0, 1, 3,  4,  6,  7,  9, 10}, true, "Octatonic"},
     {"k7m2p4", "maj6",              4, {0, 4, 7,  9,  0,  0,  0}, false, "Extended"},
     {"x3n9qw", "6(add9)",           5, {0, 4, 7,  9, 14,  0,  0}, false, "Extended"},
     {"b8t5rz", "min6(add9)",        5, {0, 3, 7,  9, 14,  0,  0}, false, "Extended"},
