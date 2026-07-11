@@ -78,6 +78,7 @@ static json patternToJson(const Pattern& p) {
         {"rootPitch",    p.rootPitch},
         {"chordHash",    p.chordHash},
         {"useSharp",     p.useSharp},
+        {"octaveOffset", p.octaveOffset},
         {"snap",         p.snap},
     };
 }
@@ -94,6 +95,7 @@ static Pattern patternFromJson(const json& j) {
     p.rootPitch    = j.value("rootPitch", 0);
     p.chordHash    = j.value("chordHash", std::string{});
     p.useSharp     = j.value("useSharp",  false);
+    p.octaveOffset = j.value("octaveOffset", 0);
     p.snap         = j.value("snap",      2);
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));
     for (const auto& jd : j.value("drumNotes", json::array())) p.drumNotes.push_back(drumNoteFromJson(jd));

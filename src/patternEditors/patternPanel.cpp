@@ -6,6 +6,7 @@
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
+#include <algorithm>
 #include <cmath>
 
 static constexpr int pad           = 3;
@@ -41,12 +42,14 @@ KeySection::KeySection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       baseLabel   (0, 0, kLabelW,  h, "Base"),
       sharpFlatBtn(0, 0, kBtnW,    h, "#", "b"),
-      rootChoice  (0, 0, kChoiceW, h)
+      rootChoice  (0, 0, kChoiceW, h),
+      octaveChoice(0, 0, kOctW,    h)
 {
     gap(kGap);
     fixed(&baseLabel,    kLabelW);
     fixed(&sharpFlatBtn, kBtnW);
     fixed(&rootChoice,   kChoiceW);
+    fixed(&octaveChoice, kOctW);
     end();
 }
 
@@ -261,6 +264,14 @@ void PatternPanel::initHarmonyControls()
     ks.rootChoice.setBorderColor(panelCtrlBorder);
     ks.rootChoice.callback(paramsCb, this);
 
+    for (const char* v : {"-1", "0", "1"})
+        ks.octaveChoice.add(v);
+    ks.octaveChoice.value(1);   // default: 0
+    ks.octaveChoice.color(HarmonyControls::kBg);
+    ks.octaveChoice.setBorderColor(panelCtrlBorder);
+    ks.octaveChoice.tooltip("Octave offset");
+    ks.octaveChoice.callback(paramsCb, this);
+
     cs.chordScaleBtn.color(HarmonyControls::kBg);
     cs.chordScaleBtn.labelcolor(panelText);
     cs.chordScaleBtn.setBorderWidth(1);
@@ -462,11 +473,12 @@ void PatternPanel::populateChordChoice()
     cc.redraw();
 }
 
-void PatternPanel::setParams(int root, std::string_view chordHash, bool sharp)
+void PatternPanel::setParams(int root, std::string_view chordHash, bool sharp, int octaveOffset)
 {
     useSharp = sharp;
     harmonyControls.keySec.sharpFlatBtn.set(sharp);
     updateRootChoiceLabels(root);
+    harmonyControls.keySec.octaveChoice.value(std::clamp(octaveOffset, -1, 1) + 1);
 
     int chord = chordIndexForHash(chordHash);
     showScale = chordDefs[chord].isScale;
@@ -586,7 +598,7 @@ void PatternPanel::commitHarmony()
         for (const auto& p : pattern->get().patterns)
             if (p.id == patId) { oldHash = p.chordHash; break; }
         std::string newHash = chordHash();
-        pattern->setPatternHarmony(patId, rootPitch(), newHash, useSharp);
+        pattern->setPatternHarmony(patId, rootPitch(), newHash, useSharp, octaveOffset());
         int oldSize = chordDefForHash(oldHash).size;
         int newSize = chordDefForHash(newHash).size;
         if (oldSize != newSize)
@@ -601,7 +613,7 @@ void PatternPanel::refreshHarmony()
     int patId = selectedPatternId();
     for (const auto& p : pattern->get().patterns) {
         if (p.id != patId) continue;
-        setParams(p.rootPitch, p.chordHash, p.useSharp);
+        setParams(p.rootPitch, p.chordHash, p.useSharp, p.octaveOffset);
         return;
     }
 }

@@ -33,10 +33,12 @@ struct KeySection : Fl_Flex {
     static constexpr int kLabelW  = 40;
     static constexpr int kBtnW    = 26;
     static constexpr int kChoiceW = 52;
-    static constexpr int kWidth   = kLabelW + kGap + kBtnW + kGap + kChoiceW;
+    static constexpr int kOctW    = 46;
+    static constexpr int kWidth   = kLabelW + kGap + kBtnW + kGap + kChoiceW + kGap + kOctW;
     Fl_Box       baseLabel;
     ToggleButton sharpFlatBtn;
     ModernChoice rootChoice;
+    ModernChoice octaveChoice;   // octave offset: -1, 0, 1
     KeySection(int x, int y, int h);
 };
 
@@ -222,8 +224,9 @@ public:
         return chordDefs[idx].hash;
     }
     bool isSharp()   const { return useSharp; }
+    int  octaveOffset() const { return harmonyControls.keySec.octaveChoice.value() - 1; }
 
-    void setParams(int root, std::string_view chordHash, bool sharp);
+    void setParams(int root, std::string_view chordHash, bool sharp, int octaveOffset);
     void setInstruments(ObservableInstrument* instr);
 
     void setPattern(ObservablePattern* tl);

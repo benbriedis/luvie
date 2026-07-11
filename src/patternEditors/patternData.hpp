@@ -58,6 +58,7 @@ struct Pattern {
 	int  rootPitch = 0;      // base note index (matches rootChoice)
 	std::string chordHash;   // stable ChordDef hash; empty = "major" (see chords.hpp)
 	bool useSharp  = false;  // #/b display spelling
+	int  octaveOffset = 0;   // -1, 0 or 1; added to every note's octave at playback
 	int  snap      = 2;      // snapChoice index; 2 = 1/16 (kSnapDefault in patternPanel.cpp)
 };
 

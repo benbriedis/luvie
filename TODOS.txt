@@ -274,6 +274,10 @@ Lighter theme for scrollbars?
 
 Loop Editor: maybe show a mini version of the patterns, similar to Seq24
 
+In pattern editor #bars and signature allow click and drag left and right, which is weird.
+   Maybe disable
+   Or maybe replace with a modern spinner and hide the arrow buttons
+   
 
 ----------------------
 
@@ -295,6 +299,12 @@ RaySession:
 	- Our transport does not seem to update (OK in Ardour)
     - Test isDirty in RaySession now
 
+Octave offset - cf alternative:  a transpose option... 
+	Could have an 'operations' icon that lists a bunch of options.
+	More flexible, but a bit confusing given the use of the base note
+  Or provide more options.
+  If keep cf adding colour (eg yellow) to the octave numbers.
+  
  
 Solo & Mute options
 1. Leave as is
@@ -350,6 +360,7 @@ cf custom chord and scale builder
 
 =========================	 
 
+        
 POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
     Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
 
@@ -358,8 +369,16 @@ TOTEST: the 'disabled' notes are correct
 
 - When collapsed I think the label name is better in the grey colour.
 
-   
-BUG (seen once): add some notes to scale, cover to chord. Centering button doesn't work
+
+Rewind when in Loop mode is a bit weird. cf disabling / not using
+
+BUG: Pattern editor - create a note and shrink its smaller than 1 column. Click in elsewhere in the column. The note disappears. Inconsistent and weird.
+
+BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
+
+BUG: Pattern editor - cannot create 2 notes in a column. Have to move extra ones in from outside. 
+
+BUG (seen once): After changing scale/chord centering button doesn't (always?) work
 
 PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
          ALT could have an octave offset. (0 default, would want to restrict to valid values. Or just -1, 0, 1)
@@ -372,6 +391,8 @@ cf master volume rubberband control? Or any other global parameters?
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
 On rewind scroll song editor to start.
+
+Add more hover over notes for controls
 
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
