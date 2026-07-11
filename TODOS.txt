@@ -388,6 +388,8 @@ Add more hover over notes for controls
 
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
+cf switching Song Mode ==> Loop Mode - maybe go into intermediate mode until bar end?
+
 
 BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
 

@@ -266,25 +266,12 @@ void SongEditor::setColOffset(int offset)
     redraw();
 }
 
-void SongEditor::scrollPlayheadIntoView(float bar)
-{
-    // In loop mode the song playhead is frozen and the grid isn't chasing it.
-    if (playhead.isLoopActive()) return;
-
-    int   sbW          = (scrollbar && scrollbar->visible()) ? scrollbarW : 0;
-    int   visibleGridW = std::max(1, w() - sbW - labelW - controlsW);
-    float playheadPx   = (bar - colOffset) * songGrid.colWidth;
-
-    if (playheadPx < 0.0f || playheadPx >= (float)visibleGridW)
-        setColOffset((int)bar);
-}
-
 void SongEditor::followPlayhead()
 {
     if (!transport) return;
     // In loop mode the song grid isn't the thing being played, so don't scroll
     // it to chase the playhead — only follow in song mode.
-    if (playhead.isLoopActive()) return;
+    if (playhead.isLoopActive()) { pendingScroll = false; return; }
     bool  playing = transport->isPlaying();
     float bar     = transport->position();
 
@@ -292,6 +279,18 @@ void SongEditor::followPlayhead()
     int   visibleGridW = std::max(1, w() - sbW - labelW - controlsW);
     int   visibleCols  = songGrid.colWidth > 0 ? visibleGridW / songGrid.colWidth : 1;
     float playheadPx   = (bar - colOffset) * songGrid.colWidth;
+
+    if (pendingScroll) {
+        // A rewind was requested: snap the playhead to the left edge if it's off
+        // screen. Doing it here (rather than in the button handler) reads the
+        // settled position and produces a single scroll in step with the redraw,
+        // whether stopped or playing.
+        pendingScroll = false;
+        if (playheadPx < 0.0f || playheadPx >= (float)visibleGridW)
+            setColOffset((int)bar);
+        wasPlaying = playing;
+        return;
+    }
 
     if (playing) {
         if (!wasPlaying) {

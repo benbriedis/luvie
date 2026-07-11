@@ -94,9 +94,8 @@ public:
 	std::function<bool(float& bar)> rewindTarget;
 
 	// Fired after the rewind button repositions the transport, so views can scroll
-	// the (possibly off-screen) playhead into view even when stopped. The argument
-	// is the target bar (position() may lag on async transports like JACK).
-	std::function<void(float bar)> onRewind;
+	// the (possibly off-screen) playhead into view even when stopped.
+	std::function<void()> onRewind;
 
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;

@@ -32,6 +32,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     int                colOffset      = 0;
     int                baseX          = 0;
     bool               wasPlaying     = false;
+    bool               pendingScroll  = false;  // snap playhead into view on next tick
 
     static constexpr int wheelStepPx = 24;   // pixels per mouse-wheel notch
 
@@ -66,9 +67,10 @@ public:
     void setParamLaneContextPopup(ParamLaneContextPopup* p);
     void setTrackView(int trackIndex, bool beatResolution);
 
-    // Scroll horizontally so `bar` sits at the left edge if it is currently
-    // off-screen (used on rewind while stopped, when followPlayhead does nothing).
-    void scrollPlayheadIntoView(float bar);
+    // Ask for the playhead to be scrolled to the left edge (if off-screen) on the
+    // next timer tick. Deferring to followPlayhead means one scroll update that
+    // stays in sync with the playhead redraw, even after an async (JACK) rewind.
+    void requestScrollToPlayhead() { pendingScroll = true; }
 
     void onTimelineChanged() override;
 };
