@@ -345,8 +345,6 @@ cf custom chord and scale builder
 
 =========================	 
 
-Too easy to accidently add a marker to a ruler. cf right click instead.
-
 POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
     Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
 

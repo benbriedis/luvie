@@ -13,11 +13,11 @@ public:
 
 	explicit MarkerPopup(Kind kind);
 
-	void openTempo(int wx, int wy, bool fixed, double bpm,
+	void openTempo(int wx, int wy, bool fixed, bool showDelete, double bpm,
 	               std::function<void(double)> onOk,
 	               std::function<void()>       onDelete);
 
-	void openTimeSig(int wx, int wy, bool fixed, int num, int den,
+	void openTimeSig(int wx, int wy, bool fixed, bool showDelete, int num, int den,
 	                 std::function<void(int, int)> onOk,
 	                 std::function<void()>          onDelete);
 
@@ -26,6 +26,7 @@ public:
 private:
 	void doOk() override;
 	void doDelete();
+	void configureDelete(bool fixed, bool showDelete);
 	Kind            kind;
 	Fl_Value_Input* input1      = nullptr;
 	ModernChoice*   denomChoice = nullptr;

@@ -17,6 +17,7 @@
 #include "transport.hpp"
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
+#include "markerContextPopup.hpp"
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
@@ -125,6 +126,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* sp      = new PatternInstanceContextPopup{};
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
+    auto* mCtxPop = new MarkerContextPopup;
     auto* ctxPop    = new TrackContextPopup;
     auto* loopCtxPop = new LoopContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
@@ -170,11 +172,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tab1->color(bgColor);
 
     auto* timeSigRuler = new MarkerRuler(0, off + tabBarH, winW, markerRulerH,
-        60, 60, MarkerRuler::TIME_SIG, song, tsPop);
+        60, 60, MarkerRuler::TIME_SIG, song, tPop, tsPop, mCtxPop);
     tab1->add(timeSigRuler);
 
     auto* tempoRuler = new MarkerRuler(0, off + tabBarH + markerRulerH, winW, markerRulerH,
-        60, 60, MarkerRuler::TEMPO, song, tPop);
+        60, 60, MarkerRuler::TEMPO, song, tPop, tsPop, mCtxPop);
     tab1->add(tempoRuler);
 
     auto* og2 = new SongEditor(0, off + tabBarH + 2*markerRulerH, winW,
@@ -359,6 +361,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(sp);     window->registerPopup(sp);
     window->add(tPop);   window->registerPopup(tPop);
     window->add(tsPop);  window->registerPopup(tsPop);
+    window->add(mCtxPop); window->registerPopup(mCtxPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);

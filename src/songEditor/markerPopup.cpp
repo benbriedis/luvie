@@ -3,12 +3,13 @@
 #include <FL/Fl_Box.H>
 
 static constexpr int popupW  = 160;
-static constexpr int popupH  = 70;
 static constexpr int pad     = 8;
 static constexpr int row1Y   = pad;
 static constexpr int row1H   = 22;
 static constexpr int row2Y   = pad + row1H + pad;
 static constexpr int row2H   = 24;
+static constexpr int popupH  = row2Y + row2H + pad;  // with the Delete row
+static constexpr int popupHSlim = row2Y;             // input row only, no Delete
 
 MarkerPopup::MarkerPopup(Kind k)
 	: InputEditorPopup(popupW, popupH), kind(k)
@@ -87,18 +88,33 @@ int MarkerPopup::handle(int event)
 	return InputEditorPopup::handle(event);
 }
 
-void MarkerPopup::openTempo(int wx, int wy, bool fixed, double bpm,
+void MarkerPopup::configureDelete(bool fixed, bool showDelete)
+{
+	if (showDelete) {
+		deleteBtn->show();
+		fixed ? deleteBtn->deactivate() : deleteBtn->activate();
+		popH = popupH;
+	} else {
+		// Freshly created marker: no Delete row until it is re-opened to edit.
+		deleteBtn->hide();
+		popH = popupHSlim;
+	}
+	// popH drives ContextMenuPopup::resize(), which otherwise pins the size.
+	size(popupW, popH);
+}
+
+void MarkerPopup::openTempo(int wx, int wy, bool fixed, bool showDelete, double bpm,
                              std::function<void(double)> onOk,
                              std::function<void()> onDelete)
 {
 	input1->value(bpm);
-	fixed ? deleteBtn->deactivate() : deleteBtn->activate();
+	configureDelete(fixed, showDelete);
 	onOkTempo  = std::move(onOk);
 	onDeleteCb = std::move(onDelete);
 	openEditor(wx, wy, input1);
 }
 
-void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
+void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool showDelete, int num, int den,
                                std::function<void(int, int)> onOk,
                                std::function<void()> onDelete)
 {
@@ -107,7 +123,7 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, int num, int den,
 	int idx = 2; // default to 4
 	for (int i = 0; i < 6; ++i) if (denoms[i] == den) { idx = i; break; }
 	denomChoice->value(idx);
-	fixed ? deleteBtn->deactivate() : deleteBtn->activate();
+	configureDelete(fixed, showDelete);
 	onOkTimeSig = std::move(onOk);
 	onDeleteCb  = std::move(onDelete);
 	openEditor(wx, wy, input1);

@@ -4,13 +4,16 @@
 #include <FL/Fl_Widget.H>
 #include "observableSong.hpp"
 #include "markerPopup.hpp"
+#include "markerContextPopup.hpp"
 
 class MarkerRuler : public Fl_Widget, public ITimelineObserver {
 public:
 	enum Kind { TEMPO, TIME_SIG };
 
 	MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
-	            Kind kind, ObservableSong* timeline, MarkerPopup* popup);
+	            Kind kind, ObservableSong* timeline,
+	            MarkerPopup* tempoPopup, MarkerPopup* timeSigPopup,
+	            MarkerContextPopup* ctxPopup);
 	~MarkerRuler();
 
 	void onTimelineChanged() override { redraw(); }
@@ -20,8 +23,10 @@ private:
 	Kind                kind;
 	int                 numCols;
 	int                 colWidth;
-	ObservableSong* timeline;
-	MarkerPopup*        popup;
+	ObservableSong*     timeline;
+	MarkerPopup*        tempoPopup;
+	MarkerPopup*        timeSigPopup;
+	MarkerContextPopup* ctxPopup;
 
 	int  draggingBar    = -1;
 	int  clickedBar     = -1;
@@ -42,7 +47,9 @@ private:
 	int  pixelToBar(int px)  const;
 	int  findBarAt(int px)   const;  // bar of marker under px, or -1
 	bool isFixed(int bar)    const   { return bar == 0; }
-	void openPopupFor(int bar);
+	bool occupied(Kind k, int bar) const;
+	void openPopupFor(Kind k, int bar, bool showDelete);
+	void addMarker(Kind k, int bar);
 
 public:
 	void setOffsetX(int ox)   { offsetX  = ox; redraw(); }

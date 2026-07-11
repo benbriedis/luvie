@@ -8,9 +8,12 @@
 #include <cstdio>
 
 MarkerRuler::MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
-                         Kind kind, ObservableSong* timeline, MarkerPopup* popup)
+                         Kind kind, ObservableSong* timeline,
+                         MarkerPopup* tempoPopup, MarkerPopup* timeSigPopup,
+                         MarkerContextPopup* ctxPopup)
 	: Fl_Widget(x, y, w, h),
-	  kind(kind), numCols(numCols), colWidth(colWidth), timeline(timeline), popup(popup)
+	  kind(kind), numCols(numCols), colWidth(colWidth), timeline(timeline),
+	  tempoPopup(tempoPopup), timeSigPopup(timeSigPopup), ctxPopup(ctxPopup)
 {
 	timeline->addObserver(this);
 }
@@ -83,19 +86,45 @@ int MarkerRuler::findBarAt(int px) const
 	return -1;
 }
 
-void MarkerRuler::openPopupFor(int bar)
+bool MarkerRuler::occupied(Kind k, int bar) const
 {
+	if (k == TEMPO) {
+		for (auto& m : timeline->get().bpms)
+			if (m.bar == bar) return true;
+	} else {
+		for (auto& m : timeline->get().timeSigs)
+			if (m.bar == bar) return true;
+	}
+	return false;
+}
+
+void MarkerRuler::addMarker(Kind k, int bar)
+{
+	if (bar < 1 || occupied(k, bar)) return;
+	if (k == TEMPO) {
+		timeline->setBpm(bar, timeline->bpmAt(bar));
+	} else {
+		int top, bottom;
+		timeline->timeSigAt(bar, top, bottom);
+		timeline->setTimeSig(bar, top, bottom);
+	}
+	openPopupFor(k, bar, /*showDelete=*/false);
+}
+
+void MarkerRuler::openPopupFor(Kind k, int bar, bool showDelete)
+{
+	MarkerPopup* popup = (k == TEMPO) ? tempoPopup : timeSigPopup;
 	Fl_Window* win = window();
 	Size   avail  = { win ? win->w() : 800, win ? win->h() : 600 };
 	Point2 anchor = { barToPixel(bar), y() };
 	Point2 pos    = calcPopupPos(avail, anchor, h(), popup->w(), popup->h());
 
-	if (kind == TEMPO) {
+	if (k == TEMPO) {
 		float bpm = 120.0f;
 		for (auto& m : timeline->get().bpms)
 			if (m.bar == bar) { bpm = m.bpm; break; }
 
-		popup->openTempo(pos.x, pos.y, isFixed(bar), bpm,
+		popup->openTempo(pos.x, pos.y, isFixed(bar), showDelete, bpm,
 			[this, bar](double bpm) { timeline->setBpm(bar, (float)bpm); },
 			[this, bar]()           { timeline->removeBpm(bar); });
 	} else {
@@ -103,7 +132,7 @@ void MarkerRuler::openPopupFor(int bar)
 		for (auto& m : timeline->get().timeSigs)
 			if (m.bar == bar) { top = m.top; bottom = m.bottom; break; }
 
-		popup->openTimeSig(pos.x, pos.y, isFixed(bar), top, bottom,
+		popup->openTimeSig(pos.x, pos.y, isFixed(bar), showDelete, top, bottom,
 			[this, bar](int top, int bottom) { timeline->setTimeSig(bar, top, bottom); },
 			[this, bar]()                    { timeline->removeTimeSig(bar); });
 	}
@@ -122,9 +151,7 @@ int MarkerRuler::handle(int event)
 			window()->cursor(FL_CURSOR_DEFAULT);
 			return 1;
 		}
-		int bar = findBarAt(Fl::event_x());
-		if (bar >= 0) window()->cursor(contextMenuCursorImage(), 0, 0);
-		else window()->cursor(FL_CURSOR_CROSS);
+		window()->cursor(contextMenuCursorImage(), 0, 0);
 		return 1;
 	}
 	case FL_PUSH: {
@@ -166,34 +193,22 @@ int MarkerRuler::handle(int event)
 	}
 	case FL_RELEASE: {
 		if (Fl::event_button() == FL_LEFT_MOUSE) {
-			if (!didDrag && draggingBar < 0 && !pushedOnMarker) {
-				// Left click on empty space: create marker and open popup
-				int bar = std::max(1, pixelToBar(Fl::event_x() - x()));
-				bool occupied = false;
-				if (kind == TEMPO) {
-					for (auto& m : timeline->get().bpms)
-						if (m.bar == bar) { occupied = true; break; }
-				} else {
-					for (auto& m : timeline->get().timeSigs)
-						if (m.bar == bar) { occupied = true; break; }
-				}
-				if (!occupied) {
-					if (kind == TEMPO)
-						timeline->setBpm(bar, timeline->bpmAt(bar));
-					else {
-						int top, bottom;
-						timeline->timeSigAt(bar, top, bottom);
-						timeline->setTimeSig(bar, top, bottom);
-					}
-					openPopupFor(bar);
-				}
-			}
+			// Left click no longer creates markers; only marker dragging.
 			draggingBar    = -1;
 			didDrag        = false;
 			pushedOnMarker = false;
 		} else if (Fl::event_button() == FL_RIGHT_MOUSE) {
-			if (clickedBar >= 0)
-				openPopupFor(clickedBar);
+			if (clickedBar >= 0) {
+				// Right click on an existing marker of this ruler: edit it.
+				openPopupFor(kind, clickedBar, /*showDelete=*/true);
+			} else {
+				// Right click on empty space: offer to add a marker of this
+				// ruler's kind at this bar.
+				int bar = std::max(1, pixelToBar(Fl::event_x() - x()));
+				const char* label = (kind == TEMPO) ? "Add BPM" : "Add time signature";
+				ctxPopup->open(label, [this, bar]() { addMarker(kind, bar); },
+				               Fl::event_x(), Fl::event_y());
+			}
 			clickedBar = -1;
 		}
 		return 1;
