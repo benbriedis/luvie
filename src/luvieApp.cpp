@@ -17,6 +17,7 @@
 #include "transport.hpp"
 #include "markerPopup.hpp"
 #include "markerRuler.hpp"
+#include "loopRuler.hpp"
 #include "patternPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
@@ -177,7 +178,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         60, 60, MarkerRuler::TEMPO, song, tPop, tsPop);
     tab1->add(tempoRuler);
 
-    auto* og2 = new SongEditor(0, off + tabBarH + 2*markerRulerH, winW,
+    auto* loopRuler = new LoopRuler(0, off + tabBarH + 2*markerRulerH, winW, markerRulerH,
+        60, 60);
+    tab1->add(loopRuler);
+
+    auto* og2 = new SongEditor(0, off + tabBarH + 3*markerRulerH, winW,
                                10, 60, 45, 60, 0.25, *p2);
     songEd = og2;
     tab1->add(og2);
@@ -236,15 +241,18 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // ---- Wire up song editor ----
     og2->setTransport(transport, song);
-    og2->onRulerOffsetChanged = [timeSigRuler, tempoRuler](int off, int clipLeft) {
+    og2->onRulerOffsetChanged = [timeSigRuler, tempoRuler, loopRuler](int off, int clipLeft) {
         timeSigRuler->setOffsetX(off);
         timeSigRuler->setClipLeft(clipLeft);
         tempoRuler->setOffsetX(off);
         tempoRuler->setClipLeft(clipLeft);
+        loopRuler->setOffsetX(off);
+        loopRuler->setClipLeft(clipLeft);
     };
-    og2->onNumColsChanged = [timeSigRuler, tempoRuler](int n) {
+    og2->onNumColsChanged = [timeSigRuler, tempoRuler, loopRuler](int n) {
         timeSigRuler->setNumCols(n);
         tempoRuler->setNumCols(n);
+        loopRuler->setNumCols(n);
     };
     og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);

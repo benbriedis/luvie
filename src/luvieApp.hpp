@@ -53,7 +53,7 @@ public:
     static constexpr int rowHeight       = 30;
 
     static int defaultWinH() {
-        return tabBarH + 2*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
+        return tabBarH + 3*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
     }
 
     // Options — set before calling build()
