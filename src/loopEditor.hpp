@@ -12,25 +12,18 @@
 #include "gridScrollPane.hpp"
 #include "modern/modernButton.hpp"
 #include "modern/modernSpinner.hpp"
-#include "modern/modernChoice.hpp"
-#include "modern/modernValueInput.hpp"
-#include "modern/beatUnitChoice.hpp"
 
-// Dark control bar at the bottom of the Loop Editor
+// Dark control bar at the bottom of the Loop Editor. BPM only: a loop is timed by
+// its pattern's own time signature and beat definition, so a song-level signature
+// here would change nothing about how the loops play. Both live in the pattern
+// editor's control bar; the song's own markers stay on the song editor's rulers.
 class LoopPanel : public Fl_Group, public ITimelineObserver {
     ObservableSong* timeline = nullptr;
 
     Fl_Box        bpmLabel;
     ModernSpinner bpmInput;
-    Fl_Box           timeSigLabel;
-    ModernValueInput timeSigNum;
-    Fl_Box           timeSigSlash;
-    ModernChoice     timeSigDen;
-    Fl_Box           beatLabel;
-    BeatUnitChoice   beatChoice;
 
     void commitBpm();
-    void commitTimeSig(bool snapBeat);
 
     void draw() override;
 

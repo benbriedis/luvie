@@ -15,28 +15,18 @@
 // LoopPanel layout
 // ======================================================
 
-static constexpr int lpPad      = 10;
-static constexpr int lpCtrlH    = 24;
-static constexpr int lpLabelW   = 40;
-static constexpr int lpBpmW     = 70;
-static constexpr int lpSmallW   = 36;
-static constexpr int lpChoiceW  = 50;
-static constexpr int lpSlashW   = 14;
-static constexpr int lpSmGap    = 4;
-static constexpr int lpGroupGap = 20;
-
-static constexpr int lpBeatLabelW = 46;
-static constexpr int lpBeatChoiceW = 46;
+// BPM is the only timing control here: a loop's tempo comes from the BPM plus the
+// pattern's OWN time signature and beat definition (see the pattern editor's
+// control bar), so a song-level signature would have no effect on how loops play.
+static constexpr int lpPad    = 10;
+static constexpr int lpCtrlH  = 24;
+static constexpr int lpLabelW = 40;
+static constexpr int lpBpmW   = 70;
+static constexpr int lpSmGap  = 4;
 
 static int lpCtrlY(int y, int h) { return y + (h - lpCtrlH) / 2; }
 static int lpBpmLabelX(int x)   { return x + lpPad; }
 static int lpBpmInputX(int x)   { return lpBpmLabelX(x) + lpLabelW + lpSmGap; }
-static int lpTsLabelX(int x)    { return lpBpmInputX(x) + lpBpmW + lpGroupGap; }
-static int lpTsNumX(int x)      { return lpTsLabelX(x) + lpLabelW + lpSmGap; }
-static int lpTsSlashX(int x)    { return lpTsNumX(x) + lpSmallW; }
-static int lpTsDenX(int x)      { return lpTsSlashX(x) + lpSlashW; }
-static int lpBeatLabelX(int x)  { return lpTsDenX(x) + lpChoiceW + lpGroupGap; }
-static int lpBeatChoiceX(int x) { return lpBeatLabelX(x) + lpBeatLabelW + lpSmGap; }
 
 // ======================================================
 // LoopPanel
@@ -44,14 +34,8 @@ static int lpBeatChoiceX(int x) { return lpBeatLabelX(x) + lpBeatLabelW + lpSmGa
 
 LoopPanel::LoopPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
-      bpmLabel    (lpBpmLabelX(x), lpCtrlY(y, h), lpLabelW,  lpCtrlH, "BPM"),
-      bpmInput    (lpBpmInputX(x), lpCtrlY(y, h), lpBpmW,    lpCtrlH),
-      timeSigLabel(lpTsLabelX(x),  lpCtrlY(y, h), lpLabelW,  lpCtrlH, "Sig"),
-      timeSigNum  (lpTsNumX(x),    lpCtrlY(y, h), lpSmallW,  lpCtrlH),
-      timeSigSlash(lpTsSlashX(x),  lpCtrlY(y, h), lpSlashW,  lpCtrlH, "/"),
-      timeSigDen  (lpTsDenX(x),    lpCtrlY(y, h), lpChoiceW, lpCtrlH),
-      beatLabel   (lpBeatLabelX(x),  lpCtrlY(y, h), lpBeatLabelW,  lpCtrlH, "Beat ="),
-      beatChoice  (lpBeatChoiceX(x), lpCtrlY(y, h), lpBeatChoiceW, lpCtrlH)
+      bpmLabel(lpBpmLabelX(x), lpCtrlY(y, h), lpLabelW, lpCtrlH, "BPM"),
+      bpmInput(lpBpmInputX(x), lpCtrlY(y, h), lpBpmW,   lpCtrlH)
 {
     box(FL_NO_BOX);
 
@@ -68,52 +52,6 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     bpmInput.callback([](Fl_Widget*, void* d) {
         static_cast<LoopPanel*>(d)->commitBpm();
     }, this);
-
-    timeSigLabel.box(FL_NO_BOX);
-    timeSigLabel.labelcolor(panelText);
-    timeSigLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-    timeSigSlash.box(FL_NO_BOX);
-    timeSigSlash.labelcolor(panelText);
-    timeSigSlash.align(FL_ALIGN_CENTER);
-
-    // The signature widgets snap the beat definition to the one the new signature
-    // implies; the beat dropdown itself commits the user's own choice as-is.
-    auto sigCb = [](Fl_Widget*, void* d) {
-        static_cast<LoopPanel*>(d)->commitTimeSig(/*snapBeat=*/true);
-    };
-    auto beatCb = [](Fl_Widget*, void* d) {
-        static_cast<LoopPanel*>(d)->commitTimeSig(/*snapBeat=*/false);
-    };
-
-    timeSigNum.color(0x37415100);
-    timeSigNum.setBorderColor(panelCtrlBorder);
-    timeSigNum.textcolor(panelText);
-    timeSigNum.cursor_color(panelText);
-    timeSigNum.labelcolor(panelText);
-    timeSigNum.range(timeSettings::numeratorMin, timeSettings::numeratorMax);
-    timeSigNum.step(1);
-    timeSigNum.value(timeSettings::numeratorDefault);
-    timeSigNum.when(FL_WHEN_RELEASE);
-    timeSigNum.callback(sigCb, this);
-
-    timeSigDen.color(0x37415100);
-    timeSigDen.labelcolor(panelText);
-    timeSigDen.setBorderColor(panelCtrlBorder);
-    for (const char* v : timeSettings::denominatorLabels)
-        timeSigDen.add(v);
-    timeSigDen.value(timeSettings::denominatorDefaultIndex);
-    timeSigDen.callback(sigCb, this);
-
-    beatLabel.box(FL_NO_BOX);
-    beatLabel.labelcolor(panelText);
-    beatLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-    beatChoice.color(0x37415100);
-    beatChoice.labelcolor(panelText);
-    beatChoice.textcolor(panelText);
-    beatChoice.setBorderColor(panelCtrlBorder);
-    beatChoice.callback(beatCb, this);
 
     end();
 }
@@ -138,33 +76,11 @@ void LoopPanel::commitBpm()
     timeline->setBpm(0, (float)bpmInput.value());
 }
 
-void LoopPanel::commitTimeSig(bool snapBeat)
-{
-    if (!timeline) return;
-    // The spinner clamps the numerator to its range; the dropdowns only ever
-    // offer the denominators and beat definitions timeSettings allows.
-    int top = (int)timeSigNum.value();
-    int den = timeSettings::denominatorAt(timeSigDen.value());
-    if (snapBeat) {
-        beatChoice.setBeatUnit(timeSettings::impliedBeatUnit(top, den));
-        beatChoice.redraw();
-    }
-    timeline->setTimeSig(0, top, den, beatChoice.beatUnit());
-}
-
 void LoopPanel::onTimelineChanged()
 {
     if (!timeline) return;
 
     bpmInput.value(timeline->bpmAt(0));
-
-    int top = timeSettings::numeratorDefault;
-    int bot = timeSettings::denominatorDefault;
-    timeline->timeSigAt(0, top, bot);
-    timeSigNum.value(top);
-    timeSigDen.value(timeSettings::denominatorIndex(bot));
-    beatChoice.setBeatUnit(timeline->beatAt(0));
-
     redraw();
 }
 
