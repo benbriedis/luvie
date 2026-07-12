@@ -25,14 +25,15 @@ static constexpr int slashW        = 12;
 static constexpr int timeSigDenW   = 50;
 static constexpr int barsLabelW    = 36;
 static constexpr int barsInputW    = 40;
-static constexpr int snapLabelW    = 40;
-static constexpr int snapChoiceW   = 70;
 static constexpr int outChoiceW    = 155;
 static constexpr int rapidBtnW     = 52;
 static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
+static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 
-static constexpr int kSnapNoteDenoms[] = { 4, 8, 16, 32, 0 };  // 0 = Free
-static constexpr int kSnapDefault      = 2;  // 1/16
+// Divisions split one beat (a time-signature denominator unit) into this many
+// parts; the choice labels are "None" (1), "1/2" and "1/3".
+static constexpr int kDivisors[]       = { 1, 2, 3 };
+static constexpr int kDivisionsDefault = 0;  // None
 static constexpr int kZoomFactors[]    = { 1, 2, 4 };
 static constexpr int kZoomDefault      = 1;  // x2
 
@@ -103,14 +104,16 @@ ZoomSection::ZoomSection(int x, int y, int h)
     end();
 }
 
-SnapSection::SnapSection(int x, int y, int h)
+DivisionsSection::DivisionsSection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
-      snapLabel (0, 0, kLabelW,  h, "Snap"),
-      snapChoice(0, 0, kChoiceW, h)
+      divLabel (0, 0, kLabelW,  h, "Div"),
+      divChoice(0, 0, kChoiceW, h),
+      snapBtn  (0, 0, kBtnW,    h, "Snap")
 {
     gap(kGap);
-    fixed(&snapLabel,  kLabelW);
-    fixed(&snapChoice, kChoiceW);
+    fixed(&divLabel,  kLabelW);
+    fixed(&divChoice, kChoiceW);
+    fixed(&snapBtn,   kBtnW);
     end();
 }
 
@@ -145,14 +148,14 @@ TimeControls::TimeControls(int x, int y, int h)
       timeSigSec(0, 0, h),
       barsSec   (0, 0, h),
       zoomSec   (0, 0, h),
-      snapSec   (0, 0, h)
+      divSec    (0, 0, h)
 {
     gap(kGap);
     margin(kMargin, 0, kMargin, 0);
     fixed(&timeSigSec, TimeSigSection::kWidth);
     fixed(&barsSec,    BarsSection::kWidth);
     fixed(&zoomSec,    ZoomSection::kWidth);
-    fixed(&snapSec,    SnapSection::kWidth);
+    fixed(&divSec,     DivisionsSection::kWidth);
     end();
 }
 
@@ -181,16 +184,15 @@ int PatternPanel::selectedPatternId() const
     return tl.patternIdForSelectedLane();
 }
 
+// The snap quantum in grid beats (one beat = one time-signature denominator
+// unit), or 0 when snapping is off. Divisions are fractions of that beat, so
+// the time signature itself does not enter into it.
 float PatternPanel::computeSnapBeats() const
 {
-    int idx = timeControls.snapSec.snapChoice.value();
-    if (idx < 0 || idx >= 5) return 0.0f;
-    int noteDenom = kSnapNoteDenoms[idx];
-    if (noteDenom == 0) return 0.0f;
-    static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
-    int tsIdx   = timeControls.timeSigSec.timeSigDen.value();
-    int tsDenom = (tsIdx >= 0 && tsIdx < 6) ? denoms[tsIdx] : 4;
-    return (float)tsDenom / (float)noteDenom;
+    if (!timeControls.divSec.snapBtn.value()) return 0.0f;
+    int idx = timeControls.divSec.divChoice.value();
+    if (idx < 0 || idx >= (int)std::size(kDivisors)) idx = kDivisionsDefault;
+    return 1.0f / (float)kDivisors[idx];
 }
 
 int PatternPanel::computeZoomFactor() const
@@ -316,7 +318,7 @@ void PatternPanel::initTimeControls()
 {
     auto& ts = timeControls.timeSigSec;
     auto& bs = timeControls.barsSec;
-    auto& ss = timeControls.snapSec;
+    auto& ds = timeControls.divSec;
 
     ts.timeSigLabel.box(FL_NO_BOX);
     ts.timeSigLabel.labelcolor(panelText);
@@ -342,7 +344,6 @@ void PatternPanel::initTimeControls()
         int patId = tl.patternIdForSelectedLane();
         int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
         self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den);
-        if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
     }, this);
 
     ts.timeSigSlash.box(FL_NO_BOX);
@@ -373,7 +374,6 @@ void PatternPanel::initTimeControls()
             }
         }
         self->pattern->setPatternTimeSig(patId, top, den);
-        if (self->onSnapChanged) self->onSnapChanged(self->computeSnapBeats());
     }, this);
 
     bs.barsLabel.box(FL_NO_BOX);
@@ -424,21 +424,42 @@ void PatternPanel::initTimeControls()
         if (self->onZoomChanged) self->onZoomChanged(self->computeZoomFactor());
     }, this);
 
-    ss.snapLabel.box(FL_NO_BOX);
-    ss.snapLabel.labelcolor(panelText);
-    ss.snapLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+    ds.divLabel.box(FL_NO_BOX);
+    ds.divLabel.labelcolor(panelText);
+    ds.divLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    for (const char* v : {"1\\/4", "1\\/8", "1\\/16", "1\\/32", "Free"})
-        ss.snapChoice.add(v);
-    ss.snapChoice.value(kSnapDefault);
-    ss.snapChoice.color(TimeControls::kBg);
-    ss.snapChoice.labelcolor(panelText);
-    ss.snapChoice.setBorderColor(panelCtrlBorder);
-    ss.snapChoice.callback([](Fl_Widget*, void* d) {
+    for (const char* v : {"None", "1\\/2", "1\\/3"})
+        ds.divChoice.add(v);
+    ds.divChoice.value(kDivisionsDefault);
+    ds.divChoice.color(TimeControls::kBg);
+    ds.divChoice.labelcolor(panelText);
+    ds.divChoice.setBorderColor(panelCtrlBorder);
+    ds.divChoice.tooltip("Subdivisions of the beat");
+    ds.divChoice.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         int patId = self->selectedPatternId();
         if (patId != 0 && self->pattern)
-            self->pattern->setPatternSnap(patId, self->timeControls.snapSec.snapChoice.value());
+            self->pattern->setPatternDivisions(patId, self->timeControls.divSec.divChoice.value());
+        if (self->onSnapChanged)
+            self->onSnapChanged(self->computeSnapBeats());
+    }, this);
+
+    ds.snapBtn.type(FL_TOGGLE_BUTTON);
+    ds.snapBtn.value(1);
+    ds.snapBtn.color(kSnapActiveColor);
+    ds.snapBtn.labelcolor(panelText);
+    ds.snapBtn.setBorderWidth(1);
+    ds.snapBtn.setBorderColor(panelCtrlBorder);
+    ds.snapBtn.tooltip("Snap new notes and resized edges to the divisions");
+    ds.snapBtn.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        auto& ds   = self->timeControls.divSec;
+        bool on    = ds.snapBtn.value() != 0;
+        ds.snapBtn.color(on ? kSnapActiveColor : TimeControls::kBg);
+        ds.snapBtn.redraw();
+        int patId = self->selectedPatternId();
+        if (patId != 0 && self->pattern)
+            self->pattern->setPatternSnapEnabled(patId, on);
         if (self->onSnapChanged)
             self->onSnapChanged(self->computeSnapBeats());
     }, this);
@@ -659,14 +680,18 @@ void PatternPanel::refreshHarmony()
     }
 }
 
-void PatternPanel::refreshSnap()
+void PatternPanel::refreshDivisions()
 {
     if (!pattern) return;
     int patId = selectedPatternId();
+    auto& ds  = timeControls.divSec;
     for (const auto& p : pattern->get().patterns) {
         if (p.id != patId) continue;
-        timeControls.snapSec.snapChoice.value(p.snap);
-        timeControls.snapSec.snapChoice.redraw();
+        ds.divChoice.value(p.divisions);
+        ds.snapBtn.value(p.snapEnabled ? 1 : 0);
+        ds.snapBtn.color(p.snapEnabled ? kSnapActiveColor : TimeControls::kBg);
+        ds.divChoice.redraw();
+        ds.snapBtn.redraw();
         return;
     }
 }
@@ -771,9 +796,9 @@ void PatternPanel::onTimelineChanged()
     refreshTimeSig();
     refreshBars();
     refreshHarmony();
-    refreshSnap();
+    refreshDivisions();
     refreshZoom();
-    // Push the freshly-loaded pattern's harmony/snap/zoom to the editors so
+    // Push the freshly-loaded pattern's harmony/divisions/zoom to the editors so
     // switching patterns reinterprets pitches, snapping and zoom for the newly
     // selected pattern.
     if (onParamsChanged) onParamsChanged();

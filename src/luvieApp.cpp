@@ -209,16 +209,16 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     patternTab = tab2;
 
     patternEd = new PatternEditor(0, off + tabBarH, winW, numRows,
-                                  numPatternBeats, rowHeight, 40, 0.25, *p1);
+                                  numPatternBeats, rowHeight, 40, 1.0f, *p1);
     tab2->add(patternEd);
 
     drumEd = new DrumPatternEditor(0, off + tabBarH, winW, drumNumRows,
-                                   numPatternBeats, drumRowH, 40, 0.25f, *p1);
+                                   numPatternBeats, drumRowH, 40, 1.0f, *p1);
     tab2->add(drumEd);
     drumEd->hide();
 
     pianorollEd = new PianorollEditor(0, off + tabBarH, winW, drumNumRows,
-                                      numPatternBeats, drumRowH, 40, 0.25f, *p1);
+                                      numPatternBeats, drumRowH, 40, 1.0f, *p1);
     tab2->add(pianorollEd);
     pianorollEd->hide();
 
