@@ -1,6 +1,7 @@
 #include "patternPanel.hpp"
 #include "observableInstrument.hpp"
 #include "chords.hpp"
+#include "timeSettings.hpp"
 #include "panelStyle.hpp"
 #include "inlineEditDispatch.hpp"
 #include <FL/Fl.H>
@@ -337,20 +338,19 @@ void PatternPanel::initTimeControls()
     ts.timeSigNum.textcolor(panelText);
     ts.timeSigNum.cursor_color(panelText);
     ts.timeSigNum.labelcolor(panelText);
-    ts.timeSigNum.range(1, 32);
+    ts.timeSigNum.range(timeSettings::numeratorMin, timeSettings::numeratorMax);
     ts.timeSigNum.step(1);
-    ts.timeSigNum.value(4);
+    ts.timeSigNum.value(timeSettings::numeratorDefault);
     ts.timeSigNum.when(FL_WHEN_RELEASE);
     ts.timeSigNum.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         auto& ts   = self->timeControls.timeSigSec;
-        static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
         if (!self->pattern) return;
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
-        int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
+        int den = timeSettings::denominatorAt(ts.timeSigDen.value());
         self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den);
     }, this);
 
@@ -360,23 +360,24 @@ void PatternPanel::initTimeControls()
     ts.timeSigDen.color(TimeControls::kBg);
     ts.timeSigDen.labelcolor(panelText);
     ts.timeSigDen.setBorderColor(panelCtrlBorder);
-    for (const char* v : {"1", "2", "4", "8", "16", "32"})
+    for (const char* v : timeSettings::denominatorLabels)
         ts.timeSigDen.add(v);
-    ts.timeSigDen.value(2); // default: /4
+    ts.timeSigDen.value(timeSettings::denominatorDefaultIndex);
     ts.timeSigDen.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         auto& ts   = self->timeControls.timeSigSec;
-        static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
         if (!self->pattern) return;
         const auto& tl = self->pattern->get();
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
-        int den = (ts.timeSigDen.value() >= 0) ? denoms[ts.timeSigDen.value()] : 4;
+        int den = timeSettings::denominatorAt(ts.timeSigDen.value());
         int top = (int)ts.timeSigNum.value();
         for (const auto& p : tl.patterns) {
             if (p.id == patId && p.timeSigBottom > 0) {
-                top = std::max(1, (int)std::round((float)p.timeSigTop * den / p.timeSigBottom));
+                // Keep the bar the same musical length across a denominator change.
+                top = std::clamp((int)std::round((float)p.timeSigTop * den / p.timeSigBottom),
+                                 timeSettings::numeratorMin, timeSettings::numeratorMax);
                 ts.timeSigNum.value(top);
                 break;
             }
@@ -639,21 +640,20 @@ void PatternPanel::refreshBars()
 
 void PatternPanel::refreshTimeSig()
 {
-    static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
     auto& ts = timeControls.timeSigSec;
-    if (!pattern) { ts.timeSigNum.value(4); ts.timeSigDen.value(2); return; }
+    auto showDefault = [&ts]() {
+        ts.timeSigNum.value(timeSettings::numeratorDefault);
+        ts.timeSigDen.value(timeSettings::denominatorDefaultIndex);
+    };
+    if (!pattern) { showDefault(); return; }
     const auto& tl = pattern->get();
     int sel = tl.selectedTrackIndex;
-    if (sel < 0 || sel >= (int)tl.tracks.size()) {
-        ts.timeSigNum.value(4); ts.timeSigDen.value(2); return;
-    }
+    if (sel < 0 || sel >= (int)tl.tracks.size()) { showDefault(); return; }
     int patId = tl.patternIdForSelectedLane();
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
         ts.timeSigNum.value(p.timeSigTop);
-        int idx = 2;
-        for (int i = 0; i < 6; ++i) if (denoms[i] == p.timeSigBottom) { idx = i; break; }
-        ts.timeSigDen.value(idx);
+        ts.timeSigDen.value(timeSettings::denominatorIndex(p.timeSigBottom));
         ts.timeSigNum.redraw();
         ts.timeSigDen.redraw();
         return;

@@ -12,6 +12,8 @@
 #include "gridScrollPane.hpp"
 #include "modern/modernButton.hpp"
 #include "modern/modernSpinner.hpp"
+#include "modern/modernChoice.hpp"
+#include "modern/modernValueInput.hpp"
 
 // Dark control bar at the bottom of the Loop Editor
 class LoopPanel : public Fl_Group, public ITimelineObserver {
@@ -19,12 +21,13 @@ class LoopPanel : public Fl_Group, public ITimelineObserver {
 
     Fl_Box        bpmLabel;
     ModernSpinner bpmInput;
-    Fl_Box      timeSigLabel;
-    InlineInput timeSigTopInput;
-    Fl_Box      timeSigSlash;
-    InlineInput timeSigBotInput;
+    Fl_Box           timeSigLabel;
+    ModernValueInput timeSigNum;
+    Fl_Box           timeSigSlash;
+    ModernChoice     timeSigDen;
 
     void commitBpm();
+    void commitTimeSig();
 
     void draw() override;
 

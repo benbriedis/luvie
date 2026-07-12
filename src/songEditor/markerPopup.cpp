@@ -1,4 +1,5 @@
 #include "markerPopup.hpp"
+#include "timeSettings.hpp"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 
@@ -28,7 +29,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		lbl->labelcolor(popupText);
 		lbl->box(FL_NO_BOX);
 		input1 = new Fl_Value_Input(pad + 34, row1Y, popupW - pad - 34 - pad, row1H);
-		input1->range(20, 300);
+		input1->range(timeSettings::bpmMin, timeSettings::bpmMax);
 		input1->step(1);
 		styleInput(input1);
 	} else {
@@ -36,7 +37,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		lbl->labelcolor(popupText);
 		lbl->box(FL_NO_BOX);
 		input1 = new Fl_Value_Input(pad + 29, row1Y, 44, row1H);
-		input1->range(1, 32);
+		input1->range(timeSettings::numeratorMin, timeSettings::numeratorMax);
 		input1->step(1);
 		styleInput(input1);
 		auto* slash = new Fl_Box(pad + 29 + 44 + 2, row1Y, 10, row1H, "/");
@@ -47,7 +48,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		denomChoice->labelcolor(popupText);
 		denomChoice->setBorderColor(0x4B556300);
 		denomChoice->setArrowColor(popupText);
-		for (const char* v : {"1", "2", "4", "8", "16", "32"})
+		for (const char* v : timeSettings::denominatorLabels)
 			denomChoice->add(v);
 	}
 
@@ -73,8 +74,7 @@ void MarkerPopup::doOk()
 	if (kind == TEMPO) {
 		if (onOkTempo) onOkTempo(input1->value());
 	} else {
-		static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
-		int den = (denomChoice->value() >= 0) ? denoms[denomChoice->value()] : 4;
+		int den = timeSettings::denominatorAt(denomChoice->value());
 		if (onOkTimeSig) onOkTimeSig((int)input1->value(), den);
 	}
 	commit();
@@ -119,10 +119,7 @@ void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool showDelete, int n
                                std::function<void()> onDelete)
 {
 	input1->value(num);
-	static constexpr int denoms[] = {1, 2, 4, 8, 16, 32};
-	int idx = 2; // default to 4
-	for (int i = 0; i < 6; ++i) if (denoms[i] == den) { idx = i; break; }
-	denomChoice->value(idx);
+	denomChoice->value(timeSettings::denominatorIndex(den));
 	configureDelete(fixed, showDelete);
 	onOkTimeSig = std::move(onOk);
 	onDeleteCb  = std::move(onDelete);

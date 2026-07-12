@@ -1,5 +1,6 @@
 #include "loopEditor.hpp"
 #include "panelStyle.hpp"
+#include "timeSettings.hpp"
 #include "appWindow.hpp"
 #include "cursors.hpp"
 #include "inlineEditDispatch.hpp"
@@ -19,6 +20,7 @@ static constexpr int lpCtrlH    = 24;
 static constexpr int lpLabelW   = 40;
 static constexpr int lpBpmW     = 70;
 static constexpr int lpSmallW   = 36;
+static constexpr int lpChoiceW  = 50;
 static constexpr int lpSlashW   = 14;
 static constexpr int lpSmGap    = 4;
 static constexpr int lpGroupGap = 20;
@@ -27,9 +29,9 @@ static int lpCtrlY(int y, int h) { return y + (h - lpCtrlH) / 2; }
 static int lpBpmLabelX(int x)   { return x + lpPad; }
 static int lpBpmInputX(int x)   { return lpBpmLabelX(x) + lpLabelW + lpSmGap; }
 static int lpTsLabelX(int x)    { return lpBpmInputX(x) + lpBpmW + lpGroupGap; }
-static int lpTsTopX(int x)      { return lpTsLabelX(x) + lpLabelW + lpSmGap; }
-static int lpTsSlashX(int x)    { return lpTsTopX(x) + lpSmallW; }
-static int lpTsBotX(int x)      { return lpTsSlashX(x) + lpSlashW; }
+static int lpTsNumX(int x)      { return lpTsLabelX(x) + lpLabelW + lpSmGap; }
+static int lpTsSlashX(int x)    { return lpTsNumX(x) + lpSmallW; }
+static int lpTsDenX(int x)      { return lpTsSlashX(x) + lpSlashW; }
 
 // ======================================================
 // LoopPanel
@@ -37,12 +39,12 @@ static int lpTsBotX(int x)      { return lpTsSlashX(x) + lpSlashW; }
 
 LoopPanel::LoopPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
-      bpmLabel       (lpBpmLabelX(x),  lpCtrlY(y, h), lpLabelW, lpCtrlH, "BPM"),
-      bpmInput       (lpBpmInputX(x),  lpCtrlY(y, h), lpBpmW,   lpCtrlH),
-      timeSigLabel   (lpTsLabelX(x),   lpCtrlY(y, h), lpLabelW, lpCtrlH, "Time"),
-      timeSigTopInput(lpTsTopX(x),     lpCtrlY(y, h), lpSmallW, lpCtrlH),
-      timeSigSlash   (lpTsSlashX(x),   lpCtrlY(y, h), lpSlashW, lpCtrlH, "/"),
-      timeSigBotInput(lpTsBotX(x),     lpCtrlY(y, h), lpSmallW, lpCtrlH)
+      bpmLabel    (lpBpmLabelX(x), lpCtrlY(y, h), lpLabelW,  lpCtrlH, "BPM"),
+      bpmInput    (lpBpmInputX(x), lpCtrlY(y, h), lpBpmW,    lpCtrlH),
+      timeSigLabel(lpTsLabelX(x),  lpCtrlY(y, h), lpLabelW,  lpCtrlH, "Sig"),
+      timeSigNum  (lpTsNumX(x),    lpCtrlY(y, h), lpSmallW,  lpCtrlH),
+      timeSigSlash(lpTsSlashX(x),  lpCtrlY(y, h), lpSlashW,  lpCtrlH, "/"),
+      timeSigDen  (lpTsDenX(x),    lpCtrlY(y, h), lpChoiceW, lpCtrlH)
 {
     box(FL_NO_BOX);
 
@@ -53,7 +55,7 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     bpmInput.step(1.0);              // set before type(): step() flips the input
     bpmInput.type(FL_FLOAT_INPUT);   // numeric type back to integer when whole
     bpmInput.format("%.1f");
-    bpmInput.range(20.0, 400.0);
+    bpmInput.range(timeSettings::bpmMin, timeSettings::bpmMax);
     bpmInput.wrap(0);
     bpmInput.when(FL_WHEN_ENTER_KEY | FL_WHEN_RELEASE);
     bpmInput.callback([](Fl_Widget*, void* d) {
@@ -68,15 +70,28 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     timeSigSlash.labelcolor(panelText);
     timeSigSlash.align(FL_ALIGN_CENTER);
 
-    timeSigTopInput.box(FL_FLAT_BOX);
-    timeSigTopInput.color(0x37415100);
-    timeSigTopInput.textcolor(panelText);
-    timeSigTopInput.cursor_color(panelText);
+    auto commitCb = [](Fl_Widget*, void* d) {
+        static_cast<LoopPanel*>(d)->commitTimeSig();
+    };
 
-    timeSigBotInput.box(FL_FLAT_BOX);
-    timeSigBotInput.color(0x37415100);
-    timeSigBotInput.textcolor(panelText);
-    timeSigBotInput.cursor_color(panelText);
+    timeSigNum.color(0x37415100);
+    timeSigNum.setBorderColor(panelCtrlBorder);
+    timeSigNum.textcolor(panelText);
+    timeSigNum.cursor_color(panelText);
+    timeSigNum.labelcolor(panelText);
+    timeSigNum.range(timeSettings::numeratorMin, timeSettings::numeratorMax);
+    timeSigNum.step(1);
+    timeSigNum.value(timeSettings::numeratorDefault);
+    timeSigNum.when(FL_WHEN_RELEASE);
+    timeSigNum.callback(commitCb, this);
+
+    timeSigDen.color(0x37415100);
+    timeSigDen.labelcolor(panelText);
+    timeSigDen.setBorderColor(panelCtrlBorder);
+    for (const char* v : timeSettings::denominatorLabels)
+        timeSigDen.add(v);
+    timeSigDen.value(timeSettings::denominatorDefaultIndex);
+    timeSigDen.callback(commitCb, this);
 
     end();
 }
@@ -101,19 +116,26 @@ void LoopPanel::commitBpm()
     timeline->setBpm(0, (float)bpmInput.value());
 }
 
+void LoopPanel::commitTimeSig()
+{
+    if (!timeline) return;
+    // The spinner clamps the numerator to its range; the dropdown only ever
+    // offers the denominators timeSettings allows.
+    timeline->setTimeSig(0, (int)timeSigNum.value(),
+                         timeSettings::denominatorAt(timeSigDen.value()));
+}
+
 void LoopPanel::onTimelineChanged()
 {
     if (!timeline) return;
 
     bpmInput.value(timeline->bpmAt(0));
 
-    char buf[32];
-    int top = 4, bot = 4;
+    int top = timeSettings::numeratorDefault;
+    int bot = timeSettings::denominatorDefault;
     timeline->timeSigAt(0, top, bot);
-    std::snprintf(buf, sizeof(buf), "%d", top);
-    timeSigTopInput.value(buf);
-    std::snprintf(buf, sizeof(buf), "%d", bot);
-    timeSigBotInput.value(buf);
+    timeSigNum.value(top);
+    timeSigDen.value(timeSettings::denominatorIndex(bot));
 
     redraw();
 }
