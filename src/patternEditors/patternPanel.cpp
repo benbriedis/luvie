@@ -195,6 +195,14 @@ float PatternPanel::computeSnapBeats() const
     return 1.0f / (float)kDivisors[idx];
 }
 
+// How many parts the beat is split into (1 = None).
+int PatternPanel::computeDivisions() const
+{
+    int idx = timeControls.divSec.divChoice.value();
+    if (idx < 0 || idx >= (int)std::size(kDivisors)) idx = kDivisionsDefault;
+    return kDivisors[idx];
+}
+
 int PatternPanel::computeZoomFactor() const
 {
     int idx = timeControls.zoomSec.zoomChoice.value();
@@ -442,6 +450,8 @@ void PatternPanel::initTimeControls()
             self->pattern->setPatternDivisions(patId, self->timeControls.divSec.divChoice.value());
         if (self->onSnapChanged)
             self->onSnapChanged(self->computeSnapBeats());
+        if (self->onDivisionsChanged)
+            self->onDivisionsChanged(self->computeDivisions());
     }, this);
 
     ds.snapBtn.type(FL_TOGGLE_BUTTON);
@@ -801,9 +811,10 @@ void PatternPanel::onTimelineChanged()
     // Push the freshly-loaded pattern's harmony/divisions/zoom to the editors so
     // switching patterns reinterprets pitches, snapping and zoom for the newly
     // selected pattern.
-    if (onParamsChanged) onParamsChanged();
-    if (onSnapChanged)   onSnapChanged(computeSnapBeats());
-    if (onZoomChanged)   onZoomChanged(computeZoomFactor());
+    if (onParamsChanged)      onParamsChanged();
+    if (onSnapChanged)        onSnapChanged(computeSnapBeats());
+    if (onDivisionsChanged)   onDivisionsChanged(computeDivisions());
+    if (onZoomChanged)        onZoomChanged(computeZoomFactor());
     redraw();
 }
 

@@ -1,4 +1,5 @@
 #include "drumGrid.hpp"
+#include "grid.hpp"
 #include "playhead.hpp"
 #include "editor.hpp"
 #include "cursors.hpp"
@@ -96,6 +97,17 @@ void DrumGrid::draw()
     fl_rectf(x(), y(), w(), h());
 
     int gridRight = std::min(w(), padX + (numCols - colOffset) * colWidth);
+    int endCol    = colOffset + w() / colWidth + 2;
+
+    // Subdivision lines first, so the row lines and column lines draw over them.
+    if (divisions > 1) {
+        fl_color(subdivLineColor);
+        for (int i = colOffset; i < std::min(endCol, numCols); i++)
+            for (int k = 1; k < divisions; k++) {
+                int x0 = x() + padX + (i - colOffset) * colWidth + k * colWidth / divisions;
+                fl_line(x0, y(), x0, y() + h());
+            }
+    }
 
     // Horizontal row lines — uniform (no octave colouring)
     for (int i = 0; i <= numRows; i++) {
@@ -104,7 +116,6 @@ void DrumGrid::draw()
     }
 
     // Vertical column lines
-    int endCol = colOffset + w() / colWidth + 2;
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + padX + (i - colOffset) * colWidth;
         bool isBar = false;

@@ -117,6 +117,7 @@ public:
 
     void focusPattern() override;
     void setSnap(float s) override { drumGrid.setSnap(s); BasePatternEditor::setSnap(s); }
+    void setDivisions(int d) override { drumGrid.setDivisions(d); }
     void setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps,
                         const std::map<int, bool>& fallbacks);
     void resize(int x, int y, int w, int h) override;

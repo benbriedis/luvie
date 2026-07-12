@@ -48,6 +48,7 @@ public:
     int  numPatternBeats() const { return patternGrid.numCols; }
     void focusPattern() override;
     void setSnap(float s) override { patternGrid.setSnap(s); BasePatternEditor::setSnap(s); }
+    void setDivisions(int d) override { patternGrid.setDivisions(d); }
     void setRapidMode(bool r)      { patternGrid.setRapidMode(r); }
 };
 

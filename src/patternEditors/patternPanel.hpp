@@ -191,6 +191,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     Fl_Box          spacer;          // flexible gap fills remaining space
 
     float computeSnapBeats() const;
+    int   computeDivisions() const;
     int   computeZoomFactor() const;
 
     void initControlRowLayout();
@@ -230,6 +231,7 @@ public:
     std::function<void()>      onParamsChanged;
     std::function<void()>      onFocus;
     std::function<void(float)> onSnapChanged;
+    std::function<void(int)>   onDivisionsChanged;
     std::function<void(int)>   onZoomChanged;
     std::function<void(bool)>  onRapidChanged;
 

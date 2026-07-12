@@ -10,6 +10,9 @@
 
 class Playhead;
 
+// Faint grey used for the beat-subdivision lines, drawn under the row lines.
+constexpr Fl_Color subdivLineColor = 0xDDDDDD00;
+
 enum class Side { Left, Right };
 struct Point { int row; float col; };
 
@@ -52,6 +55,7 @@ protected:
 
     Playhead* playhead  = nullptr;
     int       colOffset = 0;
+    int       divisions = 1;  // beat subdivisions; 1 = None, so no extra lines
 
     bool isActiveDrag() const {
         return std::holds_alternative<StateDragMove>(state) ||
@@ -97,6 +101,7 @@ public:
     void setColOffset(int off)    { colOffset = off; redraw(); }
     int  getColOffset() const     { return colOffset; }
     void setSnap(float s)         { snap = s; }
+    void setDivisions(int d)      { divisions = d > 1 ? d : 1; redraw(); }
 };
 
 #endif

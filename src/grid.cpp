@@ -41,13 +41,24 @@ void Grid::draw()
         }
     }
 
+    int endCol = colOffset + w() / colWidth + 2;
+    int colBottom = std::min(h(), gridBottom());
+
+    // Subdivision lines first, so the row lines and column lines draw over them.
+    if (divisions > 1) {
+        fl_color(subdivLineColor);
+        for (int i = colOffset; i < std::min(endCol, numCols); i++)
+            for (int k = 1; k < divisions; k++) {
+                int x0 = x() + (i - colOffset) * colWidth + k * colWidth / divisions;
+                fl_line(x0, y(), x0, y() + colBottom);
+            }
+    }
+
     for (int i = 0; i < numRows + 1; i++) {
         fl_color(rowLineColor(i));
         fl_line(x(), y() + rowY(i), x() + gridRight, y() + rowY(i));
     }
 
-    int endCol = colOffset + w() / colWidth + 2;
-    int colBottom = std::min(h(), gridBottom());
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + (i - colOffset) * colWidth;
         fl_color(columnColor(i));

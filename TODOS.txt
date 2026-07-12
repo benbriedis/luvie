@@ -356,6 +356,8 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 =========================	 
+IMPROVEMENT - when dragging notes if I grab the note at the bottom or top it would be neater 
+	to perhaps jump the cursor to the middle (or vertical middle) and drag from there.
 
 POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
     Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)

@@ -77,6 +77,8 @@ public:
 
     virtual void focusPattern() {}
     virtual void setSnap(float s) { paramGrid.setSnap(s); }
+    // Beat subdivisions (1 = None): drawn as faint grid lines, independent of snapping.
+    virtual void setDivisions(int d) { (void)d; }
     // Zoom factor (1/2/4): scales column width from its x1 base; note minimum
     // pixel widths are unaffected, so shorter notes remain creatable when zoomed.
     void setZoom(int factor);

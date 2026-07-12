@@ -34,6 +34,7 @@ class DrumGrid : public Fl_Box, public ITimelineObserver {
     int                 padX      = 0;   // left margin (px) before beat 0, so the
                                          // leftmost note circle isn't clipped
     float               snap;
+    int                 divisions = 1;  // beat subdivisions; 1 = None, so no extra lines
 
     NoteContextPopup&     popup;
     DrumState  state;
@@ -73,6 +74,7 @@ public:
     void setColOffset(int off) { colOffset = off; redraw(); }
     void setNumRows(int n)     { numRows   = n;   rebuildNotes(); }
     void setSnap(float s)      { snap = s; }
+    void setDivisions(int d)   { divisions = d > 1 ? d : 1; redraw(); }
     void onTimelineChanged()   override;
 
     int getRowOffset() const { return rowOffset; }
