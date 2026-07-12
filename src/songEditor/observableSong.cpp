@@ -427,6 +427,30 @@ double ObservableSong::secondsPerBarAt(int bar) const
     return timeSettings::secondsPerBar(timeSettings::barCrotchets(top, bottom), cpmAt(bar));
 }
 
+const Pattern* ObservableSong::patternById(int patternId) const
+{
+    for (const auto& p : data.patterns)
+        if (p.id == patternId) return &p;
+    return nullptr;
+}
+
+float ObservableSong::patternBeatsPerBar(int bar, const Pattern& pat) const
+{
+    int top, bottom;
+    timeSigAt(bar, top, bottom);
+    return (float)timeSettings::patternBeatsPerBar(
+        timeSettings::barCrotchets(top, bottom), beatAt(bar), pat.timeSigBottom, pat.beat);
+}
+
+float ObservableSong::patternBeatsPerBar(int bar, int patternId) const
+{
+    if (const Pattern* pat = patternById(patternId))
+        return patternBeatsPerBar(bar, *pat);
+    int top, bottom;
+    timeSigAt(bar, top, bottom);
+    return (float)top;
+}
+
 // ---------------------------------------------------------------------------
 
 std::vector<ObservableSong::TimeSegment> ObservableSong::buildSegments() const

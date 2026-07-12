@@ -46,6 +46,16 @@ public:
     // Seconds one bar lasts at `bar`, from its time signature, beat and tempo.
     double secondsPerBarAt(int bar) const;
 
+    // How many of a pattern's grid beats fit in one song bar at `bar`. Every
+    // conversion between a pattern's beats and song bars must go through this:
+    // a pattern's columns are units of ITS time signature, timed by ITS beat
+    // definition, so they are not the song's beats unless the two signatures
+    // agree. The patternId overload falls back to the song's numerator when the
+    // pattern is gone. See timeSettings::patternBeatsPerBar.
+    float patternBeatsPerBar(int bar, const Pattern& pat) const;
+    float patternBeatsPerBar(int bar, int patternId) const;
+    const Pattern* patternById(int patternId) const;
+
     // Time conversion — integrates over BPM/time-sig segments
     double barToSeconds(float bar) const;
     float  secondsToBar(double secs) const;

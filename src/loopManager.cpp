@@ -36,9 +36,8 @@ void LoopManager::sync(const ObservableSong& tl, float currentBar)
 				for (const auto& p : data.patterns)
 					if (p.id == inst.patternId) { pat = &p; break; }
 				if (!pat || pat->lengthBeats <= 0.0f) break;
-				int top, bottom;
-				tl.timeSigAt((int)inst.startBar, top, bottom);
-				songResult[inst.patternId] = inst.startBar - inst.startOffset / (float)top;
+				float beatsPerBar = tl.patternBeatsPerBar((int)inst.startBar, *pat);
+				songResult[inst.patternId] = inst.startBar - inst.startOffset / beatsPerBar;
 				break;  // at most one active instance per lane
 			}
 		}

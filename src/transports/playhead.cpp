@@ -173,7 +173,10 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
-		float beatsPerBar = (float)top;
+		// Timing runs on the pattern's own beat (its signature and beat definition);
+		// the printed position is a song bar/beat, so that uses the song's numerator.
+		float beatsPerBar = obsTl->patternBeatsPerBar((int)std::max(0.0f, anchorBar), *pat);
+		float songBeats   = (float)top;
 		float len         = pat->lengthBeats;
 		float prevBeats   = (prevPos - anchorBar) * beatsPerBar;
 		float curBeats    = (curPos  - anchorBar) * beatsPerBar;
@@ -184,7 +187,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
-				int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+				int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 				if (verbose) {
 					std::string name = pitchName ? pitchName(note.row)
 					                             : std::to_string(note.row);
@@ -208,7 +211,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				forEachFiring(dn.beat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
-					int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+					int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
 						       bar, beat, label.c_str(), dn.note, dn.beat);
@@ -223,7 +226,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
-					int   beat    = (int)((songBar - std::floor(songBar)) * beatsPerBar) + 1;
+					int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
@@ -274,12 +277,12 @@ int Playhead::barsToPixel(float bars) const
 		int patId = displayedPatternId();
 
 		// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
-		int top, bottom;
-		obsTl->timeSigAt(loopActive ? 0 : (int)std::max(0.0f, bars), top, bottom);
+		float beatsPerBar = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
+		                                              patId);
 
 		if (loopMgr && loopMgr->isPatternActive(patId)) {
 			float anchor  = loopMgr->patternAnchorBar(patId);
-			float elapsed = (bars - anchor) * (float)top;
+			float elapsed = (bars - anchor) * beatsPerBar;
 			float beats   = std::fmod(elapsed, (float)numCols);
 			if (beats < 0.0f) beats += numCols;
 			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
@@ -287,7 +290,7 @@ int Playhead::barsToPixel(float bars) const
 
 		// Virtual position: beat 0 of the pattern will land on the next bar boundary.
 		float nextBar     = std::floor(bars) + 1.0f;
-		float beatsToNext = (nextBar - bars) * (float)top;
+		float beatsToNext = (nextBar - bars) * beatsPerBar;
 		float virtualBeat = std::fmod((float)numCols - beatsToNext, (float)numCols);
 		if (virtualBeat < 0.0f) virtualBeat += numCols;
 		return std::clamp((int)(virtualBeat * colWidth), 0, numCols * colWidth - 2);
@@ -372,7 +375,10 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 
 		int top, bottom;
 		obsTl->timeSigAt((int)std::max(0.0f, anchorBar), top, bottom);
-		float beatsPerBar = (float)top;
+		// Timing runs on the pattern's own beat; the printed position is a song
+		// bar/beat, so that uses the song's numerator. See checkVerboseNotes.
+		float beatsPerBar = obsTl->patternBeatsPerBar((int)std::max(0.0f, anchorBar), *pat);
+		float songBeats   = (float)top;
 		float len         = pat->lengthBeats;
 		float prevBeats   = (prevPos - anchorBar) * beatsPerBar;
 		float curBeats    = (curPos  - anchorBar) * beatsPerBar;
@@ -383,7 +389,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
-				int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+				int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 				if (verbose) {
 					std::string name = pitchName ? pitchName(note.row) : std::to_string(note.row);
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
@@ -406,7 +412,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				forEachFiring(dn.beat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
-					int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+					int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
 						       bar, beat, label.c_str(), dn.note, dn.beat);
@@ -421,7 +427,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
 					int   bar     = (int)songBar + 1;
-					int   beat    = (int)(std::fmod(firstFire, beatsPerBar)) + 1;
+					int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);

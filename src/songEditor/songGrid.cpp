@@ -211,8 +211,11 @@ void SongGrid::draw()
         if (note.row < 0 || note.row >= numRows) continue;
         int y0  = y() + rowY((int)note.row);
         int rh  = rowH((int)note.row);
-        int top = 4, bottom = 4;
-        timeline->timeSigAt((int)note.beat, top, bottom);
+        const Pattern* pat = timeline->patternForInstance(note.id);
+        // The pattern's beats, not the song's: its signature and beat definition
+        // decide how much of a bar one of its beats spans.
+        float beatsPerBar = timeline->patternBeatsPerBar(
+            (int)note.beat, pat ? pat->id : 0);
 
         float startOffset = 0.0f;
         // While left-resizing, show dragStartOffset so the tick stays fixed visually
@@ -223,13 +226,12 @@ void SongGrid::draw()
             if (const PatternInstance* inst = timeline->instanceById(note.id))
                 startOffset = inst->startOffset;
 
-        float beatZeroPos = note.beat - startOffset / top;
+        float beatZeroPos = note.beat - startOffset / beatsPerBar;
         float instanceEnd = note.beat + note.length;
 
         float intervalBars = 0.0f;
-        if (const Pattern* pat = timeline->patternForInstance(note.id))
-            if (pat->lengthBeats > 0.0f)
-                intervalBars = pat->lengthBeats / top;
+        if (pat && pat->lengthBeats > 0.0f)
+            intervalBars = pat->lengthBeats / beatsPerBar;
 
         float firstTick = beatZeroPos;
         if (intervalBars > 0.0f) {
@@ -812,7 +814,11 @@ int SongGrid::overlappingCell(int noteIdx) const
 
 void SongGrid::onBeginDrag(int noteIdx)
 {
-    if (timeline) { int dummy; timeline->timeSigAt((int)notes[noteIdx].beat, dragBeatsPerBar, dummy); }
+    if (timeline) {
+        const Pattern* pat = timeline->patternForInstance(notes[noteIdx].id);
+        dragBeatsPerBar = timeline->patternBeatsPerBar((int)notes[noteIdx].beat,
+                                                       pat ? pat->id : 0);
+    }
     float startOffset = 0.0f;
     if (const PatternInstance* inst = timeline->instanceById(notes[noteIdx].id))
         startOffset = inst->startOffset;

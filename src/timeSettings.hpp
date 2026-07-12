@@ -71,6 +71,36 @@ inline constexpr double barCrotchets(int top, int bottom)
 	return bottom > 0 ? (double)top * 4.0 / (double)bottom : (double)top;
 }
 
+// One time-signature unit — one grid column of a pattern in that signature — in
+// crotchets: a crotchet in x/4, a quaver in x/8, a minim in x/2.
+inline constexpr double unitCrotchets(int bottom)
+{
+	return bottom > 0 ? 4.0 / (double)bottom : 1.0;
+}
+
+// How many of a pattern's grid beats elapse over one song bar — the factor that
+// converts pattern beats to song bars and back.
+//
+// A pattern is timed by its OWN time signature and beat definition, not the
+// song's: at 120 BPM a pattern whose beat is the crotchet plays 120 crotchets a
+// minute, so one of its grid columns lasts unitCrotchets(its denominator) at
+// that rate. Since the song bar it is measured against is timed the same way off
+// the song's signature, the shared BPM cancels and this ratio is a constant.
+//
+// The consequence users see: a one-bar 4/4 pattern and a one-bar 8/8 pattern,
+// both counted in crotchets, are both four crotchets long and so take the same
+// time to play — the 8/8 one simply runs eight columns through the same bar.
+inline constexpr double patternBeatsPerBar(double songBarCrotchets, BeatUnit songBeat,
+                                           int patternBottom, BeatUnit patternBeat)
+{
+	// The pattern column measured in the song's crotchets: its own note value,
+	// rescaled when the two beat definitions disagree (a pattern counted in
+	// dotted crotchets runs 1.5x the crotchet rate of a song counted in crotchets).
+	double columnCrotchets = unitCrotchets(patternBottom)
+	                       * beatCrotchets(songBeat) / beatCrotchets(patternBeat);
+	return columnCrotchets > 0.0 ? songBarCrotchets / columnCrotchets : 1.0;
+}
+
 // How long one bar lasts, from the two quantities above. Every bar<->seconds
 // conversion in the app funnels through this so they cannot drift apart.
 inline constexpr double secondsPerBar(double barCrotchetCount, double cpm)

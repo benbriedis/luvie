@@ -22,7 +22,7 @@ class SongGrid : public Grid, public ITimelineObserver {
     bool                beatResolution    = false;
     float               tickBarPos        = 0.0f;
     float               dragStartOffset   = 0.0f;
-    int                 dragBeatsPerBar   = 4;
+    float               dragBeatsPerBar   = 4.0f;  // the dragged pattern's beats per song bar
     int                 rowOffset         = 0;   // first partially-visible absolute row
     int                 pixelOffset       = 0;   // pixels of rowOffset scrolled off the top
 

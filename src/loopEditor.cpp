@@ -629,12 +629,11 @@ void LoopEditor::togglePattern(int trackIdx, int laneIdx)
             for (const auto& p : timeline->get().patterns)
                 if (p.id == patId) { pat = &p; break; }
             if (pat && pat->lengthBeats > 0.0f) {
-                int top, bottom;
-                timeline->timeSigAt((int)std::max(0.0f, bar), top, bottom);
-                float beatsToNext = (std::floor(bar) + 1.0f - bar) * (float)top;
+                float beatsPerBar = timeline->patternBeatsPerBar((int)std::max(0.0f, bar), *pat);
+                float beatsToNext = (std::floor(bar) + 1.0f - bar) * beatsPerBar;
                 float virtualBeat = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
                 if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
-                anchorBar = bar - virtualBeat / (float)top;
+                anchorBar = bar - virtualBeat / beatsPerBar;
             }
         }
         loopMgr->activate(patId, anchorBar);
@@ -681,13 +680,12 @@ float LoopEditor::beatProgress(int trackIdx, int laneIdx) const
         if (p.id == patId) { pat = &p; break; }
     if (!pat || pat->lengthBeats <= 0.0f) return 0.0f;
 
-    float bars = transport->position();
-    int   top, bottom;
-    timeline->timeSigAt((int)std::max(0.0f, bars), top, bottom);
+    float bars        = transport->position();
+    float beatsPerBar = timeline->patternBeatsPerBar((int)std::max(0.0f, bars), *pat);
 
     if (loopMgr->isPatternActive(patId)) {
         float anchorBar    = loopMgr->patternAnchorBar(patId);
-        float elapsed      = (bars - anchorBar) * (float)top;
+        float elapsed      = (bars - anchorBar) * beatsPerBar;
         float posInPattern = std::fmod(elapsed, pat->lengthBeats);
         if (posInPattern < 0.0f) posInPattern += pat->lengthBeats;
         return posInPattern / pat->lengthBeats;
@@ -695,7 +693,7 @@ float LoopEditor::beatProgress(int trackIdx, int laneIdx) const
 
     // Virtual position: beat 0 will align with the next bar if enabled now.
     float nextBar      = std::floor(bars) + 1.0f;
-    float beatsToNext  = (nextBar - bars) * (float)top;
+    float beatsToNext  = (nextBar - bars) * beatsPerBar;
     float virtualBeat  = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
     if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
     return virtualBeat / pat->lengthBeats;

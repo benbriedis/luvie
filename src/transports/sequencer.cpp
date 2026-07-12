@@ -164,9 +164,8 @@ void Sequencer::rebuildSnapshot()
         is.startOffset  = 0.0f;
         is.patternBeats = pat->lengthBeats;
         is.loop         = true;
-        int top, bot;
-        timeline->timeSigAt((int)std::max(0.0f, anchorBar), top, bot);
-        is.beatsPerBar = (float)top;
+        float beatsPerBar = timeline->patternBeatsPerBar((int)std::max(0.0f, anchorBar), *pat);
+        is.beatsPerBar    = beatsPerBar;
         buildNotes(is, pat, trackIdx, trackInstrument);
 
         // Param lanes. Build BEFORE moving `is` below — moving leaves portName empty.
@@ -177,7 +176,7 @@ void Sequencer::rebuildSnapshot()
             pis.startBar     = anchorBar;
             pis.length       = 1.0e9f;
             pis.startOffset  = 0.0f;
-            pis.beatsPerBar  = (float)top;
+            pis.beatsPerBar  = beatsPerBar;
             pis.patternBeats = pat->lengthBeats;
             pis.loop         = true;
             pis.portName     = is.portName;
@@ -240,9 +239,8 @@ void Sequencer::rebuildSnapshot()
                 is.length       = inst.length;
                 is.startOffset  = inst.startOffset;
                 is.patternBeats = pat->lengthBeats;
-                int top, bot;
-                timeline->timeSigAt((int)inst.startBar, top, bot);
-                is.beatsPerBar = (float)top;
+                float beatsPerBar = timeline->patternBeatsPerBar((int)inst.startBar, *pat);
+                is.beatsPerBar    = beatsPerBar;
                 buildNotes(is, pat, trackIdx, track.instrumentId);
 
                 // Param lanes for this pattern instance. Build BEFORE moving `is`
@@ -255,7 +253,7 @@ void Sequencer::rebuildSnapshot()
                         pis.startBar     = inst.startBar;
                         pis.length       = inst.length;
                         pis.startOffset  = inst.startOffset;
-                        pis.beatsPerBar  = (float)top;
+                        pis.beatsPerBar  = beatsPerBar;
                         pis.patternBeats = pat->lengthBeats;
                         pis.portName     = is.portName;
                         pis.midiChannel  = is.midiChannel;

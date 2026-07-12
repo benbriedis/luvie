@@ -118,14 +118,11 @@ void DrumGrid::draw()
     // Vertical column lines
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + padX + (i - colOffset) * colWidth;
-        bool isBar = false;
-        if (pattern) {
-            int top, bottom;
-            pattern->song()->timeSigAt(0, top, bottom);
-            isBar = (top > 0) && (i % top == 0);
-        } else {
-            isBar = (i % 4 == 0);
-        }
+        // Bar lines come from the pattern's own time signature, as in PatternGrid.
+        bool isBar = (i % 4 == 0);
+        if (pattern)
+            if (const Pattern* p = pattern->song()->patternById(patternId))
+                isBar = p->timeSigTop > 0 && (i % p->timeSigTop == 0);
         fl_color(isBar ? kBarCol : kBeatCol);
         fl_line(x0, y(), x0, y() + h());
     }
