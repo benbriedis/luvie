@@ -91,4 +91,11 @@ When switching from Song Mode to Loop Mode could go into intermediate mode until
 	BUT I think only required going one way or the other in order to line up bar.
 	MIGHT be clearer when enterring into Loop Mode though than exiting...
 
-        
+MISSION STATEMENT
+-----------------
+Luvie has aspects of being an instrument and aspects of being a piece of music notation s/w.
+Don't want to get too carried away with the second aspect - could have endless time signatures
+etc, but its more important to be musical about things. 
+(Do need to be able drive Jack I guess, inc the time master, and maybe fit in with other 
+requirements so there may be a bit of compromise required.).
+

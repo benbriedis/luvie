@@ -26,3 +26,20 @@ Selecting instruments
 
 
 To bridge between ALSA and Jack MIDI use:    a2jmidid -e  [I MAY build this in]
+
+BPM vs "CPM"
+============
+Jack, probably LV2, and most DAWs arguably misuse BPM. What they really mean is "crochets per minute (CPM)". This is good is some ways, bad in some ways. The lacks of accuracy is regretable.
+
+Luvie needs to be able to deal with other definitions of a beat (eg beat = dotted crotchet).
+Thus in Luvie BPM is not CPM. An implication of this is you will see different values for 
+BPM in Jack and Luvie when the song editor uses non-crotchet definitions of beat.
+
+Beat definition in the Song Editor: its only really used to determine the length of bars and tempo
+within the song editor. Patterns look after themselves. In time it COULD be used as 
+the Jack master.
+
+Beat definition in Loop Editor: it can't really act as transport master as the
+   patterns can define different time signatures. Can't even send Jack a
+   BPM as it really expects CPM and there can be multiple different CPMs at one time.
+   If we want time master here - probably best to use settings from Song Master.

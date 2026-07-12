@@ -25,6 +25,12 @@ FUTURE FUNCTIONALITY
   Make sure its ONLY being used to send BPM and time signature changes, plus maybe measure that 
      latency/sync thing at the start of the song that causes notes right at the start of a song to go missing.
   The Luvie UI should maintain its own separate Jack connection for sending transport messages (ONLY).
+  NB if using as time master NB my BPMs need to be adjusted using the beat definition to get
+     Jack's "BPM" (really CPM).
+  If we want the Loop Master to be time master we probably need to get the details from
+  the Song Master as different loops can have different time signatures and this leads to 
+  possibly multiple simultaneous CPMs. Too fussy and obscure I think to give the Loop Editor
+  its own time signature and beat definitions for this purpose that are otherwise not used.
 
 - Linear ramping of tempos...
 
@@ -111,17 +117,6 @@ Shrinking pattern editor horizontally - could reorangise things a bit before res
 	   NB having Ardour set to Master doesn't seem to affect anything at the moment.
 	e. BUG: Moving a note around on the Pattern editor moves the playhead forward a pixel or so (standalone, no jack)
 	
-
-2. Loop editor
-	a. Swap between it an song editor based on displayed tab.
-	   Disable swapping between them when playing.
-	b. This editor needs its own tempo and time signature fields to replace those provided by the song editor.
-	NOTE the pattern editor really needs a #beats field (rather than a #bars, which can be inconsistent between song editor and loop editor...
-	   a bit forced though - is there a better way? Dont REALLY want to have to have a time signature field for every pattern which is probably
-	   the "proper" way.
-	)
-
-
 
 cf Show recent projects - Probably need program settings to remember between runs...
    Ditto if I want to remember the last Save As / Export / Import directory.
@@ -356,6 +351,9 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 =========================	 
+Swapping between song editor and loop editor - think I'd rather round out the song editor's 
+   bar (but hold on to last bar settings).
+
 IMPROVEMENT - when dragging notes if I grab the note at the bottom or top it would be neater 
 	to perhaps jump the cursor to the middle (or vertical middle) and drag from there.
 
@@ -405,4 +403,19 @@ There was a crash when scales list overlapped bottom of laptop screen via Carla.
 
 Through Carla there was some message about Carla not being responsive while Luvie GUI was
    being shown. (Carla was on laptop screen and Luvie on the other one at the time).
+    
+Look at: rewind in Loop Editor
+
+BUG? When snapping can shink note to < min. cf should I allow?
+
+
+BUG: create a half-note. Increase division to 1/1. Can drag to just beyond the grid.
+
+BUG: 1/3 - moving last note in is forbidden sometimes
+
+BUG: in other places we get a white line on the RHS
+
+cf requiring numerator > 1
+
+TO TEST swapping from  loop editor - intermediate mode - probably needs to be controlled via a song-beat counter if its not already being
 
