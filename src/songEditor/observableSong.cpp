@@ -9,12 +9,15 @@
 template <class F>
 void ObservableSong::reanchoringTempo(F&& mutate)
 {
-    const bool  playing = transport && transport->isPlaying();
-    const float posBars = playing ? transport->position() : 0.0f;
+    if (!transport) { mutate(); return; }
+    const float posBars = transport->position();
     mutate();
     // reanchor (not seek): keeps the playhead pinned to its pre-change bar under
-    // the new tempo without the note reset a user seek would cause.
-    if (playing) transport->reanchor(posBars);
+    // the new tempo without the note reset a user seek would cause. Also needed
+    // while stopped: a transport that derives its bar from a frame/second count
+    // (JACK) would otherwise re-read the parked position through the new tempo
+    // map and scrub every playhead — song and loop alike.
+    transport->reanchor(posBars);
 }
 
 ObservableSong::ObservableSong(float initBpm, int initTop, int initBottom)

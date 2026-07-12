@@ -81,6 +81,11 @@ public:
     int handle(int event) override {
         switch (event) {
             case FL_MOUSEWHEEL: {
+                // Fl_Group offers the wheel to children the pointer is NOT over as
+                // well (that is how a scrollbar catches a wheel over its pane), so
+                // a spinner that took every wheel event would change value on a
+                // scroll anywhere in the window. Only act when the pointer is on us.
+                if (!Fl::event_inside(this)) return 0;
                 int dy = Fl::event_dy();
                 if (dy != 0) { bumpSteps(-dy); return 1; }
                 return 0;
