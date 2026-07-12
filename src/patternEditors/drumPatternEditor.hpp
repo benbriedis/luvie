@@ -88,6 +88,7 @@ class DrumPatternEditor : public BasePatternEditor {
     void gridSetColOffset(int off) override { drumGrid.setColOffset(off); }
     void gridSetColWidth(int cw)   override { drumGrid.colWidth = cw; }
     void gridSetNumRows(int n)     override { drumGrid.setNumRows(n); }
+    void gridSetNumCols(int n)     override { drumGrid.numCols = n; }
     void gridResize(int x, int y, int w, int h) override { drumGrid.resize(x, y, w, h); }
     void labelsSetRowOffset(int off) override {
         drumLabels.setRowOffset(off);

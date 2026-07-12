@@ -150,12 +150,33 @@ void BasePatternEditor::onTimelineChanged()
     if (trackChanged || patChanged) {
         setGridPattern(patId);
         paramGrid.setPattern(pattern, patId);
+        lastLengthBeats = -1.0f;
     } else {
         paramGrid.update(pattern, patId);
     }
+    applyPatternLength(patId);
     paramLabels.setPattern(pattern, patId);
     updateParamScrollbar();
     afterTimelineChanged(patId);
+}
+
+// Keep the visible column count in step with the pattern's length (the Bars
+// control edits lengthBeats; every editor renders one column per beat).
+void BasePatternEditor::applyPatternLength(int patId)
+{
+    if (patId <= 0 || !pattern) return;
+    float lb = 0.0f;
+    for (const auto& p : pattern->get().patterns)
+        if (p.id == patId) { lb = p.lengthBeats; break; }
+
+    if (lb <= 0.0f || lb == lastLengthBeats) return;
+    lastLengthBeats = lb;
+
+    gridSetNumCols((int)lb);
+    paramGrid.setNumCols((int)lb);
+    playhead.setNumCols((int)lb);
+    setColOffset(colOffset);
+    redraw();
 }
 
 void BasePatternEditor::setZoom(int factor)

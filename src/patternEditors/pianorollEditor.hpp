@@ -49,6 +49,7 @@ class PianorollEditor : public BasePatternEditor {
     void gridSetColOffset(int off) override { grid.setColOffset(off); }
     void gridSetColWidth(int cw)   override { grid.colWidth = cw; }
     void gridSetNumRows(int n)     override { grid.setNumRows(n); }
+    void gridSetNumCols(int n)     override { grid.numCols = n; }
     void gridResize(int x, int y, int w, int h) override { grid.resize(x, y, w, h); }
     void labelsSetRowOffset(int off) override { labels.setRowOffset(off); }
     void labelsSetNumRows(int n)     override { labels.setNumRows(n); }

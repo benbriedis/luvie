@@ -12,7 +12,6 @@ class PatternEditor : public BasePatternEditor {
 
     NoteLabels  noteLabels;
     PatternGrid patternGrid;
-    float       lastLengthBeats = -1.0f;
     int         rootPitch       = 0;
     int         chordIndex      = 0;   // resolved from the pattern's chord hash
 
@@ -30,6 +29,7 @@ class PatternEditor : public BasePatternEditor {
     void gridSetColOffset(int off) override { patternGrid.setColOffset(off); }
     void gridSetColWidth(int cw)   override { patternGrid.colWidth = cw; }
     void gridSetNumRows(int n)     override { patternGrid.setNumRows(n); }
+    void gridSetNumCols(int n)     override { patternGrid.numCols = n; }
     void gridResize(int x, int y, int w, int h) override { patternGrid.resize(x, y, w, h); }
     void labelsSetRowOffset(int off) override { noteLabels.setRowOffset(off); }
     void labelsSetNumRows(int n)     override { noteLabels.setNumRows(n); }
@@ -38,7 +38,6 @@ class PatternEditor : public BasePatternEditor {
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { noteLabels.onRowClicked = std::move(fn); }
 
     void setGridPattern(int patId) override;
-    void afterTimelineChanged(int patId) override;
 
 public:
     PatternEditor(int x, int y, int visibleW, int numRows, int numCols,

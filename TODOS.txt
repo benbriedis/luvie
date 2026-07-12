@@ -2,16 +2,11 @@
 
 Suggestions for Carla (install newest first)
 =====================
-1. Double click on rack or item in canvas to display custom UI if one exists.
-   Failing that, raise the Custom UI to the top of the context UI.
-
-2. Canvas - simplify somehow.
-   Possible algoorithm - reduce its size by creating a binding box around current items and 
+1. Canvas - simplify somehow.
+   Possible algorithm - reduce its size by creating a binding box around current items and 
    adding 200px to each sides.
+   Maybe a layout button.
 
-3. Improve filters in plugins: too easy to check something and forget its been checked. 
-   Even remembers across sessions I think. Might be OK if were to drop filters when closing window.
-   Alt: list the current filters under the search box?
 
 Suggestions for RaySession (install newest first)
 ==========================
@@ -362,7 +357,6 @@ cf custom chord and scale builder
 
 =========================	 
 
-        
 POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
     Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
 
@@ -388,8 +382,6 @@ Add more hover over notes for controls
 
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
-cf switching Song Mode ==> Loop Mode - maybe go into intermediate mode until bar end?
-
 
 BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
 
@@ -403,3 +395,12 @@ Maybe add darker/lighter columns - eg
 cf relationship to BPM crotchet / dotted crotchet etc
    
 Min note length - does this correspond to snap?   
+
+
+TODO probably put drums on a different midi_out initially. (cf drums_out) or something
+
+There was a crash when scales list overlapped bottom of laptop screen via Carla.
+
+Through Carla there was some message about Carla not being responsive while Luvie GUI was
+   being shown. (Carla was on laptop screen and Luvie on the other one at the time).
+

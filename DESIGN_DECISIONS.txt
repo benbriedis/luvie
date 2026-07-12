@@ -85,4 +85,10 @@ Alternate plugin architectures
 2. Clap apparently supports transport commands, so may be able to remove Jack dependencies when used within a plugin.
    DONT THINK Ardour supports Clap at the moment.
    
+Intermediate mode (between Loop and Song modes)
+=================
+When switching from Song Mode to Loop Mode could go into intermediate mode until bar end I guess 
+	BUT I think only required going one way or the other in order to line up bar.
+	MIGHT be clearer when enterring into Loop Mode though than exiting...
 
+        

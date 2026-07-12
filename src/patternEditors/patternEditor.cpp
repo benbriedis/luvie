@@ -127,22 +127,4 @@ void PatternEditor::setGridPattern(int patId)
     if (patId <= 0) return;
     patternGrid.setPattern(pattern, patId);
     setRowOffset(computeDefaultOffset(patId));
-    lastLengthBeats = -1.0f;
-}
-
-void PatternEditor::afterTimelineChanged(int patId)
-{
-    if (patId <= 0 || !pattern) return;
-    float lb = 0.0f;
-    for (const auto& p : pattern->get().patterns)
-        if (p.id == patId) { lb = p.lengthBeats; break; }
-
-    if (lb != lastLengthBeats && lb > 0.0f) {
-        lastLengthBeats      = lb;
-        patternGrid.numCols  = (int)lb;
-        paramGrid.setNumCols((int)lb);
-        playhead.setNumCols((int)lb);
-        setColOffset(colOffset);
-        redraw();
-    }
 }

@@ -30,6 +30,7 @@ protected:
     int                colOffset         = 0;
     int                paramLaneOffset   = 0;
     int                baseColWidth      = 0;   // colWidth at zoom x1
+    float              lastLengthBeats   = -1.0f;
 
     // Subclass grid geometry — all are one-liners forwarding to the concrete grid/labels
     virtual int  labelsWidth()      const = 0;
@@ -44,6 +45,7 @@ protected:
     virtual void gridSetColOffset(int offset)             = 0;
     virtual void gridSetColWidth(int colWidth)            = 0;
     virtual void gridSetNumRows(int n)                    = 0;
+    virtual void gridSetNumCols(int n)                    = 0;
     virtual void gridResize(int x, int y, int w, int h)   = 0;
     virtual void labelsSetRowOffset(int offset)           = 0;
     virtual void labelsSetNumRows(int n)                  = 0;
@@ -60,6 +62,7 @@ protected:
 
     void setRowOffset(int offset);
     void setColOffset(int offset);
+    void applyPatternLength(int patId);
     void updateParamScrollbar();
     void relayout();
     void layoutBody() override { relayout(); }
