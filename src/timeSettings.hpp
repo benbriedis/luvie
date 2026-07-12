@@ -41,6 +41,18 @@ inline constexpr std::array<BeatUnit, 3> beatUnits =
 inline constexpr BeatUnit beatUnitDefault      = BeatUnit::Crotchet;
 inline constexpr int      beatUnitDefaultIndex = 0;
 
+// The beat definition a time signature implies: the crotchet, except for the
+// compound signatures (an /8 whose numerator groups into threes: 6/8, 9/8, 12/8)
+// which are counted in dotted crotchets. Every place the UI changes a time
+// signature snaps the beat to this; the user is free to pick a different beat
+// from the dropdown afterwards, and that choice sticks until the signature
+// changes again.
+inline constexpr BeatUnit impliedBeatUnit(int top, int bottom)
+{
+	if (bottom == 8 && top % 3 == 0) return BeatUnit::DottedCrotchet;
+	return BeatUnit::Crotchet;
+}
+
 // The beat's length in crotchets. The one number that turns a BPM into a CPM.
 inline constexpr double beatCrotchets(BeatUnit u)
 {

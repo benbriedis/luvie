@@ -30,7 +30,7 @@ class LoopPanel : public Fl_Group, public ITimelineObserver {
     BeatUnitChoice   beatChoice;
 
     void commitBpm();
-    void commitTimeSig();
+    void commitTimeSig(bool snapBeat);
 
     void draw() override;
 

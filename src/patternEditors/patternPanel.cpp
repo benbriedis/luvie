@@ -325,6 +325,15 @@ void PatternPanel::initHarmonyControls()
     cs.chordChoice.callback(paramsCb, this);
 }
 
+// The signature just changed: snap the beat definition to the one it implies.
+// The beat dropdown's own callback does not do this, so a beat the user picks
+// afterwards stays until the signature changes again.
+static void snapBeatTo(TimeSigSection& ts, int top, int den)
+{
+    ts.beatChoice.setBeatUnit(timeSettings::impliedBeatUnit(top, den));
+    ts.beatChoice.redraw();
+}
+
 void PatternPanel::initTimeControls()
 {
     auto& ts = timeControls.timeSigSec;
@@ -353,8 +362,9 @@ void PatternPanel::initTimeControls()
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
         int den = timeSettings::denominatorAt(ts.timeSigDen.value());
-        self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den,
-                                         ts.beatChoice.beatUnit());
+        int top = (int)ts.timeSigNum.value();
+        snapBeatTo(ts, top, den);
+        self->pattern->setPatternTimeSig(patId, top, den, ts.beatChoice.beatUnit());
     }, this);
 
     ts.timeSigSlash.box(FL_NO_BOX);
@@ -385,6 +395,7 @@ void PatternPanel::initTimeControls()
                 break;
             }
         }
+        snapBeatTo(ts, top, den);
         self->pattern->setPatternTimeSig(patId, top, den, ts.beatChoice.beatUnit());
     }, this);
 

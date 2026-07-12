@@ -67,6 +67,14 @@ MarkerPopup::MarkerPopup(Kind k)
 		beatChoice = new BeatUnitChoice(pad + 48, row2Y, beatChoiceW, row2H);
 		styleChoice(beatChoice);
 
+		// Editing the signature snaps the beat to the one it implies; the user can
+		// then pick another before the popup commits.
+		auto snapBeatCb = [](Fl_Widget*, void* d) {
+			static_cast<MarkerPopup*>(d)->snapBeat();
+		};
+		input1->callback(snapBeatCb, this);
+		denomChoice->callback(snapBeatCb, this);
+
 		deleteY = row3Y;
 	}
 
@@ -82,6 +90,13 @@ MarkerPopup::MarkerPopup(Kind k)
 	deleteBtn->callback([](Fl_Widget*, void* d) {
 		static_cast<MarkerPopup*>(d)->doDelete();
 	}, this);
+}
+
+void MarkerPopup::snapBeat()
+{
+	int den = timeSettings::denominatorAt(denomChoice->value());
+	beatChoice->setBeatUnit(timeSettings::impliedBeatUnit((int)input1->value(), den));
+	beatChoice->redraw();
 }
 
 void MarkerPopup::doDelete()

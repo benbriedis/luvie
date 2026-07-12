@@ -77,8 +77,13 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     timeSigSlash.labelcolor(panelText);
     timeSigSlash.align(FL_ALIGN_CENTER);
 
-    auto commitCb = [](Fl_Widget*, void* d) {
-        static_cast<LoopPanel*>(d)->commitTimeSig();
+    // The signature widgets snap the beat definition to the one the new signature
+    // implies; the beat dropdown itself commits the user's own choice as-is.
+    auto sigCb = [](Fl_Widget*, void* d) {
+        static_cast<LoopPanel*>(d)->commitTimeSig(/*snapBeat=*/true);
+    };
+    auto beatCb = [](Fl_Widget*, void* d) {
+        static_cast<LoopPanel*>(d)->commitTimeSig(/*snapBeat=*/false);
     };
 
     timeSigNum.color(0x37415100);
@@ -90,7 +95,7 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     timeSigNum.step(1);
     timeSigNum.value(timeSettings::numeratorDefault);
     timeSigNum.when(FL_WHEN_RELEASE);
-    timeSigNum.callback(commitCb, this);
+    timeSigNum.callback(sigCb, this);
 
     timeSigDen.color(0x37415100);
     timeSigDen.labelcolor(panelText);
@@ -98,7 +103,7 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     for (const char* v : timeSettings::denominatorLabels)
         timeSigDen.add(v);
     timeSigDen.value(timeSettings::denominatorDefaultIndex);
-    timeSigDen.callback(commitCb, this);
+    timeSigDen.callback(sigCb, this);
 
     beatLabel.box(FL_NO_BOX);
     beatLabel.labelcolor(panelText);
@@ -108,7 +113,7 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     beatChoice.labelcolor(panelText);
     beatChoice.textcolor(panelText);
     beatChoice.setBorderColor(panelCtrlBorder);
-    beatChoice.callback(commitCb, this);
+    beatChoice.callback(beatCb, this);
 
     end();
 }
@@ -133,14 +138,18 @@ void LoopPanel::commitBpm()
     timeline->setBpm(0, (float)bpmInput.value());
 }
 
-void LoopPanel::commitTimeSig()
+void LoopPanel::commitTimeSig(bool snapBeat)
 {
     if (!timeline) return;
     // The spinner clamps the numerator to its range; the dropdowns only ever
     // offer the denominators and beat definitions timeSettings allows.
-    timeline->setTimeSig(0, (int)timeSigNum.value(),
-                         timeSettings::denominatorAt(timeSigDen.value()),
-                         beatChoice.beatUnit());
+    int top = (int)timeSigNum.value();
+    int den = timeSettings::denominatorAt(timeSigDen.value());
+    if (snapBeat) {
+        beatChoice.setBeatUnit(timeSettings::impliedBeatUnit(top, den));
+        beatChoice.redraw();
+    }
+    timeline->setTimeSig(0, top, den, beatChoice.beatUnit());
 }
 
 void LoopPanel::onTimelineChanged()

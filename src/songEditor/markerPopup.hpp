@@ -29,6 +29,7 @@ public:
 private:
 	void doOk() override;
 	void doDelete();
+	void snapBeat();
 	void configureDelete(bool fixed, bool showDelete);
 	Kind            kind;
 	Fl_Value_Input* input1      = nullptr;
