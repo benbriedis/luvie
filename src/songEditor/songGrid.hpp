@@ -6,6 +6,7 @@
 #include "patternInstanceContextPopup.hpp"
 #include "paramDotPopup.hpp"
 #include "paramLaneTypes.hpp"
+#include <cmath>
 #include <unordered_set>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +70,10 @@ protected:
     void onCommitResize(const StateDragResize& s) override;
     void onNoteDoubleClick(int noteIdx) override;
     void toggleNote() override;
+    // Song blocks are placed one whole bar long, at the bar the click lands in;
+    // beat subdivisions do not apply here.
+    float newNoteLength() const override { return 1.0f; }
+    float newNoteStart(float fcol) const override { return std::floor(fcol); }
 
 public:
     SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);

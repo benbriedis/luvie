@@ -79,6 +79,17 @@ protected:
     // stop here so they don't run past the last row into empty space below.
     virtual int gridBottom() const { return h(); }
 
+    // Geometry of the note a click at beat position `fcol` would create: one
+    // subdivision long, filling the subdivision cell the click landed in (or
+    // starting at the click itself when snapping is off).
+    virtual float newNoteLength() const { return 1.0f / (float)divisions; }
+    virtual float newNoteStart(float fcol) const;
+
+    // True when the click at `fcol` lands inside the note — i.e. it removes it.
+    bool hitsNote(const Note& n, int row, float fcol) const {
+        return (int)n.row == row && fcol >= n.beat && fcol < n.beat + n.length;
+    }
+
     // Virtual extension hooks
     virtual bool     isRowBlocked(int visualRow) const { (void)visualRow; return false; }
     virtual Fl_Color columnColor(int col)      const { (void)col;      return 0x00EE0000; }

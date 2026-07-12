@@ -104,7 +104,6 @@ void PatternGrid::toggleNote()
     if (ex >= gridRight) return;
 
     int   visual_row = ey / rowHeight;
-    float col        = (float)(ex / colWidth) + colOffset;
     float fcol       = (float)ex / colWidth + colOffset;
 
     if (!pattern || patternId < 0) {
@@ -112,13 +111,11 @@ void PatternGrid::toggleNote()
         return;
     }
 
-    // Remove a note if one starts at exactly this cell. A short note that
-    // starts at the cell start leaves empty space after it in the same cell;
-    // clicking in that space must do nothing (for now) rather than remove it.
+    // Clicking inside a note removes it; clicking the empty space a shorter
+    // note leaves behind creates a new one.
     for (auto& n : notes) {
-        if (n.row == visual_row && n.beat == col) {
-            if (fcol < n.beat + n.length)
-                pattern->removeNote(n.id);
+        if (hitsNote(n, visual_row, fcol)) {
+            pattern->removeNote(n.id);
             return;
         }
     }
@@ -128,12 +125,15 @@ void PatternGrid::toggleNote()
     int abs_row    = virtualToAbsRow(virtualPos);
     if (abs_row < 0) return;
 
+    float col    = newNoteStart(fcol);
+    float length = newNoteLength();
+
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) { return n.row == visual_row
                                   && col < n.beat + n.length
-                                  && col + 1.0f > n.beat; });
+                                  && col + length > n.beat; });
     if (clear)
-        pattern->addNote(patternId, col, abs_row, 1.0f);
+        pattern->addNote(patternId, col, abs_row, length);
 }
 
 std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)

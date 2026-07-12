@@ -118,17 +118,19 @@ int Grid::handle(int event)
                 state = StateDragResize{noteIdx, side};
             } else {
                 // Idle — check whether note creation is allowed at click position
-                int   ex       = Fl::event_x() - x();
-                int   row      = rowAtPixelY(Fl::event_y() - y());
-                float col      = (float)(ex / colWidth) + colOffset;
+                int   ex        = Fl::event_x() - x();
+                int   row       = rowAtPixelY(Fl::event_y() - y());
+                float fcol      = (float)ex / colWidth + colOffset;
+                float col       = newNoteStart(fcol);
+                float length    = newNoteLength();
                 int   gridRight = std::min(w(), (numCols - colOffset) * colWidth);
                 creationForbidden = ex >= gridRight;
                 if (!creationForbidden) {
                     bool wouldRemove = std::any_of(notes.begin(), notes.end(),
-                        [=](const Note& n) { return n.row == row && n.beat == col; });
+                        [=, this](const Note& n) { return hitsNote(n, row, fcol); });
                     if (!wouldRemove) {
                         creationForbidden = std::any_of(notes.begin(), notes.end(),
-                            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + 1.0f > n.beat; });
+                            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + length > n.beat; });
                         if (creationForbidden)
                             window()->cursor(forbiddenCursorImage(), 11, 11);
                     }
@@ -286,21 +288,29 @@ void Grid::findNoteForCursor()
     redraw();
 }
 
+float Grid::newNoteStart(float fcol) const
+{
+    float beat = snap > 0.0f ? std::floor(fcol / snap) * snap : fcol;
+    return std::clamp(beat, 0.0f, (float)numCols - newNoteLength());
+}
+
 void Grid::toggleNote()
 {
-    int   ex  = Fl::event_x() - x();
-    int   ey  = Fl::event_y() - y();
-    int   row = rowAtPixelY(ey);
-    float col = (float)(ex / colWidth) + colOffset;
+    int   ex     = Fl::event_x() - x();
+    int   ey     = Fl::event_y() - y();
+    int   row    = rowAtPixelY(ey);
+    float fcol   = (float)ex / colWidth + colOffset;
+    float col    = newNoteStart(fcol);
+    float length = newNoteLength();
 
     int size = notes.size();
     notes.erase(std::remove_if(notes.begin(), notes.end(),
-        [=](const Note& n) { return n.row == row && n.beat == col; }), notes.end());
+        [=, this](const Note& n) { return hitsNote(n, row, fcol); }), notes.end());
     if ((int)notes.size() == size) {
         bool clear = std::none_of(notes.begin(), notes.end(),
-            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + 1.0f > n.beat; });
+            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + length > n.beat; });
         if (clear)
-            notes.push_back({0, row, col, 1.0});
+            notes.push_back({0, row, col, length});
     }
     redraw();
 }
