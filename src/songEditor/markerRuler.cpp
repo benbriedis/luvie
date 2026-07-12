@@ -105,7 +105,7 @@ void MarkerRuler::addMarker(Kind k, int bar)
 	} else {
 		int top, bottom;
 		timeline->timeSigAt(bar, top, bottom);
-		timeline->setTimeSig(bar, top, bottom);
+		timeline->setTimeSig(bar, top, bottom, timeline->beatAt(bar));
 	}
 	openPopupFor(k, bar, /*showDelete=*/false);
 }
@@ -128,12 +128,15 @@ void MarkerRuler::openPopupFor(Kind k, int bar, bool showDelete)
 			[this, bar]()           { timeline->removeBpm(bar); });
 	} else {
 		int top = 4, bottom = 4;
+		timeSettings::BeatUnit beat = timeSettings::beatUnitDefault;
 		for (auto& m : timeline->get().timeSigs)
-			if (m.bar == bar) { top = m.top; bottom = m.bottom; break; }
+			if (m.bar == bar) { top = m.top; bottom = m.bottom; beat = m.beat; break; }
 
-		popup->openTimeSig(pos.x, pos.y, isFixed(bar), showDelete, top, bottom,
-			[this, bar](int top, int bottom) { timeline->setTimeSig(bar, top, bottom); },
-			[this, bar]()                    { timeline->removeTimeSig(bar); });
+		popup->openTimeSig(pos.x, pos.y, isFixed(bar), showDelete, top, bottom, beat,
+			[this, bar](int top, int bottom, timeSettings::BeatUnit beat) {
+				timeline->setTimeSig(bar, top, bottom, beat);
+			},
+			[this, bar]() { timeline->removeTimeSig(bar); });
 	}
 }
 

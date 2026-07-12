@@ -358,12 +358,21 @@ float ObservableSong::bpmAt(int bar) const
     return result;
 }
 
-void ObservableSong::setTimeSig(int bar, int top, int bottom)
+float ObservableSong::cpmAt(int bar) const
+{
+    return bpmAt(bar) * (float)timeSettings::beatCrotchets(beatAt(bar));
+}
+
+void ObservableSong::setTimeSig(int bar, int top, int bottom, timeSettings::BeatUnit beat)
 {
     for (auto& m : data.timeSigs) {
-        if (m.bar == bar) { m.top = top; m.bottom = bottom; notify(); return; }
+        if (m.bar == bar) {
+            m.top = top; m.bottom = bottom; m.beat = beat;
+            notify();
+            return;
+        }
     }
-    data.timeSigs.push_back({bar, top, bottom});
+    data.timeSigs.push_back({bar, top, bottom, beat});
     sortTimeSigs();
     notify();
 }
@@ -383,10 +392,11 @@ void ObservableSong::moveTimeSigMarker(int fromBar, int toBar)
         [fromBar](const TimeSigMarker& m) { return m.bar == fromBar; });
     if (it == data.timeSigs.end()) return;
     int top = it->top, bottom = it->bottom;
+    timeSettings::BeatUnit beat = it->beat;
     data.timeSigs.erase(it);
     data.timeSigs.erase(std::remove_if(data.timeSigs.begin(), data.timeSigs.end(),
         [toBar](const TimeSigMarker& m) { return m.bar == toBar; }), data.timeSigs.end());
-    data.timeSigs.push_back({toBar, top, bottom});
+    data.timeSigs.push_back({toBar, top, bottom, beat});
     sortTimeSigs();
     notify();
 }
@@ -398,6 +408,23 @@ void ObservableSong::timeSigAt(int bar, int& top, int& bottom) const
         if (m.bar <= bar) { top = m.top; bottom = m.bottom; }
         else break;
     }
+}
+
+timeSettings::BeatUnit ObservableSong::beatAt(int bar) const
+{
+    timeSettings::BeatUnit beat = timeSettings::beatUnitDefault;
+    for (auto& m : data.timeSigs) {
+        if (m.bar <= bar) beat = m.beat;
+        else break;
+    }
+    return beat;
+}
+
+double ObservableSong::secondsPerBarAt(int bar) const
+{
+    int top, bottom;
+    timeSigAt(bar, top, bottom);
+    return timeSettings::secondsPerBar(timeSettings::barCrotchets(top, bottom), cpmAt(bar));
 }
 
 // ---------------------------------------------------------------------------
@@ -412,7 +439,7 @@ std::vector<ObservableSong::TimeSegment> ObservableSong::buildSegments() const
     for (int bar : breakpoints) {
         int top, bottom;
         timeSigAt(bar, top, bottom);
-        segs.push_back({bar, bpmAt(bar), top});
+        segs.push_back({bar, cpmAt(bar), top, timeSettings::barCrotchets(top, bottom)});
     }
     return segs;
 }
@@ -426,7 +453,7 @@ double ObservableSong::barToSeconds(float targetBar) const
         float segEnd   = (i + 1 < (int)segs.size()) ? (float)segs[i+1].bar : targetBar;
         if (segStart >= targetBar) break;
         float barsInSeg = std::min(segEnd, targetBar) - segStart;
-        double secsPerBar = segs[i].beatsPerBar * 60.0 / segs[i].bpm;
+        double secsPerBar = timeSettings::secondsPerBar(segs[i].barCrotchets, segs[i].cpm);
         secs += barsInSeg * secsPerBar;
     }
     return secs;
@@ -439,7 +466,7 @@ float ObservableSong::secondsToBar(double secs) const
     for (int i = 0; i < (int)segs.size(); i++) {
         float  segStart   = (float)segs[i].bar;
         float  segEnd     = (i + 1 < (int)segs.size()) ? (float)segs[i+1].bar : 1e9f;
-        double secsPerBar = segs[i].beatsPerBar * 60.0 / segs[i].bpm;
+        double secsPerBar = timeSettings::secondsPerBar(segs[i].barCrotchets, segs[i].cpm);
         double segSecs    = (segEnd - segStart) * secsPerBar;
         if (remaining < segSecs + 1e-9)
             return segStart + (float)(remaining / secsPerBar);
@@ -447,7 +474,7 @@ float ObservableSong::secondsToBar(double secs) const
     }
     if (!segs.empty()) {
         auto& last = segs.back();
-        double secsPerBar = last.beatsPerBar * 60.0 / last.bpm;
+        double secsPerBar = timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
         return (float)(last.bar + remaining / secsPerBar);
     }
     return 0.0f;

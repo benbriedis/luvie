@@ -14,6 +14,7 @@
 #include "modern/modernSpinner.hpp"
 #include "modern/modernChoice.hpp"
 #include "modern/modernValueInput.hpp"
+#include "modern/beatUnitChoice.hpp"
 
 // Dark control bar at the bottom of the Loop Editor
 class LoopPanel : public Fl_Group, public ITimelineObserver {
@@ -25,6 +26,8 @@ class LoopPanel : public Fl_Group, public ITimelineObserver {
     ModernValueInput timeSigNum;
     Fl_Box           timeSigSlash;
     ModernChoice     timeSigDen;
+    Fl_Box           beatLabel;
+    BeatUnitChoice   beatChoice;
 
     void commitBpm();
     void commitTimeSig();

@@ -26,17 +26,25 @@ public:
     // across tempo edits (see reanchoringTempo). No-op until set.
     void setTransport(ITransport* t) { transport = t; }
 
-    // BPM
+    // Tempo, in beats per minute — a beat being the time signature's BeatUnit.
     void  setBpm(int bar, float bpm);
     void  removeBpm(int bar);
     void  moveBpmMarker(int fromBar, int toBar);
     float bpmAt(int bar) const;
 
-    // Time signature
-    void setTimeSig(int bar, int top, int bottom);
+    // Tempo in crotchets per minute: the BPM scaled by the beat definition. This
+    // is the tempo the timing math and the JACK/LV2 hosts speak in.
+    float cpmAt(int bar) const;
+
+    // Time signature (+ the beat definition stored with it)
+    void setTimeSig(int bar, int top, int bottom,
+                    timeSettings::BeatUnit beat = timeSettings::beatUnitDefault);
     void removeTimeSig(int bar);
     void moveTimeSigMarker(int fromBar, int toBar);
     void timeSigAt(int bar, int& top, int& bottom) const;
+    timeSettings::BeatUnit beatAt(int bar) const;
+    // Seconds one bar lasts at `bar`, from its time signature, beat and tempo.
+    double secondsPerBarAt(int bar) const;
 
     // Time conversion — integrates over BPM/time-sig segments
     double barToSeconds(float bar) const;
@@ -140,10 +148,14 @@ public:
     void loadTimeline(const Timeline& tl);
 
 private:
+    // A stretch of the timeline with one tempo and one time signature. Held in
+    // crotchets so a bar's duration is barCrotchets * 60 / cpm regardless of how
+    // the beat is defined.
     struct TimeSegment {
-        int   bar;
-        float bpm;
-        int   beatsPerBar;
+        int    bar;
+        float  cpm;           // crotchets per minute
+        int    beatsPerBar;   // time-signature numerator = grid columns per bar
+        double barCrotchets;
     };
     std::vector<TimeSegment> buildSegments() const;
     Timeline data;

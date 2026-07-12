@@ -234,6 +234,7 @@ int ObservablePattern::createPattern(float lengthBeats, int instrumentId)
     p.instrumentId = instrumentId >= 0 ? instrumentId : song_->defaultInstrumentId;
     song_->patternNames.assignAuto(p);
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+    p.beat = song_->beatAt(0);
     song_->data.patterns.push_back(p);
     song_->notify();
     return id;
@@ -251,6 +252,7 @@ int ObservablePattern::createDrumPattern(float lengthBeats, int instrumentId)
             ? song_->defaultDrumInstrumentId : song_->defaultInstrumentId);
     song_->patternNames.assignAuto(p);
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+    p.beat = song_->beatAt(0);
     song_->data.patterns.push_back(std::move(p));
     song_->notify();
     return id;
@@ -266,6 +268,7 @@ int ObservablePattern::createPianorollPattern(float lengthBeats)
     p.instrumentId = song_->defaultInstrumentId;
     song_->patternNames.assignAuto(p);
     song_->timeSigAt(0, p.timeSigTop, p.timeSigBottom);
+    p.beat = song_->beatAt(0);
     song_->data.patterns.push_back(std::move(p));
     song_->notify();
     return id;
@@ -282,6 +285,9 @@ int ObservablePattern::copyPattern(int srcPatId)
     copy.id = song_->nextId++;
     copy.lengthBeats = src->lengthBeats;
     copy.type = src->type;
+    copy.timeSigTop    = src->timeSigTop;
+    copy.timeSigBottom = src->timeSigBottom;
+    copy.beat          = src->beat;
     copy.rootPitch = src->rootPitch;
     copy.chordHash = src->chordHash;
     copy.useSharp  = src->useSharp;
@@ -312,7 +318,8 @@ static void truncatePatternNotes(Pattern& p)
         [&p](const DrumNote& n) { return n.beat >= p.lengthBeats; }), p.drumNotes.end());
 }
 
-void ObservablePattern::setPatternTimeSig(int patId, int top, int bottom)
+void ObservablePattern::setPatternTimeSig(int patId, int top, int bottom,
+                                          timeSettings::BeatUnit beat)
 {
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
@@ -320,6 +327,7 @@ void ObservablePattern::setPatternTimeSig(int patId, int top, int bottom)
             float denomScale = (p.timeSigBottom > 0) ? (float)bottom / (float)p.timeSigBottom : 1.0f;
             p.timeSigTop    = top;
             p.timeSigBottom = bottom;
+            p.beat          = beat;
             p.lengthBeats   = (float)(bars * top);
             if (denomScale != 1.0f) {
                 for (auto& n : p.notes) {

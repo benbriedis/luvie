@@ -67,12 +67,12 @@ void Playhead::timerCb(void* data)
 
 	double interval = 0.1;
 	if (self->transport && self->transport->isPlaying() && self->obsTl) {
-		float curBar = self->transport->position();
-		float bpm    = self->obsTl->bpmAt((int)curBar);
-		int   top, bottom;
-		self->obsTl->timeSigAt((int)curBar, top, bottom);
-		double pxPerSec = (double)self->colWidth * bpm / 60.0 / top;
-		interval = std::clamp(1.0 / pxPerSec, 0.016, 0.05);
+		float  curBar     = self->transport->position();
+		double secsPerBar = self->obsTl->secondsPerBarAt((int)curBar);
+		if (secsPerBar > 0.0) {
+			double pxPerSec = (double)self->colWidth / secsPerBar;
+			interval = std::clamp(1.0 / pxPerSec, 0.016, 0.05);
+		}
 	}
 	Fl::repeat_timeout(interval, timerCb, data);
 }

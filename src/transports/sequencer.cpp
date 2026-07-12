@@ -68,34 +68,30 @@ void Sequencer::rebuildSnapshot()
     const Timeline& tl = timeline->get();
     Snapshot newSnap;
 
-    // Build time segments at each BPM / time-signature boundary.
+    // Build time segments at each tempo / time-signature boundary.
     {
         std::set<int> breakpoints;
         breakpoints.insert(0);
         for (auto& m : tl.bpms)     breakpoints.insert(m.bar);
         for (auto& m : tl.timeSigs) breakpoints.insert(m.bar);
 
-        double accSecs = 0.0;
-        int    prevBar = 0;
-        float  prevBpm = timeline->bpmAt(0);
-        int    prevTop, prevBot;
-        timeline->timeSigAt(0, prevTop, prevBot);
+        double accSecs      = 0.0;
+        int    prevBar      = 0;
+        double prevSecsPerBar = timeline->secondsPerBarAt(0);
 
         for (int bar : breakpoints) {
-            if (bar != 0) {
-                double secsPerBar = prevTop * 60.0 / prevBpm;
-                accSecs += (bar - prevBar) * secsPerBar;
-            }
+            if (bar != 0)
+                accSecs += (bar - prevBar) * prevSecsPerBar;
 
             int top, bot;
             timeline->timeSigAt(bar, top, bot);
-            float bpm = timeline->bpmAt(bar);
+            double barCrotchets = timeSettings::barCrotchets(top, bot);
+            float  cpm          = timeline->cpmAt(bar);
 
-            newSnap.segs.push_back({(float)bar, bpm, top, accSecs});
+            newSnap.segs.push_back({(float)bar, cpm, top, barCrotchets, accSecs});
 
-            prevBar = bar;
-            prevBpm = bpm;
-            prevTop = top;
+            prevBar        = bar;
+            prevSecsPerBar = timeSettings::secondsPerBar(barCrotchets, cpm);
         }
     }
 
@@ -324,13 +320,13 @@ double Sequencer::snapBarToSeconds(float bar) const
 {
     for (int i = 0; i + 1 < (int)snap.segs.size(); i++) {
         if (bar < snap.segs[i + 1].bar) {
-            double secsPerBar = snap.segs[i].beatsPerBar * 60.0 / snap.segs[i].bpm;
+            double secsPerBar = timeSettings::secondsPerBar(snap.segs[i].barCrotchets, snap.segs[i].cpm);
             return snap.segs[i].startSecs + (bar - snap.segs[i].bar) * secsPerBar;
         }
     }
     if (!snap.segs.empty()) {
         auto& last = snap.segs.back();
-        double secsPerBar = last.beatsPerBar * 60.0 / last.bpm;
+        double secsPerBar = timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
         return last.startSecs + (bar - last.bar) * secsPerBar;
     }
     return 0.0;
@@ -342,13 +338,13 @@ float Sequencer::snapSecondsToBar(double secs) const
         double segStart = snap.segs[i].startSecs;
         double segEnd   = snap.segs[i + 1].startSecs;
         if (secs < segEnd) {
-            double secsPerBar = snap.segs[i].beatsPerBar * 60.0 / snap.segs[i].bpm;
+            double secsPerBar = timeSettings::secondsPerBar(snap.segs[i].barCrotchets, snap.segs[i].cpm);
             return snap.segs[i].bar + (float)((secs - segStart) / secsPerBar);
         }
     }
     if (!snap.segs.empty()) {
         auto& last = snap.segs.back();
-        double secsPerBar = last.beatsPerBar * 60.0 / last.bpm;
+        double secsPerBar = timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
         return last.bar + (float)((secs - last.startSecs) / secsPerBar);
     }
     return 0.0f;

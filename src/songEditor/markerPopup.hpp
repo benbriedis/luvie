@@ -4,7 +4,9 @@
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
+#include "modern/beatUnitChoice.hpp"
 #include "modern/inputEditorPopup.hpp"
+#include "timeSettings.hpp"
 #include <functional>
 
 class MarkerPopup : public InputEditorPopup {
@@ -17,9 +19,10 @@ public:
 	               std::function<void(double)> onOk,
 	               std::function<void()>       onDelete);
 
-	void openTimeSig(int wx, int wy, bool fixed, bool showDelete, int num, int den,
-	                 std::function<void(int, int)> onOk,
-	                 std::function<void()>          onDelete);
+	void openTimeSig(int wx, int wy, bool fixed, bool showDelete,
+	                 int num, int den, timeSettings::BeatUnit beat,
+	                 std::function<void(int, int, timeSettings::BeatUnit)> onOk,
+	                 std::function<void()>                                 onDelete);
 
 	int handle(int event) override;
 
@@ -30,11 +33,17 @@ private:
 	Kind            kind;
 	Fl_Value_Input* input1      = nullptr;
 	ModernChoice*   denomChoice = nullptr;
+	BeatUnitChoice* beatChoice  = nullptr;
 	ModernButton*   deleteBtn   = nullptr;
 
-	std::function<void(double)>   onOkTempo;
-	std::function<void(int, int)> onOkTimeSig;
-	std::function<void()>         onDeleteCb;
+	// Row geometry differs by kind: TIME_SIG has the extra beat-definition row.
+	int deleteY    = 0;
+	int popupH     = 0;
+	int popupHSlim = 0;
+
+	std::function<void(double)>                            onOkTempo;
+	std::function<void(int, int, timeSettings::BeatUnit)>  onOkTimeSig;
+	std::function<void()>                                  onDeleteCb;
 };
 
 #endif

@@ -75,6 +75,7 @@ static json patternToJson(const Pattern& p) {
         {"name",         p.name},
         {"timeSigTop",   p.timeSigTop},
         {"timeSigBottom",p.timeSigBottom},
+        {"beat",         (int)p.beat},
         {"rootPitch",    p.rootPitch},
         {"chordHash",    p.chordHash},
         {"useSharp",     p.useSharp},
@@ -94,6 +95,7 @@ static Pattern patternFromJson(const json& j) {
     p.name         = j.value("name", "");
     p.timeSigTop   = j.value("timeSigTop",    4);
     p.timeSigBottom= j.value("timeSigBottom", 4);
+    p.beat         = timeSettings::beatUnitAt(j.value("beat", timeSettings::beatUnitDefaultIndex));
     p.rootPitch    = j.value("rootPitch", 0);
     p.chordHash    = j.value("chordHash", std::string{});
     p.useSharp     = j.value("useSharp",  false);
@@ -220,7 +222,8 @@ static json timelineToJson(const Timeline& tl) {
     for (const auto& b : tl.bpms) jbpms.push_back({{"bar", b.bar}, {"bpm", b.bpm}});
 
     json jsigs = json::array();
-    for (const auto& s : tl.timeSigs) jsigs.push_back({{"bar", s.bar}, {"top", s.top}, {"bottom", s.bottom}});
+    for (const auto& s : tl.timeSigs)
+        jsigs.push_back({{"bar", s.bar}, {"top", s.top}, {"bottom", s.bottom}, {"beat", (int)s.beat}});
 
     json jpats = json::array();
     for (const auto& p : tl.patterns) jpats.push_back(patternToJson(p));
@@ -262,7 +265,8 @@ static Timeline timelineFromJson(const json& j) {
     for (const auto& jb : j.value("bpms", json::array()))
         tl.bpms.push_back({jb.at("bar"), (float)jb.at("bpm")});
     for (const auto& js : j.value("timeSigs", json::array()))
-        tl.timeSigs.push_back({js.at("bar"), (int)js.at("top"), (int)js.at("bottom")});
+        tl.timeSigs.push_back({js.at("bar"), (int)js.at("top"), (int)js.at("bottom"),
+                               timeSettings::beatUnitAt(js.value("beat", timeSettings::beatUnitDefaultIndex))});
     for (const auto& jp : j.value("patterns", json::array()))
         tl.patterns.push_back(patternFromJson(jp));
     for (const auto& jt : j.value("tracks", json::array()))

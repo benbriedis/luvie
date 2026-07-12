@@ -9,11 +9,13 @@ static constexpr int row1Y   = pad;
 static constexpr int row1H   = 22;
 static constexpr int row2Y   = pad + row1H + pad;
 static constexpr int row2H   = 24;
-static constexpr int popupH  = row2Y + row2H + pad;  // with the Delete row
-static constexpr int popupHSlim = row2Y;             // input row only, no Delete
+// The time-signature popup carries a second input row (the beat definition), so
+// its Delete button — and with it the popup's height — sits one row lower.
+static constexpr int row3Y   = row2Y + row2H + pad;
+static constexpr int beatChoiceW = 46;
 
 MarkerPopup::MarkerPopup(Kind k)
-	: InputEditorPopup(popupW, popupH), kind(k)
+	: InputEditorPopup(popupW, row2Y + row2H + pad), kind(k)
 {
 
 	auto styleInput = [](Fl_Value_Input* inp) {
@@ -24,6 +26,14 @@ MarkerPopup::MarkerPopup(Kind k)
 		inp->labelcolor(popupText);
 	};
 
+	auto styleChoice = [](ModernChoice* c) {
+		c->color(popupInputBg);
+		c->labelcolor(popupText);
+		c->textcolor(popupText);
+		c->setBorderColor(0x4B556300);
+		c->setArrowColor(popupText);
+	};
+
 	if (kind == TEMPO) {
 		auto* lbl = new Fl_Box(pad, row1Y, 30, row1H, "BPM");
 		lbl->labelcolor(popupText);
@@ -32,6 +42,8 @@ MarkerPopup::MarkerPopup(Kind k)
 		input1->range(timeSettings::bpmMin, timeSettings::bpmMax);
 		input1->step(1);
 		styleInput(input1);
+
+		deleteY = row2Y;
 	} else {
 		auto* lbl = new Fl_Box(pad, row1Y, 25, row1H, "Sig");
 		lbl->labelcolor(popupText);
@@ -44,15 +56,24 @@ MarkerPopup::MarkerPopup(Kind k)
 		slash->labelcolor(popupText);
 		slash->box(FL_NO_BOX);
 		denomChoice = new ModernChoice(pad + 29 + 44 + 16, row1Y, 44, row1H);
-		denomChoice->color(popupInputBg);
-		denomChoice->labelcolor(popupText);
-		denomChoice->setBorderColor(0x4B556300);
-		denomChoice->setArrowColor(popupText);
+		styleChoice(denomChoice);
 		for (const char* v : timeSettings::denominatorLabels)
 			denomChoice->add(v);
+
+		auto* beatLbl = new Fl_Box(pad, row2Y, 44, row2H, "Beat =");
+		beatLbl->labelcolor(popupText);
+		beatLbl->box(FL_NO_BOX);
+		beatLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+		beatChoice = new BeatUnitChoice(pad + 48, row2Y, beatChoiceW, row2H);
+		styleChoice(beatChoice);
+
+		deleteY = row3Y;
 	}
 
-	deleteBtn = new ModernButton(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
+	popupH     = deleteY + row2H + pad;
+	popupHSlim = deleteY;
+
+	deleteBtn = new ModernButton(pad, deleteY, popupW - 2 * pad, row2H, "Delete");
 	deleteBtn->color(FL_WHITE);
 	deleteBtn->labelcolor(popupText);
 
@@ -75,7 +96,7 @@ void MarkerPopup::doOk()
 		if (onOkTempo) onOkTempo(input1->value());
 	} else {
 		int den = timeSettings::denominatorAt(denomChoice->value());
-		if (onOkTimeSig) onOkTimeSig((int)input1->value(), den);
+		if (onOkTimeSig) onOkTimeSig((int)input1->value(), den, beatChoice->beatUnit());
 	}
 	commit();
 }
@@ -114,12 +135,14 @@ void MarkerPopup::openTempo(int wx, int wy, bool fixed, bool showDelete, double 
 	openEditor(wx, wy, input1);
 }
 
-void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool showDelete, int num, int den,
-                               std::function<void(int, int)> onOk,
+void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool showDelete,
+                               int num, int den, timeSettings::BeatUnit beat,
+                               std::function<void(int, int, timeSettings::BeatUnit)> onOk,
                                std::function<void()> onDelete)
 {
 	input1->value(num);
 	denomChoice->value(timeSettings::denominatorIndex(den));
+	beatChoice->setBeatUnit(beat);
 	configureDelete(fixed, showDelete);
 	onOkTimeSig = std::move(onOk);
 	onDeleteCb  = std::move(onDelete);

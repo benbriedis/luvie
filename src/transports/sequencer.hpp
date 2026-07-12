@@ -67,7 +67,11 @@ public:
 
 protected:
     // ── Snapshot (RT-readable copy of the timeline) ───────────────────────────
-    struct TimeSegment { float bar; float bpm; int beatsPerBar; double startSecs; };
+    // cpm = crotchets per minute (the BPM markers scaled by the beat definition);
+    // barCrotchets comes from the time signature. One bar lasts
+    // barCrotchets * 60 / cpm. beatsPerBar is the numerator — the grid's beat,
+    // which is what note positions are measured in and is a different unit.
+    struct TimeSegment { float bar; float cpm; int beatsPerBar; double barCrotchets; double startSecs; };
     struct NoteSnap    { int midiPitch; float beat; float length; float velocity; };
     struct InstanceSnap {
         float startBar;

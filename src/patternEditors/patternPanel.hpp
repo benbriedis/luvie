@@ -13,6 +13,7 @@
 #include "modernButton.hpp"
 #include "toggleButton.hpp"
 #include "modernChoice.hpp"
+#include "modern/beatUnitChoice.hpp"
 #include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
 #include "chords.hpp"
@@ -52,17 +53,22 @@ struct ChordSection : Fl_Flex {
     ChordSection(int x, int y, int h);
 };
 
+// Time signature plus the beat definition it is counted in. The beat dropdown
+// carries no label here (the control bar is tight); it has a tooltip instead.
 struct TimeSigSection : Fl_Flex {
     static constexpr int kGap    = 3;
     static constexpr int kLabelW = 28;
     static constexpr int kNumW   = 26;
     static constexpr int kSlashW = 12;
     static constexpr int kDenW   = 50;
-    static constexpr int kWidth  = kLabelW + kGap + kNumW + kGap + kSlashW + kGap + kDenW;
+    static constexpr int kBeatW  = 44;
+    static constexpr int kWidth  = kLabelW + kGap + kNumW + kGap + kSlashW + kGap + kDenW
+                                 + kGap + kBeatW;
     Fl_Box           timeSigLabel;
     ModernValueInput timeSigNum;
     Fl_Box           timeSigSlash;
     ModernChoice     timeSigDen;
+    BeatUnitChoice   beatChoice;
     TimeSigSection(int x, int y, int h);
 };
 

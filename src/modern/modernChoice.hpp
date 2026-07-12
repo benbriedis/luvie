@@ -19,12 +19,7 @@ class ModernChoice : public Fl_Choice {
         fl_color(borderCol);
         fl_rect(x(), y(), w(), h());
 
-        const char* lbl = value() >= 0 ? text(value()) : nullptr;
-        if (lbl) {
-            fl_font(labelfont(), labelsize());
-            fl_color(labelcolor());
-            fl_draw(lbl, x() + 8, y(), w() - 24, h(), FL_ALIGN_LEFT | FL_ALIGN_CENTER);
-        }
+        drawValue(x() + 8, y(), w() - 24, h());
 
         // chevron
         int cx = x() + w() - 13;
@@ -47,6 +42,17 @@ class ModernChoice : public Fl_Choice {
         if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
         return Fl_Choice::handle(event);
+    }
+
+protected:
+    // Renders the selected item in the closed control. Subclasses whose items are
+    // pictures rather than words (see BeatUnitChoice) override this.
+    virtual void drawValue(int X, int Y, int W, int H) {
+        const char* lbl = value() >= 0 ? text(value()) : nullptr;
+        if (!lbl) return;
+        fl_font(labelfont(), labelsize());
+        fl_color(labelcolor());
+        fl_draw(lbl, X, Y, W, H, FL_ALIGN_LEFT | FL_ALIGN_CENTER);
     }
 
 public:

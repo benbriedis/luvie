@@ -48,7 +48,8 @@ public:
     int copyPattern(int srcPatId);
 
     // Pattern properties
-    void setPatternTimeSig(int patId, int top, int bottom);
+    void setPatternTimeSig(int patId, int top, int bottom,
+                           timeSettings::BeatUnit beat = timeSettings::beatUnitDefault);
     void setPatternLength(int patId, float lengthBeats);
     void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp, int octaveOffset);
     void setPatternDivisions(int patId, int divisions);

@@ -25,6 +25,9 @@ static constexpr int lpSlashW   = 14;
 static constexpr int lpSmGap    = 4;
 static constexpr int lpGroupGap = 20;
 
+static constexpr int lpBeatLabelW = 46;
+static constexpr int lpBeatChoiceW = 46;
+
 static int lpCtrlY(int y, int h) { return y + (h - lpCtrlH) / 2; }
 static int lpBpmLabelX(int x)   { return x + lpPad; }
 static int lpBpmInputX(int x)   { return lpBpmLabelX(x) + lpLabelW + lpSmGap; }
@@ -32,6 +35,8 @@ static int lpTsLabelX(int x)    { return lpBpmInputX(x) + lpBpmW + lpGroupGap; }
 static int lpTsNumX(int x)      { return lpTsLabelX(x) + lpLabelW + lpSmGap; }
 static int lpTsSlashX(int x)    { return lpTsNumX(x) + lpSmallW; }
 static int lpTsDenX(int x)      { return lpTsSlashX(x) + lpSlashW; }
+static int lpBeatLabelX(int x)  { return lpTsDenX(x) + lpChoiceW + lpGroupGap; }
+static int lpBeatChoiceX(int x) { return lpBeatLabelX(x) + lpBeatLabelW + lpSmGap; }
 
 // ======================================================
 // LoopPanel
@@ -44,7 +49,9 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
       timeSigLabel(lpTsLabelX(x),  lpCtrlY(y, h), lpLabelW,  lpCtrlH, "Sig"),
       timeSigNum  (lpTsNumX(x),    lpCtrlY(y, h), lpSmallW,  lpCtrlH),
       timeSigSlash(lpTsSlashX(x),  lpCtrlY(y, h), lpSlashW,  lpCtrlH, "/"),
-      timeSigDen  (lpTsDenX(x),    lpCtrlY(y, h), lpChoiceW, lpCtrlH)
+      timeSigDen  (lpTsDenX(x),    lpCtrlY(y, h), lpChoiceW, lpCtrlH),
+      beatLabel   (lpBeatLabelX(x),  lpCtrlY(y, h), lpBeatLabelW,  lpCtrlH, "Beat ="),
+      beatChoice  (lpBeatChoiceX(x), lpCtrlY(y, h), lpBeatChoiceW, lpCtrlH)
 {
     box(FL_NO_BOX);
 
@@ -93,6 +100,16 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     timeSigDen.value(timeSettings::denominatorDefaultIndex);
     timeSigDen.callback(commitCb, this);
 
+    beatLabel.box(FL_NO_BOX);
+    beatLabel.labelcolor(panelText);
+    beatLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    beatChoice.color(0x37415100);
+    beatChoice.labelcolor(panelText);
+    beatChoice.textcolor(panelText);
+    beatChoice.setBorderColor(panelCtrlBorder);
+    beatChoice.callback(commitCb, this);
+
     end();
 }
 
@@ -119,10 +136,11 @@ void LoopPanel::commitBpm()
 void LoopPanel::commitTimeSig()
 {
     if (!timeline) return;
-    // The spinner clamps the numerator to its range; the dropdown only ever
-    // offers the denominators timeSettings allows.
+    // The spinner clamps the numerator to its range; the dropdowns only ever
+    // offer the denominators and beat definitions timeSettings allows.
     timeline->setTimeSig(0, (int)timeSigNum.value(),
-                         timeSettings::denominatorAt(timeSigDen.value()));
+                         timeSettings::denominatorAt(timeSigDen.value()),
+                         beatChoice.beatUnit());
 }
 
 void LoopPanel::onTimelineChanged()
@@ -136,6 +154,7 @@ void LoopPanel::onTimelineChanged()
     timeline->timeSigAt(0, top, bot);
     timeSigNum.value(top);
     timeSigDen.value(timeSettings::denominatorIndex(bot));
+    beatChoice.setBeatUnit(timeline->beatAt(0));
 
     redraw();
 }

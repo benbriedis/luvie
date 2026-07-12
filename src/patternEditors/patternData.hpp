@@ -1,6 +1,7 @@
 #ifndef PATTERN_DATA_HPP
 #define PATTERN_DATA_HPP
 
+#include "timeSettings.hpp"  // BeatUnit
 #include <set>
 #include <string>
 #include <vector>
@@ -55,6 +56,7 @@ struct Pattern {
 	std::string name;                  // display name; empty = auto ("InstrumentName N")
 	int timeSigTop    = 4;
 	int timeSigBottom = 4;
+	timeSettings::BeatUnit beat = timeSettings::beatUnitDefault;
 	int  rootPitch = 0;      // base note index (matches rootChoice)
 	std::string chordHash;   // stable ChordDef hash; empty = "major" (see chords.hpp)
 	bool useSharp  = false;  // #/b display spelling

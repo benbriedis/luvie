@@ -73,13 +73,15 @@ TimeSigSection::TimeSigSection(int x, int y, int h)
       timeSigLabel(0, 0, kLabelW, h, "Sig"),
       timeSigNum  (0, 0, kNumW,   h),
       timeSigSlash(0, 0, kSlashW, h, "/"),
-      timeSigDen  (0, 0, kDenW,   h)
+      timeSigDen  (0, 0, kDenW,   h),
+      beatChoice  (0, 0, kBeatW,  h)
 {
     gap(kGap);
     fixed(&timeSigLabel, kLabelW);
     fixed(&timeSigNum,   kNumW);
     fixed(&timeSigSlash, kSlashW);
     fixed(&timeSigDen,   kDenW);
+    fixed(&beatChoice,   kBeatW);
     end();
 }
 
@@ -351,7 +353,8 @@ void PatternPanel::initTimeControls()
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
         int den = timeSettings::denominatorAt(ts.timeSigDen.value());
-        self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den);
+        self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den,
+                                         ts.beatChoice.beatUnit());
     }, this);
 
     ts.timeSigSlash.box(FL_NO_BOX);
@@ -382,7 +385,25 @@ void PatternPanel::initTimeControls()
                 break;
             }
         }
-        self->pattern->setPatternTimeSig(patId, top, den);
+        self->pattern->setPatternTimeSig(patId, top, den, ts.beatChoice.beatUnit());
+    }, this);
+
+    ts.beatChoice.color(TimeControls::kBg);
+    ts.beatChoice.labelcolor(panelText);
+    ts.beatChoice.textcolor(panelText);
+    ts.beatChoice.setBorderColor(panelCtrlBorder);
+    ts.beatChoice.tooltip("Beat definition");
+    ts.beatChoice.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        auto& ts   = self->timeControls.timeSigSec;
+        if (!self->pattern) return;
+        const auto& tl = self->pattern->get();
+        int sel = tl.selectedTrackIndex;
+        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
+        int patId = tl.patternIdForSelectedLane();
+        int den   = timeSettings::denominatorAt(ts.timeSigDen.value());
+        self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den,
+                                         ts.beatChoice.beatUnit());
     }, this);
 
     bs.barsLabel.box(FL_NO_BOX);
@@ -644,6 +665,7 @@ void PatternPanel::refreshTimeSig()
     auto showDefault = [&ts]() {
         ts.timeSigNum.value(timeSettings::numeratorDefault);
         ts.timeSigDen.value(timeSettings::denominatorDefaultIndex);
+        ts.beatChoice.value(timeSettings::beatUnitDefaultIndex);
     };
     if (!pattern) { showDefault(); return; }
     const auto& tl = pattern->get();
@@ -654,8 +676,10 @@ void PatternPanel::refreshTimeSig()
         if (p.id != patId) continue;
         ts.timeSigNum.value(p.timeSigTop);
         ts.timeSigDen.value(timeSettings::denominatorIndex(p.timeSigBottom));
+        ts.beatChoice.setBeatUnit(p.beat);
         ts.timeSigNum.redraw();
         ts.timeSigDen.redraw();
+        ts.beatChoice.redraw();
         return;
     }
 }

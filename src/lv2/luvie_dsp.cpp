@@ -127,7 +127,7 @@ public:
             const TimeSegment* seg = &snap.segs.back();
             for (size_t i = 0; i + 1 < snap.segs.size(); i++)
                 if (secs < snap.segs[i + 1].startSecs) { seg = &snap.segs[i]; break; }
-            double secsPerBar = seg->beatsPerBar * 60.0 / seg->bpm;
+            double secsPerBar = timeSettings::secondsPerBar(seg->barCrotchets, seg->cpm);
             barsTotal   = seg->bar + (float)((secs - seg->startSecs) / secsPerBar);
             beatsPerBar = (float)seg->beatsPerBar;
         }

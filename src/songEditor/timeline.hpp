@@ -2,6 +2,7 @@
 #define TIMELINE_HPP
 
 #include "patternData.hpp"   // Note, DrumNote, ParamLane, Pattern, PatternType
+#include "timeSettings.hpp"  // BeatUnit
 #include <string>
 #include <vector>
 
@@ -15,6 +16,9 @@ struct Instrument {
     bool        isDrum = false;
 };
 
+// Tempo in beats per minute, where a beat is the BeatUnit of the time signature
+// in force. Crotchets per minute — what the timing math runs on — is derived:
+// see ObservableSong::cpmAt().
 struct BpmMarker {
 	int   bar;
 	float bpm;
@@ -24,6 +28,7 @@ struct TimeSigMarker {
 	int bar;
 	int top;
 	int bottom;
+	timeSettings::BeatUnit beat = timeSettings::beatUnitDefault;
 };
 
 struct PatternInstance {
