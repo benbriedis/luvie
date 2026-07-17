@@ -35,9 +35,12 @@ Luvie needs to be able to deal with other definitions of a beat (eg beat = dotte
 Thus in Luvie BPM is not CPM. An implication of this is you will see different values for 
 BPM in Jack and Luvie when the song editor uses non-crotchet definitions of beat.
 
-Beat definition in the Song Editor: its only really used to determine the length of bars and tempo
-within the song editor. Patterns look after themselves. In time it COULD be used as 
-the Jack master.
+Beat definitions and time signatures in the Song Editor: these are pretty much only used within
+the Song Editor itselF to determine where patterns start and stop, and how long a bar is.
+Patterns look after themselves. 
+I THINK the first values are additionally used as the default settings For new patterns.
+In time it COULD be used as the Jack master too.
+Note that the Song Editor's BPM, by contrast, IS used by the patterns.
 
 Beat definition in Loop Editor: it can't really act as transport master as the
    patterns can define different time signatures. Can't even send Jack a

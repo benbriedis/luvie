@@ -210,9 +210,15 @@ void Grid::moving(StateDragMove& s)
     Note* note = &notes[s.noteIdx];
     float ex   = Fl::event_x() - x();
     note->beat  = (ex - s.grabX) / (float)colWidth + colOffset;
-    if (note->beat < 0.0f) note->beat = 0.0f;
-    if (note->beat + note->length > numCols) note->beat = numCols - note->length;
     if (snap > 0.0f) note->beat = std::round(note->beat / snap) * snap;
+    // Clamp AFTER snapping so the note can't extend past the right edge. When
+    // snapping is on, clamp the start DOWN to the last grid line that still
+    // fits the note, otherwise a fractional-length note would land off-grid.
+    if (note->beat < 0.0f) note->beat = 0.0f;
+    if (note->beat + note->length > numCols) {
+        float maxBeat = numCols - note->length;
+        note->beat = snap > 0.0f ? std::floor(maxBeat / snap) * snap : maxBeat;
+    }
     float ey   = Fl::event_y() - y();
     int newRow = std::clamp(rowAtPixelY(std::max(0, (int)(ey - s.grabY))), 0, numRows - 1);
     if (!isRowBlocked(newRow)) {

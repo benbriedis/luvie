@@ -409,8 +409,6 @@ Look at: rewind in Loop Editor
 BUG? When snapping can shink note to < min. cf should I allow?
 
 
-BUG: create a half-note. Increase division to 1/1. Can drag to just beyond the grid.
-
 BUG: 1/3 - moving last note in is forbidden sometimes
 
 BUG: in other places we get a white line on the RHS
