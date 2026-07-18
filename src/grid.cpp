@@ -249,22 +249,34 @@ void Grid::resizing(StateDragResize& s)
     Note* note      = &notes[s.noteIdx];
     float ex        = Fl::event_x() - x();
     if (s.side == Side::Left) {
-        float endCol = note->beat + note->length;
-        note->beat    = ex / (float)colWidth + colOffset;
-        if (snap) note->beat = std::round(note->beat / snap) * snap;
+        float endCol  = note->beat + note->length;   // fixed (right) edge
+        float newBeat = ex / (float)colWidth + colOffset;
+        if (snap) newBeat = std::round(newBeat / snap) * snap;
         int   neighbour = overlappingCell(s.noteIdx);
         float min       = neighbour < 0 ? 0.0f : notes[neighbour].beat + notes[neighbour].length;
-        if (note->beat < min) note->beat = min;
-        note->length = endCol - note->beat;
-        if (note->length < minLength) { note->length = minLength; note->beat = endCol - minLength; }
+        if (newBeat < min) newBeat = min;
+        // Enforce the minimum length WITHOUT dragging the moving edge off the
+        // grid: if the snapped position is too close to the fixed edge, back
+        // off to the nearest grid line that still leaves at least minLength.
+        if (endCol - newBeat < minLength) {
+            float limit = endCol - minLength;
+            newBeat = snap ? std::floor(limit / snap) * snap : limit;
+            if (newBeat < min) newBeat = min;
+        }
+        note->beat   = newBeat;
+        note->length = endCol - newBeat;
     } else {
-        note->length  = ex / (float)colWidth + colOffset - note->beat;
-        float endCol  = note->beat + note->length;
-        if (snap) { endCol = std::round(endCol / snap) * snap; note->length = endCol - note->beat; }
+        float endCol = ex / (float)colWidth + colOffset;   // moving (right) edge
+        if (snap) endCol = std::round(endCol / snap) * snap;
         int   neighbour = overlappingCell(s.noteIdx);
         float max       = neighbour < 0 ? (float)numCols : notes[neighbour].beat;
-        if (note->beat + note->length > max) note->length = max - note->beat;
-        if (note->length < minLength) note->length = minLength;
+        if (endCol > max) endCol = max;
+        if (endCol - note->beat < minLength) {
+            float limit = note->beat + minLength;
+            endCol = snap ? std::ceil(limit / snap) * snap : limit;
+            if (endCol > max) endCol = max;
+        }
+        note->length = endCol - note->beat;
     }
     redraw();
 }

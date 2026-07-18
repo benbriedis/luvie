@@ -406,8 +406,6 @@ Through Carla there was some message about Carla not being responsive while Luvi
     
 Look at: rewind in Loop Editor
 
-BUG? When snapping can shink note to < min. cf should I allow?
-
 cf requiring numerator > 1
 
 TO TEST swapping from  loop editor - intermediate mode - probably needs to be controlled via a song-beat counter if its not already being
