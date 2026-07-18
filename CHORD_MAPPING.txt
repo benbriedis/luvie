@@ -1,0 +1,173 @@
+================================================================================
+CHORD AND SCALE MAPPING
+================================================================================
+
+This document describes how the plain (piano-roll style) pattern editor maps its
+grid rows onto MIDI pitches for a chosen chord or scale, and how notes are
+converted when the chord/scale is changed.
+
+Primary source: src/patternEditors/chords.hpp
+Related:        src/patternEditors/noteLabels.cpp   (row labels / display)
+                src/songEditor/observablePattern.cpp (remapPatternNotes, conversion)
+
+
+--------------------------------------------------------------------------------
+1. THE CHORD/SCALE TABLE
+--------------------------------------------------------------------------------
+
+Every chord and scale is one entry in the constexpr array `chordDefs[]` in
+chords.hpp. Each entry is a `ChordDef`:
+
+    hash      Stable, unique 6-char [a-z0-9] identity. This -- NOT the array
+              index and NOT the display name -- is what gets stored, serialized
+              and passed around. Index and name are free to change (reordering,
+              relabelling) without breaking saved songs.
+    name      Display name shown in the chord/scale menu.
+    size      Number of tones in one octave-group (length of `intervals`).
+    intervals Semitone offsets above the root for each tone, ascending, e.g.
+              major = {0, 4, 7}, maj7 = {0, 4, 7, 11}, 13 = {0,4,7,10,14,17,21}.
+    isScale   true  -> listed under "Scale"; false -> listed under "Chord".
+    submenu   Menu grouping ("Modes", "Extended", "Named", ...); empty = top level.
+
+A stored hash is resolved to its current array index with
+`chordIndexForHash(hash)` (linear scan; unknown/empty falls back to 0 = "major").
+This lookup is allocation-free and safe to call from the RT thread.
+
+
+--------------------------------------------------------------------------------
+2. GRID ROWS: DEGREE + OCTAVE
+--------------------------------------------------------------------------------
+
+A note's vertical position is a single integer `row` (Note.row). It decomposes
+into a chord-tone degree and an octave-group:
+
+    degree = row % size          (which tone within the chord/scale)
+    octave = row / size          (how many octave-groups above the base)
+
+Row 0 is the root in the base octave. Rows count upward tone by tone; each block
+of `size` rows is the next octave-group of the same chord/scale.
+
+
+--------------------------------------------------------------------------------
+3. ROW -> PITCH  (chordToneOffset / rowToMidi)
+--------------------------------------------------------------------------------
+
+The semitone offset of a row above the root is:
+
+    chordToneOffset(def, row) = def.intervals[row % size] + (row / size) * 12
+
+KEY RULE: each octave-group advances by exactly ONE REAL OCTAVE (12 semitones),
+regardless of how wide the chord's intervals are. The root therefore recurs every
+12 semitones and always sits in the same octave.
+
+Full row -> MIDI pitch:
+
+    rowToMidi(row, rootPitch, chordIndex):
+        rootMidi0 = 12 + (rootPitch + 9) % 12      // MIDI pitch of the root
+        midi      = rootMidi0 + chordToneOffset(def, row)
+        clamp midi to [0, 127]
+
+`rowToMidi` is the single source of truth shared by:
+  - the JACK RT engine and the soft (Playhead-driven) output path, so playback
+    always agrees, and
+  - NoteLabels, so the pitch printed next to a row matches what is played.
+
+Note names in the label column come from `noteName()` in noteLabels.cpp, which
+formats the same computed MIDI pitch (root spelling honours the sharp/flat flag).
+
+
+--------------------------------------------------------------------------------
+4. EXTENDED CHORDS AND THE OVERLAP TRADE-OFF
+--------------------------------------------------------------------------------
+
+Extended chords (9ths / 11ths / 13ths, and some named chords) contain intervals
+above 12 -- e.g. 13 = {0,4,7,10,14,17,21}. Because the octave step is a fixed 12
+(not the chord's full span), the upper tones of one octave-group reach ABOVE the
+root of the next group. Concretely, for the 13 chord:
+
+    octave 0: 0, 4, 7, 10, 14, 17, 21
+    octave 1: 12, 16, 19, 22, 26, 29, 33
+
+Row 6 (=21) is higher in pitch than row 7 (=12). So for these chords the grid
+rows are NOT strictly ascending in pitch; successive octave-groups overlap.
+
+This is intentional. The alternative -- advancing each group by the chord's own
+span (24 semitones for a 13 chord) -- would keep rows strictly ascending but make
+the root recur only every two octaves, so changing the chord would move a note's
+root into a different octave. Root octave-stability (section 5) was chosen over
+strict monotonicity. Do not reintroduce a per-chord span term in chordToneOffset.
+
+
+--------------------------------------------------------------------------------
+5. CHANGING THE CHORD/SCALE: CONVERSION (remapPatternNotes)
+--------------------------------------------------------------------------------
+
+Guiding principle: conversions work UPWARD FROM THE ROOT. A note's root stays in
+the same octave before and after any chord or scale change.
+
+When the user picks a different chord/scale in the pattern panel
+(PatternPanel::commitHarmony), the new hash is stored on the pattern. If the tone
+count (`size`) changed, ObservablePattern::remapPatternNotes(patId, oldSize,
+newSize) rewrites every note in the pattern, preserving its (octave, degree):
+
+    degree = row % oldSize
+    octave = row / oldSize
+
+  - If degree < newSize (the degree still exists in the new chord):
+        row = octave * newSize + degree
+    The note keeps its degree and its octave. Because the octave step is a
+    uniform 12 semitones (section 3), the root of each octave is unchanged and
+    every kept note stays in its octave; only the chord-tone colour shifts (e.g.
+    a major third becomes a minor third).
+
+  - If degree >= newSize (the degree has no home in a smaller chord, e.g. the
+    7th when converting maj7 -> major):
+        the note is DISABLED (see section 6) rather than deleted.
+
+If `size` is unchanged, no remap runs: the rows are already valid and rowToMidi
+simply reads the new chord's intervals, so each row moves to the corresponding
+tone of the new chord in the same octave.
+
+
+--------------------------------------------------------------------------------
+6. DISABLED NOTES (degrees that don't fit a smaller chord)
+--------------------------------------------------------------------------------
+
+A note whose degree is absent in the current (smaller) chord is not thrown away.
+remapPatternNotes marks it:
+
+    note.disabled       = true
+    note.disabledDegree = degree      // the original degree, remembered
+    note.row            = octave       // row is compressed to just the octave
+
+Disabled notes:
+  - are skipped by every playback path (playhead / sequencer -- they make no
+    sound),
+  - are drawn greyed in the grid and their degree is shown greyed in the label
+    column (patternGrid / noteLabels),
+  - are serialized (disabled / disabledDegree fields in timelineIO), so they
+    survive save/load.
+
+If the chord later grows so that `disabledDegree < newSize`, the note is restored
+to a normal note at its original degree and octave:
+
+    row      = row * newSize + disabledDegree
+    disabled = false
+
+This lets a round trip (e.g. maj7 -> major -> maj7) bring the 7th back exactly
+where it was.
+
+
+--------------------------------------------------------------------------------
+7. SUMMARY
+--------------------------------------------------------------------------------
+
+  * Chords/scales are table entries with an interval list and a stable hash.
+  * A row splits into degree (row % size) and octave (row / size).
+  * Pitch = root + intervals[degree] + octave * 12. Octaves are always real
+    12-semitone octaves, so the root is octave-stable.
+  * Extended chords overlap into the next octave-group (rows not strictly
+    ascending) -- an accepted trade-off for that stability.
+  * Changing the chord keeps each note's degree and octave; degrees that don't
+    fit a smaller chord are disabled (greyed, silent) and restored if the chord
+    grows again.

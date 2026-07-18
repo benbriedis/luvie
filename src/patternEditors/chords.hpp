@@ -66,6 +66,17 @@ inline constexpr ChordDef chordDefs[] = {
     {"p3n9tb", "13",                7, {0, 4, 7, 10, 14, 17, 21}, false, "Extended"},
     {"m6d2vc", "13(b9)",            7, {0, 4, 7, 10, 13, 17, 21}, false, "Extended"},
     {"x4l7kq", "13(b9b5)",          7, {0, 4, 6, 10, 13, 17, 21}, false, "Extended"},
+    {"dream8", "Dream",             4, {0, 5, 6,  7,  0,  0,  0}, false, "Named"},
+    {"elktr7", "Elektra",           5, {0, 1, 4,  7,  9,  0,  0}, false, "Named"},
+    {"farbn3", "Farben",            5, {0, 4, 8,  9, 11,  0,  0}, false, "Named"},
+    {"hnd1rx", "Hendrix",           5, {0, 4, 7, 10, 15,  0,  0}, false, "Named"},
+    {"magic7", "Magic",             8, {0, 1, 5,  6, 10, 12, 15, 17}, false, "Named"},
+    {"muchrd", "Mu",                4, {0, 2, 4,  7,  0,  0,  0}, false, "Named"},
+    {"myst3q", "Mystic",            6, {0, 2, 4,  6,  9, 10,  0}, false, "Named"},
+    {"odenap", "Ode to Napoleon",   6, {0, 1, 4,  5,  8,  9,  0}, false, "Named"},
+    {"ptr8ka", "Petrushka",         6, {0, 1, 4,  6,  7, 10,  0}, false, "Named"},
+    {"sowht4", "So What",           5, {0, 3, 5,  7, 10,  0,  0}, false, "Named"},
+    {"trstn5", "Tristan",           4, {0, 3, 6, 10,  0,  0,  0}, false, "Named"},
 };
 
 inline constexpr int numChordDefs = sizeof(chordDefs) / sizeof(chordDefs[0]);
@@ -96,16 +107,16 @@ inline const ChordDef& chordDefForHash(std::string_view hash)
     return chordDefs[chordIndexForHash(hash)];
 }
 
-// Semitone offset above the root for the n-th tone, walking up successive
-// octave-groups. Extended chords (9ths/11ths/13ths) span more than one octave,
-// so each group must advance by a whole number of octaves large enough to clear
-// the chord's top interval — otherwise the wrap lands below the previous tone and
-// the sequence dips instead of ascending. For chords/scales that fit in an octave
-// this is just +12 per group, matching the historical behaviour.
+// Semitone offset above the root for the n-th tone, stacking successive octave
+// groups exactly one real octave (12 semitones) apart. Anchoring every group on a
+// +12 root keeps a note's root in the same octave before and after a chord/scale
+// change, and lets note conversions work upward from the root (see remapPatternNotes).
+// Extended chords (9ths/11ths/13ths) reach above the octave, so their upper tones can
+// overlap the next group's lower tones — the row sequence is not strictly ascending
+// for those chords, the accepted trade-off for keeping the root octave-stable.
 inline int chordToneOffset(const ChordDef& def, int n)
 {
-    int span = (def.intervals[def.size - 1] / 12 + 1) * 12;
-    return def.intervals[n % def.size] + (n / def.size) * span;
+    return def.intervals[n % def.size] + (n / def.size) * 12;
 }
 
 // Map a pattern note row → MIDI pitch for the given root/chord. Shared by the JACK

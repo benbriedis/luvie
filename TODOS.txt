@@ -265,6 +265,7 @@ LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
 Lighter theme for scrollbars?
 
 Loop Editor: maybe show a mini version of the patterns, similar to Seq24
+  Showing bar boundaries in summaries WOULD be useful.
 
 In pattern editor #bars and signature allow click and drag left and right, which is weird.
    Maybe disable
@@ -319,8 +320,8 @@ FROM GOOGLE:
 	DAW/Click Setting: In a Digital Audio Workstation (DAW), you would set the tempo based on the 8th note (in DAW terms) to get an accurate, consistent pulse   
   
 
-Add more chords and scales
-==========================
+Add more scales
+===============
 Scales - cf
   https://en.wikipedia.org/wiki/Hungarian_minor_scale
   https://en.wikipedia.org/wiki/Arabic_maqam
@@ -330,14 +331,16 @@ Scales - cf
   https://en.wikipedia.org/wiki/List_of_musical_scales_and_modes
 
 	In https://en.wikipedia.org/wiki/Octatonic_scale see:
-	   alpha, beta and gamma shords and scales
+	   alpha, beta and gamma scales
 
 	   NOTE: The Hungarian major scale and Romanian major scale are both heptatonic subsets of the octatonic scale with one scale degree removed.
 
-  
-Chords:
-   https://en.wikipedia.org/wiki/Petrushka_chord (+see list at bottom)
-   Jimi Hendrix chord
+More chords?
+============
+	https://en.wikipedia.org/wiki/Viennese_trichord - NB a class of chords
+	Alpha, beta and gamma chords 
+
+	(handy ref: https://en.wikipedia.org/wiki/List_of_chords )
 
 cf custom chord and scale builder
    - Would want to be able to export and import them.
@@ -389,3 +392,7 @@ Look at: rewind in Loop Editor
 
 TO TEST swapping from  loop editor - intermediate mode - probably needs to be controlled via a song-beat counter if its not already being
 
+Look at changing time signatures: auto changes are a bit annoying.
+   Number of bars are also implicated. Don't want to (easily) lose notes.
+
+Review and trim CHORD_MAPPING.txt  Maybe move to DESIGN_DECISIONS
