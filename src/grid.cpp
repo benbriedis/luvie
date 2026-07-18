@@ -130,7 +130,7 @@ int Grid::handle(int event)
                         [=, this](const Note& n) { return hitsNote(n, row, fcol); });
                     if (!wouldRemove) {
                         creationForbidden = std::any_of(notes.begin(), notes.end(),
-                            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + length > n.beat; });
+                            [=](const Note& n) { return n.row == row && beatsOverlap(col, length, n.beat, n.length); });
                         if (creationForbidden)
                             window()->cursor(forbiddenCursorImage(), 11, 11);
                     }
@@ -314,7 +314,7 @@ void Grid::toggleNote()
         [=, this](const Note& n) { return hitsNote(n, row, fcol); }), notes.end());
     if ((int)notes.size() == size) {
         bool clear = std::none_of(notes.begin(), notes.end(),
-            [=](const Note& n) { return n.row == row && col < n.beat + n.length && col + length > n.beat; });
+            [=](const Note& n) { return n.row == row && beatsOverlap(col, length, n.beat, n.length); });
         if (clear)
             notes.push_back({0, row, col, length});
     }
@@ -323,14 +323,10 @@ void Grid::toggleNote()
 
 int Grid::overlappingCell(int noteIdx) const
 {
-    Note  a      = notes[noteIdx];
-    float aStart = a.beat, aEnd = a.beat + a.length;
+    Note a = notes[noteIdx];
     for (const auto [i, b] : std::views::enumerate(notes)) {
         if (i == noteIdx || b.row != a.row) continue;
-        float bStart      = b.beat, bEnd = b.beat + b.length;
-        float firstEnd    = aStart <= bStart ? aEnd : bEnd;
-        float secondStart = aStart <= bStart ? bStart : aStart;
-        if (firstEnd > secondStart) return i;
+        if (beatsOverlap(a.beat, a.length, b.beat, b.length)) return i;
     }
     return -1;
 }

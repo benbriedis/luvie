@@ -76,8 +76,7 @@ void PianorollGrid::toggleNote()
 
     bool clear = std::none_of(notes.begin(), notes.end(),
         [=](const Note& n) { return n.row == visual_row
-                                  && col < n.beat + n.length
-                                  && col + length > n.beat; });
+                                  && beatsOverlap(col, length, n.beat, n.length); });
     if (clear)
         pattern->addNote(patternId, col, midiNote, length);
 }

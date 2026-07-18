@@ -90,6 +90,21 @@ protected:
         return (int)n.row == row && fcol >= n.beat && fcol < n.beat + n.length;
     }
 
+    // Tolerance (in beats) for treating two note ranges as overlapping. Snapping
+    // to non-power-of-two subdivisions (1/3, 1/5, 1/7) can't be represented
+    // exactly in float, so an abutting note's start and its neighbour's end
+    // differ by ~1e-7 beats; a strict comparison then reports a phantom overlap
+    // and forbids the placement. This epsilon is far below any real subdivision
+    // (1/7 ≈ 0.14) yet well above that rounding noise.
+    static constexpr float kBeatEpsilon = 1e-4f;
+
+    // True when beat-ranges [aStart, aStart+aLen) and [bStart, bStart+bLen)
+    // overlap by more than kBeatEpsilon (so merely touching does not count).
+    static bool beatsOverlap(float aStart, float aLen, float bStart, float bLen) {
+        return aStart + kBeatEpsilon < bStart + bLen &&
+               bStart + kBeatEpsilon < aStart + aLen;
+    }
+
     // Virtual extension hooks
     virtual bool     isRowBlocked(int visualRow) const { (void)visualRow; return false; }
     virtual Fl_Color columnColor(int col)      const { (void)col;      return 0x00EE0000; }
