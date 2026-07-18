@@ -20,6 +20,14 @@ static constexpr Fl_Color colTrackDiv    = 0x64748B00;  // bright separator betw
 static constexpr Fl_Color colInstrHeader = 0x64748B00;  // dedicated instrument name row bg
 static constexpr int      instrNameRowH  = 24;           // height of instrument header rows
 static constexpr int      iconAreaW      = 16;           // width reserved for expand/collapse arrow
+static constexpr int      btnColW        = 22;           // right column holding the S/M buttons (first lane only)
+
+// Solo/Mute button colours (buttons appear on the top-most lane of each track)
+static constexpr Fl_Color colBtnOff  = 0x29354800;
+static constexpr Fl_Color colSoloOn  = 0x22C55E00;
+static constexpr Fl_Color colMuteOn  = 0xEF444400;
+static constexpr Fl_Color colBtnTextOn  = FL_WHITE;
+static constexpr Fl_Color colBtnTextOff = 0x64748B00;
 
 TrackLabels::TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight)
     : Fl_Group(x, y, w, numVisibleRows * rowHeight),
@@ -316,6 +324,37 @@ void TrackLabels::draw()
         return {};
     };
 
+    // Draw left-aligned, but when the text is wider than the cell show its END
+    // instead of its start, so the distinguishing tail of a long pattern name
+    // stays visible. Used for pattern names only. Uses the current font.
+    auto drawTailClipped = [&](const std::string& s, int tx, int ty, int tw, int th) {
+        if (s.empty()) return;
+        size_t i = 0;
+        // Drop whole UTF-8 characters from the front until the tail fits.
+        while (i < s.size() && fl_width(s.c_str() + i) > tw) {
+            i++;
+            while (i < s.size() && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) i++;
+        }
+        fl_draw(s.c_str() + i, tx, ty, tw, th, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+    };
+
+    // Solo/Mute buttons occupy the right btnColW of the top-most lane row only; lower
+    // lanes leave the space to their pattern names.
+    auto drawTrackButtons = [&](int ry, int rh, bool solo, bool mute) {
+        int bx   = x() + w() - btnColW + 1;
+        int bw   = btnColW - 2;
+        int btnH = rh / 2;
+        fl_color(solo ? colSoloOn : colBtnOff);
+        fl_rectf(bx, ry, bw, btnH);
+        fl_font(FL_HELVETICA_BOLD, 9);
+        fl_color(solo ? colBtnTextOn : colBtnTextOff);
+        fl_draw("S", bx, ry, bw, btnH, FL_ALIGN_CENTER);
+        fl_color(mute ? colMuteOn : colBtnOff);
+        fl_rectf(bx, ry + btnH, bw, rh - btnH);
+        fl_color(mute ? colBtnTextOn : colBtnTextOff);
+        fl_draw("M", bx, ry + btnH, bw, rh - btnH, FL_ALIGN_CENTER);
+    };
+
     fl_push_clip(x(), y(), w(), h());   // partial top/bottom rows must not overdraw neighbours
     fl_font(FL_HELVETICA, 11);
     for (int i = rowOffset; i < rowOffset + numVisibleRows; i++) {
@@ -384,13 +423,16 @@ void TrackLabels::draw()
                     for (int j = 0; j < (int)track.lanes.size(); j++)
                         if (track.lanes[j].id == ref.id) { laneNum = j + 1; break; }
 
+                    // Only the top-most lane keeps the S/M buttons; its name must
+                    // leave room for them, while lower lanes reclaim the full width.
+                    int rightPad = isFirstLane ? btnColW : 0;
+
                     if (isUnstacked) {
                         // ── Unstacked lane: just pattern name (instrument name is in header row) ──
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        fl_draw(patName(track.lanes[laneNum-1].patternId).c_str(),
-                                x() + 4, ry, w() - 8, rh,
-                                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                        drawTailClipped(patName(track.lanes[laneNum-1].patternId),
+                                        x() + 4, ry, w() - 8 - rightPad, rh);
                     } else if (isFirstLane) {
                         // ── Stacked first lane: right-arrow expand icon + track label ──
                         Fl_Color arrowCol = isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText;
@@ -398,9 +440,12 @@ void TrackLabels::draw()
                         int ax = x() + 4, ay = ry + rh / 2 - 4;
                         fl_polygon(ax, ay, ax, ay + 8, ax + 6, ay + 4);
                         fl_font(FL_HELVETICA_BOLD, 9);
-                        fl_draw(tl.instrumentName(track.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
+                        fl_draw(tl.instrumentName(track.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4 - rightPad, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                     }
+
+                    if (isFirstLane)
+                        drawTrackButtons(ry, rh, track.solo, track.mute);
                 }
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
@@ -479,6 +524,22 @@ int TrackLabels::handle(int event)
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
+
+            // S/M buttons live in the right btnColW of the top-most lane row.
+            if (Fl::event_x() >= x() + w() - btnColW &&
+                row >= 0 && row < (int)ro.size() && ro[row].kind == RowKind::Lane) {
+                int tIdx = timeline->trackIndexForLaneId(ro[row].id);
+                if (tIdx >= 0) {
+                    const auto& t = timeline->get().tracks[tIdx];
+                    if (!t.lanes.empty() && t.lanes[0].id == ro[row].id) {
+                        int rowPY = rowYInPanel(row);
+                        bool isSolo = (Fl::event_y() - y() - rowPY) < rowHFor(row) / 2;
+                        if (isSolo) timeline->setTrackSolo(t.id, !t.solo);
+                        else        timeline->setTrackMute(t.id, !t.mute);
+                        return 1;
+                    }
+                }
+            }
 
             if (Fl::event_clicks() > 0) {
                 if (row < (int)ro.size()) {

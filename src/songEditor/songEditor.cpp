@@ -12,8 +12,7 @@ SongEditor::SongEditor(int x, int y, int visibleW,
                        float snap, NoteContextPopup& popup)
     : Editor(x, y, visibleW, rulerH + numRows * rowHeight + hScrollH, numCols, colWidth),
       gridPane(x, y + rulerH, visibleW, numRows * rowHeight + hScrollH),
-      trackLabels(x, y + rulerH, labelW, numRows, rowHeight),
-      trackControls(x + labelW, y + rulerH, controlsW, numRows, rowHeight),
+      trackLabels(x, y + rulerH, labelW + controlsW, numRows, rowHeight),
       songGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     baseX        = x;
@@ -42,7 +41,6 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     hScrollbar->hide();
 
     trackLabels.position(x, y + rulerH);
-    trackControls.position(x + labelW, y + rulerH);
     songGrid.position(x + labelW + controlsW, y + rulerH);
     songGrid.setPlayhead(&playhead);
 
@@ -51,7 +49,6 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     // between it and the transport. (add() reparents from the editor group.)
     gridPane.add(*scrollbar);
     gridPane.add(trackLabels);
-    gridPane.add(trackControls);
     gridPane.add(songGrid);
     gridPane.add(*hScrollbar);
 
@@ -100,7 +97,6 @@ void SongEditor::setTransport(ITransport* t, ObservableSong* tl)
     songGrid.onOpenPattern        = [this](int i, int laneId) { if (onOpenPattern) onOpenPattern(i, laneId); };
     songGrid.setTimeline(tl);
     trackLabels.setTimeline(tl);
-    trackControls.setTimeline(tl);
     updateScrollBounds();
 }
 
@@ -189,7 +185,6 @@ void SongEditor::updateScrollBounds()
 
     // Reposition labels, controls, and grid based on scrollbar presence
     trackLabels.position(baseX + sbW, trackLabels.y());
-    trackControls.position(baseX + sbW + labelW, trackControls.y());
     songGrid.position(baseX + sbW + labelW + controlsW, songGrid.y());
     rulerOffsetX = sbW + labelW + controlsW;
 
@@ -219,7 +214,6 @@ void SongEditor::updateScrollBounds()
     // rows at the top/bottom are clipped by each widget's bounds.
     songGrid.size(visibleGridW, contentBodyH);
     trackLabels.size(trackLabels.w(), contentBodyH);
-    trackControls.size(trackControls.w(), contentBodyH);
 
     pushScroll(contentBodyH);
     redraw();
@@ -237,8 +231,6 @@ void SongEditor::pushScroll(int availH)
     songGrid.setScroll(rowOff, pxOff);
     trackLabels.setNumVisibleRows(renderCount);
     trackLabels.setScroll(rowOff, pxOff);
-    trackControls.setNumVisibleRows(renderCount);
-    trackControls.setScroll(rowOff, pxOff);
 }
 
 void SongEditor::setScrollPx(int px)

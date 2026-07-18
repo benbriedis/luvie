@@ -298,12 +298,6 @@ Octave offset - cf alternative:  a transpose option...
   If keep cf adding colour (eg yellow) to the octave numbers.
   
  
-Solo & Mute options
-1. Leave as is
-2. Just place on top track
-3. Deal with patterns separately
-- Solution needs to work for stacked and unstacked.
-
 ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
 
  
@@ -388,14 +382,13 @@ cf relationship to BPM crotchet / dotted crotchet etc
 
 TODO probably put drums on a different midi_out initially. (cf drums_out) or something
 
-There was a crash when scales list overlapped bottom of laptop screen via Carla.
-
-Through Carla there was some message about Carla not being responsive while Luvie GUI was
-   being shown. (Carla was on laptop screen and Luvie on the other one at the time).
+Update FLTK?
+- downdowns that hover over other applications
+- There was a crash when scales list overlapped bottom of laptop screen via Carla.
+- Through Carla there was some message about Carla not being responsive while Luvie GUI was
+     being shown. (Carla was on laptop screen and Luvie on the other one at the time).
     
 Look at: rewind in Loop Editor
-
-cf requiring numerator > 1
 
 TO TEST swapping from  loop editor - intermediate mode - probably needs to be controlled via a song-beat counter if its not already being
 
