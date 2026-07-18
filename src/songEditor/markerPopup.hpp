@@ -30,6 +30,7 @@ private:
 	void doOk() override;
 	void doDelete();
 	void snapBeat();
+	int  numerator() const;
 	void configureDelete(bool fixed, bool showDelete);
 	Kind            kind;
 	Fl_Value_Input* input1      = nullptr;

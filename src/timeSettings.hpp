@@ -23,7 +23,7 @@ inline constexpr std::array<const char*, 3> denominatorLabels = {"2", "4", "8"};
 inline constexpr int denominatorDefault      = 4;
 inline constexpr int denominatorDefaultIndex = 1;
 
-inline constexpr int numeratorMin     = 1;
+inline constexpr int numeratorMin     = 2;
 inline constexpr int numeratorMax     = 17;
 inline constexpr int numeratorDefault = 4;
 

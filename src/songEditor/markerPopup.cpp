@@ -2,6 +2,7 @@
 #include "timeSettings.hpp"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <algorithm>
 
 static constexpr int popupW  = 160;
 static constexpr int pad     = 8;
@@ -92,10 +93,18 @@ MarkerPopup::MarkerPopup(Kind k)
 	}, this);
 }
 
+// The numerator input honours its range() only while dragging; a typed value is
+// accepted verbatim, so clamp it here at every read.
+int MarkerPopup::numerator() const
+{
+	return std::clamp((int)input1->value(),
+	                  timeSettings::numeratorMin, timeSettings::numeratorMax);
+}
+
 void MarkerPopup::snapBeat()
 {
 	int den = timeSettings::denominatorAt(denomChoice->value());
-	beatChoice->setBeatUnit(timeSettings::impliedBeatUnit((int)input1->value(), den));
+	beatChoice->setBeatUnit(timeSettings::impliedBeatUnit(numerator(), den));
 	beatChoice->redraw();
 }
 
@@ -111,7 +120,7 @@ void MarkerPopup::doOk()
 		if (onOkTempo) onOkTempo(input1->value());
 	} else {
 		int den = timeSettings::denominatorAt(denomChoice->value());
-		if (onOkTimeSig) onOkTimeSig((int)input1->value(), den, beatChoice->beatUnit());
+		if (onOkTimeSig) onOkTimeSig(numerator(), den, beatChoice->beatUnit());
 	}
 	commit();
 }
