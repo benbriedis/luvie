@@ -174,10 +174,23 @@ int DrumGrid::handle(int evt)
 
         // Left mouse
         if (idx >= 0) {
+            // Jump the cursor to the note's centre so it tracks the middle of
+            // the note during the drag. grabX/grabY hold the window position the
+            // drag is anchored to; use the warped centre when the warp actually
+            // happened, otherwise keep the grabbed position (unwarped platforms).
+            int vr         = rowOffset + numRows - 1 - notes[idx].note;
+            int centreWinX = x() + padX + (int)((notes[idx].beat - colOffset) * colWidth);
+            int centreWinY = y() + vr * rowHeight + rowHeight / 2;
+            int grabX      = Fl::event_x();
+            int grabY      = Fl::event_y();
+            if (warpPointerTo(window(), centreWinX, centreWinY)) {
+                grabX = centreWinX;
+                grabY = centreWinY;
+            }
             // Start drag on this note
             state = DrumStateDrag{
                 idx,
-                Fl::event_x(), Fl::event_y(),
+                grabX, grabY,
                 notes[idx].beat, notes[idx].note,
                 false
             };

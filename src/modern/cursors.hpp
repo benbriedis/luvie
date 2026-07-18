@@ -9,6 +9,13 @@
 const Fl_RGB_Image* forbiddenCursorImage();
 const Fl_RGB_Image* contextMenuCursorImage();
 
+// Warp the mouse pointer to the window-relative position (winX, winY). Used at
+// drag start so the cursor jumps to the centre of the block being moved.
+// Returns true if the pointer was actually moved; false when the platform
+// doesn't support warping (e.g. Wayland), so callers can skip re-anchoring
+// their grab offset and keep the pre-warp behaviour.
+bool warpPointerTo(Fl_Window* win, int winX, int winY);
+
 // General hover-cursor helper. Call at the top of a widget's handle().
 // Returns >= 0 when the event is consumed by cursor logic (caller should return that value).
 // Returns -1 when the event is unrelated to cursor management.

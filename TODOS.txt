@@ -354,9 +354,6 @@ cf custom chord and scale builder
 Swapping between song editor and loop editor - think I'd rather round out the song editor's 
    bar (but hold on to last bar settings).
 
-IMPROVEMENT - when dragging notes if I grab the note at the bottom or top it would be neater 
-	to perhaps jump the cursor to the middle (or vertical middle) and drag from there.
-
 POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
     Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
 
@@ -368,11 +365,7 @@ TOTEST: the 'disabled' notes are correct
 
 Rewind when in Loop mode is a bit weird. cf disabling / not using
 
-BUG (seen once): After changing scale/chord centering button doesn't (always?) work
-
-PROBLEM: base note probably should include the octave, otherwise a pattern can descend unexpectedly.
-         ALT could have an octave offset. (0 default, would want to restrict to valid values. Or just -1, 0, 1)
-
+BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
 
 cf master volume rubberband control? Or any other global parameters?
 
@@ -385,8 +378,6 @@ Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
 BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
 
-BUG: Pattern editor - cannot create 2 notes in a column. Have to move extra ones in from outside. 
-
 Maybe add a default note length
 
 Maybe add darker/lighter columns - eg
@@ -394,8 +385,6 @@ Maybe add darker/lighter columns - eg
    4/4   - split into 2 or 3 parts
 cf relationship to BPM crotchet / dotted crotchet etc
    
-Min note length - does this correspond to snap?   
-
 
 TODO probably put drums on a different midi_out initially. (cf drums_out) or something
 

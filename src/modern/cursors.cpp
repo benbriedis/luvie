@@ -1,5 +1,25 @@
 #include "cursors.hpp"
 #include <cmath>
+#include <FL/platform.H>   // fl_display (X11), fl_xid()
+
+#ifdef FLTK_USE_X11
+#include <X11/Xlib.h>
+#endif
+
+bool warpPointerTo(Fl_Window* win, int winX, int winY)
+{
+#ifdef FLTK_USE_X11
+    // On X11 `fl_display` is non-null (it's null under the Wayland backend).
+    if (fl_display && win) {
+        // Coordinates are relative to the destination window (fl_xid).
+        XWarpPointer(fl_display, None, fl_xid(win), 0, 0, 0, 0, winX, winY);
+        XFlush(fl_display);
+        return true;
+    }
+#endif
+    (void)win; (void)winX; (void)winY;
+    return false;   // Wayland: pointer warping isn't permitted — no-op.
+}
 
 const Fl_RGB_Image* forbiddenCursorImage() {
 	static const int SIZE = 20;

@@ -121,6 +121,25 @@ int Grid::handle(int event)
                 } else {
                     Point orig = {(int)notes[noteIdx].row, notes[noteIdx].beat};
                     onBeginDrag(noteIdx);
+                    // Jump the cursor to the block's centre so it tracks the
+                    // middle of the note during the drag instead of wherever it
+                    // happened to be grabbed. Re-anchor grabX/grabY to the centre
+                    // to match the warped cursor (only when the warp actually
+                    // happened, so unwarped platforms keep the note in place
+                    // rather than making it jump). The centre x is clamped to the
+                    // visible area so a long note doesn't fling the cursor off
+                    // the grid; grabX is then taken from the clamped position.
+                    const Note& n  = notes[noteIdx];
+                    int   row      = (int)n.row;
+                    float centreY  = rowH(row) / 2.0f;
+                    float leftEdge = (n.beat - colOffset) * colWidth;
+                    float centreX  = std::clamp(leftEdge + n.length * colWidth / 2.0f,
+                                                0.0f, (float)w());
+                    if (warpPointerTo(window(), x() + (int)centreX,
+                                                y() + rowY(row) + (int)centreY)) {
+                        grabX = centreX - leftEdge;
+                        grabY = centreY;
+                    }
                     state = StateDragMove{noteIdx, grabX, grabY, orig, orig, false};
                 }
             } else if (auto* h = std::get_if<StateHoverResize>(&state)) {
