@@ -2,9 +2,11 @@
 #include "timeSettings.hpp"
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <FL/fl_draw.H>
 #include <algorithm>
 
-static constexpr int popupWMax = 194;   // TEMPO width, and the time-sig starting point
+static constexpr int popupWMax = 194;   // base width; the time-sig row shrinks to hug its content
+static constexpr int tempoW    = 126;   // 35% narrower than the old full-width BPM popup
 static constexpr int pad     = 8;
 static constexpr int row1Y   = pad;
 static constexpr int row1H   = 22;
@@ -36,10 +38,11 @@ MarkerPopup::MarkerPopup(Kind k)
 	int winW = popupWMax;
 
 	if (kind == TEMPO) {
+		winW = tempoW;
 		auto* lbl = new Fl_Box(pad, row1Y, 30, row1H, "BPM");
 		lbl->labelcolor(popupText);
 		lbl->box(FL_NO_BOX);
-		input1 = new Fl_Value_Input(pad + 34, row1Y, popupWMax - pad - 34 - pad, row1H);
+		input1 = new Fl_Value_Input(pad + 34, row1Y, tempoW - pad - 34 - pad, row1H);
 		input1->range(timeSettings::bpmMin, timeSettings::bpmMax);
 		input1->step(1);
 		styleInput(input1);
@@ -49,12 +52,13 @@ MarkerPopup::MarkerPopup(Kind k)
 		auto* lbl = new Fl_Box(pad, row1Y, 25, row1H, "Sig");
 		lbl->labelcolor(popupText);
 		lbl->box(FL_NO_BOX);
-		input1 = new Fl_Value_Input(pad + 29, row1Y, 44, row1H);
+		constexpr int numW = 32;
+		input1 = new Fl_Value_Input(pad + 29, row1Y, numW, row1H);
 		input1->range(timeSettings::numeratorMin, timeSettings::numeratorMax);
 		input1->step(1);
 		styleInput(input1);
-		constexpr int denomX = pad + 29 + 44 + 16;
-		auto* slash = new Fl_Box(pad + 29 + 44 + 2, row1Y, 10, row1H, "/");
+		constexpr int denomX = pad + 29 + numW + 16;
+		auto* slash = new Fl_Box(pad + 29 + numW + 2, row1Y, 10, row1H, "/");
 		slash->labelcolor(popupText);
 		slash->box(FL_NO_BOX);
 		denomChoice = new DenomBeatChoice(denomX, row1Y, 0, row1H);
@@ -78,7 +82,10 @@ MarkerPopup::MarkerPopup(Kind k)
 
 	size(winW, popupH);
 
-	deleteBtn = new ModernButton(pad, deleteY, winW - 2 * pad, row2H, "Delete");
+	// The button hugs its label rather than stretching across the popup.
+	fl_font(FL_HELVETICA, FL_NORMAL_SIZE);
+	int deleteW = (int)fl_width("Delete") + 24;
+	deleteBtn = new ModernButton(pad, deleteY, deleteW, row2H, "Delete");
 	deleteBtn->color(FL_WHITE);
 	deleteBtn->labelcolor(popupText);
 
@@ -140,7 +147,8 @@ void MarkerPopup::configureDelete(bool fixed, bool showDelete)
 		deleteBtn->hide();
 		popH = popupHSlim;
 	}
-	// popH drives ContextMenuPopup::resize(), which otherwise pins the size.
+	// popW/popH drive ContextMenuPopup::resize(), which otherwise pins the size.
+	popW = popupW;
 	size(popupW, popH);
 }
 
