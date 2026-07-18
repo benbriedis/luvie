@@ -20,36 +20,46 @@
 // from labelcolor().
 
 // Draw one note about the point (cx, cy), which is the glyph's centre in both
-// axes: filled head, stem up on the right, augmentation dot for the dotted
-// crotchet.
+// axes: filled head, stem up on the right, a flag on the stem for the quaver
+// values and an augmentation dot for the dotted ones.
 inline void drawBeatUnitGlyph(timeSettings::BeatUnit u, int cx, int cy, Fl_Color col)
 {
+	using timeSettings::BeatUnit;
+
 	constexpr int headW = 9;
 	constexpr int headH = 7;
 	constexpr int stemH = 13;   // from the head's centre upwards
+
+	const bool dotted  = (u == BeatUnit::DottedCrotchet || u == BeatUnit::DottedQuaver);
+	const bool flagged = (u == BeatUnit::DottedQuaver);
 
 	// The note is bottom-heavy — head below, stem above — so its centre sits well
 	// above the head. Offsetting the head by this puts the whole glyph's bounding
 	// box, not just the head, in the middle of the row.
 	constexpr int headCy = (stemH - headH / 2) / 2;
 
-	// The dotted crotchet is wider than the others; nudge it left so all three
-	// sit on the same optical centre rather than drifting as the value changes.
-	if (u == timeSettings::BeatUnit::DottedCrotchet) cx -= 2;
+	// The dotted values are wider (an augmentation dot on the right); nudge them
+	// left so every glyph sits on the same optical centre rather than drifting as
+	// the value changes.
+	if (dotted) cx -= 2;
 
-	const int headX = cx - headW / 2;
-	const int headY = cy + headCy - headH / 2;
-	const int stemX = headX + headW - 1;
-	const int stemY = headY + headH / 2;
+	const int headX    = cx - headW / 2;
+	const int headY    = cy + headCy - headH / 2;
+	const int stemX    = headX + headW - 1;
+	const int stemY    = headY + headH / 2;
+	const int stemTopY = stemY - stemH;
 
 	fl_color(col);
 	fl_pie(headX, headY, headW, headH, 0, 360);
 
 	fl_line_style(FL_SOLID, 2);
-	fl_line(stemX, stemY, stemX, stemY - stemH);
+	fl_line(stemX, stemY, stemX, stemTopY);
+	// A single quaver flag: a diagonal off the top of the stem, down to the right.
+	if (flagged)
+		fl_line(stemX, stemTopY, stemX + 5, stemTopY + 7);
 	fl_line_style(0);
 
-	if (u == timeSettings::BeatUnit::DottedCrotchet)
+	if (dotted)
 		fl_pie(stemX + 3, stemY - 1, 4, 4, 0, 360);
 }
 
@@ -96,6 +106,7 @@ class BeatUnitChoice : public ModernChoice {
 		static const Fl_Menu_Item menu[] = {
 			{"0", 0, 0, 0, 0, (uchar)beatUnitLabel::kType, 0, 0, 0},
 			{"1", 0, 0, 0, 0, (uchar)beatUnitLabel::kType, 0, 0, 0},
+			{"2", 0, 0, 0, 0, (uchar)beatUnitLabel::kType, 0, 0, 0},
 			{0, 0, 0, 0, 0, 0, 0, 0, 0},
 		};
 		return menu;

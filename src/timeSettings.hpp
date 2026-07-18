@@ -32,13 +32,15 @@ inline constexpr double bpmMax     = 400.0;
 inline constexpr double bpmDefault = 120.0;
 
 // Beat definition: the note value one BPM beat is worth. Stored alongside every
-// time signature. The enum values are persisted in the song file, so they must
-// stay stable; 0 (Crotchet) is the value an older file without one loads as.
-// A retired value (e.g. 2, the old Minim) loads as the default via beatUnitAt.
-enum class BeatUnit { Crotchet = 0, DottedCrotchet = 1 };
+// time signature. The enum value is persisted in the song file as the beat's
+// index into beatUnits, so the two must stay in step: the enum value equals the
+// array position, values stay stable, and 0 (Crotchet) is what an older file
+// without a beat loads as. Value 2 was once a Minim (long retired); a file that
+// still carries that value now loads as the DottedQuaver in that slot.
+enum class BeatUnit { Crotchet = 0, DottedCrotchet = 1, DottedQuaver = 2 };
 
-inline constexpr std::array<BeatUnit, 2> beatUnits =
-	{BeatUnit::Crotchet, BeatUnit::DottedCrotchet};
+inline constexpr std::array<BeatUnit, 3> beatUnits =
+	{BeatUnit::Crotchet, BeatUnit::DottedCrotchet, BeatUnit::DottedQuaver};
 inline constexpr BeatUnit beatUnitDefault      = BeatUnit::Crotchet;
 inline constexpr int      beatUnitDefaultIndex = 0;
 
@@ -59,6 +61,7 @@ inline constexpr double beatCrotchets(BeatUnit u)
 {
 	switch (u) {
 	case BeatUnit::DottedCrotchet: return 1.5;
+	case BeatUnit::DottedQuaver:   return 0.75;
 	case BeatUnit::Crotchet:       break;
 	}
 	return 1.0;
