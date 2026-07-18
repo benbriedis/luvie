@@ -13,6 +13,7 @@ static constexpr Fl_Color kParamLine       = 0x8888CC00;
 static constexpr Fl_Color kParamDotFill    = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim     = 0x1111EE00;
 static constexpr Fl_Color kTrackDiv        = 0x64748B00;
+static constexpr Fl_Color kTrackDivOnHeader= 0x37415100;  // darker: divider between two grey header rows (empty instrument) must stay visible
 static constexpr Fl_Color kInstrHeaderBg   = 0x64748B00;  // same slate-blue as dividers
 static constexpr Fl_Color kBlockFill       = 0x5555EE00;
 static constexpr Fl_Color kBlockBar        = 0x1111EE00;
@@ -201,8 +202,13 @@ void SongGrid::draw()
                 drawDiv = t.stackedLanes;
             }
             if (!drawDiv) continue;
+            // The grey divider is invisible against a grey header row directly
+            // above it (an empty instrument, which is a lone header). Use a darker
+            // divider there so two adjacent grey rows don't merge.
+            bool prevIsHeader = absRow - 1 >= 0 && absRow - 1 < (int)ro.size() &&
+                                ro[absRow - 1].kind == RowKind::Header;
             int lineY = y() + rowY(vr) - 1;
-            fl_color(kTrackDiv);
+            fl_color(prevIsHeader ? kTrackDivOnHeader : kTrackDiv);
             fl_rectf(x(), lineY, gridRight, 2);
         }
     }
