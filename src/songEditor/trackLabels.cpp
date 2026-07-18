@@ -400,18 +400,26 @@ void TrackLabels::draw()
             } else if (ref.kind == RowKind::Lane) {
                 // ref.id is a Lane ID — find the owning Track
                 bool isSel = (ref.id == tl.selectedLaneId);
-                Fl_Color bg = isSel ? colSelected : colNormal;
+                int  tIdx  = timeline->trackIndexForLaneId(ref.id);
+                bool isFirstLane = false;
+                bool isUnstacked = true;
+                if (tIdx >= 0) {
+                    const auto& track = tl.tracks[tIdx];
+                    isFirstLane = (!track.lanes.empty() && track.lanes[0].id == ref.id);
+                    isUnstacked = !track.stackedLanes;
+                }
+                // A collapsed (stacked) instrument shows its label on the first-lane row;
+                // give it the same grey/dark scheme as the expanded header row.
+                bool isCollapsedInstr = isFirstLane && !isUnstacked;
+
+                Fl_Color bg = isCollapsedInstr ? colInstrHeader : (isSel ? colSelected : colNormal);
                 if (isDragSrc) bg = fl_color_average(bg, FL_WHITE, 0.75f);
                 fl_color(bg);
                 fl_rectf(x(), ry, w(), rh);
                 fl_color(colBorder);
                 fl_line(x(), ry + rh - 1, x() + w() - 1, ry + rh - 1);
-                int tIdx = timeline->trackIndexForLaneId(ref.id);
                 if (tIdx >= 0) {
                     const auto& track = tl.tracks[tIdx];
-                    bool isFirstLane = (!track.lanes.empty() && track.lanes[0].id == ref.id);
-                    bool isMultiLane = (int)track.lanes.size() > 1;
-                    bool isUnstacked = !track.stackedLanes;
 
                     // Track boundary divider for stacked tracks only (unstacked tracks use header row)
                     if (isFirstLane && ry > y() && !isUnstacked) {
@@ -435,8 +443,8 @@ void TrackLabels::draw()
                                         x() + 4, ry, w() - 8 - rightPad, rh);
                     } else if (isFirstLane) {
                         // ── Stacked first lane: right-arrow expand icon + track label ──
-                        Fl_Color arrowCol = isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText;
-                        fl_color(arrowCol);
+                        // Matches the expanded header row: dark arrow + text on grey.
+                        fl_color(colNormal);
                         int ax = x() + 4, ay = ry + rh / 2 - 4;
                         fl_polygon(ax, ay, ax, ay + 8, ax + 6, ay + 4);
                         fl_font(FL_HELVETICA_BOLD, 9);

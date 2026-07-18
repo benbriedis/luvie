@@ -354,9 +354,6 @@ POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playbac
 TOTEST: the 'disabled' notes are correct
    - cf creating a requirements document for this and/or unit tests
 
-- When collapsed I think the label name is better in the grey colour.
-
-
 Rewind when in Loop mode is a bit weird. cf disabling / not using
 
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
