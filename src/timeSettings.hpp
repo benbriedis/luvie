@@ -4,10 +4,9 @@
 #include <array>
 
 // Single source of truth for the time-signature, beat-definition and tempo
-// settings the UI offers: the denominator dropdown options, the numerator range,
-// the beat-definition dropdown options and the BPM range. Used by the song
-// editor's time-signature ruler, the Loop Editor panel and the pattern editors'
-// control bar.
+// settings the UI offers: the numerator range, the combined denominator/beat
+// dropdown options and the BPM range. Used by the song editor's time-signature
+// ruler, the Loop Editor panel and the pattern editors' control bar.
 //
 // Tempo vocabulary — the two are NOT the same number:
 //   BPM  beats per minute, where one beat is the BeatUnit stored next to the
@@ -16,12 +15,6 @@
 //        "BPM", and what all bar/seconds conversion runs on.
 // CPM = BPM * beatCrotchets(beat).
 namespace timeSettings {
-
-// Denominator dropdown: the note value that one time-signature unit is worth.
-inline constexpr std::array<int, 3>         denominators      = {2, 4, 8};
-inline constexpr std::array<const char*, 3> denominatorLabels = {"2", "4", "8"};
-inline constexpr int denominatorDefault      = 4;
-inline constexpr int denominatorDefaultIndex = 1;
 
 inline constexpr int numeratorMin     = 2;
 inline constexpr int numeratorMax     = 17;
@@ -111,22 +104,6 @@ inline constexpr double secondsPerBar(double barCrotchetCount, double cpm)
 	return cpm > 0.0 ? barCrotchetCount * 60.0 / cpm : 0.0;
 }
 
-// Dropdown index for a denominator. A value that is no longer offered (e.g. a 16
-// loaded from an older song file) falls back to the default entry.
-inline int denominatorIndex(int denominator)
-{
-	for (int i = 0; i < (int)denominators.size(); ++i)
-		if (denominators[i] == denominator) return i;
-	return denominatorDefaultIndex;
-}
-
-// Denominator for a dropdown index; an unset selection (-1) gives the default.
-inline int denominatorAt(int index)
-{
-	if (index < 0 || index >= (int)denominators.size()) return denominatorDefault;
-	return denominators[index];
-}
-
 inline int beatUnitIndex(BeatUnit u)
 {
 	for (int i = 0; i < (int)beatUnits.size(); ++i)
@@ -139,6 +116,48 @@ inline BeatUnit beatUnitAt(int index)
 {
 	if (index < 0 || index >= (int)beatUnits.size()) return beatUnitDefault;
 	return beatUnits[index];
+}
+
+// The UI merges the denominator and the beat definition into one dropdown: the
+// three plain denominators (counted in crotchets) plus the two /8 variants that
+// are counted in a dotted beat. The data model still stores the denominator and
+// the beat separately — this is only how the pair is offered to the user.
+//
+//   2   4   8   8<dotted quaver>   8<dotted crotchet>
+struct DenomBeat { int denominator; BeatUnit beat; };
+
+inline constexpr std::array<DenomBeat, 5> denomBeatOptions = {{
+	{2, BeatUnit::Crotchet},
+	{4, BeatUnit::Crotchet},
+	{8, BeatUnit::Crotchet},
+	{8, BeatUnit::DottedQuaver},
+	{8, BeatUnit::DottedCrotchet},
+}};
+inline constexpr int denomBeatDefaultIndex = 1;   // 4, crotchet
+
+// The dropdown index for a denominator/beat pair. An exact match wins; a pair
+// with no entry (an old file's retired denominator, or a beat this denominator
+// is not offered with) falls back to the crotchet entry for that denominator,
+// and failing that to the default.
+inline int denomBeatIndex(int denominator, BeatUnit beat)
+{
+	for (int i = 0; i < (int)denomBeatOptions.size(); ++i)
+		if (denomBeatOptions[i].denominator == denominator && denomBeatOptions[i].beat == beat)
+			return i;
+	for (int i = 0; i < (int)denomBeatOptions.size(); ++i)
+		if (denomBeatOptions[i].denominator == denominator
+		    && denomBeatOptions[i].beat == BeatUnit::Crotchet)
+			return i;
+	return denomBeatDefaultIndex;
+}
+
+// The denominator/beat pair for a dropdown index; an unset selection (-1) gives
+// the default.
+inline DenomBeat denomBeatAt(int index)
+{
+	if (index < 0 || index >= (int)denomBeatOptions.size())
+		return denomBeatOptions[denomBeatDefaultIndex];
+	return denomBeatOptions[index];
 }
 
 }

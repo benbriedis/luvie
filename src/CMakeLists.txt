@@ -35,6 +35,7 @@ target_include_directories(luvie_core PUBLIC
 # PUBLIC so the plugin (which links luvie_core) inherits these too
 target_link_libraries(luvie_core PUBLIC
     fltk::fltk
+    fltk::images          # Fl_SVG_Image (dotted-note glyphs in the time-sig control)
     jack_headers          # JACK headers only; the library is dlopen'd at runtime (jackShim.cpp)
     ${CMAKE_DL_LIBS}      # dlopen/dlsym for the JACK shim
     rtmidi

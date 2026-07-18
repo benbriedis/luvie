@@ -53,7 +53,12 @@ void MarkerRuler::draw()
 		}
 	} else {
 		for (auto& m : timeline->get().timeSigs) {
-			std::snprintf(label, sizeof(label), "%d/%d", m.top, m.bottom);
+			// A dotted-note beat (e.g. 6/8 counted in dotted crotchets) is flagged
+			// with a trailing '*' — the bar is not simply m.top beats of 1/m.bottom.
+			bool dotted = (m.beat == timeSettings::BeatUnit::DottedQuaver ||
+			               m.beat == timeSettings::BeatUnit::DottedCrotchet);
+			std::snprintf(label, sizeof(label), "%d/%d%s", m.top, m.bottom,
+			              dotted ? "*" : "");
 			drawMarker(m.bar, label);
 		}
 	}

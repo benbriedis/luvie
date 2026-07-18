@@ -10,6 +10,14 @@ class ModernChoice : public Fl_Choice {
     Fl_Color arrowCol  = 0x94A3B800;
     Fl_Color hoverCol  = 0;  // 0 = auto (lighten bg)
 
+public:
+    // Layout metrics shared with subclasses that size themselves to their content
+    // (see DenomBeatChoice::naturalWidth). The value sits in x+kInset .. w-kValuePad,
+    // clearing the chevron on the right.
+    static constexpr int kInset    = 6;
+    static constexpr int kValuePad = 18;
+
+private:
     void draw() override {
         Fl_Color bg  = color();
         Fl_Color hov = hoverCol ? hoverCol : fl_color_average(bg, FL_WHITE, 0.8f);
@@ -19,10 +27,10 @@ class ModernChoice : public Fl_Choice {
         fl_color(borderCol);
         fl_rect(x(), y(), w(), h());
 
-        drawValue(x() + 8, y(), w() - 24, h());
+        drawValue(x() + kInset, y(), w() - kInset - kValuePad, h());
 
         // chevron
-        int cx = x() + w() - 13;
+        int cx = x() + w() - 10;
         int cy = y() + h() / 2 + 1;
         fl_color(arrowCol);
         fl_line_style(FL_SOLID, 2);
@@ -46,7 +54,7 @@ class ModernChoice : public Fl_Choice {
 
 protected:
     // Renders the selected item in the closed control. Subclasses whose items are
-    // pictures rather than words (see BeatUnitChoice) override this.
+    // pictures rather than words (see DenomBeatChoice) override this.
     virtual void drawValue(int X, int Y, int W, int H) {
         const char* lbl = value() >= 0 ? text(value()) : nullptr;
         if (!lbl) return;

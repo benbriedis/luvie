@@ -4,7 +4,7 @@
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
-#include "modern/beatUnitChoice.hpp"
+#include "modern/denomBeatChoice.hpp"
 #include "modern/inputEditorPopup.hpp"
 #include "timeSettings.hpp"
 #include <functional>
@@ -32,16 +32,15 @@ private:
 	void snapBeat();
 	int  numerator() const;
 	void configureDelete(bool fixed, bool showDelete);
-	Kind            kind;
-	Fl_Value_Input* input1      = nullptr;
-	ModernChoice*   denomChoice = nullptr;
-	BeatUnitChoice* beatChoice  = nullptr;
-	ModernButton*   deleteBtn   = nullptr;
+	Kind             kind;
+	Fl_Value_Input*  input1      = nullptr;
+	DenomBeatChoice* denomChoice = nullptr;
+	ModernButton*    deleteBtn   = nullptr;
 
-	// Row geometry differs by kind: TIME_SIG has the extra beat-definition row.
 	int deleteY    = 0;
 	int popupH     = 0;
 	int popupHSlim = 0;
+	int popupW     = 0;   // hugs the content; set once in the constructor
 
 	std::function<void(double)>                            onOkTempo;
 	std::function<void(int, int, timeSettings::BeatUnit)>  onOkTimeSig;

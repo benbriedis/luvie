@@ -74,15 +74,13 @@ TimeSigSection::TimeSigSection(int x, int y, int h)
       timeSigLabel(0, 0, kLabelW, h, "Sig"),
       timeSigNum  (0, 0, kNumW,   h),
       timeSigSlash(0, 0, kSlashW, h, "/"),
-      timeSigDen  (0, 0, kDenW,   h),
-      beatChoice  (0, 0, kBeatW,  h)
+      timeSigDen  (0, 0, kDenW,   h)
 {
     gap(kGap);
     fixed(&timeSigLabel, kLabelW);
     fixed(&timeSigNum,   kNumW);
     fixed(&timeSigSlash, kSlashW);
     fixed(&timeSigDen,   kDenW);
-    fixed(&beatChoice,   kBeatW);
     end();
 }
 
@@ -316,13 +314,15 @@ void PatternPanel::initHarmonyControls()
     cs.chordChoice.callback(paramsCb, this);
 }
 
-// The signature just changed: snap the beat definition to the one it implies.
-// The beat dropdown's own callback does not do this, so a beat the user picks
-// afterwards stays until the signature changes again.
-static void snapBeatTo(TimeSigSection& ts, int top, int den)
+// The numerator just changed: snap the beat definition to the one the signature
+// implies, keeping the current denominator. Choosing a denominator/beat entry
+// from the dropdown is explicit and does not snap, so a beat the user picks that
+// way stays until the numerator changes again.
+static void snapBeatTo(TimeSigSection& ts, int top)
 {
-    ts.beatChoice.setBeatUnit(timeSettings::impliedBeatUnit(top, den));
-    ts.beatChoice.redraw();
+    int den = ts.timeSigDen.denominator();
+    ts.timeSigDen.set(den, timeSettings::impliedBeatUnit(top, den));
+    ts.timeSigDen.redraw();
 }
 
 void PatternPanel::initZoomChoice()
@@ -373,10 +373,10 @@ void PatternPanel::initTimeControls()
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
-        int den = timeSettings::denominatorAt(ts.timeSigDen.value());
         int top = (int)ts.timeSigNum.value();
-        snapBeatTo(ts, top, den);
-        self->pattern->setPatternTimeSig(patId, top, den, ts.beatChoice.beatUnit());
+        snapBeatTo(ts, top);
+        self->pattern->setPatternTimeSig(patId, top, ts.timeSigDen.denominator(),
+                                         ts.timeSigDen.beatUnit());
     }, this);
 
     ts.timeSigSlash.box(FL_NO_BOX);
@@ -384,10 +384,10 @@ void PatternPanel::initTimeControls()
 
     ts.timeSigDen.color(TimeControls::kBg);
     ts.timeSigDen.labelcolor(panelText);
+    ts.timeSigDen.textcolor(panelText);
     ts.timeSigDen.setBorderColor(panelCtrlBorder);
-    for (const char* v : timeSettings::denominatorLabels)
-        ts.timeSigDen.add(v);
-    ts.timeSigDen.value(timeSettings::denominatorDefaultIndex);
+    ts.timeSigDen.tooltip("Denominator / beat");
+    ts.timeSigDen.value(timeSettings::denomBeatDefaultIndex);
     ts.timeSigDen.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         auto& ts   = self->timeControls.timeSigSec;
@@ -396,7 +396,7 @@ void PatternPanel::initTimeControls()
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
-        int den = timeSettings::denominatorAt(ts.timeSigDen.value());
+        int den = ts.timeSigDen.denominator();
         int top = (int)ts.timeSigNum.value();
         for (const auto& p : tl.patterns) {
             if (p.id == patId && p.timeSigBottom > 0) {
@@ -407,26 +407,7 @@ void PatternPanel::initTimeControls()
                 break;
             }
         }
-        snapBeatTo(ts, top, den);
-        self->pattern->setPatternTimeSig(patId, top, den, ts.beatChoice.beatUnit());
-    }, this);
-
-    ts.beatChoice.color(TimeControls::kBg);
-    ts.beatChoice.labelcolor(panelText);
-    ts.beatChoice.textcolor(panelText);
-    ts.beatChoice.setBorderColor(panelCtrlBorder);
-    ts.beatChoice.tooltip("Beat definition");
-    ts.beatChoice.callback([](Fl_Widget*, void* d) {
-        auto* self = static_cast<PatternPanel*>(d);
-        auto& ts   = self->timeControls.timeSigSec;
-        if (!self->pattern) return;
-        const auto& tl = self->pattern->get();
-        int sel = tl.selectedTrackIndex;
-        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.patternIdForSelectedLane();
-        int den   = timeSettings::denominatorAt(ts.timeSigDen.value());
-        self->pattern->setPatternTimeSig(patId, (int)ts.timeSigNum.value(), den,
-                                         ts.beatChoice.beatUnit());
+        self->pattern->setPatternTimeSig(patId, top, den, ts.timeSigDen.beatUnit());
     }, this);
 
     bs.barsLabel.box(FL_NO_BOX);
@@ -668,8 +649,7 @@ void PatternPanel::refreshTimeSig()
     auto& ts = timeControls.timeSigSec;
     auto showDefault = [&ts]() {
         ts.timeSigNum.value(timeSettings::numeratorDefault);
-        ts.timeSigDen.value(timeSettings::denominatorDefaultIndex);
-        ts.beatChoice.value(timeSettings::beatUnitDefaultIndex);
+        ts.timeSigDen.value(timeSettings::denomBeatDefaultIndex);
     };
     if (!pattern) { showDefault(); return; }
     const auto& tl = pattern->get();
@@ -679,11 +659,9 @@ void PatternPanel::refreshTimeSig()
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
         ts.timeSigNum.value(p.timeSigTop);
-        ts.timeSigDen.value(timeSettings::denominatorIndex(p.timeSigBottom));
-        ts.beatChoice.setBeatUnit(p.beat);
+        ts.timeSigDen.set(p.timeSigBottom, p.beat);
         ts.timeSigNum.redraw();
         ts.timeSigDen.redraw();
-        ts.beatChoice.redraw();
         return;
     }
 }
