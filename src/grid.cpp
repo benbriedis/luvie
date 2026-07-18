@@ -49,7 +49,10 @@ void Grid::draw()
         fl_color(subdivLineColor);
         for (int i = colOffset; i < std::min(endCol, numCols); i++)
             for (int k = 1; k < divisions; k++) {
-                int x0 = x() + (i - colOffset) * colWidth + k * colWidth / divisions;
+                // Round (not truncate) so these guide lines coincide with the
+                // rounded note edges computed below.
+                int x0 = x() + (i - colOffset) * colWidth
+                             + (int)std::lround((double)k * colWidth / divisions);
                 fl_line(x0, y(), x0, y() + colBottom);
             }
     }
@@ -66,10 +69,19 @@ void Grid::draw()
     }
 
     for (const Note& note : notes) {
-        int x0    = x() + (int)((note.beat - colOffset) * colWidth);
-        int y0    = y() + rowY((int)note.row);
-        int rh    = rowH((int)note.row);
-        int width = (int)(note.length * colWidth);
+        // Derive left and right edges by rounding each independently, then take
+        // the width from their difference. Computing width from note.length on
+        // its own truncates separately from x0, so with non-power-of-two
+        // subdivisions (1/3, ...) a note's right edge and the next note's left
+        // edge land on different pixels, leaving faint gaps between abutting
+        // notes. Rounding both edges makes a note's right edge equal the next
+        // note's left edge exactly — flush, with no gap and no overdraw.
+        int xLeft  = (int)std::lround((note.beat - colOffset) * (double)colWidth);
+        int xRight = (int)std::lround((note.beat + note.length - colOffset) * (double)colWidth);
+        int x0     = x() + xLeft;
+        int y0     = y() + rowY((int)note.row);
+        int rh     = rowH((int)note.row);
+        int width  = xRight - xLeft;
         if (x0 + width < x() || x0 > x() + w()) continue;
         drawNoteBlock(note, x0, y0, width, rh);
     }
