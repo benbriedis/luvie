@@ -104,6 +104,18 @@ void LoopManager::clear()
 	if (hadContent) notify();
 }
 
+void LoopManager::mirror(const std::unordered_map<int, float>& actives,
+                         const std::unordered_set<int>& manual,
+                         const std::unordered_set<int>& disabled)
+{
+	if (actives == activePats && manual == manualActive && disabled == manuallyDisabled)
+		return;
+	activePats      = actives;
+	manualActive    = manual;
+	manuallyDisabled = disabled;
+	notify();
+}
+
 bool LoopManager::isPatternActive(int patId) const
 {
 	return activePats.count(patId) > 0;

@@ -13,6 +13,8 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <functional>
+#include <unordered_map>
 
 /* Force FLTK to use X11 (not Wayland) when running as an LV2 plugin inside
    a Qt/Wayland host like Carla. FLTK looks up this symbol via dlsym() at
@@ -35,6 +37,7 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
+#define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
 
 /* File used to pass state between DSP restore and UI open, and between UI sessions */
 static std::string g_stateFilePath;
@@ -50,6 +53,10 @@ class HostTransport : public ITransport {
 public:
     explicit HostTransport(ITransport* display) : display(display) {}
     void setCommand(ITransport* c) { command = c; }
+    /* Loop mode is Luvie's own concept, not JACK's, so forwarding it to the command
+       transport is not enough in plugin mode — the engine that acts on it lives in
+       the DSP process. onLoopMode ships it there. */
+    void setOnLoopMode(std::function<void(bool)> f) { onLoopMode = std::move(f); }
 
     void  play()           override { if (command) command->play(); }
     void  pause()          override { if (command) command->pause(); }
@@ -57,11 +64,15 @@ public:
     void  seek(float bars) override { if (command) command->seek(bars); }
     float position()  const override { return display ? display->position()  : 0.0f; }
     bool  isPlaying() const override { return display ? display->isPlaying() : false; }
-    void  setLoopMode(bool m) override { if (command) command->setLoopMode(m); }
+    void  setLoopMode(bool m) override {
+        if (command) command->setLoopMode(m);
+        if (onLoopMode) onLoopMode(m);
+    }
 
 private:
     ITransport* display = nullptr;
     ITransport* command = nullptr;
+    std::function<void(bool)> onLoopMode;
 };
 
 /* -----------------------------------------------------------------------
@@ -71,6 +82,7 @@ private:
 struct LuvieUI;
 static std::string serializeStateToString(LuvieUI* ui);
 static void sendState(LuvieUI* ui);
+static void sendLoopState(LuvieUI* ui);
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size);
 
 /* -----------------------------------------------------------------------
@@ -88,6 +100,7 @@ struct LuvieUI {
     LV2_URID                atom_eventTransfer  = 0;
     LV2_URID                luvie_state_urid    = 0;
     LV2_URID                luvie_midi_urid     = 0;
+    LV2_URID                luvie_loop_urid     = 0;
     LV2_URID                atom_Object         = 0;
     LV2_URID                atom_Blank          = 0;
     LV2_URID                time_Position       = 0;
@@ -122,10 +135,23 @@ struct LuvieUI {
     bool restoringState = false;
 
     /* Incremented per full sendState() so the DSP worker can tell consecutive
-       (chunked) messages apart and detect a dropped chunk. */
+       (chunked) messages apart and detect a dropped chunk. Starts at 1: msgId 0 is
+       the reserved marker for a loop-state message. */
     uint32_t stateMsgId = 0;
 
+    /* Loop-mode flag as last set from the UI, and the observer that re-sends the
+       loop state whenever the LoopManager changes. */
+    bool loopMode = false;
+    struct LoopBridge : ILoopObserver {
+        LuvieUI* ui = nullptr;
+        void onLoopsChanged() override { sendLoopState(ui); }
+    } loopBridge;
+
+    /* Last loop atom actually written, so an unchanged one is not re-sent. */
+    std::vector<uint8_t> lastLoopMsg;
+
     ~LuvieUI() {
+        app.loopMgr.removeObserver(&loopBridge);
         /* Stop the JACK poll (cancels its FLTK timeout) before tearing down; the
            observer references jackControl, so destroy it first. */
         if (jackObserver) jackObserver->stop();
@@ -241,6 +267,95 @@ static void sendState(LuvieUI* ui)
                       static_cast<uint32_t>(buf.size()),
                       ui->atom_eventTransfer, buf.data());
     }
+}
+
+/* Send loop mode + the active-loop set to the DSP as one `luvie_loop` atom on
+   control_in. Loop state is runtime-only (never part of the saved project), and in
+   plugin mode the engine that plays it lives in another process, so every change to
+   the mode or to the LoopManager has to be shipped explicitly — without this the DSP
+   keeps rendering the song while the UI shows Loop Mode.
+
+   This is called from the LoopManager observer, which in Song Mode fires several
+   times a bar as sync() tracks the playhead across pattern blocks. Two things keep
+   that from turning into a steady trickle of atoms:
+
+     - We send only what the DSP actually reads. In Song Mode the engine consults
+       just isManual()/isManuallyDisabled() and the anchors of *manual* patterns —
+       song-originated actives are never looked at there, because the timeline
+       instances already describe them. Those are exactly what sync() churns, so
+       Song Mode payloads only change when the user flips a Loop-Editor switch (or
+       an instance boundary clears one). In Loop Mode sync() is gated off and the
+       frozen active set IS the thing being played, so it all goes.
+     - The payload is compared against the last one sent and dropped if identical,
+       which mops up the remaining repeats. Entries are sorted by pattern id so the
+       bytes are deterministic and the comparison is meaningful.
+
+   Payload: a LuvieStateChunk header with msgId 0 (marks it as a loop message for the
+   DSP worker), then LuvieLoopState, then one entry per pattern with any loop state. */
+static void sendLoopState(LuvieUI* ui)
+{
+    if (!ui || !ui->writeFunc || !ui->luvie_loop_urid || !ui->atom_eventTransfer)
+        return;
+
+    const LoopManager& lm      = ui->app.loopMgr;
+    const bool         loopMode = ui->loopMode;
+
+    /* One entry per pattern mentioned by any of the sets; a pattern can be in more
+       than one (e.g. active *and* manual), so merge by id first. */
+    std::unordered_map<int, LuvieLoopEntry> merged;
+    auto entryFor = [&](int patId) -> LuvieLoopEntry& {
+        auto it = merged.find(patId);
+        if (it == merged.end())
+            it = merged.emplace(patId, LuvieLoopEntry{patId, 0.0f, 0u}).first;
+        return it->second;
+    };
+    for (const auto& [patId, anchor] : lm.patterns()) {
+        /* Song Mode: only manual loops are read by the engine (see above). */
+        if (!loopMode && !lm.isManual(patId)) continue;
+        LuvieLoopEntry& e = entryFor(patId);
+        e.anchorBar = anchor;
+        e.flags |= LUVIE_LOOP_ACTIVE;
+    }
+    for (int patId : lm.manualPatterns())   entryFor(patId).flags |= LUVIE_LOOP_MANUAL;
+    for (int patId : lm.disabledPatterns()) entryFor(patId).flags |= LUVIE_LOOP_DISABLED;
+
+    std::vector<LuvieLoopEntry> entries;
+    entries.reserve(merged.size());
+    for (const auto& [patId, e] : merged) entries.push_back(e);
+    std::sort(entries.begin(), entries.end(),
+              [](const LuvieLoopEntry& a, const LuvieLoopEntry& b) {
+                  return a.patternId < b.patternId;
+              });
+
+    const size_t bodyLen = sizeof(LuvieStateChunk) + sizeof(LuvieLoopState)
+                         + entries.size() * sizeof(LuvieLoopEntry);
+
+    std::vector<uint8_t> buf(sizeof(LV2_Atom) + bodyLen);
+    auto* atom = reinterpret_cast<LV2_Atom*>(buf.data());
+    atom->size = static_cast<uint32_t>(bodyLen);
+    atom->type = ui->luvie_loop_urid;
+
+    uint8_t* p = buf.data() + sizeof(LV2_Atom);
+    LuvieStateChunk chunkHdr{ 0u, static_cast<uint32_t>(bodyLen - sizeof(LuvieStateChunk)),
+                              0u, 0u };
+    std::memcpy(p, &chunkHdr, sizeof(chunkHdr));
+    p += sizeof(chunkHdr);
+
+    LuvieLoopState hdr{ loopMode ? 1u : 0u, static_cast<uint32_t>(entries.size()) };
+    std::memcpy(p, &hdr, sizeof(hdr));
+    p += sizeof(hdr);
+
+    for (const LuvieLoopEntry& e : entries) {
+        std::memcpy(p, &e, sizeof(e));
+        p += sizeof(e);
+    }
+
+    if (buf == ui->lastLoopMsg) return;   // nothing the DSP would act on has changed
+    ui->lastLoopMsg = buf;
+
+    ui->writeFunc(ui->controller, PORT_CONTROL_IN,
+                  static_cast<uint32_t>(buf.size()),
+                  ui->atom_eventTransfer, buf.data());
 }
 
 /* Send one raw MIDI message (1-3 bytes) to the DSP as a `luvie_midi` atom on
@@ -366,6 +481,7 @@ static LV2UI_Handle instantiate(
         ui->atom_eventTransfer  = m(LV2_ATOM__eventTransfer);
         ui->luvie_state_urid    = m(LUVIE_STATE_URI);
         ui->luvie_midi_urid     = m(LUVIE_MIDI_URI);
+        ui->luvie_loop_urid     = m(LUVIE_LOOP_URI);
         ui->atom_Object         = m(LV2_ATOM__Object);
         ui->atom_Blank          = m(LV2_ATOM__Blank);
         ui->time_Position       = m(LV2_TIME__Position);
@@ -429,6 +545,18 @@ static LV2UI_Handle instantiate(
     ui->restoringState = true;
     ui->app.build(ui->window, ui->song, ui->pattern, ui->instruments, ui->hostTransport);
     ui->app.disableSaveMenu(/*saveAs=*/true);
+
+    /* ---- Mirror loop state to the DSP ----
+       The standalone shares one LoopManager between the UI and the engine; here they
+       are in different processes, so mode changes (LoopModeController -> transport)
+       and active-set changes (Loop Editor switches, song sync) both have to be sent
+       across. Send on either, so the DSP's mirror always matches what the UI shows. */
+    ui->loopBridge.ui = ui;
+    ui->app.loopMgr.addObserver(&ui->loopBridge);
+    ui->hostTransport->setOnLoopMode([ui](bool m) {
+        ui->loopMode = m;
+        sendLoopState(ui);
+    });
 
     /* Emit auditioned notes (and their note-offs) to the DSP as raw MIDI. */
     ui->app.auditioner.setMidiSink([ui](int ch, int midi, int vel, bool on) {

@@ -298,27 +298,9 @@ Octave offset - cf alternative:  a transpose option...
   Or provide more options.
   If keep cf adding colour (eg yellow) to the octave numbers.
   
- 
-ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
 
  
-Stacked:
-  Maybe colour tracks differently
-  Add some border around instrument name row so consecutive ones don't run together
-     
-Unstacked:  
-  Maybe remove vertical lines through the instrument headers? Or fade them there.
 
-
-
-
-In time add a BPM=crotchet, BMP=dotted crotchet, BPM=quaver option I guess.   
-FROM GOOGLE:
-	Handling Beats Per Minute (BPM) in 8/8 time is generally treated as an 8th note pulse, where each 8th note gets one beat, rather than a quarter note. Because 8/8 is often used for irregular, additive rhythms (like 3+3+2 or 3+2+3), the tempo is usually set to the 8th note (
-	) to maintain a steady pulse throughout changing groupings.
-
-	DAW/Click Setting: In a Digital Audio Workstation (DAW), you would set the tempo based on the 8th note (in DAW terms) to get an accurate, consistent pulse   
-  
 
 Add more scales
 ===============
@@ -348,37 +330,12 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 =========================	 
-Swapping between song editor and loop editor - think I'd rather round out the song editor's 
-   bar (but hold on to last bar settings).
-
-POSSIBLE REFACTOR: by the way Claude talks it sounds like the standalone playback backend is heavily duplicated.
-    Should probably call the code we use for Jack instead (or maybe LV2). Might be good if standalone is RT (if supported?)
-
-TOTEST: the 'disabled' notes are correct
-   - cf creating a requirements document for this and/or unit tests
-
-Rewind when in Loop mode is a bit weird. cf disabling / not using
-
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
 
 cf master volume rubberband control? Or any other global parameters?
 
-Maybe indicate which patterns are pianorolls (NB name could indicate)
-
 Add more hover over notes for controls
 
-Rewind in song mode:  reset all loops (ie any manual changes should disappear)
-
-
-BUG: Pattern editor - create a note and shrink it. Cannot move it without resizing.
-
-Maybe add a default note length
-
-Maybe add darker/lighter columns - eg
-   12/8  - group into 4
-   4/4   - split into 2 or 3 parts
-cf relationship to BPM crotchet / dotted crotchet etc
-   
 
 TODO probably put drums on a different midi_out initially. (cf drums_out) or something
 
@@ -387,12 +344,30 @@ Update FLTK?
 - There was a crash when scales list overlapped bottom of laptop screen via Carla.
 - Through Carla there was some message about Carla not being responsive while Luvie GUI was
      being shown. (Carla was on laptop screen and Luvie on the other one at the time).
-    
+
+
+Swapping between song editor and loop editor - think I'd rather round out the song editor's 
+   bar (but hold on to last bar settings).
+
 Look at: rewind in Loop Editor
+	Rewind when in Loop mode is a bit weird. cf disabling / not using
 
 TO TEST swapping from  loop editor - intermediate mode - probably needs to be controlled via a song-beat counter if its not already being
+ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
 
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
 
 Review and trim CHORD_MAPPING.txt  Maybe move to DESIGN_DECISIONS
+
+
+
+Maybe indicate which patterns are pianorolls (NB name could indicate)
+
+CHECK:
+Rewind in song mode:  reset all loops (ie any manual changes should disappear)
+
+Unstacked:  
+  Maybe remove vertical lines through the instrument headers? Or fade them there.
+
+

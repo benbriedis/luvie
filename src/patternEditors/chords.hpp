@@ -17,15 +17,75 @@ struct ChordDef {
 };
 
 inline constexpr ChordDef chordDefs[] = {
-    {"if0b8i", "major",             3, {0, 4, 7,  0,  0,  0,  0}, false, nullptr},
-    {"upisim", "minor",             3, {0, 3, 7,  0,  0,  0,  0}, false, nullptr},
-    {"9pz6vx", "dim7",              4, {0, 3, 6,  9,  0,  0,  0}, false, nullptr},
-    {"snu7lw", "min7",              4, {0, 3, 7, 10,  0,  0,  0}, false, nullptr},
-    {"y42556", "maj7",              4, {0, 4, 7, 11,  0,  0,  0}, false, nullptr},
-    {"p6b8pw", "min(maj7)",         4, {0, 3, 7, 11,  0,  0,  0}, false, nullptr},
-    {"mvae2e", "½dim",            4, {0, 3, 6, 10,  0,  0,  0}, false, nullptr},
-    {"mbi6ln", "aug",               3, {0, 4, 8,  0,  0,  0,  0}, false, nullptr},
-    {"bafxnj", "sus4",              3, {0, 5, 7,  0,  0,  0,  0}, false, nullptr},
+    // --- Chords ---
+    // Basic triads. The major triad MUST stay at index 0: chordIndexForHash()
+    // falls back to 0 for unknown/empty hashes (the historical default).
+    {"if0b8i", "Major",             3, {0, 4, 7,  0,  0,  0,  0}, false, "Basic"},
+    {"upisim", "Minor",             3, {0, 3, 7,  0,  0,  0,  0}, false, "Basic"},
+    {"mbi6ln", "Augmented",         3, {0, 4, 8,  0,  0,  0,  0}, false, "Basic"},
+    {"dimtri", "°",                 3, {0, 3, 6,  0,  0,  0,  0}, false, "Basic"},  // dim triad, classical notation
+    {"bafxnj", "sus4",              3, {0, 5, 7,  0,  0,  0,  0}, false, "Basic"},
+    {"sus2ch", "sus2",              3, {0, 2, 7,  0,  0,  0,  0}, false, "Basic"},
+
+    // Major family (major triad, no dominant b7)
+    {"y42556", "maj7",              4, {0, 4, 7, 11,  0,  0,  0}, false, "Major"},
+    {"k7m2p4", "maj6",              4, {0, 4, 7,  9,  0,  0,  0}, false, "Major"},
+    {"n6m2rt", "add9",              4, {0, 4, 7, 14,  0,  0,  0}, false, "Major"},
+    {"x3n9qw", "6\\/9",               5, {0, 4, 7,  9, 14,  0,  0}, false, "Major"},
+    {"k9x4nf", "maj9",              5, {0, 4, 7, 11, 14,  0,  0}, false, "Major"},
+    {"m7sh11", "maj7(#11)",         5, {0, 4, 7, 11, 18,  0,  0}, false, "Major"},
+    {"m9sh11", "maj9(#11)",         6, {0, 4, 7, 11, 14, 18,  0}, false, "Major"},
+    {"majsh5", "maj7(#5)",          4, {0, 4, 8, 11,  0,  0,  0}, false, "Major"},
+    {"t8b4ws", "maj7(b5)",          4, {0, 4, 6, 11,  0,  0,  0}, false, "Major"},
+
+    // Minor family (minor third)
+    {"snu7lw", "min7",              4, {0, 3, 7, 10,  0,  0,  0}, false, "Minor"},
+    {"p6b8pw", "min(maj7)",         4, {0, 3, 7, 11,  0,  0,  0}, false, "Minor"},
+    {"v2c6ky", "min6",              4, {0, 3, 7,  9,  0,  0,  0}, false, "Minor"},
+    {"minad9", "min(add9)",         4, {0, 3, 7, 14,  0,  0,  0}, false, "Minor"},
+    {"b8t5rz", "m6\\/9",              5, {0, 3, 7,  9, 14,  0,  0}, false, "Minor"},
+    {"q7d3jx", "min9",              5, {0, 3, 7, 10, 14,  0,  0}, false, "Minor"},
+    {"v7c3mq", "min9(maj7)",        5, {0, 3, 7, 11, 14,  0,  0}, false, "Minor"},
+    {"h8w4zx", "min11",             6, {0, 3, 7, 10, 14, 17,  0}, false, "Minor"},
+    {"min13a", "min13",             7, {0, 3, 7, 10, 14, 17, 21}, false, "Minor"},
+
+    // Dominant family (major third + minor 7th)
+    {"dom7ch", "7",                 4, {0, 4, 7, 10,  0,  0,  0}, false, "Dominant"},
+    {"z4h9kp", "9",                 5, {0, 4, 7, 10, 14,  0,  0}, false, "Dominant"},
+    {"r2k6lp", "11",                6, {0, 4, 7, 10, 14, 17,  0}, false, "Dominant"},
+    {"p3n9tb", "13",                7, {0, 4, 7, 10, 14, 17, 21}, false, "Dominant"},
+    {"h4l9dm", "7(sus4)",           4, {0, 5, 7, 10,  0,  0,  0}, false, "Dominant"},
+    {"p9x2tv", "7(b5)",             4, {0, 4, 6, 10,  0,  0,  0}, false, "Dominant"},
+    {"j6w3nb", "7(#5)",             4, {0, 4, 8, 10,  0,  0,  0}, false, "Dominant"},
+    {"r5k8cq", "7(b9)",             5, {0, 4, 7, 10, 13,  0,  0}, false, "Dominant"},
+    {"m3z7hf", "7(#9)",             5, {0, 4, 7, 10, 15,  0,  0}, false, "Dominant"},
+    {"d7sh11", "7(#11)",            5, {0, 4, 7, 10, 18,  0,  0}, false, "Dominant"},
+    {"c2v6ln", "aug7(b9)",          5, {0, 4, 8, 10, 13,  0,  0}, false, "Dominant"},
+    {"w8c5vb", "aug9",              5, {0, 4, 8, 10, 14,  0,  0}, false, "Dominant"},
+    {"l3q7dz", "9(b5)",             5, {0, 4, 6, 10, 14,  0,  0}, false, "Dominant"},
+    {"b5t2hw", "9(#11)",            6, {0, 4, 7, 10, 14, 18,  0}, false, "Dominant"},
+    {"m6d2vc", "13(b9)",            7, {0, 4, 7, 10, 13, 17, 21}, false, "Dominant"},
+    {"x4l7kq", "13(b9b5)",          7, {0, 4, 6, 10, 13, 17, 21}, false, "Dominant"},
+
+    // Diminished family
+    {"dimjaz", "dim",               3, {0, 3, 6,  0,  0,  0,  0}, false, "Diminished"},  // dim triad, jazz notation
+    {"9pz6vx", "dim7",              4, {0, 3, 6,  9,  0,  0,  0}, false, "Diminished"},
+    {"mvae2e", "m7(b5)",            4, {0, 3, 6, 10,  0,  0,  0}, false, "Diminished"},
+
+    // Named chords
+    {"dream8", "Dream",             4, {0, 5, 6,  7,  0,  0,  0}, false, "Named"},
+    {"elktr7", "Elektra",           5, {0, 1, 4,  7,  9,  0,  0}, false, "Named"},
+    {"farbn3", "Farben",            5, {0, 4, 8,  9, 11,  0,  0}, false, "Named"},
+    {"hnd1rx", "Hendrix",           5, {0, 4, 7, 10, 15,  0,  0}, false, "Named"},
+    {"magic7", "Magic",             8, {0, 1, 5,  6, 10, 12, 15, 17}, false, "Named"},
+    {"muchrd", "Mu",                4, {0, 2, 4,  7,  0,  0,  0}, false, "Named"},
+    {"myst3q", "Mystic",            6, {0, 2, 4,  6,  9, 10,  0}, false, "Named"},
+    {"odenap", "Ode to Napoleon",   6, {0, 1, 4,  5,  8,  9,  0}, false, "Named"},
+    {"ptr8ka", "Petrushka",         6, {0, 1, 4,  6,  7, 10,  0}, false, "Named"},
+    {"sowht4", "So What",           5, {0, 3, 5,  7, 10,  0,  0}, false, "Named"},
+    {"trstn5", "Tristan",           4, {0, 3, 6, 10,  0,  0,  0}, false, "Named"},
+
+    // --- Scales ---
     {"m6skzq", "Major Pent.",       5, {0, 2, 4,  7,  9,  0,  0}, true,  nullptr},
     {"on64vt", "Minor Pent.",       5, {0, 3, 5,  7, 10,  0,  0}, true,  nullptr},
     {"gyz07l", "Major",             7, {0, 2, 4,  5,  7,  9, 11}, true,  nullptr},
@@ -42,41 +102,6 @@ inline constexpr ChordDef chordDefs[] = {
     {"ktcanc", "Whole tone",        6, {0, 2, 4,  6,  8, 10,  0}, true,  nullptr},
     {"oct8wh", "Whole-half",        8, {0, 2, 3,  5,  6,  8,  9, 11}, true, "Octatonic"},
     {"oct8hw", "Half-whole",        8, {0, 1, 3,  4,  6,  7,  9, 10}, true, "Octatonic"},
-    {"k7m2p4", "maj6",              4, {0, 4, 7,  9,  0,  0,  0}, false, "Extended"},
-    {"x3n9qw", "6(add9)",           5, {0, 4, 7,  9, 14,  0,  0}, false, "Extended"},
-    {"b8t5rz", "min6(add9)",        5, {0, 3, 7,  9, 14,  0,  0}, false, "Extended"},
-    {"v2c6ky", "min6",              4, {0, 3, 7,  9,  0,  0,  0}, false, "Extended"},
-    {"h4l9dm", "7(sus4)",           4, {0, 5, 7, 10,  0,  0,  0}, false, "Extended"},
-    {"j6w3nb", "7(aug5)",           4, {0, 4, 8, 10,  0,  0,  0}, false, "Extended"},
-    {"p9x2tv", "7(b5)",             4, {0, 4, 6, 10,  0,  0,  0}, false, "Extended"},
-    {"r5k8cq", "7(b9)",             5, {0, 4, 7, 10, 13,  0,  0}, false, "Extended"},
-    {"m3z7hf", "7(#9)",             5, {0, 4, 7, 10, 15,  0,  0}, false, "Extended"},
-    {"t8b4ws", "maj7(b5)",          4, {0, 4, 6, 11,  0,  0,  0}, false, "Extended"},
-    {"c2v6ln", "aug7(b9)",          5, {0, 4, 8, 10, 13,  0,  0}, false, "Extended"},
-    {"q7d3jx", "min9",              5, {0, 3, 7, 10, 14,  0,  0}, false, "Extended"},
-    {"z4h9kp", "9",                 5, {0, 4, 7, 10, 14,  0,  0}, false, "Extended"},
-    {"n6m2rt", "add9",              4, {0, 4, 7, 14,  0,  0,  0}, false, "Extended"},
-    {"w8c5vb", "aug9",              5, {0, 4, 8, 10, 14,  0,  0}, false, "Extended"},
-    {"l3q7dz", "9(b5)",             5, {0, 4, 6, 10, 14,  0,  0}, false, "Extended"},
-    {"k9x4nf", "maj9",              5, {0, 4, 7, 11, 14,  0,  0}, false, "Extended"},
-    {"b5t2hw", "9(#11)",            6, {0, 4, 7, 10, 14, 18,  0}, false, "Extended"},
-    {"v7c3mq", "min9(maj7)",        5, {0, 3, 7, 11, 14,  0,  0}, false, "Extended"},
-    {"r2k6lp", "11",                6, {0, 4, 7, 10, 14, 17,  0}, false, "Extended"},
-    {"h8w4zx", "min11",             6, {0, 3, 7, 10, 14, 17,  0}, false, "Extended"},
-    {"p3n9tb", "13",                7, {0, 4, 7, 10, 14, 17, 21}, false, "Extended"},
-    {"m6d2vc", "13(b9)",            7, {0, 4, 7, 10, 13, 17, 21}, false, "Extended"},
-    {"x4l7kq", "13(b9b5)",          7, {0, 4, 6, 10, 13, 17, 21}, false, "Extended"},
-    {"dream8", "Dream",             4, {0, 5, 6,  7,  0,  0,  0}, false, "Named"},
-    {"elktr7", "Elektra",           5, {0, 1, 4,  7,  9,  0,  0}, false, "Named"},
-    {"farbn3", "Farben",            5, {0, 4, 8,  9, 11,  0,  0}, false, "Named"},
-    {"hnd1rx", "Hendrix",           5, {0, 4, 7, 10, 15,  0,  0}, false, "Named"},
-    {"magic7", "Magic",             8, {0, 1, 5,  6, 10, 12, 15, 17}, false, "Named"},
-    {"muchrd", "Mu",                4, {0, 2, 4,  7,  0,  0,  0}, false, "Named"},
-    {"myst3q", "Mystic",            6, {0, 2, 4,  6,  9, 10,  0}, false, "Named"},
-    {"odenap", "Ode to Napoleon",   6, {0, 1, 4,  5,  8,  9,  0}, false, "Named"},
-    {"ptr8ka", "Petrushka",         6, {0, 1, 4,  6,  7, 10,  0}, false, "Named"},
-    {"sowht4", "So What",           5, {0, 3, 5,  7, 10,  0,  0}, false, "Named"},
-    {"trstn5", "Tristan",           4, {0, 3, 6, 10,  0,  0,  0}, false, "Named"},
 };
 
 inline constexpr int numChordDefs = sizeof(chordDefs) / sizeof(chordDefs[0]);

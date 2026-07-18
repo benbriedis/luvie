@@ -29,6 +29,7 @@
 #include "luvie_dsp.h"   // LuvieStateChunk
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
+#define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
 
 static std::map<std::string,LV2_URID> g_uris;
 static std::vector<std::string>       g_rev{ "" };  // index 0 unused
@@ -97,11 +98,16 @@ int main(int argc, char** argv) {
     // Mirror Ardour: send time:Position only on transport *change* (cycle 0),
     // unless --pos-every-cycle is passed. --chunk N forces the state to be split
     // into N-byte payload chunks (to exercise the worker's reassembly path).
+    // --loop P sends a luvie_loop atom on cycle 1 that switches the DSP into Loop
+    // Mode with pattern P looping from bar 0 — the plugin-mode equivalent of hitting
+    // the mode switch in the UI, which otherwise never reaches the DSP.
     bool     posEveryCycle = false;
     uint32_t chunkBytes    = (uint32_t)json.size();  // default: single chunk
+    int      loopPattern   = -1;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--pos-every-cycle")) posEveryCycle = true;
         else if (!strcmp(argv[i], "--chunk") && i + 1 < argc) chunkBytes = (uint32_t)atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--loop") && i + 1 < argc) loopPattern = atoi(argv[++i]);
     }
     if (chunkBytes == 0) chunkBytes = 1;
 
@@ -125,6 +131,7 @@ int main(int argc, char** argv) {
     LV2_URID uSpeed = map_uri(nullptr, LV2_TIME__speed);
     LV2_URID uMidi  = map_uri(nullptr, LV2_MIDI__MidiEvent);
     LV2_URID uState = map_uri(nullptr, LUVIE_STATE_URI);
+    LV2_URID uLoop  = map_uri(nullptr, LUVIE_LOOP_URI);
 
     int64_t frame = 0;
     int totalEmitted = 0;
@@ -150,6 +157,18 @@ int main(int argc, char** argv) {
                 lv2_atom_forge_write(&forge, &hdr, (uint32_t)sizeof(hdr));
                 lv2_atom_forge_write(&forge, json.data() + off, cs);
             }
+        }
+        if (c == 1 && loopPattern >= 0) {
+            // LuvieStateChunk header with msgId 0 marks a loop message, not JSON.
+            LuvieStateChunk mark{ 0, (uint32_t)(sizeof(LuvieLoopState) + sizeof(LuvieLoopEntry)), 0, 0 };
+            LuvieLoopState  ls{ 1, 1 };
+            LuvieLoopEntry  le{ loopPattern, 0.0f, LUVIE_LOOP_ACTIVE | LUVIE_LOOP_MANUAL };
+            lv2_atom_forge_frame_time(&forge, 0);
+            lv2_atom_forge_atom(&forge, (uint32_t)(sizeof(mark) + sizeof(ls) + sizeof(le)), uLoop);
+            lv2_atom_forge_write(&forge, &mark, (uint32_t)sizeof(mark));
+            lv2_atom_forge_write(&forge, &ls,   (uint32_t)sizeof(ls));
+            lv2_atom_forge_write(&forge, &le,   (uint32_t)sizeof(le));
+            printf("cycle 1: sent luvie_loop (loop mode on, pattern %d)\n", loopPattern);
         }
         if (posEveryCycle || c == 0) {
             lv2_atom_forge_frame_time(&forge, 0);

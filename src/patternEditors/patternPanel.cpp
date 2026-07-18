@@ -288,7 +288,7 @@ void PatternPanel::initHarmonyControls()
     ks.rootChoice.setBorderColor(panelCtrlBorder);
     ks.rootChoice.callback(paramsCb, this);
 
-    for (const char* v : {"-1", "0", "1"})
+    for (const char* v : {"-1", "0", "+1"})
         ks.octaveChoice.add(v);
     ks.octaveChoice.value(1);   // default: 0
     ks.octaveChoice.color(HarmonyControls::kBg);

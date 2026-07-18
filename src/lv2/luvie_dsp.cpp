@@ -39,6 +39,7 @@
 #include <lv2/worker/worker.h>
 
 #include "sequencer.hpp"
+#include "loopManager.hpp"
 #include "observableSong.hpp"
 #include "timelineIO.hpp"
 
@@ -53,6 +54,7 @@
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
+#define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
 
 /* Opt-in diagnostics: run the host with LUVIE_DEBUG=1 to trace state application
    and per-second transport/MIDI activity on stderr. */
@@ -184,6 +186,10 @@ struct Plugin {
     ObservableSong* song   = nullptr;
     Lv2Engine*      engine = nullptr;
 
+    /* Passive mirror of the UI process's LoopManager, fed by luvie_loop atoms. The
+       engine observes it exactly as the standalone engine observes the real one. */
+    LoopManager     loopMgr;
+
     /* Transport position tracking. The host sends time:Position only on transport
        changes, so between updates we advance curFrame ourselves while playing. */
     int64_t curFrame = 0;
@@ -262,6 +268,40 @@ static void applyState(Plugin* p, const std::string& json)
     p->stateDirty.store(true);
 }
 
+/* Apply a loop-state message (worker thread). Rebuilding the engine snapshot is
+   what makes the mode switch audible: setLoopMode() picks which branch of the
+   snapshot builder runs, and the mirrored LoopManager supplies the active set it
+   reads. Order matters — set the mode first so the LoopManager's change notification
+   rebuilds against the new mode rather than the old one. */
+static void applyLoopState(Plugin* p, const void* body, uint32_t size)
+{
+    if (size < sizeof(LuvieLoopState)) return;
+
+    LuvieLoopState hdr;
+    std::memcpy(&hdr, body, sizeof(hdr));       // body may be unaligned
+
+    uint32_t avail = (size - (uint32_t)sizeof(LuvieLoopState)) / (uint32_t)sizeof(LuvieLoopEntry);
+    uint32_t count = hdr.count < avail ? hdr.count : avail;
+
+    std::unordered_map<int, float> actives;
+    std::unordered_set<int>        manual, disabled;
+    const char* rec = (const char*)body + sizeof(LuvieLoopState);
+    for (uint32_t i = 0; i < count; i++, rec += sizeof(LuvieLoopEntry)) {
+        LuvieLoopEntry e;
+        std::memcpy(&e, rec, sizeof(e));
+        if (e.flags & LUVIE_LOOP_ACTIVE)   actives[e.patternId] = e.anchorBar;
+        if (e.flags & LUVIE_LOOP_MANUAL)   manual.insert(e.patternId);
+        if (e.flags & LUVIE_LOOP_DISABLED) disabled.insert(e.patternId);
+    }
+
+    if (luvieDebug())
+        fprintf(stderr, "[luvie] applyLoopState: loopMode=%u, %u entries (%zu active)\n",
+                hdr.loopMode, count, actives.size());
+
+    p->engine->setLoopMode(hdr.loopMode != 0);
+    p->loopMgr.mirror(actives, manual, disabled);
+}
+
 /* -----------------------------------------------------------------------
    LV2 Worker: parse + apply state off the audio thread
    ----------------------------------------------------------------------- */
@@ -290,6 +330,13 @@ static LV2_Worker_Status work(
     std::memcpy(&hdr, data, sizeof(hdr));   // data may be unaligned
     const char* payload = (const char*)data + sizeof(LuvieStateChunk);
     uint32_t avail = size - (uint32_t)sizeof(LuvieStateChunk);
+
+    /* msgId 0 is the reserved marker for a non-JSON worker message. */
+    if (hdr.msgId == 0) {
+        applyLoopState(p, payload, avail);
+        return LV2_WORKER_SUCCESS;
+    }
+
     uint32_t chunkSize = hdr.chunkSize < avail ? hdr.chunkSize : avail;
 
     if (hdr.offset == 0) {
@@ -341,6 +388,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->midi_MidiEvent     = map->map(map->handle, LV2_MIDI__MidiEvent);
     uris->luvie_state        = map->map(map->handle, LUVIE_STATE_URI);
     uris->luvie_midi         = map->map(map->handle, LUVIE_MIDI_URI);
+    uris->luvie_loop         = map->map(map->handle, LUVIE_LOOP_URI);
     uris->state_StateChanged = map->map(map->handle, LV2_STATE__StateChanged);
 }
 
@@ -381,6 +429,7 @@ static LV2_Handle instantiate(
     p->song   = new ObservableSong(120.0f, 4, 4);
     p->engine = new Lv2Engine(sampleRate);
     p->engine->setTimeline(p->song);
+    p->engine->setLoopManager(&p->loopMgr);
 
     return (LV2_Handle)p;
 }
@@ -439,7 +488,9 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                     auditionLen[auditionCount] = (int)n;
                     auditionCount++;
                 }
-            } else if (ev->body.type == uris->luvie_state) {
+            } else if (ev->body.type == uris->luvie_state || ev->body.type == uris->luvie_loop) {
+                /* Both carry a LuvieStateChunk header, so the worker can tell them
+                   apart; forward the body verbatim (no parsing on the RT thread). */
                 if (p->schedule) {
                     LV2_Worker_Status ws = p->schedule->schedule_work(
                         p->schedule->handle, ev->body.size, LV2_ATOM_BODY_CONST(&ev->body));

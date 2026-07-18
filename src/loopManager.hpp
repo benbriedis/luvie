@@ -37,6 +37,18 @@ public:
 	// just the UI. Cleared by sync() when the next placement of the pattern starts.
 	bool  isManuallyDisabled(int patId) const { return manuallyDisabled.count(patId) > 0; }
 	const std::unordered_map<int, float>& patterns() const { return activePats; }
+	const std::unordered_set<int>& manualPatterns() const { return manualActive; }
+	const std::unordered_set<int>& disabledPatterns() const { return manuallyDisabled; }
+
+	// Replace the whole active/manual/disabled state in one step. Used by the LV2
+	// DSP, whose LoopManager is a passive mirror of the UI process's one (the two
+	// live in different processes, so the UI ships its state over the atom port
+	// rather than sharing the object). Notifies only if something actually changed.
+	// songOriginated is left empty: the mirror never runs sync(), so it has no
+	// timeline-driven state of its own to reconcile.
+	void mirror(const std::unordered_map<int, float>& actives,
+	            const std::unordered_set<int>& manual,
+	            const std::unordered_set<int>& disabled);
 
 	void addObserver(ILoopObserver* o);
 	void removeObserver(ILoopObserver* o);

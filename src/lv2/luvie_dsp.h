@@ -33,8 +33,14 @@ enum {
    across several atoms and reassembled on the worker thread. All four fields are
    uint32_t, giving a naturally-packed header with no padding.
 
+   Every payload the DSP hands to the LV2 Worker starts with this header, so msgId
+   doubles as the worker's message discriminator: msgId 0 is reserved and means the
+   body is not JSON at all but a LuvieLoopState (see below). Real state sends number
+   from 1 upwards.
+
      msgId      identifies one complete message; it changes for every full send, so a
                 dropped chunk is detected when the next message starts (offset 0).
+                0 is reserved for non-state worker messages.
      totalSize  total JSON byte count across all chunks of this message.
      offset     byte offset of this chunk within the JSON.
      chunkSize  JSON bytes in this chunk (== atom body size - sizeof(LuvieStateChunk)). */
@@ -44,6 +50,33 @@ typedef struct {
     uint32_t offset;
     uint32_t chunkSize;
 } LuvieStateChunk;
+
+/* Loop state (`luvie_loop` atoms on control_in). Loop mode and the active-loop set
+   are runtime state, not project data, so they never travel in the JSON blob; the
+   UI ships them separately whenever they change. They still have to be applied off
+   the audio thread (applying rebuilds the Sequencer snapshot, which allocates), so
+   like state they go via the LV2 Worker. The payload is small and bounded by the
+   pattern count, so it is always one atom — no chunking.
+
+   Atom body: a LuvieStateChunk header with msgId 0 (the marker that says "loop
+   message, not JSON"), then this header, then `count` LuvieLoopEntry records. */
+typedef struct {
+    uint32_t loopMode;   /* 1 while the UI is in Loop Mode, 0 in Song Mode */
+    uint32_t count;      /* number of LuvieLoopEntry records that follow */
+} LuvieLoopState;
+
+/* One pattern's loop state. A pattern appears here if it is active, manual, or
+   manually disabled; anchorBar is meaningful only when LUVIE_LOOP_ACTIVE is set. */
+enum {
+    LUVIE_LOOP_ACTIVE   = 1u << 0,  /* in LoopManager::patterns() */
+    LUVIE_LOOP_MANUAL   = 1u << 1,  /* turned on by a Loop-Editor switch */
+    LUVIE_LOOP_DISABLED = 1u << 2   /* silenced by a Loop-Editor switch */
+};
+typedef struct {
+    int32_t  patternId;
+    float    anchorBar;
+    uint32_t flags;
+} LuvieLoopEntry;
 
 typedef struct {
     LV2_URID atom_Blank;
@@ -64,6 +97,7 @@ typedef struct {
     LV2_URID atom_Chunk;
     LV2_URID luvie_state;         /* full JSON state blob */
     LV2_URID luvie_midi;          /* one-shot audition MIDI (raw bytes), UI -> DSP */
+    LV2_URID luvie_loop;          /* loop mode + active loop set, UI -> DSP */
     LV2_URID state_StateChanged;  /* notify host that state is dirty */
 } URIs;
 

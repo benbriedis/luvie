@@ -27,6 +27,26 @@ Selecting instruments
 
 To bridge between ALSA and Jack MIDI use:    a2jmidid -e  [I MAY build this in]
 
+Connecting Luvie to Carla via Alsa
+==================================
+Can be done using Carla's patchbay. Press Ctrl-R to refresh the patchbay after starting Luvie. 
+
+Connecting Luvie to Carla via Jack using Pipewire (maybe using pw-jack)
+=======================================================================
+Carla can't start Jack itself, which is annoying as it's nice to store all our project
+settings in one place, but modern Pipewire doesn't need you to.  
+Sadly I haven't got this version of Pipewire yet, but can use 'pw-jack carlai myProject.carxp'.
+	Need to set the Engine to Jack 
+	Set Jack to auto-connect
+	Restart the server.
+	Need to check "Use JACK Transport" to enable Luvie's transport controls.
+	... now everything is stored under one roof.
+
+
+TO see Pulseaudio connections
+	qpwgraph  or helvum
+
+
 BPM vs "CPM"
 ============
 Jack, probably LV2, and most DAWs arguably misuse BPM. What they really mean is "crochets per minute (CPM)". This is good is some ways, bad in some ways. The lacks of accuracy is regretable.
