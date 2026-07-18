@@ -7,7 +7,7 @@
 #include <FL/Fl_Menu_Item.H>
 #include <FL/fl_draw.H>
 
-// Dropdown for the beat definition: crotchet, dotted crotchet or minim.
+// Dropdown for the beat definition: crotchet or dotted crotchet.
 //
 // The options are pictures, not words, and we cannot count on a font that has
 // the musical glyphs (U+1D15E and friends are outside the BMP and missing from
@@ -20,8 +20,8 @@
 // from labelcolor().
 
 // Draw one note about the point (cx, cy), which is the glyph's centre in both
-// axes: filled head for the crotchets, hollow head for the minim, stem up on the
-// right, augmentation dot for the dotted crotchet.
+// axes: filled head, stem up on the right, augmentation dot for the dotted
+// crotchet.
 inline void drawBeatUnitGlyph(timeSettings::BeatUnit u, int cx, int cy, Fl_Color col)
 {
 	constexpr int headW = 9;
@@ -43,13 +43,7 @@ inline void drawBeatUnitGlyph(timeSettings::BeatUnit u, int cx, int cy, Fl_Color
 	const int stemY = headY + headH / 2;
 
 	fl_color(col);
-	if (u == timeSettings::BeatUnit::Minim) {
-		fl_line_style(FL_SOLID, 2);
-		fl_arc(headX, headY, headW, headH, 0, 360);
-		fl_line_style(0);
-	} else {
-		fl_pie(headX, headY, headW, headH, 0, 360);
-	}
+	fl_pie(headX, headY, headW, headH, 0, 360);
 
 	fl_line_style(FL_SOLID, 2);
 	fl_line(stemX, stemY, stemX, stemY - stemH);
@@ -102,7 +96,6 @@ class BeatUnitChoice : public ModernChoice {
 		static const Fl_Menu_Item menu[] = {
 			{"0", 0, 0, 0, 0, (uchar)beatUnitLabel::kType, 0, 0, 0},
 			{"1", 0, 0, 0, 0, (uchar)beatUnitLabel::kType, 0, 0, 0},
-			{"2", 0, 0, 0, 0, (uchar)beatUnitLabel::kType, 0, 0, 0},
 			{0, 0, 0, 0, 0, 0, 0, 0, 0},
 		};
 		return menu;

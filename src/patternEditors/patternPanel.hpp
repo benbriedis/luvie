@@ -82,16 +82,6 @@ struct BarsSection : Fl_Flex {
     BarsSection(int x, int y, int h);
 };
 
-struct ZoomSection : Fl_Flex {
-    static constexpr int kGap     = 3;
-    static constexpr int kLabelW  = 40;
-    static constexpr int kChoiceW = 52;
-    static constexpr int kWidth   = kLabelW + kGap + kChoiceW;
-    Fl_Box       zoomLabel;
-    ModernChoice zoomChoice;
-    ZoomSection(int x, int y, int h);
-};
-
 // Beat subdivisions: the beat (one time-signature denominator unit) is split
 // into 1, 2 or 3 parts. The Snap toggle decides whether edits quantise to them.
 struct DivisionsSection : Fl_Flex {
@@ -123,11 +113,10 @@ struct TimeControls : Fl_Flex {
     static constexpr int      kGap    = 3;
     static constexpr int      kMargin = 4;
     static constexpr int      kCtrlH  = 24;
-    static constexpr int      kWidth  = kMargin + TimeSigSection::kWidth + kGap + BarsSection::kWidth + kGap + ZoomSection::kWidth + kGap + DivisionsSection::kWidth + kMargin;
+    static constexpr int      kWidth  = kMargin + TimeSigSection::kWidth + kGap + BarsSection::kWidth + kGap + DivisionsSection::kWidth + kMargin;
     static constexpr Fl_Color kBg     = 0x894B9400;
     TimeSigSection   timeSigSec;
     BarsSection      barsSec;
-    ZoomSection      zoomSec;
     DivisionsSection divSec;
     TimeControls(int x, int y, int h);
     void draw() override;
@@ -189,6 +178,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     InlineInput     input;           // direct child of PatternPanel for overlay
     Fl_Flex         controlRow;      // outer flex — all subsequent members go here
     RecenterButton  recentreBtn;
+    ModernChoice    zoomChoice;      // sits just after recentreBtn; tooltip-only (no label)
     Fl_Box          patternName;
     ModernChoice    outChoice;
     HarmonyControls harmonyControls;
@@ -203,6 +193,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void initControlRowLayout();
     void initPatternName();
     void initHarmonyControls();
+    void initZoomChoice();
     void initTimeControls();
     void initOutChoice();
     void initRapidBtn();

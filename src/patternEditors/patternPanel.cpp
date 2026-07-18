@@ -17,6 +17,7 @@ static constexpr int ctrlH         = 24;
 static constexpr int labelW        = 55;
 static constexpr int nameW         = 150;
 static constexpr int recentreBtnW  = 26;
+static constexpr int zoomChoiceW   = 52;
 static constexpr int toggleBtnW    = 26;
 static constexpr int rootChoiceW   = 110;
 static constexpr int choiceW       = 130;
@@ -32,7 +33,7 @@ static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
 static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 
 // Divisions split one beat (a time-signature denominator unit) into this many
-// parts; the choice labels are "None" (1), "1/2", "1/3", "1/5" and "1/7".
+// parts; the choice labels are "1/1" (1), "1/2", "1/3", "1/5" and "1/7".
 static constexpr int kDivisors[]       = { 1, 2, 3, 5, 7 };
 static constexpr int kDivisionsDefault = 0;  // None
 static constexpr int kZoomFactors[]    = { 1, 2, 4 };
@@ -96,17 +97,6 @@ BarsSection::BarsSection(int x, int y, int h)
     end();
 }
 
-ZoomSection::ZoomSection(int x, int y, int h)
-    : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
-      zoomLabel (0, 0, kLabelW,  h, "Zoom"),
-      zoomChoice(0, 0, kChoiceW, h)
-{
-    gap(kGap);
-    fixed(&zoomLabel,  kLabelW);
-    fixed(&zoomChoice, kChoiceW);
-    end();
-}
-
 DivisionsSection::DivisionsSection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       divLabel (0, 0, kLabelW,  h, "Div"),
@@ -150,14 +140,12 @@ TimeControls::TimeControls(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       timeSigSec(0, 0, h),
       barsSec   (0, 0, h),
-      zoomSec   (0, 0, h),
       divSec    (0, 0, h)
 {
     gap(kGap);
     margin(kMargin, 0, kMargin, 0);
     fixed(&timeSigSec, TimeSigSection::kWidth);
     fixed(&barsSec,    BarsSection::kWidth);
-    fixed(&zoomSec,    ZoomSection::kWidth);
     fixed(&divSec,     DivisionsSection::kWidth);
     end();
 }
@@ -208,7 +196,7 @@ int PatternPanel::computeDivisions() const
 
 int PatternPanel::computeZoomFactor() const
 {
-    int idx = timeControls.zoomSec.zoomChoice.value();
+    int idx = zoomChoice.value();
     if (idx < 0 || idx >= (int)std::size(kZoomFactors)) idx = kZoomDefault;
     return kZoomFactors[idx];
 }
@@ -218,6 +206,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       input          (0, 0, nameW,       ctrlH),
       controlRow     (x, y, w, h,        Fl_Flex::HORIZONTAL),
       recentreBtn    (0, 0, recentreBtnW,ctrlH),
+      zoomChoice     (0, 0, zoomChoiceW, ctrlH),
       patternName    (0, 0, nameW,       ctrlH),
       outChoice      (0, 0, outChoiceW,  ctrlH),
       harmonyControls(0, 0, ctrlH),
@@ -228,6 +217,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     initControlRowLayout();
     initPatternName();
     initHarmonyControls();
+    initZoomChoice();
     initTimeControls();
     initOutChoice();
     initRapidBtn();
@@ -242,6 +232,7 @@ void PatternPanel::initControlRowLayout()
     controlRow.margin(pad, 2, pad, 2);
 
     controlRow.fixed(&recentreBtn,     recentreBtnW);
+    controlRow.fixed(&zoomChoice,      zoomChoiceW);
     controlRow.fixed(&patternName,     nameW);
     controlRow.fixed(&outChoice,       outChoiceW);
     controlRow.fixed(&harmonyControls, HarmonyControls::kWidth);
@@ -332,6 +323,27 @@ static void snapBeatTo(TimeSigSection& ts, int top, int den)
 {
     ts.beatChoice.setBeatUnit(timeSettings::impliedBeatUnit(top, den));
     ts.beatChoice.redraw();
+}
+
+void PatternPanel::initZoomChoice()
+{
+    for (const char* v : {"x1", "x2", "x4"})
+        zoomChoice.add(v);
+    zoomChoice.value(kZoomDefault);
+    // Sitting first in the row, it would otherwise grab the window's initial
+    // keyboard focus; drop it from focus navigation (still fully clickable).
+    zoomChoice.clear_visible_focus();
+    zoomChoice.color(panelBg);
+    zoomChoice.labelcolor(panelText);
+    zoomChoice.setBorderColor(panelCtrlBorder);
+    zoomChoice.tooltip("Zoom");
+    zoomChoice.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        int patId = self->selectedPatternId();
+        if (patId != 0 && self->pattern)
+            self->pattern->setPatternZoom(patId, self->zoomChoice.value());
+        if (self->onZoomChanged) self->onZoomChanged(self->computeZoomFactor());
+    }, this);
 }
 
 void PatternPanel::initTimeControls()
@@ -446,30 +458,11 @@ void PatternPanel::initTimeControls()
         }
     }, this);
 
-    auto& zs = timeControls.zoomSec;
-    zs.zoomLabel.box(FL_NO_BOX);
-    zs.zoomLabel.labelcolor(panelText);
-    zs.zoomLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-    for (const char* v : {"x1", "x2", "x4"})
-        zs.zoomChoice.add(v);
-    zs.zoomChoice.value(kZoomDefault);
-    zs.zoomChoice.color(TimeControls::kBg);
-    zs.zoomChoice.labelcolor(panelText);
-    zs.zoomChoice.setBorderColor(panelCtrlBorder);
-    zs.zoomChoice.callback([](Fl_Widget*, void* d) {
-        auto* self = static_cast<PatternPanel*>(d);
-        int patId = self->selectedPatternId();
-        if (patId != 0 && self->pattern)
-            self->pattern->setPatternZoom(patId, self->timeControls.zoomSec.zoomChoice.value());
-        if (self->onZoomChanged) self->onZoomChanged(self->computeZoomFactor());
-    }, this);
-
     ds.divLabel.box(FL_NO_BOX);
     ds.divLabel.labelcolor(panelText);
     ds.divLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    for (const char* v : {"None", "1\\/2", "1\\/3", "1\\/5", "1\\/7"})
+    for (const char* v : {"1\\/1", "1\\/2", "1\\/3", "1\\/5", "1\\/7"})
         ds.divChoice.add(v);
     ds.divChoice.value(kDivisionsDefault);
     ds.divChoice.color(TimeControls::kBg);
@@ -747,8 +740,8 @@ void PatternPanel::refreshZoom()
     int patId = selectedPatternId();
     for (const auto& p : pattern->get().patterns) {
         if (p.id != patId) continue;
-        timeControls.zoomSec.zoomChoice.value(p.zoom);
-        timeControls.zoomSec.zoomChoice.redraw();
+        zoomChoice.value(p.zoom);
+        zoomChoice.redraw();
         return;
     }
 }
@@ -782,7 +775,7 @@ void PatternPanel::configureStandardRow()
 {
     harmonyControls.show();
     rapidBtn.show();
-    timeControls.zoomSec.zoomChoice.activate();
+    zoomChoice.activate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -796,7 +789,7 @@ void PatternPanel::configureDrumRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
-    timeControls.zoomSec.zoomChoice.activate();
+    zoomChoice.activate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
@@ -810,7 +803,7 @@ void PatternPanel::configurePianorollRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
-    timeControls.zoomSec.zoomChoice.activate();
+    zoomChoice.activate();
     controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
     redraw();
 }
