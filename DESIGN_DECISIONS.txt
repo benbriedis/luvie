@@ -99,3 +99,29 @@ etc, but its more important to be musical about things.
 (Do need to be able drive Jack I guess, inc the time master, and maybe fit in with other 
 requirements so there may be a bit of compromise required.).
 
+
+CONVERTING BETWEEN CHORDS OR BETWEEN SCALES
+===========================================
+The rules used as: 
+1. Keep the root note the same.
+2. Match notes up from there  cf C ==> Cdim triad
+     1. c => c
+	 2. e => e flat
+	 3. g => g flat
+3. Many chords extend over 2 (strictly speaking they can go further, but I'm not bothering with those).	 
+   In the main pattern editor chords are allowed to ascend up to 2 octaves within a chord/scale block. 
+   If they do enter a second octave then the note pitches will drop back to a lower pitch when going up
+   a chord/scale octave.
+
+So the matching algorithm is very simple (an advantage) and isomorphic across conversions (another advantage).
+In practice it works quite well because with chords:
+	- Almost all have a 3rd or 3rd equivalent (eg 2 or 4).  
+		Power chords are an exception, but they're not very interesting for a program like this.
+	- Almost all have a 5th or 5 equivalent.
+	- Almost all chords with more than 3 notes have a 7th or equivalent.
+	- Pretty much everything else is a bonus.
+Similarly the most common scales have 7 notes with equivalent notes.
+Also its reasonable to support conversions between like scales (eg pentantics) or chords,
+   but matching up very different ones is probably not a reasonable thing to expect.
+
+

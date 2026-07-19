@@ -59,6 +59,7 @@ protected:
     // Song blocks are not velocity-coloured — keep a fixed block colour.
     void drawNoteBlock(const Note& note, int x0, int y0, int width, int rh) override;
     bool     isRowBlocked(int visualRow) const override;
+    bool     rowHidesColumnLines(int visualRow) const override { return isInstrHeaderVR(visualRow); }
     Fl_Color rowBgColor(int visualRow) const override;
     void moving(StateDragMove& s) override;
     void resizing(StateDragResize& s) override;

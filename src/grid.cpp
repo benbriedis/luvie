@@ -44,6 +44,30 @@ void Grid::draw()
     int endCol = colOffset + w() / colWidth + 2;
     int colBottom = std::min(h(), gridBottom());
 
+    // Vertical lines skip the rows that opt out (instrument header rows in the
+    // song editor), so draw them as spans of consecutive rows that want them
+    // rather than as one full-height line.
+    vector<std::pair<int, int>> colSpans;
+    {
+        auto addSpan = [&](int top, int bottom) {
+            bottom = std::min(bottom, colBottom);
+            if (bottom > top) colSpans.emplace_back(top, bottom);
+        };
+        int runStart = -1;
+        for (int r = 0; r < numRows; r++) {
+            if (rowHidesColumnLines(r)) {
+                if (runStart >= 0) addSpan(runStart, rowY(r));
+                runStart = -1;
+            } else if (runStart < 0) {
+                runStart = rowY(r);
+            }
+        }
+        int rowsBottom = rowY(numRows);
+        if (runStart >= 0) addSpan(runStart, rowsBottom);
+        // Any empty area below the last row still gets full-height lines.
+        addSpan(rowsBottom, colBottom);
+    }
+
     // Subdivision lines first, so the row lines and column lines draw over them.
     if (divisions > 1) {
         fl_color(subdivLineColor);
@@ -53,7 +77,8 @@ void Grid::draw()
                 // rounded note edges computed below.
                 int x0 = x() + (i - colOffset) * colWidth
                              + (int)std::lround((double)k * colWidth / divisions);
-                fl_line(x0, y(), x0, y() + colBottom);
+                for (const auto& [top, bottom] : colSpans)
+                    fl_line(x0, y() + top, x0, y() + bottom);
             }
     }
 
@@ -65,7 +90,8 @@ void Grid::draw()
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + (i - colOffset) * colWidth;
         fl_color(columnColor(i));
-        fl_line(x0, y(), x0, y() + colBottom);
+        for (const auto& [top, bottom] : colSpans)
+            fl_line(x0, y() + top, x0, y() + bottom);
     }
 
     for (const Note& note : notes) {

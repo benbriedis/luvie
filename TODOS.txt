@@ -32,8 +32,6 @@ FUTURE FUNCTIONALITY
   possibly multiple simultaneous CPMs. Too fussy and obscure I think to give the Loop Editor
   its own time signature and beat definitions for this purpose that are otherwise not used.
 
-- Linear ramping of tempos...
-
 - Could provide input triggers for patterns when in loop mode (useful to Ableton-style pads).
 
 - Pianoroll and drum patterns - allow importing of patterns.
@@ -336,6 +334,7 @@ cf master volume rubberband control? Or any other global parameters?
 
 Add more hover over notes for controls
 
+DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
 
 TODO probably put drums on a different midi_out initially. (cf drums_out) or something
 
@@ -348,6 +347,7 @@ Update FLTK?
 
 Swapping between song editor and loop editor - think I'd rather round out the song editor's 
    bar (but hold on to last bar settings).
+   BUT I'd still need an intermediate mode going out too to allow the bar to finish...
 
 Look at: rewind in Loop Editor
 	Rewind when in Loop mode is a bit weird. cf disabling / not using
@@ -358,16 +358,13 @@ ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled p
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
 
-Review and trim CHORD_MAPPING.txt  Maybe move to DESIGN_DECISIONS
 
-
+- Linear ramping of tempos...
 
 Maybe indicate which patterns are pianorolls (NB name could indicate)
 
 CHECK:
 Rewind in song mode:  reset all loops (ie any manual changes should disappear)
 
-Unstacked:  
-  Maybe remove vertical lines through the instrument headers? Or fade them there.
 
 

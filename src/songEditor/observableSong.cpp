@@ -77,8 +77,14 @@ void ObservableSong::loadTimeline(const Timeline& tl)
         for (auto& lane : t.lanes) {
             if (lane.id == 0) lane.id = nextId++;  // assign ID to lanes from old saves
             else if (lane.id >= nextId) nextId = lane.id + 1;
-            for (const auto& inst : lane.patterns)
+            for (auto& inst : lane.patterns) {
                 if (inst.id >= nextId) nextId = inst.id + 1;
+                // A block always plays the pattern of the lane it sits in. Saves
+                // written before movePattern() re-bound dragged blocks can hold an
+                // instance still pointing at the lane it was created in, so snap
+                // any stale binding back to the lane it now occupies.
+                inst.patternId = lane.patternId;
+            }
         }
     }
     for (const auto& lane : data.paramLanes) {
@@ -1335,6 +1341,10 @@ void ObservableSong::movePattern(int instanceId, int newLaneId, float newStartBa
                 PatternInstance inst = *it;
                 lane.patterns.erase(it);
                 inst.startBar = newStartBar;
+                // A block plays the pattern of the lane it sits in, so adopt the
+                // destination lane's pattern rather than carrying over the one it
+                // was created with.
+                inst.patternId = dest->patternId;
                 dest->patterns.push_back(std::move(inst));
                 notify();
                 return;
