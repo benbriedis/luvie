@@ -180,8 +180,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
     addBtn->setBorderColor(borderCol);
     addBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<OutputsOverlay*>(d);
-        std::string name = self->uniquePortName(
-            "midi_out_" + std::to_string(self->outputs_.size() + 1));
+        std::string name = self->nextDefaultPortName();
         self->outputs_.push_back({self->nextPortId_++, name, self->defaultBackend_});
         self->rebuildRows();
         if (self->onPortAdded) self->onPortAdded(name);
@@ -223,7 +222,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
 
     end();
 
-    outputs_.push_back({nextPortId_++, "midi_out_1"});
+    addDefaultOutputs();
     rebuildRows();
     hide();
 }
@@ -285,7 +284,7 @@ void OutputsOverlay::setOutputs(const std::vector<std::string>& portNames) {
     for (const auto& n : portNames)
         if (!n.empty()) outputs_.push_back({nextPortId_++, n});
     if (outputs_.empty())
-        outputs_.push_back({nextPortId_++, "midi_out_1"});
+        addDefaultOutputs();
     rebuildRows();
 }
 
@@ -294,7 +293,7 @@ void OutputsOverlay::setOutputs(const std::vector<JackOutput>& ports) {
     for (const auto& p : ports)
         if (!p.portName.empty()) outputs_.push_back({nextPortId_++, p.portName, p.backend});
     if (outputs_.empty())
-        outputs_.push_back({nextPortId_++, "midi_out_1"});
+        addDefaultOutputs();
     rebuildRows();
 }
 
@@ -361,6 +360,25 @@ void OutputsOverlay::updateInstrumentDrumMap(int instrId, int midiNote, const st
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+// A fresh project starts with one melodic and one drum port.
+void OutputsOverlay::addDefaultOutputs() {
+    outputs_.push_back({nextPortId_++, "inst1",  defaultBackend_});
+    outputs_.push_back({nextPortId_++, "drums1", defaultBackend_});
+}
+
+// "inst1", "inst2", ... — the lowest number not already taken by a port.
+std::string OutputsOverlay::nextDefaultPortName() const {
+    auto inUse = [&](const std::string& name) {
+        for (const auto& o : outputs_)
+            if (o.portName == name) return true;
+        return false;
+    };
+    for (int n = 1; ; n++) {
+        std::string name = "inst" + std::to_string(n);
+        if (!inUse(name)) return name;
+    }
+}
 
 std::string OutputsOverlay::uniquePortName(const std::string& base, int excludeIdx) const {
     auto isUnique = [&](const std::string& name) {

@@ -56,6 +56,15 @@ FUTURE FUNCTIONALITY
 
 - LATER cf 'scenes' for song/verse looping or swapping between songs
 
+THINK ABOUT when in song mode when rewinding:  reset all loops (ie any manual changes should disappear)
+      - but want if repositioning playhead manually or the song loops due to looping being on?
+	  - do we want a setting to control this behaviour?
+
+Swapping between song editor and loop editor - think I'd rather round out the song editor's bar 
+   (but hold on to last bar settings).
+   BUT I'd still need an intermediate mode going out too to allow the bar to finish...
+
+
 LIMITATION
 ==========
 Currently only one Luvie instance per Ardour will work. 
@@ -290,13 +299,6 @@ RaySession:
 	- Our transport does not seem to update (OK in Ardour)
     - Test isDirty in RaySession now
 
-Octave offset - cf alternative:  a transpose option... 
-	Could have an 'operations' icon that lists a bunch of options.
-	More flexible, but a bit confusing given the use of the base note
-  Or provide more options.
-  If keep cf adding colour (eg yellow) to the octave numbers.
-  
-
  
 
 
@@ -328,15 +330,12 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 =========================	 
+
+Try Valgrind
+
+Add a better-looking flat symbol using SVG
+
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
-
-cf master volume rubberband control? Or any other global parameters?
-
-Add more hover over notes for controls
-
-DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
-
-TODO probably put drums on a different midi_out initially. (cf drums_out) or something
 
 Update FLTK?
 - downdowns that hover over other applications
@@ -344,27 +343,28 @@ Update FLTK?
 - Through Carla there was some message about Carla not being responsive while Luvie GUI was
      being shown. (Carla was on laptop screen and Luvie on the other one at the time).
 
+Octave offset - cf alternative:  a transpose option... 
+	Could have an 'operations' icon that lists a bunch of options.
+	More flexible, but a bit confusing given the use of the base note
+  Or provide more options.
+  If keep cf adding colour (eg yellow) to the octave numbers.
+  
+Normal pattern editor: think put coloured items under the dark bar.
+    Probably put a transpose tool after the scale, with a gap in between.
+	Potentially remove the +1, -1 control after that
 
-Swapping between song editor and loop editor - think I'd rather round out the song editor's 
-   bar (but hold on to last bar settings).
-   BUT I'd still need an intermediate mode going out too to allow the bar to finish...
-
-Look at: rewind in Loop Editor
-	Rewind when in Loop mode is a bit weird. cf disabling / not using
-
-TO TEST swapping from  loop editor - intermediate mode - probably needs to be controlled via a song-beat counter if its not already being
-ISSUE: clicking on 'Loop' when on 'Song'... should leave the currently enabled patterns enabled
 
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
 
+Add more hover over notes for controls
+
+DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
 
 - Linear ramping of tempos...
 
-Maybe indicate which patterns are pianorolls (NB name could indicate)
-
-CHECK:
-Rewind in song mode:  reset all loops (ie any manual changes should disappear)
-
+Maybe indicate which patterns are pianorolls and ideally drums - cf small SVGs bottom right or top right...
+   Pianokeys +
+   Maybe a snare and cymbol
 
 

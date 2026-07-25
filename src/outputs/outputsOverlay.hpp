@@ -102,6 +102,10 @@ class OutputsOverlay : public OverlayWindow {
     std::vector<Fl_Widget*> getFocusOrder() const;
     void advanceFocusBy(int dir);
 
+    // Seeds outputs_ with the default port set for a fresh project.
+    void addDefaultOutputs();
+
+    std::string nextDefaultPortName() const;
     std::string uniquePortName(const std::string& base, int excludeIdx = -1) const;
     std::string uniqueInstrName(const std::string& base, int excludeIdx = -1) const;
     std::string nextDefaultInstrName(bool isDrum) const;

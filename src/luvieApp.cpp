@@ -485,13 +485,16 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Initial state ----
     // Seed with default instruments on a fresh (empty) session.
     if (song_->get().instruments.empty()) {
-        const std::string port = outputsOverlay->getOutputs().empty()
-            ? "" : outputsOverlay->getOutputs()[0];
+        const auto ports = outputsOverlay->getOutputs();
+        // The melodic instrument takes the first port, the drumkit the second
+        // (falling back to the first if only one port exists).
+        const std::string port     = ports.empty() ? "" : ports[0];
+        const std::string drumPort = ports.size() > 1 ? ports[1] : port;
         int id1 = instruments_->add("Instrument A", false);
         int id2 = instruments_->add("Drums A", true);
         outputsOverlay->setInstruments({
-            {id1, "Instrument A", port,  1, {}, false, false, -1, -1, -1, -1},
-            {id2, "Drums A",      port, 10, {}, true,  false, -1, -1, -1, -1}
+            {id1, "Instrument A", port,      1, {}, false, false, -1, -1, -1, -1},
+            {id2, "Drums A",      drumPort, 10, {}, true,  false, -1, -1, -1, -1}
         });
     }
     pushInstruments();
