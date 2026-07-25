@@ -402,7 +402,8 @@ int Grid::overlappingCell(int noteIdx) const
 
 void Grid::openContextMenu(int idx)
 {
-    popup.open(idx, &notes, this, makeDeleteCallback(idx), makeVelocityCallback(idx));
+    popup.open(idx, &notes, this, makeDeleteCallback(idx), makeVelocityCallback(idx),
+               makeTransposeCallback(idx));
 }
 
 void Grid::clampSelection()

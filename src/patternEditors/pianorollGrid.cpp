@@ -1,4 +1,5 @@
 #include "pianorollGrid.hpp"
+#include "transposePopup.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"
 #include <FL/Fl.H>
@@ -93,6 +94,21 @@ std::function<void(float)> PianorollGrid::makeVelocityCallback(int noteIdx)
     if (!pattern) return nullptr;
     int id = notes[noteIdx].id;
     return [this, id](float v) { pattern->setNoteVelocity(id, v); };
+}
+
+// Transpose applies to the whole pattern, not the clicked note: an octave either
+// way, narrowed to the shifts that keep every note inside the MIDI range.
+std::function<void(int,int)> PianorollGrid::makeTransposeCallback(int noteIdx)
+{
+    if (!pattern || !transposePopup || patternId < 0) return nullptr;
+    (void)noteIdx;
+    return [this](int px, int py) {
+        auto [lo, hi] = pattern->patternPitchExtent(patternId);
+        if (lo < 0) return;
+        transposePopup->open(px, py,
+            {std::max(-maxSemitones, -lo), std::min(maxSemitones, totalRows - 1 - hi)},
+            [this](int semitones) { pattern->transposePattern(patternId, semitones); });
+    };
 }
 
 void PianorollGrid::onCommitMove(const StateDragMove& s)

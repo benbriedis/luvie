@@ -324,6 +324,27 @@ void TrackLabels::draw()
         return {};
     };
 
+    // Short kind tag shown under the pattern name.
+    auto patKind = [&](int patId) -> const char* {
+        for (const auto& p : tl.patterns) {
+            if (p.id != patId) continue;
+            if (p.type == PatternType::PIANOROLL) return "pianoroll";
+            if (p.type == PatternType::DRUM)      return "drums";
+            return "harmony";
+        }
+        return nullptr;
+    };
+
+    // Draw the kind tag faintly in the bottom-left corner of a lane row. Kept on
+    // the left so the S/M buttons (top-most lane only) never shift it.
+    auto drawKindTag = [&](const char* kind, int ry, int rh, Fl_Color bg) {
+        if (!kind) return;
+        fl_font(FL_HELVETICA, 8);
+        fl_color(fl_color_average(colText, bg, 0.45f));
+        fl_draw(kind, x() + 4, ry, w() - 8, rh - 2,
+                FL_ALIGN_LEFT | FL_ALIGN_BOTTOM | FL_ALIGN_CLIP);
+    };
+
     // Draw left-aligned, but when the text is wider than the cell show its END
     // instead of its start, so the distinguishing tail of a long pattern name
     // stays visible. Used for pattern names only. Uses the current font.
@@ -439,8 +460,9 @@ void TrackLabels::draw()
                         // ── Unstacked lane: just pattern name (instrument name is in header row) ──
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
-                        drawTailClipped(patName(track.lanes[laneNum-1].patternId),
-                                        x() + 4, ry, w() - 8 - rightPad, rh);
+                        int patId = track.lanes[laneNum-1].patternId;
+                        drawTailClipped(patName(patId), x() + 4, ry, w() - 8 - rightPad, rh);
+                        drawKindTag(patKind(patId), ry, rh, bg);
                     } else if (isFirstLane) {
                         // ── Stacked first lane: right-arrow expand icon + track label ──
                         // Matches the expanded header row: dark arrow + text on grey.

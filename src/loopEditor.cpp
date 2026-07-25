@@ -47,7 +47,6 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
     bpmInput.type(FL_FLOAT_INPUT);   // numeric type back to integer when whole
     bpmInput.format("%.1f");
     bpmInput.range(timeSettings::bpmMin, timeSettings::bpmMax);
-    bpmInput.wrap(0);
     bpmInput.when(FL_WHEN_ENTER_KEY | FL_WHEN_RELEASE);
     bpmInput.callback([](Fl_Widget*, void* d) {
         static_cast<LoopPanel*>(d)->commitBpm();

@@ -15,6 +15,7 @@ class PatternGrid : public Grid, public ITimelineObserver {
     int                 rowOffset       = 0;   // in virtual-row units
     std::vector<int>    disabledDegrees;        // sorted ascending; unique disabled degrees
     int                 groupSize       = 3;   // chordSize + disabledDegrees.size()
+    int                 totalTones      = 0;   // rows the labels show, in virtual-row units
 
     struct RapidCell {
         int row, col;
@@ -38,12 +39,20 @@ class PatternGrid : public Grid, public ITimelineObserver {
     // Convert a virtual row index to chord-space abs_row (-1 if in a disabled slot)
     int virtualToAbsRow(int virtualPos) const;
 
+    // Virtual row a stored note occupies (-1 if its disabled degree is gone),
+    // and the note-slot a virtual row stands for — inverses of each other.
+    int virtualPosOf(const Note& n) const;
+    ObservablePattern::NoteRowSlot slotForVirtualPos(int noteId, int virtualPos) const;
+    std::pair<int,int> virtualPosExtent() const;
+    void transposeRows(int rows);
+
 protected:
     Fl_Color columnColor(int col) const override;
     Fl_Color rowLineColor(int i)  const override;
     Fl_Color rowBgColor(int row)  const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     std::function<void(float)> makeVelocityCallback(int noteIdx) override;
+    std::function<void(int,int)> makeTransposeCallback(int noteIdx) override;
     void onCommitMove(const StateDragMove& s) override;
     void onCommitResize(const StateDragResize& s) override;
     void toggleNote() override;
@@ -59,6 +68,7 @@ public:
 
     void setPattern(ObservablePattern* tl, int patId);
     void setChordSize(int size) { chordSize = size; groupSize = size + (int)disabledDegrees.size(); redraw(); }
+    void setTotalTones(int t)   { totalTones = t; }
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);
     void setRapidMode(bool r);

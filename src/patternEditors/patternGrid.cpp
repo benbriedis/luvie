@@ -1,4 +1,5 @@
 #include "patternGrid.hpp"
+#include "transposePopup.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"
 #include <FL/Fl.H>
@@ -147,6 +148,78 @@ std::function<void(float)> PatternGrid::makeVelocityCallback(int noteIdx)
     if (!pattern) return nullptr;
     int id = notes[noteIdx].id;
     return [this, id](float v) { pattern->setNoteVelocity(id, v); };
+}
+
+// Virtual row a stored note occupies — the inverse of the mapping rebuildNotes
+// uses. -1 when a disabled note's degree is no longer in the layout.
+int PatternGrid::virtualPosOf(const Note& n) const
+{
+    if (groupSize <= 0 || chordSize <= 0) return -1;
+    if (!n.disabled)
+        return (n.row / chordSize) * groupSize + (n.row % chordSize);
+
+    auto it = std::find(disabledDegrees.begin(), disabledDegrees.end(), n.disabledDegree);
+    if (it == disabledDegrees.end()) return -1;
+    return n.row * groupSize + chordSize + (int)std::distance(disabledDegrees.begin(), it);
+}
+
+// A row's note-slot: a chord degree in the lower part of each octave group, one
+// of the greyed-out disabled degrees above it. A transposed note takes on the
+// character of the row it lands on, which is what "move everything up N rows"
+// means visually.
+ObservablePattern::NoteRowSlot PatternGrid::slotForVirtualPos(int noteId, int virtualPos) const
+{
+    int octave = virtualPos / groupSize;
+    int pos    = virtualPos % groupSize;
+    if (pos < chordSize)
+        return {noteId, octave * chordSize + pos, false, -1};
+    return {noteId, octave, true, disabledDegrees[pos - chordSize]};
+}
+
+// Lowest/highest virtual row the pattern's notes occupy; {-1,-1} when it has
+// none. Taken from the pattern, not `notes`, which holds only the visible rows.
+std::pair<int,int> PatternGrid::virtualPosExtent() const
+{
+    int lo = -1, hi = -1;
+    for (const auto& n : pattern->buildPatternNotes(patternId)) {
+        int vp = virtualPosOf(n);
+        if (vp < 0) continue;
+        if (lo < 0 || vp < lo) lo = vp;
+        if (vp > hi) hi = vp;
+    }
+    return {lo, hi};
+}
+
+void PatternGrid::transposeRows(int rows)
+{
+    if (!pattern || patternId < 0 || rows == 0 || groupSize <= 0) return;
+
+    std::vector<ObservablePattern::NoteRowSlot> slots;
+    for (const auto& n : pattern->buildPatternNotes(patternId)) {
+        int vp = virtualPosOf(n);
+        if (vp < 0) continue;
+        vp += rows;
+        if (vp < 0 || vp >= totalTones) return;  // the offered range rules this out
+        slots.push_back(slotForVirtualPos(n.id, vp));
+    }
+    pattern->setNoteRows(patternId, slots);
+}
+
+// Transpose applies to the whole pattern, not the clicked note, and counts GUI
+// rows: one octave group is groupSize rows, which is the most we offer either
+// way. Disabled notes move with the rest.
+std::function<void(int,int)> PatternGrid::makeTransposeCallback(int noteIdx)
+{
+    if (!pattern || !transposePopup || patternId < 0 || groupSize <= 0 || totalTones <= 0)
+        return nullptr;
+    (void)noteIdx;
+    return [this](int px, int py) {
+        auto [lo, hi] = virtualPosExtent();
+        if (lo < 0) return;
+        transposePopup->open(px, py,
+            {std::max(-groupSize, -lo), std::min(groupSize, totalTones - 1 - hi)},
+            [this](int rows) { transposeRows(rows); });
+    };
 }
 
 void PatternGrid::onCommitMove(const StateDragMove& s)

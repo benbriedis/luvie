@@ -5,6 +5,7 @@
 #include "observableSong.hpp"
 #include "timeline.hpp"
 #include <string>
+#include <utility>
 #include <vector>
 
 // Observes ObservableSong and exposes pattern-level editing (notes, drum notes,
@@ -28,6 +29,19 @@ public:
     void resizeNoteRight(int noteId, float newLength);
     void resizeNoteLeft(int noteId, float newStart, float newLength);
     void setNoteVelocity(int noteId, float velocity);
+    void transposePattern(int patternId, int semitones);
+    // Lowest/highest MIDI pitch a pianoroll pattern uses; {-1,-1} when it has no notes.
+    std::pair<int,int> patternPitchExtent(int patternId) const;
+
+    // Where a note sits in the harmony editor's row space. `row` is the abs_row
+    // for an enabled note and the octave for a disabled one, as Note documents.
+    struct NoteRowSlot {
+        int  noteId;
+        int  row;
+        bool disabled;
+        int  disabledDegree;
+    };
+    void setNoteRows(int patternId, const std::vector<NoteRowSlot>& slots);
     std::vector<Note> buildPatternNotes(int patternId) const;
     void remapPatternNotes(int patId, int oldSize, int newSize);
 

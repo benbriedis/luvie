@@ -14,7 +14,7 @@ Suggestions for RaySession (install newest first)
 
 Suggestions for LV2
 ===================
-1. Add support transport commands.
+1. Add support for transport commands.
    That way removes advantages Clap might have wrt integration with Ardour.
 
 FUTURE FUNCTIONALITY
@@ -73,7 +73,7 @@ Currently only one Luvie instance per Ardour will work.
 
 
 
-DISTRO TO DOS?
+DISTRO TODOs?
 ==============
 
 Think about installation of dependencies - eg 
@@ -106,11 +106,6 @@ Do we get warning if deleting the plugin and notes have been added?
 
 
 cf being able to select a group of notes? cf picking the tool from the context menu?
-
-BUG? When changing chord the position of the notes change...
-
-
-Shrinking pattern editor horizontally - could reorangise things a bit before resorting to cropping in smaller windows.
 
 
 ------------------------------TODOs---------------------------
@@ -207,16 +202,6 @@ MINOR BUG: when editting label text can get a danky FLTK popup appear when right
 Conversion routine to clone a regular pattern to pianoroll? 
 	The opposite way would be harder, but something could be attempted in time maybe.
 
-Coding: 
-	Move to modern?  widgetCursorHandle() 
-	Chop up some long files?
-	Subdirectories?
-
-
-TEST 
-	are solo/mute stored? Probably should be I guess  (song editor, pattern editor)
-	STILL A BUG? Sometimes can't add notes to the drum editor  [MAY have been fixed]
-	STILL A BUG? Sometime first track cant be set to drum editor [ONLY SAW ONCE.. maybe related to above error?]
 
 --------
 
@@ -265,11 +250,7 @@ Create my own license...
 
 MINOR
 -----
-Luvie (GUI) in window titlebar is odd... maybe Carla is adding it?
-
-LHS label column of regular pattern too wide (maybe sharing with drum pattern)?
-
-Lighter theme for scrollbars?
+LHS label column of regular pattern is wider than necessary.
 
 Loop Editor: maybe show a mini version of the patterns, similar to Seq24
   Showing bar boundaries in summaries WOULD be useful.
@@ -281,17 +262,6 @@ In pattern editor #bars and signature allow click and drag left and right, which
 
 ----------------------
 
-
-Standard pattern editor control row may be too wide? Wrap? 
-	Wider initial app (so we can fit in pattern editor controls at start)
-	Or just require the user to grow the page?  
-	    NB should show a > to indicate missing items in this case.
-		In this case why not have < > buttons?
-	Or more an item or two down to the transport?
-
-
-FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
-         allow it to be editted.
 
 Song parameter pitch bend + pattern pitch bend - get a warbling effect. Probably should multiply the values together (with appropriate normalisation) and output once.
 
@@ -330,6 +300,9 @@ cf custom chord and scale builder
      (easy for the global stuff to go wrong).
 
 =========================	 
+cf Modifying 'Add pattern' to 'Add harmony'. And maybe in the code too...
+   'Pattern' is kind-of more accurate.
+   Or maybe remove the 'harmony' label.
 
 Try Valgrind
 
@@ -343,11 +316,15 @@ Update FLTK?
 - Through Carla there was some message about Carla not being responsive while Luvie GUI was
      being shown. (Carla was on laptop screen and Luvie on the other one at the time).
 
+FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
+         allow it to be editted.
+
 Octave offset - cf alternative:  a transpose option... 
 	Could have an 'operations' icon that lists a bunch of options.
 	More flexible, but a bit confusing given the use of the base note
   Or provide more options.
   If keep cf adding colour (eg yellow) to the octave numbers.
+  Add to pianoroll too... may be best to add to the dark bar for consistency (and clarity).
   
 Normal pattern editor: think put coloured items under the dark bar.
     Probably put a transpose tool after the scale, with a gap in between.
@@ -363,8 +340,5 @@ DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song
 
 - Linear ramping of tempos...
 
-Maybe indicate which patterns are pianorolls and ideally drums - cf small SVGs bottom right or top right...
-   Pianokeys +
-   Maybe a snare and cymbol
 
 

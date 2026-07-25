@@ -23,9 +23,13 @@ inline Point2 calcPopupPos(Size available, Point2 anchor, int anchorH, int popW,
 // Base class for all context menu and editor popup windows.
 // Provides colour/box setup, item creation, positioning, and show logic.
 class ContextMenuPopup : public BasePopup {
+public:
+    // Background tint an item takes on hover; public so rows built outside a
+    // popup class (e.g. the velocity row) can match it.
+    static constexpr Fl_Color hoverCol = 0xDDEEFF00;
+
 protected:
     static constexpr int      btnH     = 30;
-    static constexpr Fl_Color hoverCol = 0xDDEEFF00;
     int popW;
     int popH;
 

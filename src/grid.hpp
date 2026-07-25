@@ -9,6 +9,7 @@
 #include <variant>
 
 class Playhead;
+class TransposePopup;
 
 // Faint grey used for the beat-subdivision lines, drawn under the row lines.
 constexpr Fl_Color subdivLineColor = 0xDDDDDD00;
@@ -48,6 +49,7 @@ public:
 protected:
     float             snap;
     NoteContextPopup&            popup;
+    TransposePopup*   transposePopup = nullptr;
     std::vector<Note> notes;
 
     GridState state;
@@ -114,6 +116,9 @@ protected:
     virtual Fl_Color rowBgColor(int row)       const { (void)row;      return FL_WHITE; }
     virtual std::function<void()> makeDeleteCallback(int noteIdx) { (void)noteIdx; return nullptr; }
     virtual std::function<void(float)> makeVelocityCallback(int noteIdx) { (void)noteIdx; return nullptr; }
+    // Non-null only in the grids that offer Transpose; the args are the context
+    // menu's position, so the transpose popup can open where it was.
+    virtual std::function<void(int,int)> makeTransposeCallback(int noteIdx) { (void)noteIdx; return nullptr; }
     virtual void openContextMenu(int idx);
     virtual void onBeginDrag(int noteIdx)               { (void)noteIdx; }
     virtual void onCommitMove(const StateDragMove& s)   { (void)s; }
@@ -126,6 +131,7 @@ public:
     Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
 
     void setPlayhead(Playhead* p) { playhead  = p; }
+    void setTransposePopup(TransposePopup* p) { transposePopup = p; }
     void setColOffset(int off)    { colOffset = off; redraw(); }
     int  getColOffset() const     { return colOffset; }
     void setSnap(float s)         { snap = s; }

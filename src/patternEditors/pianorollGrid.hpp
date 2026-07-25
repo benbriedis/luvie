@@ -17,12 +17,14 @@ protected:
     Fl_Color rowBgColor(int row)  const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     std::function<void(float)> makeVelocityCallback(int noteIdx) override;
+    std::function<void(int,int)> makeTransposeCallback(int noteIdx) override;
     void onCommitMove(const StateDragMove& s) override;
     void onCommitResize(const StateDragResize& s) override;
     void toggleNote() override;
 
 public:
-    static constexpr int totalRows = 128;
+    static constexpr int totalRows    = 128;
+    static constexpr int maxSemitones = 12;   // most a transpose offers, either way
 
     PianorollGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PianorollGrid();

@@ -29,6 +29,7 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
     patternGrid.onDisabledDegreesChanged = [this](const std::vector<int>& dd, int gs, const std::set<int>& occ) {
         int oldTotal = noteLabels.getTotalTones();
         noteLabels.setDisabledDegrees(dd, gs, occ);
+        patternGrid.setTotalTones(noteLabels.getTotalTones());
         if (noteLabels.getTotalTones() != oldTotal)
             setRowOffset(noteLabels.getRowOffset());
     };
@@ -51,6 +52,7 @@ void PatternEditor::setNoteParams(int root, std::string_view chordHash, bool sha
     chordIndex = newChordIndex;
     noteLabels.setParams(root, chordHash, sharp);
     patternGrid.setChordSize(chordDefs[chordIndex].size);
+    patternGrid.setTotalTones(noteLabels.getTotalTones());
 
     // This runs on every timeline change (via PatternPanel::onParamsChanged), so
     // only refocus the view when the harmony genuinely changed — otherwise adding

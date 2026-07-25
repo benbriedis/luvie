@@ -116,6 +116,69 @@ void ObservablePattern::setNoteVelocity(int noteId, float velocity)
     }
 }
 
+std::pair<int,int> ObservablePattern::patternPitchExtent(int patternId) const
+{
+    for (const auto& pat : song_->data.patterns) {
+        if (pat.id != patternId) continue;
+        if (pat.notes.empty()) break;
+
+        int lo = 127, hi = 0;
+        for (const auto& n : pat.notes) {
+            lo = std::min(lo, n.row);
+            hi = std::max(hi, n.row);
+        }
+        return {lo, hi};
+    }
+    return {-1, -1};
+}
+
+// Shift every note of a pianoroll pattern (row = MIDI pitch) by `semitones`.
+// Callers offer only shifts that keep the pattern in range (patternPitchExtent);
+// the clamp here is the backstop that keeps that invariant in one place.
+// One notify() covers everything downstream: the editors redraw and the
+// sequencer snapshot (JACK/native) or the plugin's state atom is rebuilt.
+void ObservablePattern::transposePattern(int patternId, int semitones)
+{
+    if (semitones == 0) return;
+    auto [lo, hi] = patternPitchExtent(patternId);
+    if (lo < 0) return;
+
+    int shift = std::clamp(semitones, -lo, 127 - hi);
+    if (shift == 0) return;
+
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patternId) continue;
+        for (auto& n : pat.notes) n.row += shift;
+        song_->notify();
+        return;
+    }
+}
+
+// Bulk row assignment, used by the harmony editor's transpose. Which row a note
+// belongs on is a question about the chord layout, so the caller works that out;
+// applying the whole set in one pass keeps it atomic and costs a single notify()
+// (one snapshot rebuild for the RT thread) however many notes moved.
+void ObservablePattern::setNoteRows(int patternId, const std::vector<NoteRowSlot>& slots)
+{
+    if (slots.empty()) return;
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patternId) continue;
+        bool changed = false;
+        for (auto& n : pat.notes) {
+            for (const auto& s : slots) {
+                if (s.noteId != n.id) continue;
+                n.row            = s.row;
+                n.disabled       = s.disabled;
+                n.disabledDegree = s.disabledDegree;
+                changed = true;
+                break;
+            }
+        }
+        if (changed) song_->notify();
+        return;
+    }
+}
+
 std::vector<Note> ObservablePattern::buildPatternNotes(int patternId) const
 {
     for (const auto& pat : song_->data.patterns)

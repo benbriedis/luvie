@@ -12,6 +12,7 @@
 //  - the mouse wheel over the widget nudges the value by one step
 //  - click-and-drag up/down anywhere on the input field changes the value
 //    (a plain click without a drag just focuses the field for typing)
+//  - the value stops at its bounds; Fl_Spinner's wrap-around is off
 //
 // Everything else (value()/range()/step()/format()/callback()/when()) behaves
 // exactly like Fl_Spinner, so callers configure it the same way.
@@ -28,11 +29,9 @@ class ModernSpinner : public Fl_Spinner {
     static constexpr int dragThreshold  = 3;  // px before a press counts as a drag
     static constexpr int pixelsPerStep  = 5;  // vertical px that equal one step
 
-    // Clamp v to [minimum, maximum]; if wrap() is on, roll past a bound to the
-    // opposite one (matching Fl_Spinner's own button behaviour).
-    double clampWrap(double v) const {
-        if (v > maximum()) return wrap() ? minimum() : maximum();
-        if (v < minimum()) return wrap() ? maximum() : minimum();
+    double clampValue(double v) const {
+        if (v > maximum()) return maximum();
+        if (v < minimum()) return minimum();
         return v;
     }
 
@@ -46,12 +45,13 @@ class ModernSpinner : public Fl_Spinner {
 
     // Nudge by a whole number of steps (wheel / keyboard-style change).
     void bumpSteps(int steps) {
-        applyValue(clampWrap(value() + steps * step()));
+        applyValue(clampValue(value() + steps * step()));
     }
 
 public:
     ModernSpinner(int x, int y, int w, int h, const char* l = nullptr)
         : Fl_Spinner(x, y, w, h, l) {
+        wrap(0);
         box(FL_FLAT_BOX);
         color(0x37415100);            // input-field background
         labelcolor(panelText);        // up/down arrow colour
@@ -70,6 +70,20 @@ public:
     }
 
     void setBorderColor(Fl_Color c) { borderCol = c; }
+
+    // Restyle for a light surface; the defaults above suit the dark panel strip.
+    // labelcolor() is what Fl_Spinner::draw() paints the arrows with.
+    void setPalette(Fl_Color field, Fl_Color text, Fl_Color button) {
+        color(field);
+        textcolor(text);
+        labelcolor(text);
+        input_.cursor_color(text);
+        input_.selection_color(button);
+        up_button_.color(button);
+        down_button_.color(button);
+        up_button_.selection_color(fl_color_average(button, text, 0.7f));
+        down_button_.selection_color(fl_color_average(button, text, 0.7f));
+    }
 
     void draw() override {
         Fl_Spinner::draw();
@@ -113,7 +127,7 @@ public:
                     }
                     if (dragging) {
                         long steps = std::lround((double)dy / pixelsPerStep);
-                        applyValue(clampWrap(dragStartValue + steps * step()));
+                        applyValue(clampValue(dragStartValue + steps * step()));
                     }
                     return 1;
                 }

@@ -31,6 +31,7 @@
 #include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
+#include "transposePopup.hpp"
 #include "patternParamGrid.hpp"
 
 std::string LuvieApp::lastFileDir;
@@ -134,6 +135,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* pdPop      = new ParamDotPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
     auto* settingsPop = new SettingsMenuPopup;
+    auto* patTransposePop   = new TransposePopup("Rows:");
+    auto* pianoTransposePop = new TransposePopup("Semitones:");
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -361,6 +364,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     patternEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
+    patternEd->setTransposePopup(patTransposePop);
+    pianorollEd->setTransposePopup(pianoTransposePop);
     patternEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);
@@ -417,6 +422,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
     window->add(settingsPop); window->registerPopup(settingsPop);
+    window->add(patTransposePop);   window->registerPopup(patTransposePop);
+    window->add(pianoTransposePop); window->registerPopup(pianoTransposePop);
     // Hover popup: a positioned sub-window, but NOT registered — registering
     // would route mouse-moves through AppWindow's click-away logic and break the
     // indicator's enter/leave tracking.
