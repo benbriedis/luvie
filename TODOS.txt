@@ -306,6 +306,8 @@ cf Modifying 'Add pattern' to 'Add harmony'. And maybe in the code too...
 
 Try Valgrind
 
+'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
+
 Add a better-looking flat symbol using SVG
 
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
@@ -319,17 +321,7 @@ Update FLTK?
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
-Octave offset - cf alternative:  a transpose option... 
-	Could have an 'operations' icon that lists a bunch of options.
-	More flexible, but a bit confusing given the use of the base note
-  Or provide more options.
-  If keep cf adding colour (eg yellow) to the octave numbers.
-  Add to pianoroll too... may be best to add to the dark bar for consistency (and clarity).
-  
 Normal pattern editor: think put coloured items under the dark bar.
-    Probably put a transpose tool after the scale, with a gap in between.
-	Potentially remove the +1, -1 control after that
-
 
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
@@ -340,5 +332,4 @@ DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song
 
 - Linear ramping of tempos...
 
-
-
+TO CHECK MORE: Not totally sure about how bonus notes are transformed when moving to more complicated chords.

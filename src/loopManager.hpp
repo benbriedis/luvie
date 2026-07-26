@@ -27,6 +27,12 @@ public:
 	// Clear all state (called on mode switch). Notifies if non-empty.
 	void clear();
 
+	// Move every active pattern's anchor to anchorBar, so each one restarts from
+	// its first beat when the transport reaches that bar. Used by the rewind
+	// button in Loop mode: without it a pattern keeps the phase it was switched
+	// on with and its playhead lands mid-pattern. Notifies if anything moved.
+	void reanchorAll(float anchorBar);
+
 	bool  isPatternActive(int patId) const;
 	float patternAnchorBar(int patId) const;  // 0.0f if not active
 	// True for patterns turned on by a Loop-Editor switch (as opposed to a song

@@ -104,6 +104,15 @@ void LoopManager::clear()
 	if (hadContent) notify();
 }
 
+void LoopManager::reanchorAll(float anchorBar)
+{
+	bool changed = false;
+	for (auto& [patId, anchor] : activePats) {
+		if (anchor != anchorBar) { anchor = anchorBar; changed = true; }
+	}
+	if (changed) notify();
+}
+
 void LoopManager::mirror(const std::unordered_map<int, float>& actives,
                          const std::unordered_set<int>& manual,
                          const std::unordered_set<int>& disabled)

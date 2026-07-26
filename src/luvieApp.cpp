@@ -291,7 +291,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // playhead is visible — followPlayhead only chases it while playing, and we
     // want it in view when we switch back from the Loop/Pattern editor.
     bottomPane->onRewind = [this, og2]() {
-        if (modeController.isSongMode()) og2->requestScrollToPlayhead();
+        if (modeController.isSongMode()) {
+            og2->requestScrollToPlayhead();
+        } else {
+            // Loop mode: rewind put the transport back at bar 0, but each active
+            // loop still carries the anchor it was switched on with, so its
+            // playhead would land mid-pattern. Re-anchor them all to bar 0 so
+            // every pattern restarts from its first beat.
+            loopMgr.reanchorAll(0.0f);
+        }
     };
     auto openPatternTab = [this, song, tab2](int trackIndex, int laneId) {
         song->selectLane(trackIndex, laneId);
