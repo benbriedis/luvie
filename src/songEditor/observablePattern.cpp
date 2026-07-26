@@ -199,14 +199,14 @@ void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
                     note.disabledDegree = -1;
                 }
             } else {
-                int degree = note.row % oldSize;
-                int octave = note.row / oldSize;
+                int degree     = note.row % oldSize;
+                int pitchGroup = note.row / oldSize;
                 if (degree < newSize) {
-                    note.row = octave * newSize + degree;
+                    note.row = pitchGroup * newSize + degree;
                 } else {
                     note.disabled       = true;
                     note.disabledDegree = degree;
-                    note.row          = octave;
+                    note.row            = pitchGroup;
                 }
             }
         }

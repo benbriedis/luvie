@@ -20,7 +20,7 @@ class NoteLabels : public Fl_Widget {
     int              rowOffset      = 0;
     int              totalTones     = 30;   // in virtual-row units
     std::vector<int> disabledDegrees;           // sorted ascending
-    int              groupSize          = 3;    // chordSize + disabledDegrees.size()
+    int              pitchGroupSize     = 3;    // chordSize + disabledDegrees.size()
     int              chordSize          = 3;
     std::set<int>    occupiedDisabledVPos;      // virtual positions with actual disabled notes
     int              flashVPos          = -1;   // virtual position briefly lit after a click

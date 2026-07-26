@@ -132,13 +132,16 @@ inline const ChordDef& chordDefForHash(std::string_view hash)
     return chordDefs[chordIndexForHash(hash)];
 }
 
-// Semitone offset above the root for the n-th tone, stacking successive octave
-// groups exactly one real octave (12 semitones) apart. Anchoring every group on a
-// +12 root keeps a note's root in the same octave before and after a chord/scale
-// change, and lets note conversions work upward from the root (see remapPatternNotes).
-// Extended chords (9ths/11ths/13ths) reach above the octave, so their upper tones can
-// overlap the next group's lower tones — the row sequence is not strictly ascending
-// for those chords, the accepted trade-off for keeping the root octave-stable.
+// Semitone offset above the root for the n-th tone. A "pitch group" is one full
+// cycle of the chord/scale's degrees — the block of rows the pattern editor draws
+// between dark lines. Successive pitch groups are anchored exactly one real octave
+// (12 semitones) apart, which keeps a note's root in the same octave before and
+// after a chord/scale change and lets note conversions work upward from the root
+// (see remapPatternNotes). A pitch group is NOT an octave of content: extended
+// chords (9ths/11ths/13ths) reach above the octave, so their upper tones can
+// overlap the next pitch group's lower tones — the row sequence is not strictly
+// ascending for those chords, the accepted trade-off for keeping the root
+// octave-stable.
 inline int chordToneOffset(const ChordDef& def, int n)
 {
     return def.intervals[n % def.size] + (n / def.size) * 12;

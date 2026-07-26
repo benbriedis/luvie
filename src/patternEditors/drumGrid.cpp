@@ -109,7 +109,7 @@ void DrumGrid::draw()
             }
     }
 
-    // Horizontal row lines — uniform (no octave colouring)
+    // Horizontal row lines — uniform (no pitch-group colouring)
     for (int i = 0; i <= numRows; i++) {
         fl_color(kRowLine);
         fl_line(x(), y() + i * rowHeight, x() + gridRight, y() + i * rowHeight);

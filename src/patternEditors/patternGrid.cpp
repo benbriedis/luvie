@@ -24,21 +24,21 @@ void PatternGrid::setPattern(ObservablePattern* tl, int patId)
     redraw();
 }
 
-// Virtual row layout per octave group (groupSize rows, bottom→top):
-//   positions 0..chordSize-1      : valid degrees 0..chordSize-1
-//   positions chordSize..groupSize-1: disabled degrees (sorted ascending by disabledDegree)
+// Virtual row layout per pitch group (pitchGroupSize rows, bottom→top):
+//   positions 0..chordSize-1           : valid degrees 0..chordSize-1
+//   positions chordSize..pitchGroupSize-1: disabled degrees (sorted ascending by disabledDegree)
 //
-// virtualPos = octave * groupSize + posInGroup
+// virtualPos = pitchGroup * pitchGroupSize + posInGroup
 // visual row = rowOffset + numRows - 1 - virtualPos   (top of grid = highest pitch)
 
 int PatternGrid::virtualToAbsRow(int virtualPos) const
 {
-    if (groupSize <= 0) return virtualPos;
-    int gs = groupSize;
+    if (pitchGroupSize <= 0) return virtualPos;
+    int gs = pitchGroupSize;
     int pos = ((virtualPos % gs) + gs) % gs;
     if (pos >= chordSize) return -1;  // disabled slot
-    int octave = virtualPos / gs;
-    return octave * chordSize + pos;
+    int pitchGroup = virtualPos / gs;
+    return pitchGroup * chordSize + pos;
 }
 
 void PatternGrid::rebuildNotes()
@@ -55,27 +55,27 @@ void PatternGrid::rebuildNotes()
             ddSet.insert(n.disabledDegree);
 
     std::vector<int> newDD(ddSet.begin(), ddSet.end());  // sorted ascending
-    int newGroupSize = chordSize + (int)newDD.size();
+    int newPitchGroupSize = chordSize + (int)newDD.size();
 
-    if (newDD != disabledDegrees || newGroupSize != groupSize) {
+    if (newDD != disabledDegrees || newPitchGroupSize != pitchGroupSize) {
         disabledDegrees = newDD;
-        groupSize       = newGroupSize;
+        pitchGroupSize  = newPitchGroupSize;
     }
 
     std::set<int> occupiedDisabledVPos;
     for (auto n : patNotes) {
         int virtualPos;
         if (n.disabled) {
-            int octave = n.row;
+            int pitchGroup = n.row;
             auto it = std::find(disabledDegrees.begin(), disabledDegrees.end(), n.disabledDegree);
             if (it == disabledDegrees.end()) continue;
             int ddIdx = (int)std::distance(disabledDegrees.begin(), it);
-            virtualPos = octave * groupSize + chordSize + ddIdx;
+            virtualPos = pitchGroup * pitchGroupSize + chordSize + ddIdx;
             occupiedDisabledVPos.insert(virtualPos);
         } else {
-            int octave = n.row / chordSize;
-            int degree = n.row % chordSize;
-            virtualPos = octave * groupSize + degree;
+            int pitchGroup = n.row / chordSize;
+            int degree     = n.row % chordSize;
+            virtualPos = pitchGroup * pitchGroupSize + degree;
         }
         int visual = (rowOffset + numRows - 1) - virtualPos;
         if (visual >= 0 && visual < numRows) {
@@ -85,7 +85,7 @@ void PatternGrid::rebuildNotes()
     }
 
     if (onDisabledDegreesChanged)
-        onDisabledDegreesChanged(disabledDegrees, groupSize, occupiedDisabledVPos);
+        onDisabledDegreesChanged(disabledDegrees, pitchGroupSize, occupiedDisabledVPos);
 
     clampSelection();
 }
@@ -154,26 +154,26 @@ std::function<void(float)> PatternGrid::makeVelocityCallback(int noteIdx)
 // uses. -1 when a disabled note's degree is no longer in the layout.
 int PatternGrid::virtualPosOf(const Note& n) const
 {
-    if (groupSize <= 0 || chordSize <= 0) return -1;
+    if (pitchGroupSize <= 0 || chordSize <= 0) return -1;
     if (!n.disabled)
-        return (n.row / chordSize) * groupSize + (n.row % chordSize);
+        return (n.row / chordSize) * pitchGroupSize + (n.row % chordSize);
 
     auto it = std::find(disabledDegrees.begin(), disabledDegrees.end(), n.disabledDegree);
     if (it == disabledDegrees.end()) return -1;
-    return n.row * groupSize + chordSize + (int)std::distance(disabledDegrees.begin(), it);
+    return n.row * pitchGroupSize + chordSize + (int)std::distance(disabledDegrees.begin(), it);
 }
 
-// A row's note-slot: a chord degree in the lower part of each octave group, one
+// A row's note-slot: a chord degree in the lower part of each pitch group, one
 // of the greyed-out disabled degrees above it. A transposed note takes on the
 // character of the row it lands on, which is what "move everything up N rows"
 // means visually.
 ObservablePattern::NoteRowSlot PatternGrid::slotForVirtualPos(int noteId, int virtualPos) const
 {
-    int octave = virtualPos / groupSize;
-    int pos    = virtualPos % groupSize;
+    int pitchGroup = virtualPos / pitchGroupSize;
+    int pos        = virtualPos % pitchGroupSize;
     if (pos < chordSize)
-        return {noteId, octave * chordSize + pos, false, -1};
-    return {noteId, octave, true, disabledDegrees[pos - chordSize]};
+        return {noteId, pitchGroup * chordSize + pos, false, -1};
+    return {noteId, pitchGroup, true, disabledDegrees[pos - chordSize]};
 }
 
 // Lowest/highest virtual row the pattern's notes occupy; {-1,-1} when it has
@@ -192,7 +192,7 @@ std::pair<int,int> PatternGrid::virtualPosExtent() const
 
 void PatternGrid::transposeRows(int rows)
 {
-    if (!pattern || patternId < 0 || rows == 0 || groupSize <= 0) return;
+    if (!pattern || patternId < 0 || rows == 0 || pitchGroupSize <= 0) return;
 
     std::vector<ObservablePattern::NoteRowSlot> slots;
     for (const auto& n : pattern->buildPatternNotes(patternId)) {
@@ -206,18 +206,18 @@ void PatternGrid::transposeRows(int rows)
 }
 
 // Transpose applies to the whole pattern, not the clicked note, and counts GUI
-// rows: one octave group is groupSize rows, which is the most we offer either
+// rows: one pitch group is pitchGroupSize rows, which is the most we offer either
 // way. Disabled notes move with the rest.
 std::function<void(int,int)> PatternGrid::makeTransposeCallback(int noteIdx)
 {
-    if (!pattern || !transposePopup || patternId < 0 || groupSize <= 0 || totalTones <= 0)
+    if (!pattern || !transposePopup || patternId < 0 || pitchGroupSize <= 0 || totalTones <= 0)
         return nullptr;
     (void)noteIdx;
     return [this](int px, int py) {
         auto [lo, hi] = virtualPosExtent();
         if (lo < 0) return;
         transposePopup->open(px, py,
-            {std::max(-groupSize, -lo), std::min(groupSize, totalTones - 1 - hi)},
+            {std::max(-pitchGroupSize, -lo), std::min(pitchGroupSize, totalTones - 1 - hi)},
             [this](int rows) { transposeRows(rows); });
     };
 }
@@ -399,16 +399,16 @@ int PatternGrid::handle(int event)
 
 // Row line i sits between visual rows i-1 and i.
 // The corresponding virtual position below line i is: rowOffset + numRows - i
-// Dark if that position is the bottom of an octave group (virtualPos % groupSize == 0).
+// Dark if that position is the bottom of a pitch group (virtualPos % pitchGroupSize == 0).
 Fl_Color PatternGrid::rowLineColor(int i) const
 {
-    if (i <= 0 || i >= numRows || groupSize <= 0) return 0xEE888800;
-    if ((rowOffset + numRows - i) % groupSize == 0)
-        return 0x33110000;  // dark octave boundary
+    if (i <= 0 || i >= numRows || pitchGroupSize <= 0) return 0xEE888800;
+    if ((rowOffset + numRows - i) % pitchGroupSize == 0)
+        return 0x33110000;  // dark pitch-group boundary
     return 0xEE888800;
 }
 
-// Grey background for disabled slots within each octave group.
+// Grey background for disabled slots within each pitch group.
 Fl_Color PatternGrid::rowBgColor(int row) const
 {
     for (const auto& n : notes)

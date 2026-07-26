@@ -53,9 +53,9 @@ int NoteLabels::computeTotalTones() const {
         if (midi > 127) break;
         enabledTotal++;
     }
-    // Convert to virtual-row count: each octave group is groupSize rows
-    int numOctaves = (enabledTotal + size - 1) / size;
-    return numOctaves * groupSize;
+    // Convert to virtual-row count: each pitch group is pitchGroupSize rows
+    int numPitchGroups = (enabledTotal + size - 1) / size;
+    return numPitchGroups * pitchGroupSize;
 }
 
 void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
@@ -69,7 +69,7 @@ void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
 
 void NoteLabels::setDisabledDegrees(const std::vector<int>& dd, int gs, const std::set<int>& occupied) {
     disabledDegrees     = dd;
-    groupSize           = gs;
+    pitchGroupSize      = gs;
     occupiedDisabledVPos = occupied;
     totalTones          = computeTotalTones();
     redraw();
@@ -82,38 +82,38 @@ void NoteLabels::setRowOffset(int offset) {
 
 // virtualPos → chord-space tone index (or -1 for disabled slot)
 std::string NoteLabels::noteForRow(int virtualPos) const {
-    if (groupSize <= 0) return "";
-    int gs  = groupSize;
+    if (pitchGroupSize <= 0) return "";
+    int gs  = pitchGroupSize;
     int pos = ((virtualPos % gs) + gs) % gs;
     if (pos >= chordSize) {
         // disabled slot: show the degree name with a dash
         int ddIdx  = pos - chordSize;
         if (ddIdx >= (int)disabledDegrees.size()) return "";
-        int degree = disabledDegrees[ddIdx];
-        int octave = virtualPos / gs;
-        int n      = octave * chordSize + degree;
+        int degree     = disabledDegrees[ddIdx];
+        int pitchGroup = virtualPos / gs;
+        int n          = pitchGroup * chordSize + degree;
         return noteName(n, rootPitch, chordIndex, useSharp);
     }
-    int octave = virtualPos / gs;
-    int n      = octave * chordSize + pos;
+    int pitchGroup = virtualPos / gs;
+    int n          = pitchGroup * chordSize + pos;
     return noteName(n, rootPitch, chordIndex, useSharp);
 }
 
 // visual row → MIDI pitch (canonical rowToMidi, matching playback); -1 if empty
 int NoteLabels::midiForRow(int r) const {
-    if (groupSize <= 0) return -1;
+    if (pitchGroupSize <= 0) return -1;
     int virtualPos = rowOffset + (numRows - 1 - r);
     if (virtualPos < 0 || virtualPos >= totalTones) return -1;
-    int gs     = groupSize;
-    int pos    = ((virtualPos % gs) + gs) % gs;
-    int octave = virtualPos / gs;
+    int gs         = pitchGroupSize;
+    int pos        = ((virtualPos % gs) + gs) % gs;
+    int pitchGroup = virtualPos / gs;
     int n;
     if (pos >= chordSize) {
         int ddIdx = pos - chordSize;
         if (ddIdx >= (int)disabledDegrees.size()) return -1;
-        n = octave * chordSize + disabledDegrees[ddIdx];
+        n = pitchGroup * chordSize + disabledDegrees[ddIdx];
     } else {
-        n = octave * chordSize + pos;
+        n = pitchGroup * chordSize + pos;
     }
     return rowToMidi(n, rootPitch, chordIndex);
 }

@@ -34,7 +34,7 @@ public:
     std::pair<int,int> patternPitchExtent(int patternId) const;
 
     // Where a note sits in the harmony editor's row space. `row` is the abs_row
-    // for an enabled note and the octave for a disabled one, as Note documents.
+    // for an enabled note and the pitch group for a disabled one, as Note documents.
     struct NoteRowSlot {
         int  noteId;
         int  row;

@@ -14,7 +14,7 @@ class PatternGrid : public Grid, public ITimelineObserver {
     int                 chordSize       = 3;
     int                 rowOffset       = 0;   // in virtual-row units
     std::vector<int>    disabledDegrees;        // sorted ascending; unique disabled degrees
-    int                 groupSize       = 3;   // chordSize + disabledDegrees.size()
+    int                 pitchGroupSize  = 3;   // chordSize + disabledDegrees.size()
     int                 totalTones      = 0;   // rows the labels show, in virtual-row units
 
     struct RapidCell {
@@ -60,21 +60,21 @@ protected:
     int handle(int event) override;
 
 public:
-    // Fired on every rebuild; args: (disabledDegrees, groupSize, occupiedDisabledVirtualPositions)
+    // Fired on every rebuild; args: (disabledDegrees, pitchGroupSize, occupiedDisabledVirtualPositions)
     std::function<void(const std::vector<int>&, int, const std::set<int>&)> onDisabledDegreesChanged;
 
     PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PatternGrid();
 
     void setPattern(ObservablePattern* tl, int patId);
-    void setChordSize(int size) { chordSize = size; groupSize = size + (int)disabledDegrees.size(); redraw(); }
+    void setChordSize(int size) { chordSize = size; pitchGroupSize = size + (int)disabledDegrees.size(); redraw(); }
     void setTotalTones(int t)   { totalTones = t; }
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);
     void setRapidMode(bool r);
     void onTimelineChanged() override;
 
-    int getGroupSize()       const { return groupSize; }
+    int getPitchGroupSize()  const { return pitchGroupSize; }
     int getChordSize()       const { return chordSize; }
     int getRowOffset()       const { return rowOffset; }
 };

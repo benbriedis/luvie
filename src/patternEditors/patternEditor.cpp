@@ -86,7 +86,7 @@ int PatternEditor::computeDefaultOffset(int patId) const
 
     int maxOffset = std::max(0, total - patternGrid.numRows);
 
-    int gs = patternGrid.getGroupSize();
+    int gs = patternGrid.getPitchGroupSize();
     int cs = patternGrid.getChordSize();
 
     int numChordTones = (total / gs) * cs;
@@ -97,18 +97,18 @@ int PatternEditor::computeDefaultOffset(int patId) const
         for (int n = 0; n < numChordTones; n++) {
             if (midiForTone(n) <= A3) bestChordTone = n;
         }
-        int octave     = bestChordTone / cs;
+        int pitchGroup = bestChordTone / cs;
         int degree     = bestChordTone % cs;
-        int virtualPos = octave * gs + degree;
+        int virtualPos = pitchGroup * gs + degree;
         return std::clamp(virtualPos - 1, 0, maxOffset);
     } else {
         int lowest = INT_MAX;
         for (const auto& n : allNotes)
             if (!n.disabled) lowest = std::min(lowest, (int)n.row);
         if (lowest == INT_MAX) lowest = 0;
-        int octave     = lowest / cs;
+        int pitchGroup = lowest / cs;
         int degree     = lowest % cs;
-        int virtualPos = octave * gs + degree;
+        int virtualPos = pitchGroup * gs + degree;
         return std::clamp(virtualPos - 1, 0, maxOffset);
     }
 }
