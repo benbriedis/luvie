@@ -118,7 +118,7 @@ void DrumGrid::draw()
     // Vertical column lines
     for (int i = colOffset; i <= std::min(endCol, numCols); i++) {
         int x0 = x() + padX + (i - colOffset) * colWidth;
-        // Bar lines come from the pattern's own time signature, as in PatternGrid.
+        // Bar lines come from the pattern's own time signature, as in HarmonyGrid.
         bool isBar = (i % 4 == 0);
         if (pattern)
             if (const Pattern* p = pattern->song()->patternById(patternId))

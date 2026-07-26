@@ -40,7 +40,7 @@ protected:
     virtual int  gridRowHeight()    const = 0;
     virtual int  gridColWidth()     const = 0;
     virtual int  gridWidgetW()      const = 0;
-    virtual int  currentRowOffset() const = 0;  // from labels (PatternEditor) or grid (others)
+    virtual int  currentRowOffset() const = 0;  // from labels (HarmonyEditor) or grid (others)
     virtual void gridSetRowOffset(int offset)             = 0;
     virtual void gridSetColOffset(int offset)             = 0;
     virtual void gridSetColWidth(int colWidth)            = 0;

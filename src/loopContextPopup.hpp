@@ -11,7 +11,7 @@
 // TrackContextPopup and may diverge from it as the Loop Editor needs differ.
 class LoopContextPopup : public ContextMenuPopup {
 public:
-    static constexpr int popW = 150;
+    static constexpr int popW = 180;
 
 private:
     ModernButton*       openPatternBtn;

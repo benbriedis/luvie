@@ -63,7 +63,7 @@ public:
     // Pattern lifecycle (creation/copy)
     // instrumentId defaults to the song's default (drum) instrument when < 0.
     // Passing it explicitly ensures the auto name reflects that instrument.
-    int createPattern(float lengthBeats, int instrumentId = -1);
+    int createHarmonyPattern(float lengthBeats, int instrumentId = -1);
     int createDrumPattern(float lengthBeats, int instrumentId = -1);
     int createPianorollPattern(float lengthBeats);
     int copyPattern(int srcPatId);

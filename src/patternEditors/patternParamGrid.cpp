@@ -140,7 +140,7 @@ void PatternParamGrid::draw()
         fl_line(x(), y() + r * kParamRowH, x() + gridRight, y() + r * kParamRowH);
     }
 
-    // Vertical column lines matching patternGrid colors
+    // Vertical column lines matching HarmonyGrid colours
     int timeSigTop = 4;
     if (pattern) {
         for (const auto& p : pattern->get().patterns)

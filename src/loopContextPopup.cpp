@@ -6,8 +6,8 @@ LoopContextPopup::LoopContextPopup()
     : ContextMenuPopup(popW, 6*30+2)
 {
     openPatternBtn      = addItem(0, "Open Pattern");
-    addLaneBtn          = addItem(1, "Add Pattern");
-    addPianorollLaneBtn = addItem(2, "Add Pianoroll");
+    addLaneBtn          = addItem(1, "Add Harmony Pattern");
+    addPianorollLaneBtn = addItem(2, "Add Pianoroll Pattern");
     cloneLaneBtn        = addItem(3, "Clone Pattern");
     removeLaneBtn       = addItem(4, "Remove Pattern");
     showInstrumentsBtn  = addItem(5, "Show Instruments");
@@ -54,6 +54,9 @@ void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int 
     canClone  ? cloneLaneBtn->activate()    : cloneLaneBtn->deactivate();
     canRemove ? removeLaneBtn->activate()   : removeLaneBtn->deactivate();
     flags.isDrumTrack ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
+    // Add Pattern copies the track's existing pattern type, so name it for what
+    // it will actually create.
+    addLaneBtn->label(flags.isDrumTrack ? "Add Drum Pattern" : "Add Harmony Pattern");
 
     openAt(wx, wy);
 }

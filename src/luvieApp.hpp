@@ -20,7 +20,7 @@ class SettingsButton;
 class SettingsMenuPopup;
 class SongEditor;
 class PortRegistry;
-class PatternEditor;
+class HarmonyEditor;
 class DrumPatternEditor;
 class PianorollEditor;
 class PatternPanel;
@@ -98,7 +98,7 @@ public:
     SettingsMenuPopup* settingsMenu   = nullptr;
     ModernTabs*        tabs         = nullptr;
     Fl_Group*          patternTab   = nullptr;
-    PatternEditor*     patternEd    = nullptr;
+    HarmonyEditor*     harmonyEd    = nullptr;
     DrumPatternEditor* drumEd       = nullptr;
     PianorollEditor*   pianorollEd  = nullptr;
     PatternPanel*      patternPanel = nullptr;

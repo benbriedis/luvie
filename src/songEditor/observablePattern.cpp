@@ -323,7 +323,7 @@ void ObservablePattern::setDrumNoteMute(int patternId, int note, bool m)
 // ---------------------------------------------------------------------------
 // Pattern lifecycle
 
-int ObservablePattern::createPattern(float lengthBeats, int instrumentId)
+int ObservablePattern::createHarmonyPattern(float lengthBeats, int instrumentId)
 {
     int id = song_->nextId++;
     Pattern p;

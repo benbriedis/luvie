@@ -8,7 +8,7 @@
 
 class TrackContextPopup : public ContextMenuPopup {
 public:
-    static constexpr int popW  = 150;
+    static constexpr int popW  = 180;
 
 private:
 

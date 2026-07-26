@@ -1,5 +1,5 @@
-#ifndef NOTE_LABELS_HPP
-#define NOTE_LABELS_HPP
+#ifndef HARMONY_LABELS_HPP
+#define HARMONY_LABELS_HPP
 
 #include <FL/Fl_Widget.H>
 #include <FL/Fl.H>
@@ -10,7 +10,7 @@
 
 std::string noteName(int n, int rootPitch, int chordIndex, bool useSharp);
 
-class NoteLabels : public Fl_Widget {
+class HarmonyLabels : public Fl_Widget {
     int              numRows;
     int              rowHeight;
     int              rootPitch      = 0;
@@ -35,8 +35,8 @@ public:
     std::function<void()>    onRightClick;
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 
-    NoteLabels(int x, int y, int w, int numRows, int rowHeight);
-    ~NoteLabels();
+    HarmonyLabels(int x, int y, int w, int numRows, int rowHeight);
+    ~HarmonyLabels();
 
     void setParams(int rootPitch, std::string_view chordHash, bool useSharp);
     void setRowOffset(int offset);

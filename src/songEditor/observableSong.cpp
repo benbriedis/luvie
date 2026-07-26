@@ -905,7 +905,7 @@ int ObservableSong::addLane(int trackId)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
 
-        PatternType ptype  = PatternType::STANDARD;
+        PatternType ptype  = PatternType::HARMONY;
         float       beats  = 4.0f;   // 1 bar in 4/4 when the track has no lane to copy
         int         instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
@@ -1022,7 +1022,7 @@ int ObservableSong::cloneLane(int trackId, int laneId)
         if (!src) return -1;
 
         // Deep-copy the source pattern (notes, drums and automation) with fresh
-        // IDs so the clone is fully independent. Works for STANDARD, PIANOROLL
+        // IDs so the clone is fully independent. Works for HARMONY, PIANOROLL
         // and DRUM patterns since the whole struct is copied.
         Pattern copy       = *src;
         copy.id            = nextId++;

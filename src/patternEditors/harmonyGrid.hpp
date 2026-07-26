@@ -1,5 +1,5 @@
-#ifndef PATTERN_GRID_HPP
-#define PATTERN_GRID_HPP
+#ifndef HARMONY_GRID_HPP
+#define HARMONY_GRID_HPP
 
 #include "grid.hpp"
 #include "observablePattern.hpp"
@@ -8,7 +8,7 @@
 #include <set>
 #include <optional>
 
-class PatternGrid : public Grid, public ITimelineObserver {
+class HarmonyGrid : public Grid, public ITimelineObserver {
     ObservablePattern* pattern        = nullptr;
     int                 patternId       = -1;
     int                 chordSize       = 3;
@@ -67,8 +67,8 @@ public:
     // Fired on every rebuild; args: (bonusDegrees, pitchGroupSize)
     std::function<void(const std::vector<int>&, int)> onBonusDegreesChanged;
 
-    PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
-    ~PatternGrid();
+    HarmonyGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
+    ~HarmonyGrid();
 
     void setPattern(ObservablePattern* tl, int patId);
     void setChordSize(int size) { chordSize = size; pitchGroupSize = size + (int)bonusDegrees.size(); redraw(); }

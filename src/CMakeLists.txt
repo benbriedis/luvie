@@ -1,8 +1,8 @@
 # Core: every SRC from the old Makefile except main.cpp
 add_library(luvie_core STATIC
     appWindow.cpp editor.cpp songEditor/songEditor.cpp patternEditors/basePatternEditor.cpp
-    patternEditors/patternEditor.cpp grid.cpp songEditor/songGrid.cpp
-    patternEditors/patternGrid.cpp songEditor/trackLabels.cpp
+    patternEditors/harmonyEditor.cpp grid.cpp songEditor/songGrid.cpp
+    patternEditors/harmonyGrid.cpp songEditor/trackLabels.cpp
     patternEditors/noteContextPopup.cpp songEditor/patternInstanceContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
     transports/simpleTransport.cpp transports/sequencer.cpp transports/jackTransport.cpp
@@ -11,7 +11,7 @@ add_library(luvie_core STATIC
     songEditor/observableSong.cpp songEditor/observablePattern.cpp
     songEditor/patternNames.cpp
     outputs/observableInstrument.cpp loopManager.cpp loopModeController.cpp patternEditors/patternPanel.cpp
-    modern/inlineEditDispatch.cpp patternEditors/noteLabels.cpp songEditor/trackContextPopup.cpp
+    modern/inlineEditDispatch.cpp patternEditors/harmonyLabels.cpp songEditor/trackContextPopup.cpp
     patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp
     loopEditor.cpp loopContextPopup.cpp

@@ -67,8 +67,8 @@ Beat definition in Loop Editor: it can't really act as transport master as the
    BPM as it really expects CPM and there can be multiple different CPMs at one time.
    If we want time master here - probably best to use settings from Song Master.
 
-The Plain ("Harmony") Pattern Editor - pitch interpretation
-===========================================================
+The Harmony Pattern Editor - pitch interpretation
+=================================================
 The purple control panel contains the current interpretation of the pitches of the pattern.
 Changes to it don't modify the pattern itself, it changes the pitches that are output.
 

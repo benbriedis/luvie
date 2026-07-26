@@ -16,7 +16,7 @@
 #include "observableInstrument.hpp"
 #include "patternPanel.hpp"
 #include "transport.hpp"
-#include "noteLabels.hpp"
+#include "harmonyLabels.hpp"
 #include "luvieApp.hpp"
 #include "outputsOverlay.hpp"
 #include "portRegistry.hpp"

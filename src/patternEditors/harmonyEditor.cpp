@@ -1,58 +1,58 @@
-#include "patternEditor.hpp"
+#include "harmonyEditor.hpp"
 #include "chords.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
 #include <climits>
 #include <set>
 
-PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCols,
+HarmonyEditor::HarmonyEditor(int x, int y, int visibleW, int numRows, int numCols,
                              int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : BasePatternEditor(x, y, visibleW, numRows, numCols, rowHeight, colWidth, snap, labelsW),
-      noteLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
-      patternGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
+      harmonyLabels(x + scrollbarW, y + rulerH, labelsW, numRows, rowHeight),
+      harmonyGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     const int gridH        = numRows * rowHeight;
     const int visibleGridW = visibleW - scrollbarW - labelsW;
 
-    noteLabels.position(x + scrollbarW, y + rulerH);
-    patternGrid.position(x + scrollbarW + labelsW, y + rulerH);
-    patternGrid.size(visibleGridW, gridH);
-    patternGrid.setPlayhead(&playhead);
+    harmonyLabels.position(x + scrollbarW, y + rulerH);
+    harmonyGrid.position(x + scrollbarW + labelsW, y + rulerH);
+    harmonyGrid.size(visibleGridW, gridH);
+    harmonyGrid.setPlayhead(&playhead);
 
-    gridPane.add(noteLabels);
-    gridPane.add(patternGrid);
+    gridPane.add(harmonyLabels);
+    gridPane.add(harmonyGrid);
     gridPane.add(paramLabels);
     gridPane.add(paramGrid);
 
     playhead.setOwner(this);
 
-    patternGrid.onBonusDegreesChanged = [this](const std::vector<int>& dd, int gs) {
-        int oldTotal = noteLabels.getTotalTones();
-        noteLabels.setBonusDegrees(dd, gs);
-        patternGrid.setTotalTones(noteLabels.getTotalTones());
-        if (noteLabels.getTotalTones() != oldTotal)
-            setRowOffset(noteLabels.getRowOffset());
+    harmonyGrid.onBonusDegreesChanged = [this](const std::vector<int>& dd, int gs) {
+        int oldTotal = harmonyLabels.getTotalTones();
+        harmonyLabels.setBonusDegrees(dd, gs);
+        harmonyGrid.setTotalTones(harmonyLabels.getTotalTones());
+        if (harmonyLabels.getTotalTones() != oldTotal)
+            setRowOffset(harmonyLabels.getRowOffset());
     };
 
     end();
 }
 
-PatternEditor::~PatternEditor() = default;
+HarmonyEditor::~HarmonyEditor() = default;
 
 // Display-only sync of the editor to a pattern's harmony. Never remaps notes:
 // remapping on a chord-size change is an interactive edit handled in
 // PatternPanel::commitHarmony, so that merely *switching* to a pattern with a
 // different-size chord does not corrupt that pattern's stored notes.
-void PatternEditor::setNoteParams(int root, std::string_view chordHash, bool sharp)
+void HarmonyEditor::setNoteParams(int root, std::string_view chordHash, bool sharp)
 {
     int  newChordIndex = chordIndexForHash(chordHash);
     bool paramsChanged = (root != rootPitch) || (newChordIndex != chordIndex);
 
     rootPitch  = root;
     chordIndex = newChordIndex;
-    noteLabels.setParams(root, chordHash, sharp);
-    patternGrid.setChordSize(chordDefs[chordIndex].size);
-    patternGrid.setTotalTones(noteLabels.getTotalTones());
+    harmonyLabels.setParams(root, chordHash, sharp);
+    harmonyGrid.setChordSize(chordDefs[chordIndex].size);
+    harmonyGrid.setTotalTones(harmonyLabels.getTotalTones());
 
     // This runs on every timeline change (via PatternPanel::onParamsChanged), so
     // only refocus the view when the harmony genuinely changed — otherwise adding
@@ -70,11 +70,11 @@ void PatternEditor::setNoteParams(int root, std::string_view chordHash, bool sha
     setRowOffset(computeDefaultOffset(patId));
 }
 
-int PatternEditor::computeDefaultOffset(int patId) const
+int HarmonyEditor::computeDefaultOffset(int patId) const
 {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = 12 + rootSemitone;
-    int total        = noteLabels.getTotalTones();
+    int total        = harmonyLabels.getTotalTones();
 
     auto midiForTone = [&](int n) {
         return rootMidi0 + chordToneOffset(chordDefs[chordIndex], n);
@@ -84,10 +84,10 @@ int PatternEditor::computeDefaultOffset(int patId) const
     if (pattern && patId >= 0)
         allNotes = pattern->buildPatternNotes(patId);
 
-    int maxOffset = std::max(0, total - patternGrid.numRows);
+    int maxOffset = std::max(0, total - harmonyGrid.numRows);
 
-    int gs = patternGrid.getPitchGroupSize();
-    int cs = patternGrid.getChordSize();
+    int gs = harmonyGrid.getPitchGroupSize();
+    int cs = harmonyGrid.getChordSize();
 
     int numChordTones = (total / gs) * cs;
 
@@ -113,7 +113,7 @@ int PatternEditor::computeDefaultOffset(int patId) const
     }
 }
 
-void PatternEditor::focusPattern()
+void HarmonyEditor::focusPattern()
 {
     int patId = -1;
     if (pattern && lastSelectedTrack >= 0) {
@@ -124,9 +124,9 @@ void PatternEditor::focusPattern()
     setRowOffset(computeDefaultOffset(patId));
 }
 
-void PatternEditor::setGridPattern(int patId)
+void HarmonyEditor::setGridPattern(int patId)
 {
     if (patId <= 0) return;
-    patternGrid.setPattern(pattern, patId);
+    harmonyGrid.setPattern(pattern, patId);
     setRowOffset(computeDefaultOffset(patId));
 }

@@ -10,7 +10,7 @@
 // pattern editors manipulate. The song-level arrangement structs that aggregate
 // these (Pattern instances, Lanes, Tracks, Timeline) live in songEditor/timeline.hpp.
 
-enum class PatternType { STANDARD = 0, DRUM = 1, PIANOROLL = 2 };
+enum class PatternType { HARMONY = 0, DRUM = 1, PIANOROLL = 2 };
 
 struct DrumNote {
 	int   id;
@@ -50,7 +50,7 @@ struct ParamLane {
 struct Pattern {
 	int   id;
 	float lengthBeats;
-	PatternType            type = PatternType::STANDARD;
+	PatternType            type = PatternType::HARMONY;
 	std::vector<Note>      notes;
 	std::vector<DrumNote>  drumNotes;
 	std::set<int>          drumSolo;   // MIDI notes to solo (empty = all play)

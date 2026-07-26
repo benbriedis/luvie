@@ -1,4 +1,4 @@
-#include "noteLabels.hpp"
+#include "harmonyLabels.hpp"
 #include "chords.hpp"
 #include "cursors.hpp"
 #include <FL/fl_draw.H>
@@ -22,13 +22,13 @@ std::string noteName(int n, int rootPitch, int chordIndex, bool useSharp)
     return std::string(name) + std::to_string(noteOct);
 }
 
-NoteLabels::NoteLabels(int x, int y, int w, int numRows, int rowHeight)
+HarmonyLabels::HarmonyLabels(int x, int y, int w, int numRows, int rowHeight)
     : Fl_Widget(x, y, w, numRows * rowHeight), numRows(numRows), rowHeight(rowHeight)
 {}
 
-NoteLabels::~NoteLabels() { Fl::remove_timeout(clearFlashCb, this); }
+HarmonyLabels::~HarmonyLabels() { Fl::remove_timeout(clearFlashCb, this); }
 
-void NoteLabels::flash(int virtualPos)
+void HarmonyLabels::flash(int virtualPos)
 {
     flashVPos = virtualPos;
     Fl::remove_timeout(clearFlashCb, this);
@@ -36,14 +36,14 @@ void NoteLabels::flash(int virtualPos)
     redraw();
 }
 
-void NoteLabels::clearFlashCb(void* self)
+void HarmonyLabels::clearFlashCb(void* self)
 {
-    auto* nl = static_cast<NoteLabels*>(self);
+    auto* nl = static_cast<HarmonyLabels*>(self);
     nl->flashVPos = -1;
     nl->redraw();
 }
 
-int NoteLabels::computeTotalTones() const {
+int HarmonyLabels::computeTotalTones() const {
     int rootSemitone = (rootPitch + 9) % 12;
     int rootMidi0    = rootSemitone;
     int size         = chordDefs[chordIndex].size;
@@ -58,7 +58,7 @@ int NoteLabels::computeTotalTones() const {
     return numPitchGroups * pitchGroupSize;
 }
 
-void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
+void HarmonyLabels::setParams(int root, std::string_view chordHash, bool sharp) {
     rootPitch  = root;
     chordIndex = chordIndexForHash(chordHash);
     chordSize  = chordDefs[chordIndex].size;
@@ -67,20 +67,20 @@ void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
     redraw();
 }
 
-void NoteLabels::setBonusDegrees(const std::vector<int>& bd, int gs) {
+void HarmonyLabels::setBonusDegrees(const std::vector<int>& bd, int gs) {
     bonusDegrees   = bd;
     pitchGroupSize = gs;
     totalTones     = computeTotalTones();
     redraw();
 }
 
-void NoteLabels::setRowOffset(int offset) {
+void HarmonyLabels::setRowOffset(int offset) {
     rowOffset = offset;
     redraw();
 }
 
 // virtualPos → the note name that row sounds, bonus rows included
-std::string NoteLabels::noteForRow(int virtualPos) const {
+std::string HarmonyLabels::noteForRow(int virtualPos) const {
     if (pitchGroupSize <= 0) return "";
     int gs  = pitchGroupSize;
     int pos = ((virtualPos % gs) + gs) % gs;
@@ -99,7 +99,7 @@ std::string NoteLabels::noteForRow(int virtualPos) const {
 }
 
 // visual row → MIDI pitch (canonical rowToMidi, matching playback); -1 if empty
-int NoteLabels::midiForRow(int r) const {
+int HarmonyLabels::midiForRow(int r) const {
     if (pitchGroupSize <= 0) return -1;
     int virtualPos = rowOffset + (numRows - 1 - r);
     if (virtualPos < 0 || virtualPos >= totalTones) return -1;
@@ -117,7 +117,7 @@ int NoteLabels::midiForRow(int r) const {
     return rowToMidi(n, rootPitch, chordIndex);
 }
 
-void NoteLabels::draw() {
+void HarmonyLabels::draw() {
     static constexpr Fl_Color bgCol     = 0x1F293700;
     static constexpr Fl_Color borderCol = 0x37415100;
 
@@ -134,7 +134,7 @@ void NoteLabels::draw() {
         if (virtualPos < 0 || virtualPos >= totalTones) continue;
         int ry = y() + r * rowHeight;
 
-        // grey background on every bonus row, matching PatternGrid::rowBgColor
+        // grey background on every bonus row, matching HarmonyGrid::rowBgColor
         if (pitchGroupSize > 0 && virtualPos % pitchGroupSize >= chordSize) {
             fl_color(0xCCCCCC00);
             fl_rectf(x(), ry, w() - 1, rowHeight);
@@ -152,7 +152,7 @@ void NoteLabels::draw() {
 
 }
 
-int NoteLabels::handle(int event) {
+int HarmonyLabels::handle(int event) {
     if (int r = contextMenuCursorHandle(this, event); r >= 0) return r;
     if (event == FL_PUSH) {
         if (Fl::event_button() == FL_RIGHT_MOUSE) {

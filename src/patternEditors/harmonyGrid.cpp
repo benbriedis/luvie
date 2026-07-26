@@ -1,4 +1,4 @@
-#include "patternGrid.hpp"
+#include "harmonyGrid.hpp"
 #include "transposePopup.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"
@@ -7,16 +7,16 @@
 #include <cmath>
 #include <set>
 
-PatternGrid::PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
+HarmonyGrid::HarmonyGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {}
 
-PatternGrid::~PatternGrid()
+HarmonyGrid::~HarmonyGrid()
 {
     swapObserver(pattern, nullptr, this);
 }
 
-void PatternGrid::setPattern(ObservablePattern* tl, int patId)
+void HarmonyGrid::setPattern(ObservablePattern* tl, int patId)
 {
     swapObserver(pattern, tl, this);
     patternId = patId;
@@ -31,7 +31,7 @@ void PatternGrid::setPattern(ObservablePattern* tl, int patId)
 // virtualPos = pitchGroup * pitchGroupSize + posInGroup
 // visual row = rowOffset + numRows - 1 - virtualPos   (top of grid = highest pitch)
 
-int PatternGrid::virtualToAbsRow(int virtualPos) const
+int HarmonyGrid::virtualToAbsRow(int virtualPos) const
 {
     if (pitchGroupSize <= 0) return virtualPos;
     int gs = pitchGroupSize;
@@ -43,14 +43,14 @@ int PatternGrid::virtualToAbsRow(int virtualPos) const
 
 // Every row the labels show is a legal home for a note — the chord's own degrees
 // and the bonus rows alike. Only rows outside the labelled range are refused.
-bool PatternGrid::validVirtualPos(int virtualPos) const
+bool HarmonyGrid::validVirtualPos(int virtualPos) const
 {
     if (pitchGroupSize <= 0 || chordSize <= 0) return false;
     if (virtualPos < 0) return false;
     return totalTones <= 0 || virtualPos < totalTones;
 }
 
-void PatternGrid::rebuildNotes()
+void HarmonyGrid::rebuildNotes()
 {
     notes.clear();
     if (!pattern || patternId < 0) { clampSelection(); return; }
@@ -97,14 +97,14 @@ void PatternGrid::rebuildNotes()
     clampSelection();
 }
 
-void PatternGrid::onTimelineChanged()
+void HarmonyGrid::onTimelineChanged()
 {
     if (!isActiveDrag())
         rebuildNotes();
     redraw();
 }
 
-void PatternGrid::toggleNote()
+void HarmonyGrid::toggleNote()
 {
     int   ey        = Fl::event_y() - y();
     int   ex        = Fl::event_x() - x();
@@ -143,7 +143,7 @@ void PatternGrid::toggleNote()
 
 // Create a note on `virtualPos`, whichever kind of row that turns out to be: a
 // bonus row takes a note carrying that row's degree, so it sounds as labelled.
-void PatternGrid::addNoteAt(int virtualPos, float col, float length)
+void HarmonyGrid::addNoteAt(int virtualPos, float col, float length)
 {
     auto slot = slotForVirtualPos(0, virtualPos);
     if (slot.bonus)
@@ -152,14 +152,14 @@ void PatternGrid::addNoteAt(int virtualPos, float col, float length)
         pattern->addNote(patternId, col, slot.row, length);
 }
 
-std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)
+std::function<void()> HarmonyGrid::makeDeleteCallback(int noteIdx)
 {
     if (!pattern) return nullptr;
     int id = notes[noteIdx].id;
     return [this, id]() { pattern->removeNote(id); };
 }
 
-std::function<void(float)> PatternGrid::makeVelocityCallback(int noteIdx)
+std::function<void(float)> HarmonyGrid::makeVelocityCallback(int noteIdx)
 {
     if (!pattern) return nullptr;
     int id = notes[noteIdx].id;
@@ -168,7 +168,7 @@ std::function<void(float)> PatternGrid::makeVelocityCallback(int noteIdx)
 
 // Virtual row a stored note occupies — the inverse of the mapping rebuildNotes
 // uses. -1 when a bonus note's degree is no longer in the layout.
-int PatternGrid::virtualPosOf(const Note& n) const
+int HarmonyGrid::virtualPosOf(const Note& n) const
 {
     if (pitchGroupSize <= 0 || chordSize <= 0) return -1;
     if (!n.bonus)
@@ -182,7 +182,7 @@ int PatternGrid::virtualPosOf(const Note& n) const
 // A row's note-slot: a chord degree in the lower part of each pitch group, or one
 // of the greyed-out bonus rows above it. A transposed note takes on the character
 // of the row it lands on, which is what "move everything up N rows" means visually.
-ObservablePattern::NoteRowSlot PatternGrid::slotForVirtualPos(int noteId, int virtualPos) const
+ObservablePattern::NoteRowSlot HarmonyGrid::slotForVirtualPos(int noteId, int virtualPos) const
 {
     int pitchGroup = virtualPos / pitchGroupSize;
     int pos        = virtualPos % pitchGroupSize;
@@ -193,7 +193,7 @@ ObservablePattern::NoteRowSlot PatternGrid::slotForVirtualPos(int noteId, int vi
 
 // Lowest/highest virtual row the pattern's notes occupy; {-1,-1} when it has
 // none. Taken from the pattern, not `notes`, which holds only the visible rows.
-std::pair<int,int> PatternGrid::virtualPosExtent() const
+std::pair<int,int> HarmonyGrid::virtualPosExtent() const
 {
     int lo = -1, hi = -1;
     for (const auto& n : pattern->buildPatternNotes(patternId)) {
@@ -205,7 +205,7 @@ std::pair<int,int> PatternGrid::virtualPosExtent() const
     return {lo, hi};
 }
 
-void PatternGrid::transposeRows(int rows)
+void HarmonyGrid::transposeRows(int rows)
 {
     if (!pattern || patternId < 0 || rows == 0 || pitchGroupSize <= 0) return;
 
@@ -223,7 +223,7 @@ void PatternGrid::transposeRows(int rows)
 // Transpose applies to the whole pattern, not the clicked note, and counts GUI
 // rows: one pitch group is pitchGroupSize rows, which is the most we offer either
 // way. Bonus notes move with the rest.
-std::function<void(int,int)> PatternGrid::makeTransposeCallback(int noteIdx)
+std::function<void(int,int)> HarmonyGrid::makeTransposeCallback(int noteIdx)
 {
     if (!pattern || !transposePopup || patternId < 0 || pitchGroupSize <= 0 || totalTones <= 0)
         return nullptr;
@@ -240,7 +240,7 @@ std::function<void(int,int)> PatternGrid::makeTransposeCallback(int noteIdx)
 // A dragged note takes on the character of the row it is dropped on — the same
 // rule transpose follows — so a note dragged onto a bonus row becomes a bonus
 // note, and one dragged off a bonus row becomes an ordinary one.
-void PatternGrid::onCommitMove(const StateDragMove& s)
+void HarmonyGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern) return;
     const Note& n  = notes[s.noteIdx];
@@ -249,7 +249,7 @@ void PatternGrid::onCommitMove(const StateDragMove& s)
     pattern->moveNoteToSlot(n.beat, slotForVirtualPos(n.id, virtualPos));
 }
 
-void PatternGrid::onCommitResize(const StateDragResize& s)
+void HarmonyGrid::onCommitResize(const StateDragResize& s)
 {
     if (!pattern) return;
     int id = notes[s.noteIdx].id;
@@ -259,14 +259,14 @@ void PatternGrid::onCommitResize(const StateDragResize& s)
         pattern->resizeNoteRight(id, notes[s.noteIdx].length);
 }
 
-void PatternGrid::setRowOffset(int offset)
+void HarmonyGrid::setRowOffset(int offset)
 {
     rowOffset = offset;
     rebuildNotes();
     redraw();
 }
 
-void PatternGrid::setRapidMode(bool r)
+void HarmonyGrid::setRapidMode(bool r)
 {
     rapidMode           = r;
     rapidRemovedOnClick = false;
@@ -278,7 +278,7 @@ void PatternGrid::setRapidMode(bool r)
     redraw();
 }
 
-bool PatternGrid::screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const
+bool HarmonyGrid::screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const
 {
     int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
     if (ex < 0 || ex >= gridRight || ey < 0 || ey >= h()) return false;
@@ -287,7 +287,7 @@ bool PatternGrid::screenToCell(int ex, int ey, int& outRow, int& outAbsCol) cons
     return true;
 }
 
-void PatternGrid::rapidTryCreate(int visualRow, int absCol)
+void HarmonyGrid::rapidTryCreate(int visualRow, int absCol)
 {
     if (visualRow < 0 || visualRow >= numRows || absCol < 0 || absCol + 1 > numCols) return;
 
@@ -317,7 +317,7 @@ void PatternGrid::rapidTryCreate(int visualRow, int absCol)
     addNoteAt(virtualPos, col, 1.0f);
 }
 
-void PatternGrid::processRapidCell(RapidCell cur)
+void HarmonyGrid::processRapidCell(RapidCell cur)
 {
     if (!rapidPending) {
         if (!rapidLast || rapidIsDiagonal(*rapidLast, cur)) {
@@ -343,7 +343,7 @@ void PatternGrid::processRapidCell(RapidCell cur)
     }
 }
 
-int PatternGrid::handle(int event)
+int HarmonyGrid::handle(int event)
 {
     if (!rapidMode)
         return Grid::handle(event);
@@ -416,7 +416,7 @@ int PatternGrid::handle(int event)
 // Row line i sits between visual rows i-1 and i.
 // The corresponding virtual position below line i is: rowOffset + numRows - i
 // Dark if that position is the bottom of a pitch group (virtualPos % pitchGroupSize == 0).
-Fl_Color PatternGrid::rowLineColor(int i) const
+Fl_Color HarmonyGrid::rowLineColor(int i) const
 {
     if (i <= 0 || i >= numRows || pitchGroupSize <= 0) return 0xEE888800;
     if ((rowOffset + numRows - i) % pitchGroupSize == 0)
@@ -427,7 +427,7 @@ Fl_Color PatternGrid::rowLineColor(int i) const
 // Grey background for every bonus row, in every pitch group — not just the ones a
 // bonus note happens to sit in. The bonus degrees belong to the layout, so they
 // read as continuous stripes running the height of the grid.
-Fl_Color PatternGrid::rowBgColor(int row) const
+Fl_Color HarmonyGrid::rowBgColor(int row) const
 {
     if (pitchGroupSize <= 0) return bgColor;
     int virtualPos = rowOffset + numRows - 1 - row;
@@ -435,7 +435,7 @@ Fl_Color PatternGrid::rowBgColor(int row) const
     return virtualToAbsRow(virtualPos) < 0 ? 0xCCCCCC00 : bgColor;
 }
 
-Fl_Color PatternGrid::columnColor(int col) const
+Fl_Color HarmonyGrid::columnColor(int col) const
 {
     if (!pattern) return 0x00EE0000;
     for (const auto& p : pattern->get().patterns) {

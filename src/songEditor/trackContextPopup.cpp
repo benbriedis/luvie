@@ -7,8 +7,8 @@ TrackContextPopup::TrackContextPopup()
 {
     openPatternBtn      = addItem(0, "Open Pattern");
     addParamBtn         = addItem(1, "Add automation \xe2\x96\xb6");
-    addLaneBtn          = addItem(2, "Add Pattern");
-    addPianorollLaneBtn = addItem(3, "Add Pianoroll");
+    addLaneBtn          = addItem(2, "Add Harmony Pattern");
+    addPianorollLaneBtn = addItem(3, "Add Pianoroll Pattern");
     cloneLaneBtn        = addItem(4, "Clone Pattern");
     removeLaneBtn       = addItem(5, "Remove Pattern");
     showInstrumentsBtn  = addItem(6, "Show Instruments");
@@ -72,6 +72,9 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
     flags.canOpenPattern ? cloneLaneBtn->activate()        : cloneLaneBtn->deactivate();
     flags.canRemoveLane  ? removeLaneBtn->activate()       : removeLaneBtn->deactivate();
     flags.isDrumTrack    ? addPianorollLaneBtn->deactivate(): addPianorollLaneBtn->activate();
+    // Add Pattern copies the track's existing pattern type, so name it for what
+    // it will actually create.
+    addLaneBtn->label(flags.isDrumTrack ? "Add Drum Pattern" : "Add Harmony Pattern");
 
     openAt(wx, wy);
 }

@@ -194,7 +194,7 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void initRapidBtn();
     void initInput();
 
-    void configureStandardRow();
+    void configureHarmonyRow();
     void configureDrumRow();
     void configurePianorollRow();
 

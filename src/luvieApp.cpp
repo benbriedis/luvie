@@ -8,7 +8,7 @@
 #include <filesystem>
 #include "appWindow.hpp"
 #include "songEditor.hpp"
-#include "patternEditor.hpp"
+#include "harmonyEditor.hpp"
 #include "noteContextPopup.hpp"
 #include "patternInstanceContextPopup.hpp"
 #include "modernTabs.hpp"
@@ -42,20 +42,20 @@ void LuvieApp::ChangeNotifier::onTimelineChanged() {
 }
 
 void LuvieApp::EditorSwitcher::onTimelineChanged() {
-    if (!app->patternEd || !app->drumEd || !app->pianorollEd || !app->song_) return;
+    if (!app->harmonyEd || !app->drumEd || !app->pianorollEd || !app->song_) return;
     const auto& data = app->song_->get();
-    PatternType type = PatternType::STANDARD;
+    PatternType type = PatternType::HARMONY;
     {
         int patId = data.patternIdForSelectedLane();
         for (const auto& p : data.patterns)
             if (p.id == patId) { type = p.type; break; }
     }
     if (type == PatternType::DRUM) {
-        app->patternEd->hide(); app->pianorollEd->hide(); app->drumEd->show();
+        app->harmonyEd->hide(); app->pianorollEd->hide(); app->drumEd->show();
     } else if (type == PatternType::PIANOROLL) {
-        app->patternEd->hide(); app->drumEd->hide(); app->pianorollEd->show();
+        app->harmonyEd->hide(); app->drumEd->hide(); app->pianorollEd->show();
     } else {
-        app->drumEd->hide(); app->pianorollEd->hide(); app->patternEd->show();
+        app->drumEd->hide(); app->pianorollEd->hide(); app->harmonyEd->show();
     }
 }
 
@@ -211,9 +211,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tab2->color(bgColor);
     patternTab = tab2;
 
-    patternEd = new PatternEditor(0, off + tabBarH, winW, numRows,
+    harmonyEd = new HarmonyEditor(0, off + tabBarH, winW, numRows,
                                   numPatternBeats, rowHeight, 40, 1.0f, *p1);
-    tab2->add(patternEd);
+    tab2->add(harmonyEd);
 
     drumEd = new DrumPatternEditor(0, off + tabBarH, winW, drumNumRows,
                                    numPatternBeats, drumRowH, 40, 1.0f, *p1);
@@ -228,14 +228,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // Stretch the editors down to the control panel so their vertical
     // scrollbars meet it (this resize also forces a relayout that fills them).
     const int patEditorH = tabsH - tabBarH - panelH;
-    patternEd->resize(0, off + tabBarH, winW, patEditorH);
+    harmonyEd->resize(0, off + tabBarH, winW, patEditorH);
     drumEd->resize(0, off + tabBarH, winW, patEditorH);
     pianorollEd->resize(0, off + tabBarH, winW, patEditorH);
 
     patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
     patternPanel->setPattern(pattern);
     tab2->add(patternPanel);
-    tab2->resizable(patternEd);
+    tab2->resizable(harmonyEd);
     tabs->add(*tab2);
 
     // ---- Transport bar ----
@@ -321,7 +321,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Wire up active pattern set ----
     loopEd->setLoopManager(&loopMgr);
     og2->setPlayheadLoopManager(&loopMgr);
-    patternEd->setPlayheadLoopManager(&loopMgr);
+    harmonyEd->setPlayheadLoopManager(&loopMgr);
     drumEd->setPlayheadLoopManager(&loopMgr);
     pianorollEd->setPlayheadLoopManager(&loopMgr);
 
@@ -340,7 +340,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // Song→Loop and does the bar-aligned seek-back on Loop→Song.
     modeController.init(transport, tabs, og2, [this](bool loop) {
         songEd->setPlayheadLoopMode(loop);
-        patternEd->setPlayheadLoopMode(loop);
+        harmonyEd->setPlayheadLoopMode(loop);
         drumEd->setPlayheadLoopMode(loop);
         pianorollEd->setPlayheadLoopMode(loop);
     });
@@ -352,44 +352,44 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
 
     // ---- Wire up pattern editors ----
-    patternEd->setPatternPlayhead(transport, pattern, 0);
+    harmonyEd->setPatternPlayhead(transport, pattern, 0);
     drumEd->setPatternPlayhead(transport, pattern, 0);
     pianorollEd->setPatternPlayhead(transport, pattern, 0);
-    patternEd->setNoteLabelsContextPopup(nlCtxPop);
+    harmonyEd->setNoteLabelsContextPopup(nlCtxPop);
     drumEd->setNoteLabelsContextPopup(nlCtxPop);
     pianorollEd->setNoteLabelsContextPopup(nlCtxPop);
-    patternEd->setParamLabelsContextPopup(nlCtxPop);
+    harmonyEd->setParamLabelsContextPopup(nlCtxPop);
     drumEd->setParamLabelsContextPopup(nlCtxPop);
     pianorollEd->setParamLabelsContextPopup(nlCtxPop);
-    patternEd->setParamDotPopup(pdPop);
+    harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
-    patternEd->setTransposePopup(patTransposePop);
+    harmonyEd->setTransposePopup(patTransposePop);
     pianorollEd->setTransposePopup(pianoTransposePop);
-    patternEd->setAuditioner(&auditioner);
+    harmonyEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);
 
     // ---- Note label / params sync ----
-    auto syncNoteLabels = [this]() {
-        patternEd->setNoteParams(patternPanel->rootPitch(),
+    auto syncHarmonyLabels = [this]() {
+        harmonyEd->setNoteParams(patternPanel->rootPitch(),
                                  patternPanel->chordHash(),
                                  patternPanel->isSharp());
         if (onExtraParamsChanged) onExtraParamsChanged();
     };
-    patternPanel->onParamsChanged = syncNoteLabels;
+    patternPanel->onParamsChanged = syncHarmonyLabels;
     patternPanel->onSnapChanged = [this](float s) {
-        if (patternEd)   patternEd->setSnap(s);
+        if (harmonyEd)   harmonyEd->setSnap(s);
         if (drumEd)      drumEd->setSnap(s);
         if (pianorollEd) pianorollEd->setSnap(s);
     };
     patternPanel->onDivisionsChanged = [this](int d) {
-        if (patternEd)   patternEd->setDivisions(d);
+        if (harmonyEd)   harmonyEd->setDivisions(d);
         if (drumEd)      drumEd->setDivisions(d);
         if (pianorollEd) pianorollEd->setDivisions(d);
     };
     patternPanel->onZoomChanged = [this](int factor) {
-        if (patternEd)   patternEd->setZoom(factor);
+        if (harmonyEd)   harmonyEd->setZoom(factor);
         if (drumEd)      drumEd->setZoom(factor);
         if (pianorollEd) pianorollEd->setZoom(factor);
     };
@@ -398,13 +398,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             drumEd->focusPattern();
         else if (pianorollEd && pianorollEd->visible())
             pianorollEd->focusPattern();
-        else if (patternEd)
-            patternEd->focusPattern();
+        else if (harmonyEd)
+            harmonyEd->focusPattern();
     };
     patternPanel->onRapidChanged = [this](bool r) {
-        if (patternEd) patternEd->setRapidMode(r);
+        if (harmonyEd) harmonyEd->setRapidMode(r);
     };
-    syncNoteLabels();
+    syncHarmonyLabels();
 
     // ---- Popups — added last (FLTK dispatches in reverse order) ----
     window->add(p1);     window->registerPopup(p1);
@@ -558,7 +558,7 @@ void LuvieApp::pushInstruments() {
             if (!found && pattern_) {
                 int patId = ci.isDrum
                     ? pattern_->createDrumPattern(numPatternBeats, ci.id)
-                    : pattern_->createPattern(numPatternBeats, ci.id);
+                    : pattern_->createHarmonyPattern(numPatternBeats, ci.id);
                 song_->addTrack(ci.id, patId);
             }
         }

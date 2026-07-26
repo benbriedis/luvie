@@ -482,7 +482,7 @@ void PatternPanel::initOutChoice()
         int sel = tl.selectedTrackIndex;
         if (sel < 0 || sel >= (int)tl.tracks.size()) return;
         int patId = tl.patternIdForSelectedLane();
-        PatternType type = PatternType::STANDARD;
+        PatternType type = PatternType::HARMONY;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; break; }
         // Build the filtered instrument list (same filtering as refreshOutChoice)
@@ -580,7 +580,7 @@ void PatternPanel::refreshOutChoice()
     if (sel < 0 || sel >= (int)tl.tracks.size()) { outChoice.value(0); return; }
     int patId = tl.patternIdForSelectedLane();
 
-    PatternType type        = PatternType::STANDARD;
+    PatternType type        = PatternType::HARMONY;
     int         currentId   = 0;
     for (const auto& p : tl.patterns) {
         if (p.id != patId) continue;
@@ -738,7 +738,7 @@ void PatternPanel::setPattern(ObservablePattern* tl)
     onTimelineChanged();
 }
 
-void PatternPanel::configureStandardRow()
+void PatternPanel::configureHarmonyRow()
 {
     harmonyControls.show();
     rapidBtn.show();
@@ -783,7 +783,7 @@ void PatternPanel::onTimelineChanged()
     if (sel >= 0 && sel < (int)tl.tracks.size()) {
         const auto& selTrack = tl.tracks[sel];
         int patId = tl.patternIdForSelectedLane();
-        PatternType type = PatternType::STANDARD;
+        PatternType type = PatternType::HARMONY;
         std::string pName;
         for (const auto& p : tl.patterns)
             if (p.id == patId) { type = p.type; pName = p.name; break; }
@@ -791,11 +791,11 @@ void PatternPanel::onTimelineChanged()
         switch (type) {
         case PatternType::DRUM:      configureDrumRow();      break;
         case PatternType::PIANOROLL: configurePianorollRow(); break;
-        default:                     configureStandardRow();  break;
+        default:                     configureHarmonyRow();  break;
         }
     } else {
         patternName.copy_label("");
-        configureStandardRow();
+        configureHarmonyRow();
     }
     refreshOutChoice();
     refreshTimeSig();
