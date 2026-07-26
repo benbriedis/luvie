@@ -34,12 +34,12 @@ public:
     std::pair<int,int> patternPitchExtent(int patternId) const;
 
     // Where a note sits in the harmony editor's row space. `row` is the abs_row
-    // for an enabled note and the pitch group for a disabled one, as Note documents.
+    // for an ordinary note and the pitch group for a bonus one, as Note documents.
     struct NoteRowSlot {
         int  noteId;
         int  row;
-        bool disabled;
-        int  disabledDegree;
+        bool bonus;
+        int  bonusDegree;
     };
     void setNoteRows(int patternId, const std::vector<NoteRowSlot>& slots);
     std::vector<Note> buildPatternNotes(int patternId) const;

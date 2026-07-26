@@ -67,10 +67,10 @@ void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
     redraw();
 }
 
-void NoteLabels::setDisabledDegrees(const std::vector<int>& dd, int gs) {
-    disabledDegrees = dd;
-    pitchGroupSize  = gs;
-    totalTones      = computeTotalTones();
+void NoteLabels::setBonusDegrees(const std::vector<int>& bd, int gs) {
+    bonusDegrees   = bd;
+    pitchGroupSize = gs;
+    totalTones     = computeTotalTones();
     redraw();
 }
 
@@ -79,16 +79,16 @@ void NoteLabels::setRowOffset(int offset) {
     redraw();
 }
 
-// virtualPos → chord-space tone index (or -1 for disabled slot)
+// virtualPos → the note name that row sounds, bonus rows included
 std::string NoteLabels::noteForRow(int virtualPos) const {
     if (pitchGroupSize <= 0) return "";
     int gs  = pitchGroupSize;
     int pos = ((virtualPos % gs) + gs) % gs;
     if (pos >= chordSize) {
-        // disabled slot: show the degree name with a dash
-        int ddIdx  = pos - chordSize;
-        if (ddIdx >= (int)disabledDegrees.size()) return "";
-        int degree     = disabledDegrees[ddIdx];
+        // bonus row: named by the degree it kept
+        int bIdx = pos - chordSize;
+        if (bIdx >= (int)bonusDegrees.size()) return "";
+        int degree     = bonusDegrees[bIdx];
         int pitchGroup = virtualPos / gs;
         int n          = pitchGroup * chordSize + degree;
         return noteName(n, rootPitch, chordIndex, useSharp);
@@ -108,9 +108,9 @@ int NoteLabels::midiForRow(int r) const {
     int pitchGroup = virtualPos / gs;
     int n;
     if (pos >= chordSize) {
-        int ddIdx = pos - chordSize;
-        if (ddIdx >= (int)disabledDegrees.size()) return -1;
-        n = pitchGroup * chordSize + disabledDegrees[ddIdx];
+        int bIdx = pos - chordSize;
+        if (bIdx >= (int)bonusDegrees.size()) return -1;
+        n = pitchGroup * chordSize + bonusDegrees[bIdx];
     } else {
         n = pitchGroup * chordSize + pos;
     }
@@ -134,7 +134,7 @@ void NoteLabels::draw() {
         if (virtualPos < 0 || virtualPos >= totalTones) continue;
         int ry = y() + r * rowHeight;
 
-        // grey background on every disabled slot, matching PatternGrid::rowBgColor
+        // grey background on every bonus row, matching PatternGrid::rowBgColor
         if (pitchGroupSize > 0 && virtualPos % pitchGroupSize >= chordSize) {
             fl_color(0xCCCCCC00);
             fl_rectf(x(), ry, w() - 1, rowHeight);

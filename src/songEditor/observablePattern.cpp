@@ -167,9 +167,9 @@ void ObservablePattern::setNoteRows(int patternId, const std::vector<NoteRowSlot
         for (auto& n : pat.notes) {
             for (const auto& s : slots) {
                 if (s.noteId != n.id) continue;
-                n.row            = s.row;
-                n.disabled       = s.disabled;
-                n.disabledDegree = s.disabledDegree;
+                n.row         = s.row;
+                n.bonus       = s.bonus;
+                n.bonusDegree = s.bonusDegree;
                 changed = true;
                 break;
             }
@@ -192,11 +192,13 @@ void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
     for (auto& pat : song_->data.patterns) {
         if (pat.id != patId) continue;
         for (auto& note : pat.notes) {
-            if (note.disabled) {
-                if (note.disabledDegree >= 0 && note.disabledDegree < newSize) {
-                    note.row    = note.row * newSize + note.disabledDegree;
-                    note.disabled = false;
-                    note.disabledDegree = -1;
+            if (note.bonus) {
+                // The new chord is big enough to hold this degree again: fold the
+                // bonus note back into an ordinary row.
+                if (note.bonusDegree >= 0 && note.bonusDegree < newSize) {
+                    note.row         = note.row * newSize + note.bonusDegree;
+                    note.bonus       = false;
+                    note.bonusDegree = -1;
                 }
             } else {
                 int degree     = note.row % oldSize;
@@ -204,9 +206,10 @@ void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
                 if (degree < newSize) {
                     note.row = pitchGroup * newSize + degree;
                 } else {
-                    note.disabled       = true;
-                    note.disabledDegree = degree;
-                    note.row            = pitchGroup;
+                    // Degree fell off the end of the new chord: keep it as a bonus note.
+                    note.bonus       = true;
+                    note.bonusDegree = degree;
+                    note.row         = pitchGroup;
                 }
             }
         }

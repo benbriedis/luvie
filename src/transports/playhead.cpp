@@ -183,20 +183,20 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
-			if (note.disabled) continue;
+			int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 				if (verbose) {
-					std::string name = pitchName ? pitchName(note.row)
-					                             : std::to_string(note.row);
+					std::string name = pitchName ? pitchName(tone)
+					                             : std::to_string(tone);
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 				}
 				if (rowToMidi)
 					emitSoftNoteOn(instrumentId,
-					               std::clamp(rowToMidi(note.row, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127),
+					               std::clamp(rowToMidi(tone, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127),
 					               note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});
@@ -385,19 +385,19 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 
 		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
-			if (note.disabled) continue;
+			int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
 				if (verbose) {
-					std::string name = pitchName ? pitchName(note.row) : std::to_string(note.row);
+					std::string name = pitchName ? pitchName(tone) : std::to_string(tone);
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
 				}
 				if (rowToMidi)
 					emitSoftNoteOn(instrumentId,
-					               std::clamp(rowToMidi(note.row, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127),
+					               std::clamp(rowToMidi(tone, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127),
 					               note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});

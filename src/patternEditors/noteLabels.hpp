@@ -18,8 +18,8 @@ class NoteLabels : public Fl_Widget {
     bool             useSharp       = true;
     int              rowOffset      = 0;
     int              totalTones     = 30;   // in virtual-row units
-    std::vector<int> disabledDegrees;           // sorted ascending
-    int              pitchGroupSize     = 3;    // chordSize + disabledDegrees.size()
+    std::vector<int> bonusDegrees;           // sorted ascending
+    int              pitchGroupSize     = 3;    // chordSize + bonusDegrees.size()
     int              chordSize          = 3;
     int              flashVPos          = -1;   // virtual position briefly lit after a click
 
@@ -41,7 +41,7 @@ public:
     void setParams(int rootPitch, std::string_view chordHash, bool useSharp);
     void setRowOffset(int offset);
     void setNumRows(int n) { numRows = n; }
-    void setDisabledDegrees(const std::vector<int>& dd, int gs);
+    void setBonusDegrees(const std::vector<int>& bd, int gs);
     int  getTotalTones() const { return totalTones; }
     int  getRowOffset()  const { return rowOffset; }
 };

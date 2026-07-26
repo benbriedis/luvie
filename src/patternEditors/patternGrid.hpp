@@ -13,8 +13,8 @@ class PatternGrid : public Grid, public ITimelineObserver {
     int                 patternId       = -1;
     int                 chordSize       = 3;
     int                 rowOffset       = 0;   // in virtual-row units
-    std::vector<int>    disabledDegrees;        // sorted ascending; unique disabled degrees
-    int                 pitchGroupSize  = 3;   // chordSize + disabledDegrees.size()
+    std::vector<int>    bonusDegrees;          // sorted ascending; unique bonus degrees
+    int                 pitchGroupSize  = 3;   // chordSize + bonusDegrees.size()
     int                 totalTones      = 0;   // rows the labels show, in virtual-row units
 
     struct RapidCell {
@@ -36,10 +36,10 @@ class PatternGrid : public Grid, public ITimelineObserver {
         return std::abs(a.row - b.row) == 1 && std::abs(a.col - b.col) == 1;
     }
 
-    // Convert a virtual row index to chord-space abs_row (-1 if in a disabled slot)
+    // Convert a virtual row index to chord-space abs_row (-1 if it's a bonus row)
     int virtualToAbsRow(int virtualPos) const;
 
-    // Virtual row a stored note occupies (-1 if its disabled degree is gone),
+    // Virtual row a stored note occupies (-1 if its bonus degree is gone),
     // and the note-slot a virtual row stands for — inverses of each other.
     int virtualPosOf(const Note& n) const;
     ObservablePattern::NoteRowSlot slotForVirtualPos(int noteId, int virtualPos) const;
@@ -60,14 +60,14 @@ protected:
     int handle(int event) override;
 
 public:
-    // Fired on every rebuild; args: (disabledDegrees, pitchGroupSize)
-    std::function<void(const std::vector<int>&, int)> onDisabledDegreesChanged;
+    // Fired on every rebuild; args: (bonusDegrees, pitchGroupSize)
+    std::function<void(const std::vector<int>&, int)> onBonusDegreesChanged;
 
     PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PatternGrid();
 
     void setPattern(ObservablePattern* tl, int patId);
-    void setChordSize(int size) { chordSize = size; pitchGroupSize = size + (int)disabledDegrees.size(); redraw(); }
+    void setChordSize(int size) { chordSize = size; pitchGroupSize = size + (int)bonusDegrees.size(); redraw(); }
     void setTotalTones(int t)   { totalTones = t; }
     void setNumRows(int n) { numRows = n; rebuildNotes(); }
     void setRowOffset(int offset);

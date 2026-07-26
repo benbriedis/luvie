@@ -67,8 +67,8 @@ Beat definition in Loop Editor: it can't really act as transport master as the
    BPM as it really expects CPM and there can be multiple different CPMs at one time.
    If we want time master here - probably best to use settings from Song Master.
 
-The Plain ("Harmony") Pattern Editor
-====================================
+The Plain ("Harmony") Pattern Editor - pitch interpretation
+===========================================================
 The purple control panel contains the current interpretation of the pitches of the pattern.
 Changes to it don't modify the pattern itself, it changes the pitches that are output.
 
@@ -76,3 +76,14 @@ For contrast compare the Transpose option that is accessable via the note contex
 This operation changes the pattern itself.
 
 
+Harmony Pattern Editor - pitch groups
+=====================================
+Chords, scales, multiple octave. 
+Steps up an octave.
+Pitches are not always strictly increasing as a result.
+
+Harmony Pattern Editor - bonus notes
+====================================
+Bonus notes sit in bonus rows
+Describe how bonus notes get stretched up additional octaves when using smaller pitch groups.
+A bonus row will disappear if all the notes in it (across all octaves) are removed.

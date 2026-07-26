@@ -147,6 +147,16 @@ inline int chordToneOffset(const ChordDef& def, int n)
     return def.intervals[n % def.size] + (n / def.size) * 12;
 }
 
+// Tone index of a stored pattern note. An ordinary note keeps its tone index in
+// `row`; a bonus note keeps its pitch group there and its degree separately (that
+// degree sits above the current chord's size), and the two recombine into the tone
+// index the row's label shows — so a bonus note sounds exactly as labelled.
+// Allocation-free, so it is safe to call from the RT thread.
+inline int noteToneIndex(int row, bool bonus, int bonusDegree, int chordIndex)
+{
+    return bonus ? row * chordDefs[chordIndex].size + bonusDegree : row;
+}
+
 // Map a pattern note row → MIDI pitch for the given root/chord. Shared by the JACK
 // RT engine (jackTransport) and the soft (Playhead-driven) output path so both agree.
 // chordIndex is an already-resolved array index (see chordIndexForHash).

@@ -121,8 +121,8 @@ void Sequencer::rebuildSnapshot()
         } else {
             int chordIndex = chordIndexForHash(pat->chordHash);
             for (const Note& note : pat->notes) {
-                if (note.disabled) continue;
-                int midi = std::clamp(rowToMidi(note.row, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127);
+                int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
+                int midi = std::clamp(rowToMidi(tone, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127);
                 is.notes.push_back({midi, note.beat, note.length, note.velocity});
             }
         }

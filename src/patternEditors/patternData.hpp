@@ -21,12 +21,16 @@ struct DrumNote {
 
 struct Note {
 	int   id;
-	int   row;             // abs_row in current chord encoding; when disabled: stores the pitch group only
+	int   row;          // abs_row in current chord encoding; for a bonus note: the pitch group only
 	float beat;
 	float length;
-	float velocity       = 0.0f;
-	bool  disabled       = false;
-	int   disabledDegree = -1;  // degree at time of disabling (>= chord size); -1 when enabled
+	float velocity    = 0.0f;
+	// A bonus note is one whose degree no longer fits the pattern's chord — it sits
+	// in a greyed "bonus row" above the chord's degrees within its pitch group, and
+	// keeps its own degree so a later switch back to a bigger chord restores it.
+	// Bonus notes play like any other; see noteToneIndex() in chords.hpp.
+	bool  bonus       = false;
+	int   bonusDegree = -1;  // degree the note kept (>= chord size); -1 when not a bonus note
 };
 
 struct ParamPoint {

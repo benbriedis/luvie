@@ -26,9 +26,9 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
 
     playhead.setOwner(this);
 
-    patternGrid.onDisabledDegreesChanged = [this](const std::vector<int>& dd, int gs) {
+    patternGrid.onBonusDegreesChanged = [this](const std::vector<int>& dd, int gs) {
         int oldTotal = noteLabels.getTotalTones();
-        noteLabels.setDisabledDegrees(dd, gs);
+        noteLabels.setBonusDegrees(dd, gs);
         patternGrid.setTotalTones(noteLabels.getTotalTones());
         if (noteLabels.getTotalTones() != oldTotal)
             setRowOffset(noteLabels.getRowOffset());
@@ -104,7 +104,7 @@ int PatternEditor::computeDefaultOffset(int patId) const
     } else {
         int lowest = INT_MAX;
         for (const auto& n : allNotes)
-            if (!n.disabled) lowest = std::min(lowest, (int)n.row);
+            if (!n.bonus) lowest = std::min(lowest, (int)n.row);
         if (lowest == INT_MAX) lowest = 0;
         int pitchGroup = lowest / cs;
         int degree     = lowest % cs;
