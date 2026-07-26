@@ -60,8 +60,8 @@ protected:
     int handle(int event) override;
 
 public:
-    // Fired on every rebuild; args: (disabledDegrees, pitchGroupSize, occupiedDisabledVirtualPositions)
-    std::function<void(const std::vector<int>&, int, const std::set<int>&)> onDisabledDegreesChanged;
+    // Fired on every rebuild; args: (disabledDegrees, pitchGroupSize)
+    std::function<void(const std::vector<int>&, int)> onDisabledDegreesChanged;
 
     PatternGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PatternGrid();

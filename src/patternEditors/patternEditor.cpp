@@ -26,9 +26,9 @@ PatternEditor::PatternEditor(int x, int y, int visibleW, int numRows, int numCol
 
     playhead.setOwner(this);
 
-    patternGrid.onDisabledDegreesChanged = [this](const std::vector<int>& dd, int gs, const std::set<int>& occ) {
+    patternGrid.onDisabledDegreesChanged = [this](const std::vector<int>& dd, int gs) {
         int oldTotal = noteLabels.getTotalTones();
-        noteLabels.setDisabledDegrees(dd, gs, occ);
+        noteLabels.setDisabledDegrees(dd, gs);
         patternGrid.setTotalTones(noteLabels.getTotalTones());
         if (noteLabels.getTotalTones() != oldTotal)
             setRowOffset(noteLabels.getRowOffset());

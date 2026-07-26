@@ -7,7 +7,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <set>
 
 std::string noteName(int n, int rootPitch, int chordIndex, bool useSharp);
 
@@ -22,7 +21,6 @@ class NoteLabels : public Fl_Widget {
     std::vector<int> disabledDegrees;           // sorted ascending
     int              pitchGroupSize     = 3;    // chordSize + disabledDegrees.size()
     int              chordSize          = 3;
-    std::set<int>    occupiedDisabledVPos;      // virtual positions with actual disabled notes
     int              flashVPos          = -1;   // virtual position briefly lit after a click
 
     int         computeTotalTones() const;
@@ -43,7 +41,7 @@ public:
     void setParams(int rootPitch, std::string_view chordHash, bool useSharp);
     void setRowOffset(int offset);
     void setNumRows(int n) { numRows = n; }
-    void setDisabledDegrees(const std::vector<int>& dd, int gs, const std::set<int>& occupied);
+    void setDisabledDegrees(const std::vector<int>& dd, int gs);
     int  getTotalTones() const { return totalTones; }
     int  getRowOffset()  const { return rowOffset; }
 };

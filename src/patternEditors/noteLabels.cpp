@@ -67,11 +67,10 @@ void NoteLabels::setParams(int root, std::string_view chordHash, bool sharp) {
     redraw();
 }
 
-void NoteLabels::setDisabledDegrees(const std::vector<int>& dd, int gs, const std::set<int>& occupied) {
-    disabledDegrees     = dd;
-    pitchGroupSize      = gs;
-    occupiedDisabledVPos = occupied;
-    totalTones          = computeTotalTones();
+void NoteLabels::setDisabledDegrees(const std::vector<int>& dd, int gs) {
+    disabledDegrees = dd;
+    pitchGroupSize  = gs;
+    totalTones      = computeTotalTones();
     redraw();
 }
 
@@ -135,8 +134,8 @@ void NoteLabels::draw() {
         if (virtualPos < 0 || virtualPos >= totalTones) continue;
         int ry = y() + r * rowHeight;
 
-        // grey background only where a disabled note actually exists
-        if (occupiedDisabledVPos.count(virtualPos)) {
+        // grey background on every disabled slot, matching PatternGrid::rowBgColor
+        if (pitchGroupSize > 0 && virtualPos % pitchGroupSize >= chordSize) {
             fl_color(0xCCCCCC00);
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }

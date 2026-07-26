@@ -62,7 +62,6 @@ void PatternGrid::rebuildNotes()
         pitchGroupSize  = newPitchGroupSize;
     }
 
-    std::set<int> occupiedDisabledVPos;
     for (auto n : patNotes) {
         int virtualPos;
         if (n.disabled) {
@@ -71,7 +70,6 @@ void PatternGrid::rebuildNotes()
             if (it == disabledDegrees.end()) continue;
             int ddIdx = (int)std::distance(disabledDegrees.begin(), it);
             virtualPos = pitchGroup * pitchGroupSize + chordSize + ddIdx;
-            occupiedDisabledVPos.insert(virtualPos);
         } else {
             int pitchGroup = n.row / chordSize;
             int degree     = n.row % chordSize;
@@ -85,7 +83,7 @@ void PatternGrid::rebuildNotes()
     }
 
     if (onDisabledDegreesChanged)
-        onDisabledDegreesChanged(disabledDegrees, pitchGroupSize, occupiedDisabledVPos);
+        onDisabledDegreesChanged(disabledDegrees, pitchGroupSize);
 
     clampSelection();
 }
@@ -408,12 +406,15 @@ Fl_Color PatternGrid::rowLineColor(int i) const
     return 0xEE888800;
 }
 
-// Grey background for disabled slots within each pitch group.
+// Grey background for every disabled slot, in every pitch group — not just the
+// ones a disabled note happens to sit in. The disabled degrees belong to the
+// layout, so they read as continuous stripes running the height of the grid.
 Fl_Color PatternGrid::rowBgColor(int row) const
 {
-    for (const auto& n : notes)
-        if (n.disabled && (int)n.row == row) return 0xCCCCCC00;
-    return bgColor;
+    if (pitchGroupSize <= 0) return bgColor;
+    int virtualPos = rowOffset + numRows - 1 - row;
+    if (virtualPos < 0 || (totalTones > 0 && virtualPos >= totalTones)) return bgColor;
+    return virtualToAbsRow(virtualPos) < 0 ? 0xCCCCCC00 : bgColor;
 }
 
 Fl_Color PatternGrid::columnColor(int col) const
