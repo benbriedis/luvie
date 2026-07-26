@@ -122,7 +122,7 @@ void Sequencer::rebuildSnapshot()
             int chordIndex = chordIndexForHash(pat->chordHash);
             for (const Note& note : pat->notes) {
                 int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
-                int midi = std::clamp(rowToMidi(tone, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127);
+                int midi = rowToMidi(tone, pat->rootPitch, chordIndex);
                 is.notes.push_back({midi, note.beat, note.length, note.velocity});
             }
         }

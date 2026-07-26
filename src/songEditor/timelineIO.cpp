@@ -79,7 +79,6 @@ static json patternToJson(const Pattern& p) {
         {"rootPitch",    p.rootPitch},
         {"chordHash",    p.chordHash},
         {"useSharp",     p.useSharp},
-        {"octaveOffset", p.octaveOffset},
         {"divisions",    p.divisions},
         {"snapEnabled",  p.snapEnabled},
         {"zoom",         p.zoom},
@@ -99,7 +98,6 @@ static Pattern patternFromJson(const json& j) {
     p.rootPitch    = j.value("rootPitch", 0);
     p.chordHash    = j.value("chordHash", std::string{});
     p.useSharp     = j.value("useSharp",  false);
-    p.octaveOffset = j.value("octaveOffset", 0);
     p.divisions    = j.value("divisions",   0);
     p.snapEnabled  = j.value("snapEnabled", true);
     p.zoom         = j.value("zoom",        1);

@@ -196,7 +196,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 				}
 				if (rowToMidi)
 					emitSoftNoteOn(instrumentId,
-					               std::clamp(rowToMidi(tone, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127),
+					               rowToMidi(tone, pat->rootPitch, chordIndex),
 					               note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});
@@ -397,7 +397,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 				}
 				if (rowToMidi)
 					emitSoftNoteOn(instrumentId,
-					               std::clamp(rowToMidi(tone, pat->rootPitch, chordIndex) + pat->octaveOffset * 12, 0, 127),
+					               rowToMidi(tone, pat->rootPitch, chordIndex),
 					               note.velocity,
 					               note.length, beatsPerBar, songBar);
 			});

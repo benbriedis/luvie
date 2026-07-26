@@ -72,7 +72,7 @@ public:
     void setPatternTimeSig(int patId, int top, int bottom,
                            timeSettings::BeatUnit beat = timeSettings::beatUnitDefault);
     void setPatternLength(int patId, float lengthBeats);
-    void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp, int octaveOffset);
+    void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp);
     void setPatternDivisions(int patId, int divisions);
     void setPatternSnapEnabled(int patId, bool enabled);
     void setPatternZoom(int patId, int zoom);

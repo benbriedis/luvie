@@ -389,7 +389,6 @@ int ObservablePattern::copyPattern(int srcPatId)
     copy.rootPitch = src->rootPitch;
     copy.chordHash = src->chordHash;
     copy.useSharp  = src->useSharp;
-    copy.octaveOffset = src->octaveOffset;
     copy.divisions   = src->divisions;
     copy.snapEnabled = src->snapEnabled;
     song_->patternNames.assignDerived(copy, src->name);
@@ -457,14 +456,13 @@ void ObservablePattern::setPatternLength(int patId, float lengthBeats)
     }
 }
 
-void ObservablePattern::setPatternHarmony(int patId, int root, std::string chordHash, bool sharp, int octaveOffset)
+void ObservablePattern::setPatternHarmony(int patId, int root, std::string chordHash, bool sharp)
 {
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
             p.rootPitch = root;
             p.chordHash = std::move(chordHash);
             p.useSharp  = sharp;
-            p.octaveOffset = octaveOffset;
             song_->notify();
             return;
         }
