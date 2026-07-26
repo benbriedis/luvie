@@ -41,6 +41,15 @@ int PatternGrid::virtualToAbsRow(int virtualPos) const
     return pitchGroup * chordSize + pos;
 }
 
+// Every row the labels show is a legal home for a note — the chord's own degrees
+// and the bonus rows alike. Only rows outside the labelled range are refused.
+bool PatternGrid::validVirtualPos(int virtualPos) const
+{
+    if (pitchGroupSize <= 0 || chordSize <= 0) return false;
+    if (virtualPos < 0) return false;
+    return totalTones <= 0 || virtualPos < totalTones;
+}
+
 void PatternGrid::rebuildNotes()
 {
     notes.clear();
@@ -119,10 +128,8 @@ void PatternGrid::toggleNote()
         }
     }
 
-    // Determine abs_row in chord space; bail if we're in a bonus row
     int virtualPos = rowOffset + numRows - 1 - visual_row;
-    int abs_row    = virtualToAbsRow(virtualPos);
-    if (abs_row < 0) return;
+    if (!validVirtualPos(virtualPos)) return;
 
     float col    = newNoteStart(fcol);
     float length = newNoteLength();
@@ -131,7 +138,18 @@ void PatternGrid::toggleNote()
         [=](const Note& n) { return n.row == visual_row
                                   && beatsOverlap(col, length, n.beat, n.length); });
     if (clear)
-        pattern->addNote(patternId, col, abs_row, length);
+        addNoteAt(virtualPos, col, length);
+}
+
+// Create a note on `virtualPos`, whichever kind of row that turns out to be: a
+// bonus row takes a note carrying that row's degree, so it sounds as labelled.
+void PatternGrid::addNoteAt(int virtualPos, float col, float length)
+{
+    auto slot = slotForVirtualPos(0, virtualPos);
+    if (slot.bonus)
+        pattern->addBonusNote(patternId, col, slot.row, slot.bonusDegree, length);
+    else
+        pattern->addNote(patternId, col, slot.row, length);
 }
 
 std::function<void()> PatternGrid::makeDeleteCallback(int noteIdx)
@@ -219,19 +237,21 @@ std::function<void(int,int)> PatternGrid::makeTransposeCallback(int noteIdx)
     };
 }
 
+// A dragged note takes on the character of the row it is dropped on — the same
+// rule transpose follows — so a note dragged onto a bonus row becomes a bonus
+// note, and one dragged off a bonus row becomes an ordinary one.
 void PatternGrid::onCommitMove(const StateDragMove& s)
 {
-    if (!pattern || notes[s.noteIdx].bonus) return;
-    int id         = notes[s.noteIdx].id;
-    int virtualPos = rowOffset + numRows - 1 - (int)notes[s.noteIdx].row;
-    int abs_row    = virtualToAbsRow(virtualPos);
-    if (abs_row < 0) return;
-    pattern->moveNote(id, notes[s.noteIdx].beat, (float)abs_row);
+    if (!pattern) return;
+    const Note& n  = notes[s.noteIdx];
+    int virtualPos = rowOffset + numRows - 1 - (int)n.row;
+    if (!validVirtualPos(virtualPos)) return;
+    pattern->moveNoteToSlot(n.beat, slotForVirtualPos(n.id, virtualPos));
 }
 
 void PatternGrid::onCommitResize(const StateDragResize& s)
 {
-    if (!pattern || notes[s.noteIdx].bonus) return;
+    if (!pattern) return;
     int id = notes[s.noteIdx].id;
     if (s.side == Side::Left)
         pattern->resizeNoteLeft(id, notes[s.noteIdx].beat, notes[s.noteIdx].length);
@@ -277,10 +297,9 @@ void PatternGrid::rapidTryCreate(int visualRow, int absCol)
 
     if (!pattern || patternId < 0) return;
 
-    // Bail on a bonus row or an invalid slot before mutating anything.
+    // Bail on a row outside the labelled range before mutating anything.
     int virtualPos = rowOffset + numRows - 1 - visualRow;
-    int abs_row    = virtualToAbsRow(virtualPos);
-    if (abs_row < 0) return;
+    if (!validVirtualPos(virtualPos)) return;
 
     float col = float(absCol);
 
@@ -295,7 +314,7 @@ void PatternGrid::rapidTryCreate(int visualRow, int absCol)
     for (int id : sameColumn)
         pattern->removeNote(id);
 
-    pattern->addNote(patternId, col, abs_row, 1.0f);
+    addNoteAt(virtualPos, col, 1.0f);
 }
 
 void PatternGrid::processRapidCell(RapidCell cur)

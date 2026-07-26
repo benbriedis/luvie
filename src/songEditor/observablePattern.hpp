@@ -24,6 +24,10 @@ public:
 
     // Pattern note CRUD
     void addNote(int patternId, float start, int pitch, float length, float velocity = 0.8f);
+    // A note placed directly on one of the harmony editor's bonus rows: `pitchGroup`
+    // and `bonusDegree` are the row's coordinates, as Note documents.
+    void addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
+                      float length, float velocity = 0.8f);
     void removeNote(int noteId);
     void moveNote(int noteId, float newStart, float newPitch);
     void resizeNoteRight(int noteId, float newLength);
@@ -42,6 +46,9 @@ public:
         int  bonusDegree;
     };
     void setNoteRows(int patternId, const std::vector<NoteRowSlot>& slots);
+    // Move one note in both axes at once: `slot` carries the row it lands on, which
+    // may be an ordinary row or a bonus one.
+    void moveNoteToSlot(float newStart, const NoteRowSlot& slot);
     std::vector<Note> buildPatternNotes(int patternId) const;
     void remapPatternNotes(int patId, int oldSize, int newSize);
 

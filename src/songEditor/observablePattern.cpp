@@ -49,6 +49,20 @@ void ObservablePattern::addNote(int patternId, float start, int pitch, float len
     }
 }
 
+void ObservablePattern::addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
+                                     float length, float velocity)
+{
+    if (bonusDegree < 0) return;
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id == patternId) {
+            pat.notes.push_back({song_->nextId++, pitchGroup, start, length, velocity,
+                                 true, bonusDegree});
+            song_->notify();
+            return;
+        }
+    }
+}
+
 void ObservablePattern::removeNote(int noteId)
 {
     for (auto& pat : song_->data.patterns) {
@@ -176,6 +190,24 @@ void ObservablePattern::setNoteRows(int patternId, const std::vector<NoteRowSlot
         }
         if (changed) song_->notify();
         return;
+    }
+}
+
+// A drag in the harmony editor changes the beat and the row together, and the row
+// may switch a note between ordinary and bonus — so it goes through one call, and
+// one notify(), rather than a moveNote() plus a setNoteRows().
+void ObservablePattern::moveNoteToSlot(float newStart, const NoteRowSlot& slot)
+{
+    for (auto& pat : song_->data.patterns) {
+        for (auto& n : pat.notes) {
+            if (n.id != slot.noteId) continue;
+            n.beat        = newStart;
+            n.row         = slot.row;
+            n.bonus       = slot.bonus;
+            n.bonusDegree = slot.bonusDegree;
+            song_->notify();
+            return;
+        }
     }
 }
 

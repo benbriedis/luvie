@@ -29,6 +29,7 @@ class PatternGrid : public Grid, public ITimelineObserver {
     std::optional<RapidCell>     rapidPending;
 
     void rebuildNotes();
+    void addNoteAt(int virtualPos, float col, float length);
     bool screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const;
     void rapidTryCreate(int visualRow, int absCol);
     void processRapidCell(RapidCell cur);
@@ -38,6 +39,9 @@ class PatternGrid : public Grid, public ITimelineObserver {
 
     // Convert a virtual row index to chord-space abs_row (-1 if it's a bonus row)
     int virtualToAbsRow(int virtualPos) const;
+
+    // Whether a virtual row is one the user can put a note on at all
+    bool validVirtualPos(int virtualPos) const;
 
     // Virtual row a stored note occupies (-1 if its bonus degree is gone),
     // and the note-slot a virtual row stands for — inverses of each other.
