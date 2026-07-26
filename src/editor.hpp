@@ -60,9 +60,8 @@ public:
     void setPlayheadSongLoop(std::function<bool(float&,float&)> fn) {
         playhead.songLoopRange = std::move(fn);
     }
-    void setPlayheadSoftRouting(std::function<int(int,int,int)> r2m,
-                                std::function<MidiInstrRoute(int)> ir) {
-        playhead.setSoftRouting(std::move(r2m), std::move(ir));
+    void setPlayheadSoftRouting(std::function<MidiInstrRoute(int)> ir) {
+        playhead.setSoftRouting(std::move(ir));
     }
 };
 

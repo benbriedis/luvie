@@ -139,9 +139,6 @@ int main(int argc, char **argv) {
     // Soft (Native/Debug) output routing for the song playhead. Lambdas read live
     // state at playback time, so they're safe to set before build() populates widgets.
     app.portRegistry = &portReg;
-    app.rowToMidi = [](int row, int root, int chord) {
-        return rowToMidi(row, root, chord);
-    };
     app.instrRoute = [&app](int instrumentId) -> MidiInstrRoute {
         if (!app.outputsOverlay) return {};
         for (const auto& ci : app.outputsOverlay->getInstruments())

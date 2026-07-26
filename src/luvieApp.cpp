@@ -310,8 +310,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     }
     // Soft (Native/Debug) MIDI output: drive non-Jack ports from the song playhead.
     og2->setPlayheadPortRegistry(portRegistry);
-    if (rowToMidi || instrRoute)
-        og2->setPlayheadSoftRouting(rowToMidi, instrRoute);
+    if (instrRoute)
+        og2->setPlayheadSoftRouting(instrRoute);
 
     // Clicking a pattern-editor row label auditions that note on the selected
     // track's instrument port.

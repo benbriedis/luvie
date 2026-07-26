@@ -120,11 +120,9 @@ void Sequencer::rebuildSnapshot()
             }
         } else {
             int chordIndex = chordIndexForHash(pat->chordHash);
-            for (const Note& note : pat->notes) {
-                int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
-                int midi = rowToMidi(tone, pat->rootPitch, chordIndex);
-                is.notes.push_back({midi, note.beat, note.length, note.velocity});
-            }
+            for (const Note& note : pat->notes)
+                is.notes.push_back({patternNoteMidi(*pat, note, chordIndex),
+                                    note.beat, note.length, note.velocity});
         }
     };
 

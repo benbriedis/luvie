@@ -1,7 +1,9 @@
 #ifndef PATTERN_DATA_HPP
 #define PATTERN_DATA_HPP
 
+#include "chords.hpp"        // noteToneIndex, rowToMidi
 #include "timeSettings.hpp"  // BeatUnit
+#include <algorithm>
 #include <set>
 #include <string>
 #include <vector>
@@ -68,5 +70,21 @@ struct Pattern {
 	bool snapEnabled = true; // snap new notes and resized edges to the divisions
 	int  zoom      = 1;      // zoomChoice index; 1 = x2 (kZoomDefault in patternPanel.cpp)
 };
+
+// MIDI pitch a stored note sounds at. A pianoroll pattern keeps the MIDI note
+// number itself in `row`; a harmony pattern keeps a chord-tone index that only
+// becomes a pitch once resolved against the pattern's root and chord. Every
+// playback path (Sequencer's RT snapshot, the soft Playhead output) must go
+// through here, else pianoroll rows get read as chord tones and land far above
+// the top of the MIDI range. chordIndex is pre-resolved from pat.chordHash by
+// the caller (chordIndexForHash) as it is loop-invariant. Allocation-free, so it
+// is safe to call from the RT thread.
+inline int patternNoteMidi(const Pattern& pat, const Note& note, int chordIndex)
+{
+	if (pat.type == PatternType::PIANOROLL)
+		return std::clamp(note.row, 0, 127);
+	int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
+	return rowToMidi(tone, pat.rootPitch, chordIndex);
+}
 
 #endif

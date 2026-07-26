@@ -63,7 +63,6 @@ public:
     std::function<std::string(int)> getPitchName;
     // Soft (Native/Debug) MIDI output routing for the song playhead.
     PortRegistry*                      portRegistry = nullptr;
-    std::function<int(int,int,int)>    rowToMidi;    // (row, root, chord) → MIDI pitch
     std::function<MidiInstrRoute(int)> instrRoute;   // instrument id → port/channel
     std::function<void()>           onExtraSeek;
     std::function<void()>           onExtraParamsChanged;

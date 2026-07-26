@@ -40,7 +40,6 @@ class Playhead : public ITimelineObserver {
 	bool          anyJackPort = false;   // are any Jack ports present?
 	bool          jackClock   = false;   // is the Jack RT engine the active clock?
 	bool          wasPlaying  = false;
-	std::function<int(int,int,int)>         rowToMidi;   // (row, root, chord) → MIDI pitch
 	std::function<MidiInstrRoute(int)>      instrRoute;  // instrument id → port/channel
 	struct SoftActiveNote { std::string portName; int channel; int pitch; float offBar; };
 	std::vector<SoftActiveNote> softNotes;
@@ -59,6 +58,7 @@ class Playhead : public ITimelineObserver {
 	void tick();
 	bool isInPattern(float bars) const;
 	void checkVerboseNotes(float prevPos, float curPos);
+	std::string noteLabel(const Pattern& pat, const Note& note, int chordIndex) const;
 	void checkLoopVerboseNotes(float prevPos, float curPos);
 	void checkVerboseSongParams(float prevPos, float curPos);
 
@@ -88,9 +88,7 @@ public:
 	void setHasSoftPorts(bool b)          { anySoftPort = b; }
 	void setHasJackPorts(bool b)          { anyJackPort = b; }
 	void setJackClockActive(bool b)       { jackClock   = b; }
-	void setSoftRouting(std::function<int(int,int,int)> r2m,
-	                    std::function<MidiInstrRoute(int)> ir) {
-		rowToMidi  = std::move(r2m);
+	void setSoftRouting(std::function<MidiInstrRoute(int)> ir) {
 		instrRoute = std::move(ir);
 	}
 	// Release all held soft notes; call before the Port set is reconciled so notes

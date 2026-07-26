@@ -149,6 +149,17 @@ void Playhead::tick()
 	if (onTick) onTick();
 }
 
+// Name for a note in verbose output. pitchName() spells a chord-tone index against
+// the editor's root/chord, which is meaningless for a pianoroll row — that already
+// is a MIDI pitch, so print the number.
+std::string Playhead::noteLabel(const Pattern& pat, const Note& note, int chordIndex) const
+{
+	if (pat.type == PatternType::PIANOROLL)
+		return std::to_string(patternNoteMidi(pat, note, chordIndex));
+	int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
+	return pitchName ? pitchName(tone) : std::to_string(tone);
+}
+
 void Playhead::checkVerboseNotes(float prevPos, float curPos)
 {
 	const Timeline& tl      = obsTl->get();
@@ -183,22 +194,17 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
-			int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
+			int midi = patternNoteMidi(*pat, note, chordIndex);
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
-				if (verbose) {
-					std::string name = pitchName ? pitchName(tone)
-					                             : std::to_string(tone);
+				if (verbose)
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
-					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
-				}
-				if (rowToMidi)
-					emitSoftNoteOn(instrumentId,
-					               rowToMidi(tone, pat->rootPitch, chordIndex),
-					               note.velocity,
-					               note.length, beatsPerBar, songBar);
+					       bar, beat, label.c_str(), noteLabel(*pat, note, chordIndex).c_str(),
+					       note.beat, note.length);
+				emitSoftNoteOn(instrumentId, midi, note.velocity,
+				               note.length, beatsPerBar, songBar);
 			});
 		}
 
@@ -385,21 +391,17 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 
 		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
-			int tone = noteToneIndex(note.row, note.bonus, note.bonusDegree, chordIndex);
+			int midi = patternNoteMidi(*pat, note, chordIndex);
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
 				int   beat    = (int)((songBar - std::floor(songBar)) * songBeats) + 1;
-				if (verbose) {
-					std::string name = pitchName ? pitchName(tone) : std::to_string(tone);
+				if (verbose)
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
-					       bar, beat, label.c_str(), name.c_str(), note.beat, note.length);
-				}
-				if (rowToMidi)
-					emitSoftNoteOn(instrumentId,
-					               rowToMidi(tone, pat->rootPitch, chordIndex),
-					               note.velocity,
-					               note.length, beatsPerBar, songBar);
+					       bar, beat, label.c_str(), noteLabel(*pat, note, chordIndex).c_str(),
+					       note.beat, note.length);
+				emitSoftNoteOn(instrumentId, midi, note.velocity,
+				               note.length, beatsPerBar, songBar);
 			});
 		}
 
