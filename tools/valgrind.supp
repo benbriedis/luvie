@@ -1,0 +1,87 @@
+# SPDX-FileCopyrightText: Ben Briedis
+# SPDX-License-Identifier: Apache-2.0
+#
+# Valgrind suppressions for Luvie (standalone). Used by tools/run-valgrind.sh.
+#
+# Deliberately narrow: only third-party one-time/cache allocations that Memcheck
+# cannot see freed. Nothing here suppresses anything in Luvie's own code.
+# Regenerate additions with --gen-suppressions=all and paste them below.
+#
+# Every entry lists `indirect` alongside the other leak kinds, and that is load
+# bearing. Suppressing a root record does NOT suppress the blocks it owns: the
+# children stay unsuppressed and keep being counted, so the LEAK SUMMARY reports
+# hundreds of KB of "indirectly lost" that belongs to fontconfig or X11 and reads
+# as if it were ours. Keep `indirect` on anything added here.
+
+# --- fontconfig: caches are process-lifetime by design ---
+{
+   fontconfig-init-leak
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,definite,indirect
+   ...
+   obj:*/libfontconfig.so*
+}
+
+# --- X11 / XCB: display + locale structures torn down at _exit ---
+{
+   libX11-XOpenDisplay
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,definite,indirect
+   ...
+   fun:XOpenDisplay
+}
+{
+   libX11-generic
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   obj:*/libX11.so*
+}
+{
+   libxcb-generic
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   obj:*/libxcb*.so*
+}
+
+# --- dynamic loader: dlopen'd modules never dlclose'd ---
+{
+   dl-init-alloc
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:_dl_init
+}
+{
+   dl-open-alloc
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   fun:dlopen*
+}
+
+# --- Mesa / GLX drivers, if the X11 backend pulls them in ---
+{
+   mesa-driver
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,definite,indirect
+   ...
+   obj:*/dri/*.so
+}
+{
+   libGLX
+   Memcheck:Leak
+   match-leak-kinds: reachable,possible,indirect
+   ...
+   obj:*/libGLX*.so*
+}
+
+# --- glibc locale / iconv tables ---
+{
+   glibc-locale
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_nl_*
+}

@@ -98,10 +98,6 @@ int main(int argc, char **argv) {
     // icon for our windows (and drops it when the window is hidden under NSM).
     Fl_Window::default_xclass("luvie");
 
-    AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
-    window.color(bgColor);
-    window.end();
-
     ObservableSong songTimeline(120.0f, 4, 4);
     ObservablePattern patternObs(&songTimeline);
     ObservableInstrument instrObs(&songTimeline);
@@ -129,6 +125,17 @@ int main(int argc, char **argv) {
     songTimeline.setTransport(&router);
 
     LuvieApp app;
+
+    // Declared after everything the widget tree points at — the observables, the
+    // transports, the port registry, and app itself (whose LoopManager member the
+    // editors observe). Locals are destroyed in reverse, so the window, and with
+    // it every widget, is torn down first. Widget destructors call removeObserver()
+    // on those objects, which is a use-after-free once they have gone. Keep this
+    // declaration last of the group.
+    AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
+    window.color(bgColor);
+    window.end();
+
     app.verbose = verbose;
 
     if (verbose) {

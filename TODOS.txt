@@ -91,20 +91,11 @@ Currently only one Luvie instance per Ardour will work.
 DISTRO TODOs?
 ==============
 
-Think about installation of dependencies - eg 
-   nlohmann/json			ADD license
-Nice if we had an install script that installed everything locally (FLTK, JSON, Jack and LV2 deps)
-
 - Add support for Debian build
 
 - Snap, Flatpak, AppImage? - research which is best for audio plugins (if any. NB LV2 plugin install might be more complex)
 
 - Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
-
-License
--------
-Source code... maybe don't include licenses for dependencies.
-Include them as required when bundling?
 
 
 Monitor preformance
@@ -261,11 +252,6 @@ Distro and Build:
 	- Windows: "CPack NSIS (or WiX) installer for the app; plugin .dll in a .lv2 bundle."
 
   
-Create my own license...
-	Also are NSM or Jack licenses required?
-	JSON library. Others?
-	What is Carla using? It aims to be similarly free I think...
-
 =====================
 
 MINOR
@@ -294,7 +280,7 @@ Try Valgrind
 
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
-Add a better-looking flat symbol, and maybe sharp, using SVG
+Add a better-looking flat symbol, and maybe sharp, using SVG.  
 
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
 
@@ -321,3 +307,4 @@ DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song
 TO CHECK MORE: Not totally sure about how bonus notes are transformed when moving to more complicated chords.
 
 BUG: looping to start of song causes a gap.
+

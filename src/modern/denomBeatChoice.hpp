@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -55,12 +56,14 @@ inline Fl_SVG_Image* beatUnitGlyphImage(timeSettings::BeatUnit u, Fl_Color col)
 {
 	using timeSettings::BeatUnit;
 
-	static std::map<std::pair<int, unsigned>, Fl_SVG_Image*> cache;
+	// The cache owns the images: a bare pointer here leaks every glyph at exit,
+	// since clearing the map frees its nodes but not what they point at.
+	static std::map<std::pair<int, unsigned>, std::unique_ptr<Fl_SVG_Image>> cache;
 
 	unsigned rgb = (unsigned)col;
 	auto key = std::make_pair((int)u, rgb);
 	auto it = cache.find(key);
-	if (it != cache.end()) return it->second;
+	if (it != cache.end()) return it->second.get();
 
 	const char* src = (u == BeatUnit::DottedQuaver) ? kDottedQuaverSvg : kDottedCrotchetSvg;
 
@@ -79,10 +82,9 @@ inline Fl_SVG_Image* beatUnitGlyphImage(timeSettings::BeatUnit u, Fl_Color col)
 			svg.replace(p, needle.size(), repl);
 	}
 
-	auto* img = new Fl_SVG_Image(nullptr, svg.c_str());
+	auto img = std::make_unique<Fl_SVG_Image>(nullptr, svg.c_str());
 	img->resize(kGlyphH, kGlyphH);   // proportional: aspect < 1 sets the width
-	cache[key] = img;
-	return img;
+	return (cache[key] = std::move(img)).get();
 }
 
 // Draw a dotted-note glyph centred on (cx, cy).
