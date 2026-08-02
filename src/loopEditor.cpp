@@ -211,7 +211,7 @@ void LoopEditor::timerCb(void* data)
 
     double interval = 0.1;
     if (self->transport && self->transport->isPlaying() && self->timeline) {
-        float bpm = self->timeline->bpmAt((int)self->transport->position());
+        float bpm = self->timeline->bpmAtBar(self->transport->position());
         // update fast enough that a beat never skips visually in a button
         interval = std::clamp(30.0 / bpm, 0.016, 0.05);
     }

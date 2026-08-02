@@ -289,6 +289,7 @@ Try Valgrind again
 
 ============================
 
+Any way to try building and/or running on Windows or Mac?
 
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
@@ -296,15 +297,9 @@ Add a better-looking flat symbol, and maybe sharp, using SVG.
 
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
 
-FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
-         allow it to be editted.
-
 Add more hover over notes for controls
 
 DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
-
-- Linear ramping of tempos...
-  Either place in one marker, or multiple
 
 
 
@@ -313,6 +308,12 @@ TO CHECK MORE: Not totally sure about how bonus notes are transformed when movin
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
 
+Normal pattern editor: think put coloured items under the dark bar.
+
+FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
+         allow it to be editted.
+
 BUG: looping to start of song causes a gap.
 
-Normal pattern editor: think put coloured items under the dark bar.
+The linear tempo ramp doesn't really want a 'start'. Can maybe show starting tempo without editting.
+

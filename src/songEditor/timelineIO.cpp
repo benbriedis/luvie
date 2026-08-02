@@ -3,6 +3,7 @@
 
 #include "timelineIO.hpp"
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -220,7 +221,17 @@ static ParamLane paramLaneFromJson(const json& j) {
 
 static json timelineToJson(const Timeline& tl) {
     json jbpms = json::array();
-    for (const auto& b : tl.bpms) jbpms.push_back({{"bar", b.bar}, {"bpm", b.bpm}});
+    for (const auto& b : tl.bpms) {
+        // The ramp fields are written only for a ramp, so an ordinary tempo
+        // marker keeps the shape it has always had in the file.
+        json jb = {{"bar", b.bar}, {"bpm", b.bpm}};
+        if (b.isRamp()) {
+            jb["curve"]      = (int)b.curve;
+            jb["lengthBars"] = b.lengthBars;
+            jb["endBpm"]     = b.endBpm;
+        }
+        jbpms.push_back(std::move(jb));
+    }
 
     json jsigs = json::array();
     for (const auto& s : tl.timeSigs)
@@ -263,8 +274,16 @@ static json timelineToJson(const Timeline& tl) {
 
 static Timeline timelineFromJson(const json& j) {
     Timeline tl;
-    for (const auto& jb : j.value("bpms", json::array()))
-        tl.bpms.push_back({jb.at("bar"), (float)jb.at("bpm")});
+    for (const auto& jb : j.value("bpms", json::array())) {
+        BpmMarker m{jb.at("bar"), (float)jb.at("bpm")};
+        // Absent in files written before tempo ramps existed: an immediate marker.
+        if (jb.value("curve", 0) == (int)timeSettings::TempoCurve::Linear) {
+            m.curve      = timeSettings::TempoCurve::Linear;
+            m.lengthBars = std::max(1, jb.value("lengthBars", 1));
+            m.endBpm     = jb.value("endBpm", m.bpm);
+        }
+        tl.bpms.push_back(m);
+    }
     for (const auto& js : j.value("timeSigs", json::array()))
         tl.timeSigs.push_back({js.at("bar"), (int)js.at("top"), (int)js.at("bottom"),
                                timeSettings::beatUnitAt(js.value("beat", timeSettings::beatUnitDefaultIndex))});

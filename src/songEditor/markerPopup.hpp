@@ -4,6 +4,7 @@
 #ifndef MARKER_POPUP_HPP
 #define MARKER_POPUP_HPP
 
+#include <FL/Fl_Box.H>
 #include <FL/Fl_Value_Input.H>
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
@@ -18,9 +19,13 @@ public:
 
 	explicit MarkerPopup(Kind kind);
 
-	void openTempo(int wx, int wy, bool fixed, bool showDelete, double bpm,
-	               std::function<void(double)> onOk,
-	               std::function<void()>       onDelete);
+	// A tempo marker is either an instantaneous change (curve Immediate, endBpm
+	// unused) or a ramp from bpm to endBpm — see BpmMarker. The popup only edits
+	// the tempos and the curve; a ramp's length is set by dragging it on the ruler.
+	void openTempo(int wx, int wy, bool fixed, bool showDelete,
+	               timeSettings::TempoCurve curve, double bpm, double endBpm,
+	               std::function<void(timeSettings::TempoCurve, double, double)> onOk,
+	               std::function<void()>                                        onDelete);
 
 	void openTimeSig(int wx, int wy, bool fixed, bool showDelete,
 	                 int num, int den, timeSettings::BeatUnit beat,
@@ -34,20 +39,30 @@ private:
 	void doDelete();
 	void snapBeat();
 	int  numerator() const;
-	void configureDelete(bool fixed, bool showDelete);
+	// Show or hide the End-BPM row for the current curve, then re-lay out: the
+	// Delete button moves and the window height changes with it.
+	void layoutTempo();
+	void relayout(bool fixed, bool showDelete);
+	double bpmOf(const Fl_Value_Input* inp) const;
+	timeSettings::TempoCurve curve() const;
+
 	Kind             kind;
-	Fl_Value_Input*  input1      = nullptr;
-	DenomBeatChoice* denomChoice = nullptr;
+	Fl_Value_Input*  input1      = nullptr;   // BPM / start BPM, or the numerator
+	Fl_Value_Input*  endBpmInput = nullptr;   // TEMPO + Linear only
+	Fl_Box*          bpmLabel    = nullptr;
+	Fl_Box*          endLabel    = nullptr;
+	ModernChoice*    curveChoice = nullptr;   // TEMPO only
+	DenomBeatChoice* denomChoice = nullptr;   // TIME_SIG only
 	ModernButton*    deleteBtn   = nullptr;
 
-	int deleteY    = 0;
-	int popupH     = 0;
-	int popupHSlim = 0;
-	int popupW     = 0;   // hugs the content; set once in the constructor
+	bool showingDelete = false;
+	bool deleteFixed   = false;
+	int  deleteY       = 0;
+	int  popupW        = 0;   // hugs the content; set once in the constructor
 
-	std::function<void(double)>                            onOkTempo;
-	std::function<void(int, int, timeSettings::BeatUnit)>  onOkTimeSig;
-	std::function<void()>                                  onDeleteCb;
+	std::function<void(timeSettings::TempoCurve, double, double)> onOkTempo;
+	std::function<void(int, int, timeSettings::BeatUnit)>         onOkTimeSig;
+	std::function<void()>                                         onDeleteCb;
 };
 
 #endif

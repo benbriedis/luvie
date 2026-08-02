@@ -30,10 +30,29 @@ public:
     void setTransport(ITransport* t) { transport = t; }
 
     // Tempo, in beats per minute — a beat being the time signature's BeatUnit.
+    // setBpm changes only the tempo the marker starts at, leaving its curve
+    // alone; setBpmMarker sets the whole marker, ramp and all.
     void  setBpm(int bar, float bpm);
+    void  setBpmMarker(int bar, float bpm, timeSettings::TempoCurve curve,
+                       int lengthBars, float endBpm);
     void  removeBpm(int bar);
     void  moveBpmMarker(int fromBar, int toBar);
-    float bpmAt(int bar) const;
+    // Move and/or resize a ramp. newEndBar is exclusive — the ramp ends flush
+    // with the end of bar newEndBar-1. Both edges are clamped to the neighbouring
+    // markers and to a minimum length of one bar; returns the bar the marker
+    // ended up on, so a drag can follow it.
+    int   resizeBpmRamp(int bar, int newBar, int newEndBar);
+
+    const BpmMarker* bpmMarkerAt(int bar) const;   // exact match on bar, or null
+    // The bars a marker's ramp may be dragged between: no overlap with the
+    // markers either side, and no longer than timeSettings::rampMaxBars.
+    int   minRampStartBar(int bar) const;
+    int   maxRampEndBar(int bar) const;
+
+    // The tempo in force at a bar. bpmAtBar takes a fractional bar and steps
+    // through a ramp beat by beat; bpmAt is the value at the bar's start.
+    float bpmAtBar(float bar) const;
+    float bpmAt(int bar) const { return bpmAtBar((float)bar); }
 
     // Tempo in crotchets per minute: the BPM scaled by the beat definition. This
     // is the tempo the timing math and the JACK/LV2 hosts speak in.
@@ -59,7 +78,14 @@ public:
     float patternBeatsPerBar(int bar, int patternId) const;
     const Pattern* patternById(int patternId) const;
 
-    // Time conversion — integrates over BPM/time-sig segments
+    // The song's tempo map: one segment per tempo/time-signature breakpoint, plus
+    // one per beat inside a linear ramp, each with the cumulative seconds at its
+    // start. This is the single source of truth for bar<->seconds — the realtime
+    // Sequencer takes a copy of it for its snapshot rather than rebuilding one.
+    // Cached; invalidated by notify().
+    const std::vector<timeSettings::TempoSegment>& tempoMap() const;
+
+    // Time conversion — integrates over the tempo map above
     double barToSeconds(float bar) const;
     float  secondsToBar(double secs) const;
     void   secondsToBarBeat(double secs, int& bar, int& beat) const;
@@ -161,16 +187,10 @@ public:
     void loadTimeline(const Timeline& tl);
 
 private:
-    // A stretch of the timeline with one tempo and one time signature. Held in
-    // crotchets so a bar's duration is barCrotchets * 60 / cpm regardless of how
-    // the beat is defined.
-    struct TimeSegment {
-        int    bar;
-        float  cpm;           // crotchets per minute
-        int    beatsPerBar;   // time-signature numerator = grid columns per bar
-        double barCrotchets;
-    };
-    std::vector<TimeSegment> buildSegments() const;
+    void buildTempoMap() const;
+    mutable std::vector<timeSettings::TempoSegment> tempoMapCache;
+    mutable bool tempoMapDirty = true;
+
     Timeline data;
     // Funnel for all pattern-name creation/changes; binds to data.patterns.
     PatternNames patternNames{data};

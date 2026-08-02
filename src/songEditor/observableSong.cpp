@@ -41,6 +41,9 @@ void ObservableSong::removeObserver(ITimelineObserver* o)
 
 void ObservableSong::notify()
 {
+    // Every mutation funnels through here, so this is the one place the cached
+    // tempo map has to be invalidated.
+    tempoMapDirty = true;
     auto copy = observers;
     for (auto* o : copy) o->onTimelineChanged();
 }
@@ -65,6 +68,10 @@ void ObservableSong::loadTimeline(const Timeline& tl)
             for (const auto& l : data.paramLanes) data.rowOrder.push_back({RowKind::Param, l.id});
         }
     }
+    // A loaded file is trusted no further than the invariants: sort the markers
+    // and shorten any ramp that reaches into the one after it.
+    sortBpms();
+    sortTimeSigs();
     nextId = 1;
     for (const auto& instr : data.instruments)
         if (instr.id >= nextId) nextId = instr.id + 1;
@@ -313,6 +320,18 @@ void ObservableSong::sortBpms()
 {
     std::sort(data.bpms.begin(), data.bpms.end(),
         [](const BpmMarker& a, const BpmMarker& b) { return a.bar < b.bar; });
+
+    // A ramp may never reach into the marker that follows it — bpmAtBar() and the
+    // tempo map both assume one marker governs each stretch. Enforced here, once,
+    // so no caller can produce an overlap by moving a marker into a ramp's path.
+    for (size_t i = 0; i < data.bpms.size(); i++) {
+        BpmMarker& m = data.bpms[i];
+        if (!m.isRamp()) continue;
+        int room = (i + 1 < data.bpms.size() ? data.bpms[i + 1].bar : m.bar + timeSettings::rampMaxBars)
+                 - m.bar;
+        m.lengthBars = std::clamp(m.lengthBars, 1,
+                                  std::max(1, std::min(room, timeSettings::rampMaxBars)));
+    }
 }
 
 void ObservableSong::sortTimeSigs()
@@ -329,6 +348,32 @@ void ObservableSong::setBpm(int bar, float bpm)
         }
         data.bpms.push_back({bar, bpm});
         sortBpms();
+        notify();
+    });
+}
+
+void ObservableSong::setBpmMarker(int bar, float bpm, timeSettings::TempoCurve curve,
+                                  int lengthBars, float endBpm)
+{
+    if (bar < 0) return;
+    reanchoringTempo([&] {
+        BpmMarker* m = nullptr;
+        for (auto& b : data.bpms)
+            if (b.bar == bar) { m = &b; break; }
+        if (!m) {
+            data.bpms.push_back({bar, bpm});
+            sortBpms();
+            for (auto& b : data.bpms)
+                if (b.bar == bar) { m = &b; break; }
+        }
+
+        m->bpm   = bpm;
+        m->curve = curve;
+        if (curve == timeSettings::TempoCurve::Linear) {
+            m->lengthBars = std::max(1, lengthBars);
+            m->endBpm     = endBpm;
+        }
+        sortBpms();   // shortens the ramp if it does not fit before the next marker
         notify();
     });
 }
@@ -350,24 +395,94 @@ void ObservableSong::moveBpmMarker(int fromBar, int toBar)
         [fromBar](const BpmMarker& m) { return m.bar == fromBar; });
     if (it == data.bpms.end()) return;
     reanchoringTempo([&] {
-        float val = it->bpm;
+        // Move the whole marker, ramp and all — not just its tempo.
+        BpmMarker moved = *it;
+        moved.bar = toBar;
         data.bpms.erase(it);
         data.bpms.erase(std::remove_if(data.bpms.begin(), data.bpms.end(),
             [toBar](const BpmMarker& m) { return m.bar == toBar; }), data.bpms.end());
-        data.bpms.push_back({toBar, val});
+        // sortBpms() shortens the ramp if the destination leaves it less room.
+        data.bpms.push_back(moved);
         sortBpms();
         notify();
     });
 }
 
-float ObservableSong::bpmAt(int bar) const
+int ObservableSong::resizeBpmRamp(int bar, int newBar, int newEndBar)
 {
-    float result = 120.0f;
-    for (auto& m : data.bpms) {
-        if (m.bar <= bar) result = m.bpm;
-        else break;
+    auto it = std::find_if(data.bpms.begin(), data.bpms.end(),
+        [bar](const BpmMarker& m) { return m.bar == bar; });
+    if (it == data.bpms.end() || !it->isRamp()) return bar;
+
+    // Bar 0 is fixed, as everywhere else: its left edge cannot move.
+    int hi = maxRampEndBar(bar);
+    if (bar == 0) newBar = 0;
+    else          newBar = std::clamp(newBar, std::max(1, minRampStartBar(bar)), hi - 1);
+    newEndBar = std::clamp(newEndBar, newBar + 1,
+                           std::min(hi, newBar + timeSettings::rampMaxBars));
+    if (newBar == bar && newEndBar == it->rampEndBar()) return bar;
+
+    reanchoringTempo([&] {
+        BpmMarker moved  = *it;
+        moved.bar        = newBar;
+        moved.lengthBars = newEndBar - newBar;
+        data.bpms.erase(it);
+        if (newBar != bar)
+            data.bpms.erase(std::remove_if(data.bpms.begin(), data.bpms.end(),
+                [newBar](const BpmMarker& m) { return m.bar == newBar; }), data.bpms.end());
+        data.bpms.push_back(moved);
+        sortBpms();
+        notify();
+    });
+    return newBar;
+}
+
+const BpmMarker* ObservableSong::bpmMarkerAt(int bar) const
+{
+    for (const auto& m : data.bpms)
+        if (m.bar == bar) return &m;
+    return nullptr;
+}
+
+int ObservableSong::minRampStartBar(int bar) const
+{
+    // The end of the previous marker's own ramp, or its bar for a plain marker.
+    int lo = 0;
+    for (const auto& m : data.bpms) {
+        if (m.bar >= bar) break;
+        lo = std::max(m.rampEndBar(), m.bar + 1);
     }
-    return result;
+    return lo;
+}
+
+int ObservableSong::maxRampEndBar(int bar) const
+{
+    for (const auto& m : data.bpms)
+        if (m.bar > bar) return m.bar;
+    return bar + timeSettings::rampMaxBars;
+}
+
+float ObservableSong::bpmAtBar(float bar) const
+{
+    const BpmMarker* gov = nullptr;
+    for (const auto& m : data.bpms) {
+        if ((float)m.bar <= bar) gov = &m;
+        else break;                       // relies on bpms being sorted
+    }
+    if (!gov) return 120.0f;
+    if (!gov->isRamp()) return gov->bpm;
+    if (bar >= (float)gov->rampEndBar()) return gov->endBpm;
+
+    // Stepped, not continuous: the tempo holds for a whole beat and jumps at the
+    // beat boundary, which is what makes a ramp a run of constant-tempo segments.
+    // The beat grid comes from the time signature at the ramp's start — an
+    // interior signature change still gets its own segment (so bar lengths stay
+    // right) but does not re-grid the ramp's steps.
+    int top, bottom;
+    timeSigAt(gov->bar, top, bottom);
+    int totalBeats = std::max(1, gov->lengthBars * top);
+    int j          = std::clamp((int)((bar - (float)gov->bar) * (float)top), 0, totalBeats - 1);
+    return gov->bpm + (gov->endBpm - gov->bpm) * (float)j / (float)totalBeats;
 }
 
 float ObservableSong::cpmAt(int bar) const
@@ -465,55 +580,61 @@ float ObservableSong::patternBeatsPerBar(int bar, int patternId) const
 
 // ---------------------------------------------------------------------------
 
-std::vector<ObservableSong::TimeSegment> ObservableSong::buildSegments() const
+void ObservableSong::buildTempoMap() const
 {
-    std::set<int> breakpoints;
-    for (auto& m : data.bpms)    breakpoints.insert(m.bar);
-    for (auto& m : data.timeSigs) breakpoints.insert(m.bar);
-
-    std::vector<TimeSegment> segs;
-    for (int bar : breakpoints) {
+    // Breakpoints: every tempo and time-signature marker, plus — for a linear
+    // ramp — one per beat of the ramp and one at its end, since the ramp's tempo
+    // steps at each of those. Bar 0 is always present so the map covers the whole
+    // timeline. Kept in doubles: a beat boundary is a fractional bar.
+    std::set<double> breakpoints;
+    breakpoints.insert(0.0);
+    for (auto& m : data.timeSigs) breakpoints.insert((double)m.bar);
+    for (auto& m : data.bpms) {
+        breakpoints.insert((double)m.bar);
+        if (!m.isRamp()) continue;
         int top, bottom;
-        timeSigAt(bar, top, bottom);
-        segs.push_back({bar, cpmAt(bar), top, timeSettings::barCrotchets(top, bottom)});
+        timeSigAt(m.bar, top, bottom);
+        int totalBeats = std::max(1, m.lengthBars * top);
+        for (int j = 1; j <= totalBeats; j++)
+            breakpoints.insert((double)m.bar + (double)j / (double)top);
     }
-    return segs;
+
+    tempoMapCache.clear();
+    tempoMapCache.reserve(breakpoints.size());
+
+    double accSecs = 0.0;
+    for (double bar : breakpoints) {
+        if (!tempoMapCache.empty()) {
+            const auto& prev = tempoMapCache.back();
+            accSecs += (bar - (double)prev.bar)
+                     * timeSettings::secondsPerBar(prev.barCrotchets, prev.cpm);
+        }
+        int top, bottom;
+        timeSigAt((int)bar, top, bottom);
+        // Every breakpoint is a beat boundary of any ramp covering it, so the
+        // stepped bpmAtBar() is genuinely constant across the segment.
+        float cpm = bpmAtBar((float)bar) * (float)timeSettings::beatCrotchets(beatAt((int)bar));
+        tempoMapCache.push_back({(float)bar, cpm, top,
+                                 timeSettings::barCrotchets(top, bottom), accSecs});
+    }
+    tempoMapDirty = false;
+}
+
+const std::vector<timeSettings::TempoSegment>& ObservableSong::tempoMap() const
+{
+    if (tempoMapDirty) buildTempoMap();
+    return tempoMapCache;
 }
 
 double ObservableSong::barToSeconds(float targetBar) const
 {
-    auto segs = buildSegments();
-    double secs = 0.0;
-    for (int i = 0; i < (int)segs.size(); i++) {
-        float segStart = (float)segs[i].bar;
-        float segEnd   = (i + 1 < (int)segs.size()) ? (float)segs[i+1].bar : targetBar;
-        if (segStart >= targetBar) break;
-        float barsInSeg = std::min(segEnd, targetBar) - segStart;
-        double secsPerBar = timeSettings::secondsPerBar(segs[i].barCrotchets, segs[i].cpm);
-        secs += barsInSeg * secsPerBar;
-    }
-    return secs;
+    if (targetBar <= 0.0f) return 0.0;
+    return timeSettings::mapBarToSeconds(tempoMap(), targetBar);
 }
 
 float ObservableSong::secondsToBar(double secs) const
 {
-    auto segs = buildSegments();
-    double remaining = secs;
-    for (int i = 0; i < (int)segs.size(); i++) {
-        float  segStart   = (float)segs[i].bar;
-        float  segEnd     = (i + 1 < (int)segs.size()) ? (float)segs[i+1].bar : 1e9f;
-        double secsPerBar = timeSettings::secondsPerBar(segs[i].barCrotchets, segs[i].cpm);
-        double segSecs    = (segEnd - segStart) * secsPerBar;
-        if (remaining < segSecs + 1e-9)
-            return segStart + (float)(remaining / secsPerBar);
-        remaining -= segSecs;
-    }
-    if (!segs.empty()) {
-        auto& last = segs.back();
-        double secsPerBar = timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
-        return (float)(last.bar + remaining / secsPerBar);
-    }
-    return 0.0f;
+    return (float)timeSettings::mapSecondsToBar(tempoMap(), secs);
 }
 
 void ObservableSong::secondsToBarBeat(double secs, int& bar, int& beat) const

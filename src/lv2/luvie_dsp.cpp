@@ -128,12 +128,8 @@ public:
             return false;
         float beatsPerBar = 4.0f;
         float barsTotal   = 0.0f;
-        if (!snap.segs.empty()) {
-            const TimeSegment* seg = &snap.segs.back();
-            for (size_t i = 0; i + 1 < snap.segs.size(); i++)
-                if (secs < snap.segs[i + 1].startSecs) { seg = &snap.segs[i]; break; }
-            double secsPerBar = timeSettings::secondsPerBar(seg->barCrotchets, seg->cpm);
-            barsTotal   = seg->bar + (float)((secs - seg->startSecs) / secsPerBar);
+        if (const TimeSegment* seg = timeSettings::segmentAtSeconds(snap.segs, secs)) {
+            barsTotal   = (float)timeSettings::mapSecondsToBar(snap.segs, secs);
             beatsPerBar = (float)seg->beatsPerBar;
         }
         snapMutex.unlock();

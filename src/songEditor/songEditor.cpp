@@ -141,7 +141,7 @@ int SongEditor::computeNumCols() const
             for (const auto& inst : lane.patterns)
                 maxEnd = std::max(maxEnd, inst.startBar + inst.length);
     for (const auto& m : data.bpms)
-        maxEnd = std::max(maxEnd, (float)m.bar);
+        maxEnd = std::max(maxEnd, (float)m.rampEndBar());
     for (const auto& m : data.timeSigs)
         maxEnd = std::max(maxEnd, (float)m.bar);
     int rounded = (int)(std::ceil(maxEnd / step) * step);

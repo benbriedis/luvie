@@ -5,6 +5,8 @@
 #define TIME_SETTINGS_HPP
 
 #include <array>
+#include <algorithm>
+#include <vector>
 
 // Single source of truth for the time-signature, beat-definition and tempo
 // settings the UI offers: the numerator range, the combined denominator/beat
@@ -26,6 +28,22 @@ inline constexpr int numeratorDefault = 4;
 inline constexpr double bpmMin     = 20.0;
 inline constexpr double bpmMax     = 400.0;
 inline constexpr double bpmDefault = 120.0;
+
+// How a tempo marker reaches its tempo. Immediate is the instantaneous change
+// that has always existed; Linear ramps from the marker's BPM to its endBpm over
+// lengthBars bars (accelerando / decelerando). The enum value is persisted in the
+// song file, so values must stay stable and 0 is what an older file loads as.
+//
+// A Linear ramp steps ONCE PER BEAT rather than varying continuously: the tempo
+// is constant within each beat and jumps to the next interpolated value at the
+// beat boundary. That keeps a ramp expressible as a run of ordinary
+// constant-tempo TempoSegments, so secondsPerBar() below stays the only tempo
+// formula in the app and no bar<->seconds conversion needs a special case.
+enum class TempoCurve { Immediate = 0, Linear = 1 };
+
+// A ramp longer than this is refused: it is subdivided into one TempoSegment per
+// beat, and the RT thread scans that table for every emitted message.
+inline constexpr int rampMaxBars = 64;
 
 // Beat definition: the note value one BPM beat is worth. Stored alongside every
 // time signature. The enum value is persisted in the song file as the beat's
@@ -105,6 +123,58 @@ inline constexpr double patternBeatsPerBar(double songBarCrotchets, BeatUnit son
 inline constexpr double secondsPerBar(double barCrotchetCount, double cpm)
 {
 	return cpm > 0.0 ? barCrotchetCount * 60.0 / cpm : 0.0;
+}
+
+// ── The tempo map ────────────────────────────────────────────────────────────
+//
+// One stretch of timeline over which both the tempo and the time signature are
+// constant, so it lasts secondsPerBar(barCrotchets, cpm) per bar. The song's
+// tempo map is a sorted run of these covering [0, infinity): every marker starts
+// one, and a linear ramp starts one per beat.
+//
+// beatsPerBar is the song's time-signature numerator, reported to hosts. (An
+// instance's beatsPerBar is a different number — how many of ITS pattern's beats
+// fit in a song bar; see ObservableSong::patternBeatsPerBar.)
+struct TempoSegment {
+	float  bar;           // fractional: beat boundaries inside a ramp
+	float  cpm;           // crotchets per minute
+	int    beatsPerBar;   // time-signature numerator = grid columns per bar
+	double barCrotchets;
+	double startSecs;     // cumulative seconds at `bar`
+};
+
+// The segment covering `bar` / `secs`. Both assume a sorted map and extrapolate
+// off the last segment. RT-safe: no allocation, no locks.
+inline const TempoSegment* segmentAtBar(const std::vector<TempoSegment>& segs, double bar)
+{
+	if (segs.empty()) return nullptr;
+	auto it = std::upper_bound(segs.begin(), segs.end(), bar,
+		[](double b, const TempoSegment& s) { return b < (double)s.bar; });
+	return it == segs.begin() ? &segs.front() : &*(it - 1);
+}
+
+inline const TempoSegment* segmentAtSeconds(const std::vector<TempoSegment>& segs, double secs)
+{
+	if (segs.empty()) return nullptr;
+	auto it = std::upper_bound(segs.begin(), segs.end(), secs,
+		[](double t, const TempoSegment& s) { return t < s.startSecs; });
+	return it == segs.begin() ? &segs.front() : &*(it - 1);
+}
+
+inline double mapBarToSeconds(const std::vector<TempoSegment>& segs, double bar)
+{
+	const TempoSegment* seg = segmentAtBar(segs, bar);
+	if (!seg) return 0.0;
+	return seg->startSecs + (bar - (double)seg->bar) * secondsPerBar(seg->barCrotchets, seg->cpm);
+}
+
+inline double mapSecondsToBar(const std::vector<TempoSegment>& segs, double secs)
+{
+	const TempoSegment* seg = segmentAtSeconds(segs, secs);
+	if (!seg) return 0.0;
+	double secsPerBar = secondsPerBar(seg->barCrotchets, seg->cpm);
+	if (secsPerBar <= 0.0) return (double)seg->bar;
+	return (double)seg->bar + (secs - seg->startSecs) / secsPerBar;
 }
 
 inline int beatUnitIndex(BeatUnit u)

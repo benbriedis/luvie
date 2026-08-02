@@ -22,9 +22,22 @@ struct Instrument {
 // Tempo in beats per minute, where a beat is the BeatUnit of the time signature
 // in force. Crotchets per minute — what the timing math runs on — is derived:
 // see ObservableSong::cpmAt().
+//
+// A Linear marker is a ramp rather than a point: the tempo goes from bpm to
+// endBpm over the bars [bar, bar + lengthBars), stepping once per beat, and
+// endBpm is the tempo in force from bar + lengthBars onwards. The ramp therefore
+// ends flush with the end of bar (bar + lengthBars - 1). The three ramp fields
+// are ignored — and not written to the song file — when curve is Immediate.
 struct BpmMarker {
 	int   bar;
 	float bpm;
+	timeSettings::TempoCurve curve = timeSettings::TempoCurve::Immediate;
+	int   lengthBars = 1;      // Linear only; >= 1
+	float endBpm     = 0.0f;   // Linear only
+
+	bool  isRamp()    const { return curve == timeSettings::TempoCurve::Linear; }
+	// One past the last bar the ramp covers; == bar for an immediate marker.
+	int   rampEndBar() const { return isRamp() ? bar + lengthBars : bar; }
 };
 
 struct TimeSigMarker {

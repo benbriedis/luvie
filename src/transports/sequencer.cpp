@@ -71,32 +71,9 @@ void Sequencer::rebuildSnapshot()
     const Timeline& tl = timeline->get();
     Snapshot newSnap;
 
-    // Build time segments at each tempo / time-signature boundary.
-    {
-        std::set<int> breakpoints;
-        breakpoints.insert(0);
-        for (auto& m : tl.bpms)     breakpoints.insert(m.bar);
-        for (auto& m : tl.timeSigs) breakpoints.insert(m.bar);
-
-        double accSecs      = 0.0;
-        int    prevBar      = 0;
-        double prevSecsPerBar = timeline->secondsPerBarAt(0);
-
-        for (int bar : breakpoints) {
-            if (bar != 0)
-                accSecs += (bar - prevBar) * prevSecsPerBar;
-
-            int top, bot;
-            timeline->timeSigAt(bar, top, bot);
-            double barCrotchets = timeSettings::barCrotchets(top, bot);
-            float  cpm          = timeline->cpmAt(bar);
-
-            newSnap.segs.push_back({(float)bar, cpm, top, barCrotchets, accSecs});
-
-            prevBar        = bar;
-            prevSecsPerBar = timeSettings::secondsPerBar(barCrotchets, cpm);
-        }
-    }
+    // The tempo table is built by the data model, so the RT thread and the UI
+    // cannot disagree about where a bar falls in time.
+    newSnap.segs = timeline->tempoMap();
 
     // Build per-track note data.
     auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx, int trackInstrument) {
@@ -317,36 +294,12 @@ void Sequencer::rebuildSnapshot()
 
 double Sequencer::snapBarToSeconds(float bar) const
 {
-    for (int i = 0; i + 1 < (int)snap.segs.size(); i++) {
-        if (bar < snap.segs[i + 1].bar) {
-            double secsPerBar = timeSettings::secondsPerBar(snap.segs[i].barCrotchets, snap.segs[i].cpm);
-            return snap.segs[i].startSecs + (bar - snap.segs[i].bar) * secsPerBar;
-        }
-    }
-    if (!snap.segs.empty()) {
-        auto& last = snap.segs.back();
-        double secsPerBar = timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
-        return last.startSecs + (bar - last.bar) * secsPerBar;
-    }
-    return 0.0;
+    return timeSettings::mapBarToSeconds(snap.segs, bar);
 }
 
 float Sequencer::snapSecondsToBar(double secs) const
 {
-    for (int i = 0; i + 1 < (int)snap.segs.size(); i++) {
-        double segStart = snap.segs[i].startSecs;
-        double segEnd   = snap.segs[i + 1].startSecs;
-        if (secs < segEnd) {
-            double secsPerBar = timeSettings::secondsPerBar(snap.segs[i].barCrotchets, snap.segs[i].cpm);
-            return snap.segs[i].bar + (float)((secs - segStart) / secsPerBar);
-        }
-    }
-    if (!snap.segs.empty()) {
-        auto& last = snap.segs.back();
-        double secsPerBar = timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
-        return last.bar + (float)((secs - last.startSecs) / secsPerBar);
-    }
-    return 0.0f;
+    return (float)timeSettings::mapSecondsToBar(snap.segs, secs);
 }
 
 // ── Cycle rendering (RT thread) ───────────────────────────────────────────────

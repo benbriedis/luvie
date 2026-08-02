@@ -4,3 +4,4 @@ Perform builds incrementally in this directory when possible in order to save ti
 
 Avoid using polling threads. They are a last resort.
 
+Don't run or test using Valgrind unless asked to.
