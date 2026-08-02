@@ -276,7 +276,19 @@ RaySession:
 
 =========================	 
 
-Try Valgrind
+LATER
+=====
+
+Update FLTK?  [NB Still not released]
+- downdowns that hover over other applications
+- There was a crash when scales list overlapped bottom of laptop screen via Carla.
+- Through Carla there was some message about Carla not being responsive while Luvie GUI was
+     being shown. (Carla was on laptop screen and Luvie on the other one at the time).
+
+Try Valgrind again
+
+============================
+
 
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
@@ -284,27 +296,23 @@ Add a better-looking flat symbol, and maybe sharp, using SVG.
 
 BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
 
-Update FLTK?
-- downdowns that hover over other applications
-- There was a crash when scales list overlapped bottom of laptop screen via Carla.
-- Through Carla there was some message about Carla not being responsive while Luvie GUI was
-     being shown. (Carla was on laptop screen and Luvie on the other one at the time).
-
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
-
-Normal pattern editor: think put coloured items under the dark bar.
-
-Look at changing time signatures: auto changes are a bit annoying.
-   Number of bars are also implicated. Don't want to (easily) lose notes.
 
 Add more hover over notes for controls
 
 DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
 
 - Linear ramping of tempos...
+  Either place in one marker, or multiple
+
+
 
 TO CHECK MORE: Not totally sure about how bonus notes are transformed when moving to more complicated chords.
 
+Look at changing time signatures: auto changes are a bit annoying.
+   Number of bars are also implicated. Don't want to (easily) lose notes.
+
 BUG: looping to start of song causes a gap.
 
+Normal pattern editor: think put coloured items under the dark bar.
