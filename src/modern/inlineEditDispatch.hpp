@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef INLINE_EDIT_DISPATCH_HPP
 #define INLINE_EDIT_DISPATCH_HPP
 

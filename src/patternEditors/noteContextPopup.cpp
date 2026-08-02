@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "noteContextPopup.hpp"
 #include "FL/Fl.H"
 #include "FL/Fl_Box.H"

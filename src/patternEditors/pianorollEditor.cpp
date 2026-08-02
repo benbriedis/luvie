@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "pianorollEditor.hpp"
 #include "cursors.hpp"
 #include <FL/fl_draw.H>

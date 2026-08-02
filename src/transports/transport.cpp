@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "transport.hpp"
 #include "editor.hpp"
 #include "popupStyle.hpp"

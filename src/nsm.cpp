@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "nsm.hpp"
 #include <lo/lo.h>
 #include <FL/Fl.H>

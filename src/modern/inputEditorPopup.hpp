@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef INPUT_EDITOR_POPUP_HPP
 #define INPUT_EDITOR_POPUP_HPP
 

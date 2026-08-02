@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: Ben Briedis
+   SPDX-License-Identifier: Apache-2.0 */
+
 #ifndef TIMELINE_SERIAL_H
 #define TIMELINE_SERIAL_H
 

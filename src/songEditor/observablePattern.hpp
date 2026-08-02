@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef OBSERVABLE_PATTERN_HPP
 #define OBSERVABLE_PATTERN_HPP
 

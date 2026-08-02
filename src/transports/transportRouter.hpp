@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef TRANSPORT_ROUTER_HPP
 #define TRANSPORT_ROUTER_HPP
 

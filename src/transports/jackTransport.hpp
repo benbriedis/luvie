@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef JACK_TRANSPORT_HPP
 #define JACK_TRANSPORT_HPP
 

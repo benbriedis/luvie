@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef DRUM_GRID_HPP
 #define DRUM_GRID_HPP
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef GRID_SCROLL_PANE_HPP
 #define GRID_SCROLL_PANE_HPP
 

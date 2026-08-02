@@ -14,6 +14,13 @@ include(GNUInstallDirs)
 include(FetchContent)
 
 # ---- Vendored dependencies: fetched + pinned for reproducibility ----
+# EXCLUDE_FROM_ALL on the declarations below is what keeps `cmake --install` from
+# emitting the dependencies' own install rules into our prefix. Without it, FLTK and
+# RtMidi install their headers, static libs, pkg-config/CMake config files, man pages
+# and even a stray fltk-options.desktop alongside Luvie. We consume them as static
+# libraries, so nothing of theirs belongs in an install of Luvie. They are still built
+# on demand, as our targets link them.
+#
 # FLTK 1.5 (dev) — built static as part of configure. Only the core lib is used,
 # so skip fluid/tests/examples/GL/forms to keep the build lean.
 set(FLTK_BUILD_SHARED_LIBS OFF)
@@ -27,6 +34,7 @@ FetchContent_Declare(fltk
     # FLTK 1.5 is unreleased (dev/master), so there is no version tag — pin the
     # exact commit. Bump this SHA to move FLTK forward.
     GIT_TAG        89c116bf5f418e2b9821e4c83052735763a6bf20
+    EXCLUDE_FROM_ALL
 )
 
 # LV2 — headers only (upstream is meson-based; nothing to compile/link).
@@ -49,9 +57,26 @@ FetchContent_Declare(rtmidi
     GIT_REPOSITORY https://github.com/thestk/rtmidi.git
     GIT_TAG        6.0.0
     GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL
 )
 
-FetchContent_MakeAvailable(fltk lv2 rtmidi)
+# nlohmann/json — header-only; used for project (JSON) load/save in
+# songEditor/timelineIO.cpp. Fetched rather than found on the system so that the
+# header we compile against is pinned (find_package(nlohmann_json 3) accepted any
+# system 3.x) and so that its LICENSE.MIT is present in the build tree for
+# cmake/GatherLicenses.cmake — the Debian package ships no licence file at all,
+# only an SPDX line inside json.hpp, and json is compiled into our binaries, so
+# its MIT notice has to travel with them.
+set(JSON_BuildTests OFF)
+set(JSON_Install    OFF)   # we install the licence, not json's headers
+FetchContent_Declare(nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3
+    GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL
+)
+
+FetchContent_MakeAvailable(fltk lv2 rtmidi nlohmann_json)
 
 # Expose the fetched LV2 headers as an interface target for the plugin.
 add_library(lv2_headers INTERFACE)
@@ -71,6 +96,11 @@ add_library(jack_headers INTERFACE)
 target_include_directories(jack_headers INTERFACE ${JACK_INCLUDE_DIRS})
 # ALSA is no longer a direct dependency: the "native" MIDI backend goes through
 # RtMidi, which finds and links libasound itself.
+
+# ---- Licences ----
+# Assembles build/LICENSES/ from LICENSE, NOTICE and the fetched dependency sources.
+# Defines LUVIE_LICENSE_DIR, which src/ and src/lv2/ install.
+include(${CMAKE_SOURCE_DIR}/cmake/GatherLicenses.cmake)
 
 add_subdirectory(src)
 add_subdirectory(src/lv2)

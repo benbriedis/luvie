@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef JACK_OBSERVER_HPP
 #define JACK_OBSERVER_HPP
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef NOTE_CONTEXT_POPUP_HPP
 #define NOTE_CONTEXT_POPUP_HPP
 

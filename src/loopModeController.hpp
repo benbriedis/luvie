@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef LOOP_MODE_CONTROLLER_HPP
 #define LOOP_MODE_CONTROLLER_HPP
 

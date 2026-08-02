@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "luvieApp.hpp"
 #include "FL/Fl_Menu_Item.H"
 #include "FL/Fl_Native_File_Chooser.H"

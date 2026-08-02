@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PATTERN_NAMES_HPP
 #define PATTERN_NAMES_HPP
 

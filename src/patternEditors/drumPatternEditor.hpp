@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef DRUM_PATTERN_EDITOR_HPP
 #define DRUM_PATTERN_EDITOR_HPP
 

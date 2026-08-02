@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "modernTabs.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>

@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: Ben Briedis
+   SPDX-License-Identifier: Apache-2.0 */
+
 #ifndef LUVIE_DSP_H
 #define LUVIE_DSP_H
 

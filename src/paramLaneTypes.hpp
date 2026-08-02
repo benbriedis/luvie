@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PARAM_LANE_TYPES_HPP
 #define PARAM_LANE_TYPES_HPP
 

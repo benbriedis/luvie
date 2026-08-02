@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PARAMETER_SUBMENU_HPP
 #define PARAMETER_SUBMENU_HPP
 

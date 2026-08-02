@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PANEL_STYLE_HPP
 #define PANEL_STYLE_HPP
 

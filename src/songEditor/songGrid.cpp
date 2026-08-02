@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "songGrid.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"

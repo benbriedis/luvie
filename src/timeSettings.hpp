@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef TIME_SETTINGS_HPP
 #define TIME_SETTINGS_HPP
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef MODERN_VALUE_INPUT_HPP
 #define MODERN_VALUE_INPUT_HPP
 

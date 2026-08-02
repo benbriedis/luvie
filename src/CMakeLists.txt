@@ -40,6 +40,7 @@ target_link_libraries(luvie_core PUBLIC
     ${CMAKE_DL_LIBS}      # dlopen/dlsym for the JACK shim
     rtmidi
     PkgConfig::LO
+    nlohmann_json::nlohmann_json   # header-only; songEditor/timelineIO.cpp
 )
 
 # ---- Version header generated from git at build time ----
@@ -65,6 +66,10 @@ target_link_libraries(luvie PRIVATE luvie_core)
 # Install the standalone app + desktop integration (was the src/Makefile
 # `install` target). Use a user-local prefix with: cmake --install build --prefix ~/.local
 install(TARGETS luvie RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# Apache-2.0 section 4a/4d: a redistributed copy must carry the licence and the
+# NOTICE file. LUVIE_LICENSE_DIR (see cmake/GatherLicenses.cmake) holds both, plus
+# the licences of the libraries compiled into the binary.
+install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ${CMAKE_SOURCE_DIR}/luvie.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES ${CMAKE_SOURCE_DIR}/logo/logo.svg

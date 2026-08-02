@@ -101,6 +101,11 @@ Nice if we had an install script that installed everything locally (FLTK, JSON, 
 
 - Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
 
+License
+-------
+Source code... maybe don't include licenses for dependencies.
+Include them as required when bundling?
+
 
 Monitor preformance
 -------------------

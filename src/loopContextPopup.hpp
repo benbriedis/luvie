@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef LOOP_CONTEXT_POPUP_HPP
 #define LOOP_CONTEXT_POPUP_HPP
 

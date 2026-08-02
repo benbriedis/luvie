@@ -6,8 +6,8 @@ find_package(Threads REQUIRED)
 # DSP: owns the real-time MIDI engine, so it compiles the FLTK-free engine sources
 # directly (NOT via luvie_core, which drags in FLTK). As an LV2 plugin it emits MIDI
 # through its atom output port (no JACK), so it compiles only the backend-agnostic
-# Sequencer core — not jackTransport / the JACK shim. nlohmann/json is a system
-# header. Compiling these into the module (rather than linking an archive) means
+# Sequencer core — not jackTransport / the JACK shim. nlohmann/json comes in as a
+# header-only target. Compiling these into the module (rather than linking an archive) means
 # -fvisibility=hidden below governs their symbols.
 add_library(luvie_dsp MODULE
     luvie_dsp.cpp
@@ -19,7 +19,8 @@ add_library(luvie_dsp MODULE
 target_include_directories(luvie_dsp PRIVATE
     ${SRC} ${SRC}/transports ${SRC}/patternEditors ${SRC}/outputs ${SRC}/songEditor)
 target_link_libraries(luvie_dsp PRIVATE
-    m lv2_headers Threads::Threads ${CMAKE_DL_LIBS})
+    m lv2_headers Threads::Threads ${CMAKE_DL_LIBS}
+    nlohmann_json::nlohmann_json)
 
 # UI (links the shared core; LV2 headers; FLTK/jack come via luvie_core)
 add_library(luvie_ui MODULE luvie_ui.cpp)
@@ -89,13 +90,44 @@ set_target_properties(luvie_dsp luvie_ui PROPERTIES
     PREFIX ""
     LIBRARY_OUTPUT_DIRECTORY "${LV2_BUNDLE}")
 
-# Copy the .ttl manifests into the bundle after build
-add_custom_command(TARGET luvie_ui POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/manifest.ttl
-        ${CMAKE_CURRENT_SOURCE_DIR}/luvie_dsp.ttl
-        ${CMAKE_CURRENT_SOURCE_DIR}/luvie_ui.ttl
-        ${LV2_BUNDLE})
+# Data files that make up the bundle alongside the two .so modules.
+set(LV2_BUNDLE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/manifest.ttl
+    ${CMAKE_CURRENT_SOURCE_DIR}/luvie_dsp.ttl
+    ${CMAKE_CURRENT_SOURCE_DIR}/luvie_ui.ttl)
+
+# One OUTPUT-driven copy rule per file, rather than a POST_BUILD hook on a
+# module: POST_BUILD only fires when that module relinks, so editing a .ttl or
+# the NOTICE on its own would leave a stale copy in the bundle.
+set(LV2_BUNDLE_COPIES "")
+foreach(f IN LISTS LV2_BUNDLE_FILES)
+    get_filename_component(fname "${f}" NAME)
+    add_custom_command(
+        OUTPUT  ${LV2_BUNDLE}/${fname}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${f} ${LV2_BUNDLE}/${fname}
+        DEPENDS ${f}
+        COMMENT "Copying ${fname} into luvie.lv2"
+        VERBATIM)
+    list(APPEND LV2_BUNDLE_COPIES ${LV2_BUNDLE}/${fname})
+endforeach()
+
+# The gathered licences go in whole: a bundle is distributed on its own, so it has
+# to carry its own terms (Apache-2.0 section 4a/4d) and those of the libraries linked
+# into luvie_ui.so, rather than relying on the source tree around it. Tracked with a
+# stamp because a directory is not a usable custom-command OUTPUT; the DEPENDS list is
+# the exact set of gathered files, so a dependency bump that changes a licence
+# refreshes the bundle copy too.
+set(LV2_LICENSE_STAMP ${CMAKE_CURRENT_BINARY_DIR}/licenses.stamp)
+add_custom_command(
+    OUTPUT  ${LV2_LICENSE_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${LUVIE_LICENSE_DIR} ${LV2_BUNDLE}/LICENSES
+    COMMAND ${CMAKE_COMMAND} -E touch ${LV2_LICENSE_STAMP}
+    DEPENDS ${LUVIE_LICENSE_FILES}
+    COMMENT "Copying LICENSES into luvie.lv2"
+    VERBATIM)
+list(APPEND LV2_BUNDLE_COPIES ${LV2_LICENSE_STAMP})
+
+add_custom_target(luvie_lv2_bundle ALL DEPENDS ${LV2_BUNDLE_COPIES})
 
 # Install the .lv2 bundle (was the root Makefile `install-lv2` target).
 # Override location with: cmake -DLV2_INSTALL_DIR=/path ...
@@ -103,3 +135,4 @@ set(LV2_INSTALL_DIR "$ENV{HOME}/.lv2" CACHE PATH "LV2 bundle install location")
 install(TARGETS luvie_dsp luvie_ui LIBRARY DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2)
 install(FILES manifest.ttl luvie_dsp.ttl luvie_ui.ttl
         DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2)
+install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2)

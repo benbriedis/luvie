@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "lv2_external_ui.h"
 #include "luvie_dsp.h"
 #include <lv2/core/lv2.h>

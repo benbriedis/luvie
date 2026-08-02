@@ -1,3 +1,19 @@
+/* SPDX-FileCopyrightText: Filipe Coelho (falkTX), Nedko Arnaudov
+   SPDX-License-Identifier: LicenseRef-PublicDomain
+
+   NOT part of Luvie's Apache-2.0 licensed source. This declares the upstream
+   kxstudio External UI extension interface, which its authors placed in the
+   public domain:
+
+       LV2 External UI extension
+       This work is in public domain.
+
+       This file is distributed in the hope that it will be useful, but
+       WITHOUT ANY WARRANTY; without even the implied warranty of
+       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+   See NOTICE at the repository root. */
+
 /* lv2_external_ui.h — kxstudio External UI extension (bundled copy)
    URI: http://kxstudio.sf.net/ns/lv2ext/external-ui
    Widely supported by Ardour, Carla, etc.  Works on X11 and Wayland alike

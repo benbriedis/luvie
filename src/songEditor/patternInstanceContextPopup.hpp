@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PATTERN_INSTANCE_CONTEXT_POPUP_HPP
 #define PATTERN_INSTANCE_CONTEXT_POPUP_HPP
 

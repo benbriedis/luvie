@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "portRegistry.hpp"
 #include "jackPort.hpp"
 #include "rtMidiPort.hpp"

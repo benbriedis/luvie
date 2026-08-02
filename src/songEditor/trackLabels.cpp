@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "trackLabels.hpp"
 #include "trackContextPopup.hpp"
 #include "cursors.hpp"

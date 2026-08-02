@@ -6,7 +6,8 @@ Luvie builds with CMake (>= 3.28) and produces three artifacts:
   - build/src/luvie            the standalone application
   - build/src/libluvie_core.a  the shared core static library
   - build/luvie.lv2/           the LV2 plugin bundle (luvie_dsp.so,
-                               luvie_ui.so, *.ttl)
+                               luvie_ui.so, *.ttl, LICENSES/)
+  - build/LICENSES/            licence texts (see "Licences" below)
 
 
 Prerequisites
@@ -14,7 +15,8 @@ Prerequisites
 
   - A C++23 compiler (g++-13 or newer; clang 16+ also works)
   - CMake >= 3.28 and a generator (Ninja recommended; Make works too)
-  - git and a network connection (the configure step fetches FLTK + LV2)
+  - git and a network connection (the configure step fetches FLTK, LV2,
+    RtMidi and nlohmann/json)
   - System development libraries (Linux):
       - JACK   (libjack-dev / jack2) -- HEADERS ONLY at build time. The JACK
                library itself is loaded at runtime via dlopen, not linked, so
@@ -38,13 +40,28 @@ On Debian/Ubuntu:
 Vendored dependencies
 ---------------------
 
-FLTK 1.5 and the LV2 headers are fetched and pinned automatically by CMake
-(FetchContent) during the configure step -- there is no separate dependency
-bootstrap. Pinned revisions live in the top-level CMakeLists.txt; sources are
-cloned into build/_deps/ and FLTK is built static in-tree. liblo and ALSA are
-host-provided system libraries (found via pkg-config). JACK is provided the same
-way for its headers only -- the library is not linked but dlopen'd at runtime, so
-JACK is a build-time (header) dependency yet only an optional runtime one.
+FLTK 1.5, the LV2 headers, RtMidi and nlohmann/json are fetched and pinned
+automatically by CMake (FetchContent) during the configure step -- there is no
+separate dependency bootstrap. Pinned revisions live in the top-level
+CMakeLists.txt; sources are cloned into build/_deps/ and FLTK and RtMidi are
+built static in-tree.
+
+nlohmann/json is fetched rather than taken from the system (it used to be found
+with find_package) for two reasons: find_package accepted any system 3.x, so the
+header being compiled against was not pinned; and the distro package ships no
+licence file at all -- only an SPDX line inside json.hpp -- leaving nothing for
+the licence gathering below to collect.
+
+Each fetched dependency is declared EXCLUDE_FROM_ALL. That keeps their own
+install rules out of `cmake --install`; without it FLTK and RtMidi deposit their
+headers, static libs, pkg-config and CMake config files, man pages and a stray
+fltk-options.desktop into the prefix alongside Luvie. They are still built on
+demand, since our targets link them.
+
+liblo and ALSA are host-provided system libraries, found via pkg-config. JACK is
+provided the same way for its headers only -- the library is not linked but
+dlopen'd at runtime, so JACK is a build-time (header) dependency yet only an
+optional runtime one.
 
 
 Step 1 -- Configure
@@ -93,6 +110,26 @@ Run the standalone app:
     ./build/src/luvie
 
 
+Licences
+--------
+
+Luvie itself is Apache-2.0 (see LICENSE and NOTICE at the top of the tree).
+Third-party licence texts are NOT checked in: build/LICENSES/ is assembled
+during configure, copying them out of the already-fetched dependency sources in
+build/_deps/ so the text always matches the version actually linked. It holds
+Luvie's LICENSE and NOTICE at the top, then FLTK/, LV2/, RtMidi/ and
+nlohmann_json/ subdirectories, and is installed alongside the app and inside the
+plugin bundle.
+
+This matters for binary distribution: RtMidi and nlohmann/json are MIT and the
+LV2 headers are ISC, and all three require their notice to appear in every copy,
+including copies compiled into a binary.
+
+If a dependency bump moves a licence file upstream, configure fails with an
+error naming the file rather than silently omitting it; fix the path in
+cmake/GatherLicenses.cmake.
+
+
 Running under PipeWire
 ----------------------
 
@@ -124,7 +161,8 @@ Installing
 
 Standalone app:
 
-Installs the binary, .desktop entry, and icon. Use a user-local prefix:
+Installs the binary, .desktop entry, icon, and the licence texts under
+share/doc/luvie/LICENSES. Use a user-local prefix:
 
     cmake --install build --prefix ~/.local
 
@@ -174,5 +212,9 @@ Troubleshooting
 
   - `Could NOT find jack/alsa/liblo` -- install the corresponding -dev packages
     (see Prerequisites).
+
+  - `Licence file for <lib> not found` during configure -- a dependency bump
+    moved the file upstream. Correct the path in cmake/GatherLicenses.cmake;
+    don't drop the entry.
 
   - C++23 errors -- your compiler is too old; pass -DCMAKE_CXX_COMPILER=g++-13.

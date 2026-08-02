@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "loopRuler.hpp"
 #include "loopRulerContextPopup.hpp"
 #include <FL/Fl.H>

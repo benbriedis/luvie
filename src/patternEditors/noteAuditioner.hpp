@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef NOTE_AUDITIONER_HPP
 #define NOTE_AUDITIONER_HPP
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "pianorollGrid.hpp"
 #include "transposePopup.hpp"
 #include "editor.hpp"

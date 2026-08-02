@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: Ben Briedis
+   SPDX-License-Identifier: Apache-2.0 */
+
 #ifndef DSP_TIMELINE_H
 #define DSP_TIMELINE_H
 

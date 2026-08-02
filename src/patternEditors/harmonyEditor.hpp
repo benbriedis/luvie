@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef HARMONY_EDITOR_HPP
 #define HARMONY_EDITOR_HPP
 

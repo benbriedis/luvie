@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PIANOROLL_GRID_HPP
 #define PIANOROLL_GRID_HPP
 

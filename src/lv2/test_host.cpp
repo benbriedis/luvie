@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 // Minimal LV2 host harness: dlopen luvie_dsp.so, feed it the project state (as a
 // luvie_state atom on control_in) + a time:Position stream, and dump whatever it
 // forges onto midi_out. Used to isolate "DSP isn't emitting" from "Ardour isn't

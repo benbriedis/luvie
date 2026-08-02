@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef SETTINGS_MENU_POPUP_HPP
 #define SETTINGS_MENU_POPUP_HPP
 

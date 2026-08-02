@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef PATTERN_PARAM_GRID_HPP
 #define PATTERN_PARAM_GRID_HPP
 

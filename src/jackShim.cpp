@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 // jackShim.cpp — dlopen-based shim for libjack.
 //
 // Luvie uses JACK for its real-time clock and MIDI output, but JACK is optional:

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "patternNames.hpp"
 
 std::string PatternNames::makeUnique(const std::string& base, int startN) const

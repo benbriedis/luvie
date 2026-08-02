@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "drumGrid.hpp"
 #include "grid.hpp"
 #include "playhead.hpp"

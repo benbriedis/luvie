@@ -1,0 +1,143 @@
+Luvie
+Copyright 2025-2026 Ben Briedis
+
+This product includes software developed by Ben Briedis.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License in the LICENSE file distributed with this product, or at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
+
+SCOPE OF THIS LICENCE
+=====================
+
+The Apache License, Version 2.0 grant above applies to those files in this
+source tree that carry the line
+
+    SPDX-License-Identifier: Apache-2.0
+
+and to no others.
+
+Any file that carries a different SPDX-License-Identifier, or that reproduces
+a third-party copyright notice, is governed solely by the terms named in that
+file. Such a file is not licensed by the copyright holder of Luvie, is not a
+part of the Apache-2.0 "Work" as that term is defined in section 1 of the
+License, and confers no rights in, and imposes no obligations on, the rest of
+this source tree. Removing such a file leaves the remainder of the tree fully
+licensed under the Apache License, Version 2.0.
+
+Likewise, the third-party libraries listed below are separate works that Luvie
+links against or includes headers from. Their licence terms govern those
+libraries alone; they do not alter the terms on which Luvie's own source is
+offered.
+
+Their licence texts are not kept in this source tree. They are copied straight
+out of the pinned dependency sources at build time into a LICENSES/ directory,
+so that the text always matches the version actually linked; see
+cmake/GatherLicenses.cmake. That directory accompanies every installed and
+binary distribution, and the paths named below are relative to it. Building
+from source is what produces it, so a source checkout on its own will not have
+one.
+
+
+THIRD-PARTY COMPONENTS
+======================
+
+FLTK (Fast Light Toolkit) 1.5
+    https://www.fltk.org
+    GNU Library General Public License, Version 2, with the FLTK exceptions.
+    Linked statically. Licence text: LICENSES/FLTK/COPYING
+
+    FLTK exception 2 provides that widgets subclassed from FLTK widgets do not
+    constitute a derivative work; exception 3 provides that static linking does
+    not constitute a derivative work and does not require the distribution of
+    application source. Exception 4 waives the requirement to ship the FLTK
+    licence, but requires that use of FLTK be identified:
+
+        Luvie is based in part on the work of the FLTK project
+        (https://www.fltk.org).
+
+RtMidi 6.0.0
+    https://github.com/thestk/rtmidi
+    Copyright (c) 2003-2023 Gary P. Scavone
+    MIT-style licence. Linked statically. Licence text: LICENSES/RtMidi/LICENSE
+
+nlohmann/json 3.11.3
+    https://github.com/nlohmann/json
+    Copyright (c) 2013-2022 Niels Lohmann
+    MIT Licence. Header-only, but compiled into Luvie's binaries.
+    Licence text: LICENSES/nlohmann_json/LICENSE.MIT
+
+LV2 1.18.10
+    https://lv2plug.in
+    Copyright 2006-2022 David Robillard, Steve Harris and others
+    Every LV2 header Luvie includes is under the ISC Licence; upstream's full
+    licence set (which also covers LV2 specification documents Luvie does not
+    ship) is gathered alongside it. No LV2 library is linked, but the headers
+    are compiled in. Licence texts: LICENSES/LV2/
+
+JACK Audio Connection Kit
+    https://jackaudio.org
+    GNU Lesser General Public License, Version 2.1 or later.
+    NOT LINKED. Luvie compiles against the JACK headers only and resolves
+    libjack at runtime via dlopen (see src/jackShim.cpp), so no JACK code is
+    incorporated into or distributed with this product.
+
+liblo
+    https://liblo.sourceforge.net
+    GNU Lesser General Public License, Version 2.1 or later.
+    Used only for NSM session management (src/nsm.cpp), linked dynamically into
+    the standalone application and never bundled with it. No liblo code is
+    incorporated into Luvie's binaries: under section 5 of the LGPL such a
+    binary is "a work that uses the Library" and falls outside that licence's
+    terms. Should liblo ever be vendored or statically linked, section 6 would
+    apply and a copy of the LGPL would have to ship with it.
+
+
+BUNDLED THIRD-PARTY SOURCE
+==========================
+
+src/lv2/lv2_external_ui.h
+    Declares the kxstudio External UI extension interface
+    (http://kxstudio.sf.net/ns/lv2ext/external-ui). The upstream header, by
+    Filipe Coelho (falkTX) and Nedko Arnaudov, is placed in the public domain:
+
+        LV2 External UI extension
+        This work is in public domain.
+
+        This file is distributed in the hope that it will be useful, but
+        WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+    This file is marked LicenseRef-PublicDomain rather than Apache-2.0 and is
+    excluded from the Apache-2.0 grant above.
+
+src/lv2/.clang-tidy
+    Copyright 2020-2025 David Robillard <d@drobilla.net>
+    SPDX-License-Identifier: 0BSD OR ISC
+    A static-analysis configuration file taken from the LV2 project. It carries
+    its own SPDX header, is excluded from the Apache-2.0 grant above, and
+    contributes no code to any built artefact. Its ISC terms are reproduced
+    here so that this source tree stays self-contained without a checked-in
+    licence directory:
+
+        Permission to use, copy, modify, and/or distribute this software for
+        any purpose with or without fee is hereby granted, provided that the
+        above copyright notice and this permission notice appear in all copies.
+
+        THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+        WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+        WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR
+        BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+        OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+        WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+        ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+        SOFTWARE.

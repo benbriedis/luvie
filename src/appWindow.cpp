@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #include "appWindow.hpp"
 #include <FL/Fl.H>
 #include <FL/platform.H>     // fl_display (X11), fl_xid(), fl_wl_xid(), fl_wl_display()

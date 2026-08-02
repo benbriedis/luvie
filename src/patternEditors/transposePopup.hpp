@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef TRANSPOSE_POPUP_HPP
 #define TRANSPOSE_POPUP_HPP
 
