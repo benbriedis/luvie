@@ -293,12 +293,10 @@ void PatternPanel::initHarmonyControls()
     cs.chordScaleBtn.onToggle = [this](bool chordMode) {
         showScale = !chordMode;
         populateChordChoice();
-        harmonyControls.chordSec.chordChoice.value(0);
         commitHarmony();
     };
 
     populateChordChoice();
-    cs.chordChoice.value(0);
     cs.chordChoice.color(HarmonyControls::kBg);
     cs.chordChoice.setBorderColor(panelCtrlBorder);
     cs.chordChoice.callback(paramsCb, this);
@@ -525,6 +523,18 @@ void PatternPanel::initInput()
     input.onUnfocus([this]() { commitEdit(); });
 }
 
+// Index of the first selectable entry. Item 0 is a submenu header whenever the
+// first definition is nested, and a header carries no chordDefs index, so
+// selection must skip past it.
+static int firstChordItem(const Fl_Menu_& cc)
+{
+    for (int i = 0; i < cc.size(); ++i) {
+        const Fl_Menu_Item& it = cc.menu()[i];
+        if (it.label() && !(it.flags & FL_SUBMENU)) return i;
+    }
+    return 0;
+}
+
 void PatternPanel::populateChordChoice()
 {
     auto& cc = harmonyControls.chordSec.chordChoice;
@@ -539,6 +549,7 @@ void PatternPanel::populateChordChoice()
                                          : chordDefs[i].name;
         cc.add(path.c_str(), 0, nullptr, (void*)(intptr_t)i);
     }
+    cc.value(firstChordItem(cc));
     cc.redraw();
 }
 
@@ -554,7 +565,6 @@ void PatternPanel::setParams(int root, std::string_view chordHash, bool sharp)
     populateChordChoice();
     // Select the menu item whose user_data carries this chordDefs index.
     auto& cc = harmonyControls.chordSec.chordChoice;
-    cc.value(0);
     for (int i = 0; i < cc.size(); ++i) {
         const Fl_Menu_Item& it = cc.menu()[i];
         if (it.label() && !(it.flags & FL_SUBMENU) &&

@@ -1,0 +1,51 @@
+
+CLAUDE ON Microtanal - MIDI 1 and MIDI 2.0
+==========================================
+
+● Short answer: yes, MIDI 2.0 makes non-12-TET pitch native — but the parts of the stack Luvie actually 
+  rides on are the least-ready parts.
+
+  What MIDI 2.0 gives you
+
+  Two mechanisms, both per-note:
+
+  - Note On "pitch 7.9" attribute — a 16-bit field, 7 bits semitone + 9 bits fraction, so ~1/512 semitone
+  (≈0.2 cents). The important part isn't the resolution, it's that it decouples the note number from the 
+  sounding pitch. Under MIDI 1 you can't sound two microtonal variants of the "same" note simultaneously,
+  because bend is per-channel; with 7.9 the note number becomes a bare identifier.
+  - Per-Note Pitch Bend as a first-class 32-bit message — what MPE simulates by burning a channel per note.
+
+  What MIDI 1 already does, awkwardly: MTS SysEx tuning tables, MPE, and MTS-ESP — a de facto standard
+  where a master plugin retunes all connected clients and loads .scl/.kbm/.tun. Microtonality on MIDI 1 is
+  solved-ish; it's just ugly.
+
+  Where Luvie sits
+
+  - JACK: no native UMP. jack2#535 and discussion #985 show raw UMP can travel over JACK MIDI ports
+  (they're byte blobs), but there's no endpoint discovery, and the proposed sniffing heuristic — treat any
+  4/8/12/16-byte packet as UMP — can misread a MIDI 1.0 SysEx. Not a stable target.
+  - LV2: no ratified UMP extension. atsushieno/lv2-midi2 is explicitly ongoing/experimental.
+  - Meanwhile the kernel is ahead: ALSA has UMP and PipeWire has UMP transport. So the OS layer is ready
+  and the plugin/session layer isn't — which is exactly backwards for you, since Luvie emits through JACK
+  ports and an LV2 midi:MidiEvent atom.
+
+  What this means for the scale table — my recommendation: change nothing
+
+  The tempting move is to store intervals in cents (×100) or 1/512-semitone units now, to be future-proof.
+  I'd argue against it: the representation isn't what blocks microtonality — the output path is. Every sink
+  you have (JACK MIDI 1, RtMidi, the LV2 atom) takes 12-TET note numbers, so cents in the table would have
+  nowhere to go. And it's a mechanical ×100 over ~40 rows whenever you do want it, so pre-paying buys
+  nothing.
+
+  There's also a conceptual point in your favour: for a sequencer, a scale is a set of degrees. What those
+  degrees are tuned to is the synth's business — which is precisely how MTS-ESP works. Luvie emitting
+  degree→note-number while a tuning master retunes downstream gets you microtonal playback with zero change
+  to chords.hpp. The 12-TET assumption is isolated in rowToMidi() (chords.hpp:163), which is where it
+  belongs.
+
+  So the practical upshot for the current question is unchanged: quarter-tone maqamat (Rast, Bayati, Saba,
+  Sikah) stay out of scope, and the candidate list is still 12-TET subsets.
+
+  Sources: MIDI.org — note numbers in MIDI 2.0, UMP & MIDI 2.0 spec, MIDI 2.0 on Linux, lv2-midi2, jack2 
+  UMP discussion, MTS-ESP
+

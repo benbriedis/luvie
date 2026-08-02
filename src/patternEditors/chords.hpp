@@ -11,9 +11,18 @@ struct ChordDef {
     const char* hash;
     const char* name;
     int         size;
-    int         intervals[8];
+    int         intervals[12];
     bool        isScale;   // true = shown under "Scale"; false = under "Chord"
-    const char* submenu;   // menu grouping; nullptr/"" = top level, else submenu name
+    // Menu grouping; nullptr/"" = top level. A '/' nests, so "World/Japan" puts the
+    // entry two levels deep (FLTK splits menu paths on '/' to any depth).
+    //
+    // Two characters need escaping in a name or a submenu, and each has its own
+    // form. A literal slash is escaped with a backslash — "6\\/9" — which FLTK
+    // strips while splitting the path. A literal ampersand is doubled — "Jazz &&
+    // Blues" — because a lone '&' marks the next character as the mnemonic and is
+    // swallowed when the item draws. Backslash does NOT work for '&': it is
+    // stripped during the path split, leaving the bare '&' to become a mnemonic.
+    const char* submenu;
 };
 
 inline constexpr ChordDef chordDefs[] = {
@@ -86,22 +95,86 @@ inline constexpr ChordDef chordDefs[] = {
     {"trstn5", "Tristan",           4, {0, 3, 6, 10,  0,  0,  0}, false, "Named"},
 
     // --- Scales ---
-    {"m6skzq", "Major Pent.",       5, {0, 2, 4,  7,  9,  0,  0}, true,  nullptr},
-    {"on64vt", "Minor Pent.",       5, {0, 3, 5,  7, 10,  0,  0}, true,  nullptr},
-    {"gyz07l", "Major",             7, {0, 2, 4,  5,  7,  9, 11}, true,  nullptr},
-    {"3zmfqr", "Minor (asc)",       7, {0, 2, 3,  5,  7,  9, 11}, true,  nullptr},
-    {"4psiem", "Minor (desc)",      7, {0, 2, 3,  5,  7,  8, 10}, true,  nullptr},
-    {"7hdzsf", "Minor (harmonic)",  7, {0, 2, 3,  5,  7,  8, 11}, true,  nullptr},
-    {"modion", "Ionian",            7, {0, 2, 4,  5,  7,  9, 11}, true,  "Modes"},
-    {"q2vws4", "Dorian",            7, {0, 2, 3,  5,  7,  9, 10}, true,  "Modes"},
-    {"wjrku4", "Phrygian",          7, {0, 1, 3,  5,  7,  8, 10}, true,  "Modes"},
-    {"n19hmt", "Lydian",            7, {0, 2, 4,  6,  7,  9, 11}, true,  "Modes"},
-    {"cgkl5p", "Mixolydian",        7, {0, 2, 4,  5,  7,  9, 10}, true,  "Modes"},
-    {"g8suvb", "Aeolian",           7, {0, 2, 3,  5,  7,  8, 10}, true,  "Modes"},
-    {"pulps0", "Locrian",           7, {0, 1, 3,  5,  6,  8, 10}, true,  "Modes"},
-    {"ktcanc", "Whole tone",        6, {0, 2, 4,  6,  8, 10,  0}, true,  nullptr},
-    {"oct8wh", "Whole-half",        8, {0, 2, 3,  5,  6,  8,  9, 11}, true, "Octatonic"},
-    {"oct8hw", "Half-whole",        8, {0, 1, 3,  4,  6,  7,  9, 10}, true, "Octatonic"},
+    // Every scale sits in a family submenu; nothing is left at top level. Rows are
+    // ordered by submenu so each menu builds from a contiguous run.
+
+    // Classic. Chromatic lives here as the "no constraint" option — with a
+    // selectable root it is genuinely useful, not just the absence of a scale.
+    {"gyz07l", "Major",             7, {0, 2, 4,  5,  7,  9, 11}, true,  "Classic"},
+    {"3zmfqr", "Minor (asc)",       7, {0, 2, 3,  5,  7,  9, 11}, true,  "Classic"},
+    {"4psiem", "Minor (desc)",      7, {0, 2, 3,  5,  7,  8, 10}, true,  "Classic"},
+    {"7hdzsf", "Minor (harmonic)",  7, {0, 2, 3,  5,  7,  8, 11}, true,  "Classic"},
+    {"harmaj", "Harmonic major",    7, {0, 2, 4,  5,  7,  8, 11}, true,  "Classic"},
+    {"m6skzq", "Major pent.",       5, {0, 2, 4,  7,  9,  0,  0}, true,  "Classic"},
+    {"on64vt", "Minor pent.",       5, {0, 3, 5,  7, 10,  0,  0}, true,  "Classic"},
+    {"neapmj", "Neapolitan major",  7, {0, 1, 3,  5,  7,  9, 11}, true,  "Classic"},
+    {"neapmn", "Neapolitan minor",  7, {0, 1, 3,  5,  7,  8, 11}, true,  "Classic"},
+    {"chrom1", "Chromatic",        12, {0, 1, 2,  3,  4,  5,  6,  7,  8,  9, 10, 11}, true, "Classic"},
+
+    // Modes of the major scale. Ionian and Aeolian duplicate Major and Minor (desc)
+    // on purpose — dropping them would leave holes in the mode sequence.
+    {"modion", "Ionian",            7, {0, 2, 4,  5,  7,  9, 11}, true,  "Major modes"},
+    {"q2vws4", "Dorian",            7, {0, 2, 3,  5,  7,  9, 10}, true,  "Major modes"},
+    {"wjrku4", "Phrygian",          7, {0, 1, 3,  5,  7,  8, 10}, true,  "Major modes"},
+    {"n19hmt", "Lydian",            7, {0, 2, 4,  6,  7,  9, 11}, true,  "Major modes"},
+    {"cgkl5p", "Mixolydian",        7, {0, 2, 4,  5,  7,  9, 10}, true,  "Major modes"},
+    {"g8suvb", "Aeolian",           7, {0, 2, 3,  5,  7,  8, 10}, true,  "Major modes"},
+    {"pulps0", "Locrian",           7, {0, 1, 3,  5,  6,  8, 10}, true,  "Major modes"},
+
+    // Symmetric — scales of limited transposition.
+    {"ktcanc", "Whole tone",        6, {0, 2, 4,  6,  8, 10,  0}, true,  "Symmetric"},
+    {"augmt6", "Augmented",         6, {0, 3, 4,  7,  8, 11,  0}, true,  "Symmetric"},
+    {"oct8wh", "Whole-half",        8, {0, 2, 3,  5,  6,  8,  9, 11}, true, "Symmetric"},
+    {"oct8hw", "Half-whole",        8, {0, 1, 3,  4,  6,  7,  9, 10}, true, "Symmetric"},
+
+    // Jazz & blues. Altered, Lydian dominant and Half-diminished are modes of the
+    // melodic minor, admitted on the strength of the jazz tradition behind them.
+    {"blues6", "Blues",             6, {0, 3, 5,  6,  7, 10,  0}, true,  "Jazz && Blues"},
+    {"bluesm", "Major blues",       6, {0, 2, 3,  4,  7,  9,  0}, true,  "Jazz && Blues"},
+    {"altrd7", "Altered",           7, {0, 1, 3,  4,  6,  8, 10}, true,  "Jazz && Blues"},
+    {"lyddom", "Lydian dominant",   7, {0, 2, 4,  6,  7,  9, 10}, true,  "Jazz && Blues"},
+    {"hlfdim", "Half-diminished",   7, {0, 2, 3,  5,  6,  8, 10}, true,  "Jazz && Blues"},
+    {"bebdom", "Bebop dominant",    8, {0, 2, 4,  5,  7,  9, 10, 11}, true, "Jazz && Blues"},
+    {"bebmaj", "Bebop major",       8, {0, 2, 4,  5,  7,  8,  9, 11}, true, "Jazz && Blues"},
+    {"bebdor", "Bebop dorian",      8, {0, 2, 3,  4,  5,  7,  9, 10}, true, "Jazz && Blues"},
+    {"bebmin", "Bebop melodic min.",8, {0, 2, 3,  5,  7,  8,  9, 11}, true, "Jazz && Blues"},
+
+    {"hunmaj", "Hungarian major",   7, {0, 3, 4,  6,  7,  9, 10}, true,  "World/Eastern Europe"},
+    {"hunmin", "Hungarian minor",   7, {0, 2, 3,  6,  7,  8, 11}, true,  "World/Eastern Europe"},
+    {"rommaj", "Romanian major",    7, {0, 1, 4,  6,  7,  9, 10}, true,  "World/Eastern Europe"},
+    {"ukrdor", "Ukrainian dorian",  7, {0, 2, 3,  6,  7,  9, 10}, true,  "World/Eastern Europe"},
+
+    // Byzantine is the double harmonic major (maqam Hijazkar); Phrygian Dominant is
+    // maqam Hijaz. The quarter-tone maqamat (Rast, Bayati, Saba, Sikah) cannot be
+    // represented in 12-TET and are deliberately absent.
+    {"persia", "Persian",           7, {0, 1, 4,  5,  6,  8, 11}, true,  "World/Middle East"},
+    {"byzant", "Byzantine",         7, {0, 1, 4,  5,  7,  8, 11}, true,  "World/Middle East"},
+    {"phrydm", "Phrygian dominant", 7, {0, 1, 4,  5,  7,  8, 10}, true,  "World/Middle East"},
+
+    // Japanese koto tunings, following Kostka & Payne. Sources disagree sharply here:
+    // Burrows and Sachs/Slonimsky each assign these names to different rotations of
+    // the same pentatonic pattern, so Hirajoshi in particular is spelled three ways
+    // in the literature. Kostka & Payne is used throughout for consistency.
+    {"hirajo", "Hirajoshi",         5, {0, 2, 3,  7,  8,  0,  0}, true,  "World/Japan"},
+    {"iwato5", "Iwato",             5, {0, 1, 5,  6, 10,  0,  0}, true,  "World/Japan"},
+    {"kumoi5", "Kumoi",             5, {0, 1, 5,  7,  9,  0,  0}, true,  "World/Japan"},
+    {"insen5", "Insen",             5, {0, 1, 5,  7, 10,  0,  0}, true,  "World/Japan"},
+    {"yoscal", "Yo",                5, {0, 2, 5,  7,  9,  0,  0}, true,  "World/Japan"},
+    {"akebon", "Akebono",           5, {0, 2, 3,  7,  9,  0,  0}, true,  "World/Japan"},
+
+    // The ten Hindustani thaats, complete. Seven duplicate pitch sets that already
+    // appear above under Western names (noted per row) — kept so the family is whole
+    // and reachable under the name a player working in that idiom would look for.
+    {"bilava", "Bilaval",           7, {0, 2, 4,  5,  7,  9, 11}, true,  "World/India"},  // = Major
+    {"khamaj", "Khamaj",            7, {0, 2, 4,  5,  7,  9, 10}, true,  "World/India"},  // = Mixolydian
+    {"kafith", "Kafi",              7, {0, 2, 3,  5,  7,  9, 10}, true,  "World/India"},  // = Dorian
+    {"asavar", "Asavari",           7, {0, 2, 3,  5,  7,  8, 10}, true,  "World/India"},  // = Minor (desc)
+    {"bhairv", "Bhairavi",          7, {0, 1, 3,  5,  7,  8, 10}, true,  "World/India"},  // = Phrygian
+    {"bhairo", "Bhairav",           7, {0, 1, 4,  5,  7,  8, 11}, true,  "World/India"},  // = Byzantine
+    {"kalyan", "Kalyan",            7, {0, 2, 4,  6,  7,  9, 11}, true,  "World/India"},  // = Lydian
+    {"marwa1", "Marwa",             7, {0, 1, 4,  6,  7,  9, 11}, true,  "World/India"},
+    {"purvi1", "Purvi",             7, {0, 1, 4,  6,  7,  8, 11}, true,  "World/India"},
+    {"todi01", "Todi",              7, {0, 1, 3,  6,  7,  8, 11}, true,  "World/India"},
 };
 
 inline constexpr int numChordDefs = sizeof(chordDefs) / sizeof(chordDefs[0]);
