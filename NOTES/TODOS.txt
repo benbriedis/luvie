@@ -97,6 +97,10 @@ DISTRO TODOs?
 
 - Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
 
+Cross Plaform:
+	CMake combined with a GitHub multi-platform configuration file (.github/workflows/build.yml):
+
+
 
 Monitor preformance
 -------------------
@@ -193,14 +197,6 @@ When 2 patterns share a channel and parameter maybe highlight in red and have a 
 MINOR FEATURE: maybe a clear all button (or context menu options) for mute and/or solo buttons? (song editor, pattern editor)
 
 
-cf looping and repositioning:  [NOTE there isn't necessary a problem here. Maybe ask AI.]
-	using "Reset All Controllers" (Control Change #121) and "All Notes Off" (CC 120)
-	and/or explicitly dealing with each notes and/or parameter...
-	THINK using 120 + 121 should do the job... if a synth has extra controllers you'd expect them to be handled by 121.
-	These should be issued BEFORE the new parameter messages are sent of course.
-
-
-
 SMALL BUG: There is still a messy cursor transition in the pattern editors when hovering over the 
            transport ruler and dropping down into the label column - cursor doesn't reliably change.
            
@@ -222,6 +218,7 @@ Create a shortcut mechanism and menu...  (cf dividing by editor type)
       open pattern  - eg map to <Enter>
       open context? - eg context button  (currently not working)
       solo? mute?
+	  Rewind could be '<' and/or ','
    Generally prefer to have 1 good set of bindings though...
       
 
@@ -316,4 +313,5 @@ FEATURE: when the last time signature or tempo is off screen show it on the far 
 BUG: looping to start of song causes a gap.
 
 The linear tempo ramp doesn't really want a 'start'. Can maybe show starting tempo without editting.
++ change 'Curve' to 'Type'.
 

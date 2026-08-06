@@ -9,7 +9,7 @@
 #include <lv2/atom/util.h>
 #include <lv2/time/time.h>
 #include <cstdio>
-#include <unistd.h>
+#include "stateFile.hpp"
 
 #include <FL/Fl.H>
 #include <string>
@@ -19,10 +19,14 @@
 #include <functional>
 #include <unordered_map>
 
+#ifdef __linux__
 /* Force FLTK to use X11 (not Wayland) when running as an LV2 plugin inside
    a Qt/Wayland host like Carla. FLTK looks up this symbol via dlsym() at
-   display-init time and skips Wayland if it is true. */
+   display-init time and skips Wayland if it is true. Linux-only: the symbol
+   exists only in FLTK's Wayland-capable build, and macOS (Cocoa) and Windows
+   (GDI) have a single native backend with nothing to choose between. */
 extern "C" FL_EXPORT bool fl_disable_wayland = true;
+#endif
 
 // luvie_core's include dirs (src/, src/modern, src/transports) propagate here.
 #include "appWindow.hpp"
@@ -473,11 +477,8 @@ static LV2UI_Handle instantiate(
     }
 
     /* Build the per-process state file path once (PID is stable for the session) */
-    if (g_stateFilePath.empty()) {
-        char buf[256];
-        snprintf(buf, sizeof(buf), "/tmp/luvie_state_%d.json", (int)getpid());
-        g_stateFilePath = buf;
-    }
+    if (g_stateFilePath.empty())
+        g_stateFilePath = luvie::stateFilePath();
 
     if (ui->map) {
         auto m = [&](const char* uri) { return ui->map->map(ui->map->handle, uri); };

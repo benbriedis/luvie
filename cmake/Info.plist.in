@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Info.plist for Luvie.app. CMake substitutes the MACOSX_BUNDLE_* variables set on the
+  `luvie` target (see src/CMakeLists.txt) plus the standard EXECUTABLE_NAME.
+
+  This is the macOS counterpart to luvie.desktop: it supplies the name shown in the Dock
+  and Finder, the icon, and the bundle identifier that Gatekeeper, notarization and
+  per-app permission grants key off.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.benbriedis.luvie</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Luvie</string>
+    <key>CFBundleDisplayName</key>
+    <string>Luvie</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
+    <key>CFBundleVersion</key>
+    <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
+    <key>CFBundleIconFile</key>
+    <string>${MACOSX_BUNDLE_ICON_FILE}</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2025-2026 Ben Briedis. Apache-2.0.</string>
+    <!-- Draw at native resolution on Retina displays instead of being scaled up. -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <!-- Luvie opens MIDI ports through CoreMIDI; macOS 14+ prompts for consent and
+         requires a reason string, or the app is denied access silently. -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Luvie uses Bluetooth to reach wireless MIDI devices.</string>
+    <!-- .luv project files, so Finder shows them as Luvie documents and can open them. -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Luvie Project</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>luv</string>
+            </array>
+        </dict>
+    </array>
+    <key>LSMinimumSystemVersion</key>
+    <string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>
+</dict>
+</plist>

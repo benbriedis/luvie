@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <numbers>   // std::numbers::pi — M_PI is POSIX, not standard C++
 
 // Square gear button at the right end of the tab bar, in line with the editor
 // tabs. A left-click fires onClick; the owner pops up a context-menu-style
@@ -30,8 +31,8 @@ class SettingsButton : public Fl_Box {
         fl_color(active() ? 0x4B556300 : 0x9CA3AF00);
         fl_begin_complex_polygon();
         for (int i = 0; i < teeth * 2; ++i) {
-            double a0  = (i)     * M_PI / teeth;
-            double a1  = (i + 1) * M_PI / teeth;
+            double a0  = (i)     * std::numbers::pi / teeth;
+            double a1  = (i + 1) * std::numbers::pi / teeth;
             double rad = (i % 2 == 0) ? R : r;
             fl_vertex(cx + rad * std::cos(a0), cy + rad * std::sin(a0));
             fl_vertex(cx + rad * std::cos(a1), cy + rad * std::sin(a1));
@@ -45,7 +46,7 @@ class SettingsButton : public Fl_Box {
         fl_color(bg());
         fl_begin_complex_polygon();
         for (int i = 0; i < 32; ++i) {
-            double a = i * 2.0 * M_PI / 32;
+            double a = i * 2.0 * std::numbers::pi / 32;
             fl_vertex(cx + hole * std::cos(a), cy + hole * std::sin(a));
         }
         fl_end_complex_polygon();

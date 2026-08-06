@@ -94,12 +94,26 @@ JACK Audio Connection Kit
 liblo
     https://liblo.sourceforge.net
     GNU Lesser General Public License, Version 2.1 or later.
-    Used only for NSM session management (src/nsm.cpp), linked dynamically into
-    the standalone application and never bundled with it. No liblo code is
-    incorporated into Luvie's binaries: under section 5 of the LGPL such a
-    binary is "a work that uses the Library" and falls outside that licence's
-    terms. Should liblo ever be vendored or statically linked, section 6 would
-    apply and a copy of the LGPL would have to ship with it.
+    Used only for NSM session management (src/nsm.cpp), which is a Linux
+    session-management protocol; the macOS and Windows builds neither link nor
+    contain liblo at all (src/nsmStub.cpp stands in for src/nsm.cpp there).
+    On Linux it is linked dynamically. No liblo code is incorporated into
+    Luvie's binaries: under section 5 of the LGPL such a binary is "a work that
+    uses the Library" and falls outside that licence's terms. Should liblo ever
+    be vendored or statically linked, section 6 would apply and a copy of the
+    LGPL would have to ship with it.
+
+    One distribution format is an exception. The Linux AppImage is a
+    self-contained bundle, so it carries a copy of liblo.so alongside the other
+    shared libraries it needs, and section 6 does apply to it. Its obligations
+    are met inside the AppImage itself: LICENSES/bundled/ holds each bundled
+    library's licence and names where liblo's complete corresponding source can
+    be obtained, and liblo remains a separate, replaceable dynamic library that
+    the user can substitute (extract with --appimage-extract, replace
+    usr/lib/liblo.so.7, repack). See tools/make-appimage.sh, which assembles
+    that directory from the libraries actually bundled rather than from a
+    hand-written list, so a new dependency cannot ship undocumented. The
+    tarball and .deb bundle nothing and are unaffected.
 
 
 BUNDLED THIRD-PARTY SOURCE

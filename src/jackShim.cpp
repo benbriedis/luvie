@@ -24,12 +24,60 @@
 // after a successful jack_client_open() on the UI thread, so by the time they run
 // the handle is already loaded and ensureLoaded() is a single branch — no dlopen,
 // no lock on the RT path.
+//
+// The same arrangement holds on all three platforms; only the loader API and the
+// library's filename differ, which is what the small platform layer below covers.
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dlfcn.h>
+#endif
 
 namespace {
+
+// ── Platform layer ──────────────────────────────────────────────────────────────
+// Two operations (open a shared library, look up a symbol in it) and the list of
+// filenames to try, per platform. Everything below this point is platform-neutral.
+
+#ifdef _WIN32
+
+using LibHandle = HMODULE;
+
+LibHandle openLib(const char* name) { return LoadLibraryA(name); }
+void* symbol(LibHandle h, const char* name) {
+    // GetProcAddress returns FARPROC (a function pointer); the round trip through
+    // void* is the documented way to store it generically.
+    return reinterpret_cast<void*>(GetProcAddress(h, name));
+}
+
+// JACK2's Windows installer ships libjack64.dll (64-bit) and drops it somewhere on
+// the default search path. libjack.dll is the 32-bit / older name, tried as a fallback.
+const char* const libNames[] = { "libjack64.dll", "libjack.dll", nullptr };
+
+#else
+
+using LibHandle = void*;
+
+LibHandle openLib(const char* name) { return dlopen(name, RTLD_NOW | RTLD_LOCAL); }
+void* symbol(LibHandle h, const char* name) { return dlsym(h, name); }
+
+#ifdef __APPLE__
+// JackOSX / jack2 install into /usr/local/lib, which is on dyld's default fallback
+// path — but only when DYLD_LIBRARY_PATH is unset, and a sandboxed or hardened
+// process may not have it. Naming the absolute path as a fallback costs nothing.
+const char* const libNames[] = {
+    "libjack.0.dylib", "libjack.dylib",
+    "/usr/local/lib/libjack.0.dylib", "/opt/homebrew/lib/libjack.0.dylib", nullptr
+};
+#else
+const char* const libNames[] = { "libjack.so.0", "libjack.so", nullptr };
+#endif
+
+#endif
 
 // Real libjack entry points, resolved once via dlsym. decltype(&jack_foo) pulls the
 // exact signature from the headers so the pointer types can never drift.
@@ -55,22 +103,22 @@ struct JackFns {
     decltype(&jack_midi_event_write)     midi_event_write     = nullptr;
 };
 
-JackFns g;
-void*   handle = nullptr;
-bool    tried  = false;
+JackFns   g;
+LibHandle handle = nullptr;
+bool      tried  = false;
 
-// Idempotent: dlopen libjack once and resolve every symbol we use. Returns true if
+// Idempotent: load libjack once and resolve every symbol we use. Returns true if
 // libjack is available. After the first call this is just `return handle != nullptr`.
 bool ensureLoaded() {
     if (tried) return handle != nullptr;
     tried = true;
 
-    handle = dlopen("libjack.so.0", RTLD_NOW | RTLD_LOCAL);
-    if (!handle) handle = dlopen("libjack.so", RTLD_NOW | RTLD_LOCAL);
+    for (const char* const* name = libNames; *name && !handle; ++name)
+        handle = openLib(*name);
     if (!handle) return false;
 
     #define LV_LOAD(field, sym) \
-        g.field = reinterpret_cast<decltype(g.field)>(dlsym(handle, #sym))
+        g.field = reinterpret_cast<decltype(g.field)>(symbol(handle, #sym))
     LV_LOAD(client_open,          jack_client_open);
     LV_LOAD(client_close,         jack_client_close);
     LV_LOAD(activate,             jack_activate);

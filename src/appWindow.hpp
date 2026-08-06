@@ -17,7 +17,11 @@ class AppWindow : public Fl_Double_Window {
 
 	int       detectEdge()        const;
 	Fl_Cursor edgeCursor(int dir) const;
-	void      startWmResize(int dir);
+	// Hands an interactive resize to the window manager. Returns false if this
+	// platform has no such handoff, in which case the edge zone must not claim
+	// the click — see wmResizeAvailable().
+	bool      startWmResize(int dir);
+	static bool wmResizeAvailable();
 
 public:
 	AppWindow(int w, int h) : Fl_Double_Window(w, h) {}

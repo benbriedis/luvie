@@ -87,6 +87,41 @@ static const int wld_edge_map[] = {
 #endif
 
 // ---------------------------------------------------------------------------
+// Windows-specific resize support
+// ---------------------------------------------------------------------------
+#ifdef _WIN32
+// <windows.h> arrives via FL/platform.H -> FL/win32.H.
+
+// DIR_* -> the WMSZ_* code WM_SYSCOMMAND expects. Same idea as the X11 and
+// Wayland maps above: the numbering is the platform's, not ours.
+static const int wmsz_edge_map[] = {
+    WMSZ_TOPLEFT,      // DIR_TL = 0
+    WMSZ_TOP,          // DIR_T  = 1
+    WMSZ_TOPRIGHT,     // DIR_TR = 2
+    WMSZ_RIGHT,        // DIR_R  = 3
+    WMSZ_BOTTOMRIGHT,  // DIR_BR = 4
+    WMSZ_BOTTOM,       // DIR_B  = 5
+    WMSZ_BOTTOMLEFT,   // DIR_BL = 6
+    WMSZ_LEFT,         // DIR_L  = 7
+};
+#endif
+
+// ---------------------------------------------------------------------------
+
+bool AppWindow::wmResizeAvailable()
+{
+#if defined(FLTK_USE_WAYLAND) || defined(FLTK_USE_X11) || defined(_WIN32)
+    return true;
+#else
+    // macOS. Cocoa already resizes a window from any of its edges, including a
+    // few pixels inside the frame, so there is nothing here to add. Saying so
+    // explicitly matters: the edge zone claims FL_MOVE to show a resize cursor
+    // and then swallows the FL_PUSH, so offering it without a working handoff
+    // would leave a 6px strip that looks resizable, isn't, and additionally
+    // blocks whatever widget sits underneath it.
+    return false;
+#endif
+}
 
 int AppWindow::detectEdge() const
 {
@@ -119,18 +154,22 @@ Fl_Cursor AppWindow::edgeCursor(int dir) const
     }
 }
 
-void AppWindow::startWmResize(int dir)
+bool AppWindow::startWmResize(int dir)
 {
+    // Every branch below is the same move: stop owning the pointer, then ask the
+    // window manager to run its own interactive resize from here. Doing the
+    // resize by hand from FL_DRAG events would work, but it would miss the
+    // compositor's snapping, edge tiling and live constraints.
 #ifdef FLTK_USE_WAYLAND
     if (!fl_display) {
         // Wayland backend — delegate to libdecor (bundled in libfltk.a)
         auto* win = reinterpret_cast<wld_window_fl*>(fl_wl_xid(this));
-        if (!win || win->kind != 0 /*DECORATED*/ || !win->frame) return;
+        if (!win || win->kind != 0 /*DECORATED*/ || !win->frame) return false;
         auto* scr = reinterpret_cast<Fl_Wayland_Screen_Driver*>(Fl::screen_driver());
         libdecor_frame_resize(win->frame, scr->get_wl_seat(),
                                  scr->get_serial(), wld_edge_map[dir]);
         Fl::pushed(nullptr);
-        return;
+        return true;
     }
 #endif
 
@@ -154,24 +193,55 @@ void AppWindow::startWmResize(int dir)
     XSendEvent(fl_display, DefaultRootWindow(fl_display), False,
                SubstructureRedirectMask | SubstructureNotifyMask, &ev);
     XFlush(fl_display);
+    return true;
 #endif
+
+#ifdef _WIN32
+    HWND hwnd = fl_win32_xid(this);
+    if (!hwnd) return false;
+    // FLTK captured the mouse when it delivered FL_PUSH. The size loop below
+    // reads the mouse itself, so it gets nothing until the capture is dropped —
+    // this is the counterpart of XUngrabPointer on the X11 path.
+    ReleaseCapture();
+    // SendMessage, not PostMessage: WM_SYSCOMMAND/SC_SIZE runs a *modal* size
+    // loop that does not return until the user lets go. It pumps messages
+    // internally, so the window keeps repainting while it is being dragged.
+    SendMessage(hwnd, WM_SYSCOMMAND, SC_SIZE + wmsz_edge_map[dir], 0);
+    // The loop consumed the button release, so FLTK never sees FL_RELEASE and
+    // would otherwise treat the next motion as a continuing drag.
+    Fl::pushed(nullptr);
+    return true;
+#endif
+
+    (void)dir;
+    return false;
 }
 
 int AppWindow::handle(int event)
 {
-    // Edge-zone cursor and drag initiation.
-    if (event == FL_MOVE || event == FL_ENTER || event == FL_PUSH) {
+    // Edge-zone cursor and drag initiation. The zone lies *inside* the client
+    // area, which is what makes it worth having: the window has ordinary native
+    // decorations, but many window managers draw no side or bottom frame at all
+    // (Luvie's own X11 session reports frame extents of 0,0,37,0 — a title bar
+    // and nothing else), leaving no border to grab. Skipped entirely where the
+    // platform resizes from its own edges; see wmResizeAvailable().
+    if (wmResizeAvailable() &&
+        (event == FL_MOVE || event == FL_ENTER || event == FL_PUSH)) {
         int dir = detectEdge();
         if (dir >= 0) {
             cursor(edgeCursor(dir));
             inEdgeZone = true;
             if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE) {
-                startWmResize(dir);
-                return 1;
+                // Only claim the click if the handoff actually happened. If it
+                // didn't, fall through so the widget under the pointer still
+                // gets it rather than the click vanishing.
+                if (startWmResize(dir)) return 1;
+                cursor(FL_CURSOR_DEFAULT);
+                inEdgeZone = false;
+            } else {
+                return 1;   // consume MOVE/ENTER so children don't steal cursor
             }
-            return 1;   // consume MOVE/ENTER so children don't steal cursor
-        }
-        if (inEdgeZone) {
+        } else if (inEdgeZone) {
             cursor(FL_CURSOR_DEFAULT);
             inEdgeZone = false;
         }

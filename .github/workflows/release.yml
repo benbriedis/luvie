@@ -1,0 +1,250 @@
+# Build, package and publish a Luvie release.
+#
+# Triggered by pushing a version tag. Produces a *draft* GitHub release so the artifacts
+# can be checked before anyone can download them; publishing is a manual click.
+#
+#     git tag -a v0.1.0 -m "Luvie 0.1.0" && git push origin v0.1.0
+#
+# See NOTES/RELEASING.txt for the full procedure and the optional signing secrets.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:          # for a dry run: builds and uploads, publishes nothing
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Build on the oldest supported distribution: glibc is the one library an
+          # AppImage cannot bundle, so the build host sets the floor for every Linux
+          # artifact produced here.
+          - name: Linux
+            os: ubuntu-22.04
+            preset: linux-dist
+          - name: macOS
+            os: macos-14
+            preset: macos-dist
+          - name: Windows
+            os: windows-latest
+            preset: windows-dist
+
+    defaults:
+      run:
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # version strings come from `git describe --tags`
+
+      # ---- Toolchain (kept in step with ci.yml) ----------------------------------
+      - name: Install Linux dependencies
+        if: matrix.name == 'Linux'
+        shell: bash
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++-13 ninja-build pkg-config xvfb file desktop-file-utils \
+            liblo-dev libasound2-dev \
+            libx11-dev libxkbcommon-dev libxinerama-dev libxcursor-dev libxfixes-dev \
+            libxft-dev libcairo2-dev libpango1.0-dev libfontconfig1-dev libdbus-1-dev \
+            libgtk-3-dev
+          echo "CC=gcc-13"  >> "$GITHUB_ENV"
+          echo "CXX=g++-13" >> "$GITHUB_ENV"
+
+      - name: Install macOS dependencies
+        if: matrix.name == 'macOS'
+        shell: bash
+        run: brew install ninja
+
+      - name: Set up MSYS2
+        if: matrix.name == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+
+      - name: Cache fetched dependencies
+        uses: actions/cache@v4
+        with:
+          path: build-dist/_deps
+          key: deps-${{ matrix.name }}-${{ hashFiles('CMakeLists.txt') }}
+
+      # ---- Build and test --------------------------------------------------------
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test (Linux)
+        if: matrix.name == 'Linux'
+        shell: bash
+        run: xvfb-run -a ctest --preset ${{ matrix.preset }}
+
+      - name: Test
+        if: matrix.name != 'Linux'
+        run: ctest --preset ${{ matrix.preset }}
+
+      # ---- Package ---------------------------------------------------------------
+      # cmake/Packaging.cmake already selects each platform's generators (TGZ + DEB here),
+      # so plain `cpack` is enough.
+      - name: Package (Linux)
+        if: matrix.name == 'Linux'
+        shell: bash
+        run: |
+          (cd build-dist && cpack)
+          tools/make-appimage.sh build-dist
+
+      # macOS packaging stages, signs and archives in one script, because the order is
+      # load-bearing — see the comments in the script. Signing activates only when the
+      # secrets exist, so a fork or an unconfigured repo still produces a usable
+      # (unsigned) zip rather than failing.
+      - name: Import macOS signing certificate
+        if: matrix.name == 'macOS'
+        shell: bash
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          if [ -z "$CERT_P12" ]; then
+            echo "MACOS_CERT_P12 not set — this build will be unsigned"
+            exit 0
+          fi
+          # A throwaway keychain, unlocked for this job only, so the certificate never
+          # touches the runner's login keychain.
+          KEYCHAIN="$RUNNER_TEMP/luvie-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          # Without this, codesign blocks on an interactive keychain-access prompt.
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "MACOS_SIGN_IDENTITY=$SIGN_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Package (macOS)
+        if: matrix.name == 'macOS'
+        shell: bash
+        env:
+          # Notarization is a separate opt-in from signing: it needs an Apple ID and an
+          # app-specific password, which not every signing setup has to hand.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [ -n "$APPLE_ID" ] && [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
+            xcrun notarytool store-credentials luvie-notary \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD"
+            export MACOS_NOTARY_PROFILE=luvie-notary
+          fi
+          tools/make-macos-zip.sh build-dist
+
+      # Signing has to happen before packaging, so the archives contain signed binaries;
+      # unlike macOS there is nothing to stage first, as signtool works on the built
+      # files in place. Skipped entirely when no certificate is configured, leaving an
+      # unsigned but perfectly functional build (users see a SmartScreen warning).
+      - name: Sign Windows binaries
+        if: matrix.name == 'Windows'
+        shell: pwsh
+        env:
+          CERT_P12: ${{ secrets.WINDOWS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:CERT_P12) {
+            Write-Host "WINDOWS_CERT_P12 not set - this build will be unsigned"
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_P12))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+                      Sort-Object FullName | Select-Object -Last 1
+          # A timestamp is what keeps the signature valid after the certificate expires.
+          Get-ChildItem -Path build-dist -Recurse -Include luvie.exe,luvie_dsp.dll,luvie_ui.dll |
+            ForEach-Object {
+              & $signtool.FullName sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 `
+                /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+              if ($LASTEXITCODE -ne 0) { throw "signtool failed on $($_.FullName)" }
+            }
+          Remove-Item $pfx
+
+      - name: Package (Windows)
+        if: matrix.name == 'Windows'
+        run: |
+          # The zips must be self-contained: the dist preset links the GCC runtime
+          # statically precisely so no MSYS2 DLL has to ship. Catch a regression here
+          # rather than in a bug report from someone without MSYS2 installed.
+          if ldd build-dist/src/luvie.exe | grep -iE 'msys|ucrt64/bin'; then
+            echo "::error::luvie.exe depends on MSYS2 DLLs; the static link flags are not taking effect"
+            exit 1
+          fi
+          (cd build-dist && cpack)
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            build-dist/*.tar.gz
+            build-dist/*.zip
+            build-dist/*.deb
+            build-dist/*.AppImage
+
+  release:
+    name: Draft GitHub release
+    needs: package
+    runs-on: ubuntu-latest
+    # Only a real tag push publishes anything; workflow_dispatch stops after building,
+    # which is what makes it usable as a dry run.
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write         # required to create the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true         # review the artifacts, then publish by hand
+          generate_release_notes: true
+          files: artifacts/*
+          body: |
+            ## Downloads
+
+            | Platform | Standalone | LV2 plugin |
+            | --- | --- | --- |
+            | Linux | `.AppImage` (runs anywhere), `luvie_*.deb`, or `luvie-*.tar.gz` | `luvie-lv2_*.deb` or `luvie-lv2-*.tar.gz` |
+            | macOS | `Luvie-*-macos-universal.zip` — contains both | (same zip) |
+            | Windows | `luvie-*-windows-x86_64.zip` | `luvie-lv2-*-windows-x86_64.zip` |
+
+            Install the LV2 bundle by copying `luvie.lv2` into
+            `~/.lv2` (Linux), `~/Library/Audio/Plug-Ins/LV2` (macOS) or
+            `%APPDATA%\LV2` (Windows).
+
+            JACK is optional everywhere: Luvie loads it at runtime if present and
+            falls back to its internal transport and native MIDI output if not.

@@ -19,7 +19,10 @@ add_library(luvie_dsp MODULE
 target_include_directories(luvie_dsp PRIVATE
     ${SRC} ${SRC}/transports ${SRC}/patternEditors ${SRC}/outputs ${SRC}/songEditor)
 target_link_libraries(luvie_dsp PRIVATE
-    m lv2_headers Threads::Threads ${CMAKE_DL_LIBS}
+    # libm is a separate library only on Linux; on macOS and Windows the maths
+    # functions live in the C runtime and there is no -lm to link.
+    $<$<PLATFORM_ID:Linux>:m>
+    lv2_headers Threads::Threads ${CMAKE_DL_LIBS}
     nlohmann_json::nlohmann_json)
 
 # UI (links the shared core; LV2 headers; FLTK/jack come via luvie_core)
@@ -39,23 +42,23 @@ target_link_libraries(luvie_ui PRIVATE luvie_core lv2_headers)
 # A version script then pins the dynamic symbol table to exactly those entry points,
 # also catching stray std:: template instantiations emitted into the module itself.
 #
-# The mechanisms here are toolchain-specific: -fvisibility is a GCC/Clang flag, and
-# --exclude-libs / --version-script are GNU binutils-ld / lld features. They cover
-# the Linux build. macOS (ld64: -exported_symbols_list) and Windows (MSVC: hidden by
-# default, export via __declspec/.def) use different mechanisms — wire those up when
-# those ports land. Each flag is feature-detected so an unsupported toolchain simply
-# builds without it (with a warning) rather than failing to configure.
+# Each of the three binary formats needs a different mechanism, and the choice is made
+# on the *format*, not on whether a flag is accepted. That distinction is load-bearing:
+# MinGW's ld accepts -Wl,--version-script and -Wl,--exclude-libs without complaint (so
+# check_linker_flag reports them as supported) but both are ELF concepts and neither has
+# any effect on a PE export table. Selecting by flag-probe alone therefore silently
+# produced a Windows DLL exporting all 87 of RtMidi's C++ symbols while reporting
+# success. Probe each flag still, but only the one that belongs to this format.
 include(CheckCompilerFlag)
 include(CheckLinkerFlag)
 
 set(LUVIE_VERSION_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/luvie.version")
+set(LUVIE_EXPORTED_SYMBOLS "${CMAKE_CURRENT_SOURCE_DIR}/luvie.exported_symbols")
 
 # -fvisibility=hidden (and the C++ inlines variant) — GCC/Clang; not an MSVC concept.
+# Meaningless on PE (which has no visibility attribute) but harmless there.
 check_compiler_flag(CXX -fvisibility=hidden          LUVIE_HAVE_FVISIBILITY)
 check_compiler_flag(CXX -fvisibility-inlines-hidden  LUVIE_HAVE_FVISIBILITY_INLINES)
-# --exclude-libs,ALL and --version-script — GNU ld / lld only.
-check_linker_flag(CXX "-Wl,--exclude-libs,ALL"                         LUVIE_HAVE_EXCLUDE_LIBS)
-check_linker_flag(CXX "-Wl,--version-script=${LUVIE_VERSION_SCRIPT}"   LUVIE_HAVE_VERSION_SCRIPT)
 
 if(LUVIE_HAVE_FVISIBILITY)
     target_compile_options(luvie_dsp PRIVATE -fvisibility=hidden)
@@ -64,25 +67,100 @@ endif()
 if(LUVIE_HAVE_FVISIBILITY_INLINES)
     target_compile_options(luvie_ui PRIVATE -fvisibility-inlines-hidden)
 endif()
-if(LUVIE_HAVE_EXCLUDE_LIBS)
-    target_link_options(luvie_dsp PRIVATE -Wl,--exclude-libs,ALL)
-    target_link_options(luvie_ui  PRIVATE -Wl,--exclude-libs,ALL)
-endif()
-if(LUVIE_HAVE_VERSION_SCRIPT)
-    target_link_options(luvie_dsp PRIVATE -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
-    target_link_options(luvie_ui  PRIVATE -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
-    # Relink the modules if the version script changes.
-    set_target_properties(luvie_dsp luvie_ui PROPERTIES
-        LINK_DEPENDS "${LUVIE_VERSION_SCRIPT}")
+
+set(LUVIE_EXPORTS_CONTROLLED FALSE)
+
+if(WIN32)
+    # PE/COFF. There is no version script; instead ld auto-exports symbols, and a
+    # module that links static archives (luvie_ui pulls in luvie_core, FLTK and RtMidi)
+    # ends up advertising their internals. --exclude-all-symbols turns auto-export off
+    # so the export table holds exactly what LV2_SYMBOL_EXPORT marked with
+    # __declspec(dllexport) — i.e. the one entry point each module defines.
+    check_linker_flag(CXX "-Wl,--exclude-all-symbols" LUVIE_HAVE_EXCLUDE_ALL_SYMBOLS)
+    if(LUVIE_HAVE_EXCLUDE_ALL_SYMBOLS)
+        target_link_options(luvie_dsp PRIVATE -Wl,--exclude-all-symbols)
+        target_link_options(luvie_ui  PRIVATE -Wl,--exclude-all-symbols)
+        set(LUVIE_EXPORTS_CONTROLLED TRUE)
+    endif()
+
+elseif(APPLE)
+    # Mach-O. ld64 has neither --version-script nor --exclude-libs, and needs neither:
+    # an explicit export list is absolute, so symbols pulled from the static archives
+    # are localized by the same flag.
+    check_linker_flag(CXX "-Wl,-exported_symbols_list,${LUVIE_EXPORTED_SYMBOLS}"
+                      LUVIE_HAVE_EXPORTED_SYMBOLS)
+    if(LUVIE_HAVE_EXPORTED_SYMBOLS)
+        target_link_options(luvie_dsp PRIVATE -Wl,-exported_symbols_list,${LUVIE_EXPORTED_SYMBOLS})
+        target_link_options(luvie_ui  PRIVATE -Wl,-exported_symbols_list,${LUVIE_EXPORTED_SYMBOLS})
+        set_target_properties(luvie_dsp luvie_ui PROPERTIES
+            LINK_DEPENDS "${LUVIE_EXPORTED_SYMBOLS}")
+        set(LUVIE_EXPORTS_CONTROLLED TRUE)
+    endif()
+
+else()
+    # ELF. Two complementary flags:
+    #   --exclude-libs,ALL   localizes every symbol pulled from a static archive
+    #                        (luvie_core, FLTK, RtMidi, static libstdc++);
+    #   --version-script     pins the dynamic symbol table to exactly the entry points,
+    #                        also catching stray std:: template instantiations emitted
+    #                        into the module's own objects.
+    check_linker_flag(CXX "-Wl,--exclude-libs,ALL"                       LUVIE_HAVE_EXCLUDE_LIBS)
+    check_linker_flag(CXX "-Wl,--version-script=${LUVIE_VERSION_SCRIPT}" LUVIE_HAVE_VERSION_SCRIPT)
+    if(LUVIE_HAVE_EXCLUDE_LIBS)
+        target_link_options(luvie_dsp PRIVATE -Wl,--exclude-libs,ALL)
+        target_link_options(luvie_ui  PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
+    if(LUVIE_HAVE_VERSION_SCRIPT)
+        target_link_options(luvie_dsp PRIVATE -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
+        target_link_options(luvie_ui  PRIVATE -Wl,--version-script=${LUVIE_VERSION_SCRIPT})
+        # Relink the modules if the version script changes.
+        set_target_properties(luvie_dsp luvie_ui PROPERTIES
+            LINK_DEPENDS "${LUVIE_VERSION_SCRIPT}")
+        set(LUVIE_EXPORTS_CONTROLLED TRUE)
+    endif()
 endif()
 
-if(NOT (LUVIE_HAVE_EXCLUDE_LIBS AND LUVIE_HAVE_VERSION_SCRIPT))
+if(NOT LUVIE_EXPORTS_CONTROLLED)
     message(WARNING
         "LV2 plugin symbol-hiding is incomplete on this toolchain: the modules may "
         "export internal FLTK/libstdc++/RtMidi symbols and risk being interposed by "
-        "the host. Add the platform-specific export-control mechanism (macOS "
-        "-exported_symbols_list / Windows .def) before shipping this build.")
+        "the host. Add the export-control mechanism for this binary format (a .def "
+        "file under MSVC) before shipping this build.")
 endif()
+
+# The export table is the whole point of the block above, and it fails quietly — a DLL
+# or .so with too many exports links, loads and works right up until it interposes a
+# host's symbol. So assert on it at build time rather than trusting the flags took.
+# The format and the symbol reader are passed in explicitly: a -P script has no notion
+# of the target platform (its WIN32 describes the host), and CMAKE_NM/CMAKE_OBJDUMP are
+# the target toolchain's, which under a cross-build are not the ones on PATH.
+if(WIN32)
+    set(LUVIE_EXPORT_FORMAT PE)
+    set(LUVIE_EXPORT_TOOL   "${CMAKE_OBJDUMP}")
+elseif(APPLE)
+    set(LUVIE_EXPORT_FORMAT MACHO)
+    set(LUVIE_EXPORT_TOOL   "${CMAKE_NM}")
+else()
+    set(LUVIE_EXPORT_FORMAT ELF)
+    set(LUVIE_EXPORT_TOOL   "${CMAKE_NM}")
+endif()
+
+foreach(mod luvie_dsp luvie_ui)
+    if(mod STREQUAL "luvie_dsp")
+        set(entry lv2_descriptor)
+    else()
+        set(entry lv2ui_descriptor)
+    endif()
+    add_custom_command(TARGET ${mod} POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+                -DMODULE=$<TARGET_FILE:${mod}>
+                -DEXPECTED=${entry}
+                -DFORMAT=${LUVIE_EXPORT_FORMAT}
+                -DTOOL=${LUVIE_EXPORT_TOOL}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckExports.cmake
+        COMMENT "Checking ${mod} export table"
+        VERBATIM)
+endforeach()
 
 # Match the Makefile output names (luvie_dsp.so, not libluvie_dsp.so)
 # and drop both into the .lv2 bundle directory.
@@ -90,9 +168,16 @@ set_target_properties(luvie_dsp luvie_ui PROPERTIES
     PREFIX ""
     LIBRARY_OUTPUT_DIRECTORY "${LV2_BUNDLE}")
 
-# Data files that make up the bundle alongside the two .so modules.
+# manifest.ttl names the module files by full filename, so it cannot be a static file:
+# CMake's module suffix is .so on Linux *and* macOS but .dll on Windows, and a manifest
+# pointing at the wrong name makes the plugin simply invisible to every host. Generate it
+# from the template instead. (The other two TTLs contain no filenames, so they are copied
+# verbatim below.)
+set(LUVIE_MODULE_SUFFIX "${CMAKE_SHARED_MODULE_SUFFIX}")
+configure_file(manifest.ttl.in ${LV2_BUNDLE}/manifest.ttl @ONLY)
+
+# Data files that make up the bundle alongside the two modules.
 set(LV2_BUNDLE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/manifest.ttl
     ${CMAKE_CURRENT_SOURCE_DIR}/luvie_dsp.ttl
     ${CMAKE_CURRENT_SOURCE_DIR}/luvie_ui.ttl)
 
@@ -130,9 +215,37 @@ list(APPEND LV2_BUNDLE_COPIES ${LV2_LICENSE_STAMP})
 add_custom_target(luvie_lv2_bundle ALL DEPENDS ${LV2_BUNDLE_COPIES})
 
 # Install the .lv2 bundle (was the root Makefile `install-lv2` target).
-# Override location with: cmake -DLV2_INSTALL_DIR=/path ...
-set(LV2_INSTALL_DIR "$ENV{HOME}/.lv2" CACHE PATH "LV2 bundle install location")
-install(TARGETS luvie_dsp luvie_ui LIBRARY DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2)
-install(FILES manifest.ttl luvie_dsp.ttl luvie_ui.ttl
-        DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2)
-install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2)
+#
+# The default is the per-user LV2 directory each platform's hosts actually scan, so a
+# plain `cmake --install build` drops the plugin somewhere useful. That path is absolute
+# and deliberately outside CMAKE_INSTALL_PREFIX — which is right for a developer install
+# but wrong for packaging, so cmake/Packaging.cmake and CI override it:
+#   cmake -DLV2_INSTALL_DIR=<prefix>/lib/lv2 ...
+if(WIN32)
+    # $ENV{HOME} is not a thing on Windows; %APPDATA%\LV2 is the convention. Fall back
+    # into the prefix if even that is unset (an unusual, service-account-style shell).
+    if(DEFINED ENV{APPDATA})
+        set(LUVIE_DEFAULT_LV2_DIR "$ENV{APPDATA}/LV2")
+    else()
+        set(LUVIE_DEFAULT_LV2_DIR "${CMAKE_INSTALL_PREFIX}/lib/lv2")
+    endif()
+elseif(APPLE)
+    set(LUVIE_DEFAULT_LV2_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/LV2")
+else()
+    set(LUVIE_DEFAULT_LV2_DIR "$ENV{HOME}/.lv2")
+endif()
+# STRING, not PATH: CMake rewrites a PATH-typed cache entry to an absolute path against
+# the current working directory, which would silently turn the relative value packaging
+# passes ("lib/lv2", meant to sit under the staging prefix) into an absolute one outside
+# it — and the plugin would then be missing from the archive rather than misplaced in it.
+set(LV2_INSTALL_DIR "${LUVIE_DEFAULT_LV2_DIR}" CACHE STRING
+    "LV2 bundle install location: absolute, or relative to CMAKE_INSTALL_PREFIX")
+
+# MODULE libraries are LIBRARY artifacts on every platform, Windows DLLs included.
+install(TARGETS luvie_dsp luvie_ui
+        LIBRARY DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2 COMPONENT Plugin)
+# The generated manifest, not the template. luvie_dsp.ttl / luvie_ui.ttl are static.
+install(FILES ${LV2_BUNDLE}/manifest.ttl luvie_dsp.ttl luvie_ui.ttl
+        DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2 COMPONENT Plugin)
+install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2
+        COMPONENT Plugin)

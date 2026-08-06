@@ -41,6 +41,7 @@
 #include <memory>
 
 int main(int argc, char **argv) {
+#ifdef __linux__
     /* Force FLTK to use X11 (not native Wayland). FLTK 1.5's Wayland backend
        does not cleanly destroy a toplevel on hide(), so under a session manager
        the GUI window can't be hidden/re-shown via NSM's optional-gui "eye" (the
@@ -48,11 +49,20 @@ int main(int argc, char **argv) {
        Wayland sessions) destroys/recreates windows properly. The `fl_disable_wayland`
        symbol only works for shared objects (the LV2 plugin uses it); for an
        executable FLTK honours FLTK_BACKEND. Set it before any FLTK display init,
-       leaving an explicit user override in place. */
+       leaving an explicit user override in place.
+       Linux-only: FLTK has a single native backend on macOS (Cocoa) and Windows
+       (GDI), so there is nothing to choose between — and setenv is POSIX. */
     setenv("FLTK_BACKEND", "x11", 0);
+#endif
 
-    bool verbose = false;
-    bool testMode = false;
+    bool  verbose = false;
+    bool  testMode = false;
+    /* Quit automatically after this many seconds, if positive. Exists for the CI
+       smoke test (see the `smoke` test in src/CMakeLists.txt): it exercises full
+       startup and — because it closes the window rather than calling exit() — the
+       whole teardown path, which is where the destruction-order hazard noted below
+       would show up. Negative means "run until the user closes the window". */
+    float exitAfter = -1.0f;
     std::string projectPath;   // optional CLI project file (standalone only)
     int  fltk_argc = 1;
 
@@ -64,12 +74,16 @@ int main(int argc, char **argv) {
                    "  --verbose        Print notes and parameter changes during playback\n"
                    "  --test           Use internal transport and debug MIDI output;\n"
                    "                   skip JACK (implies --verbose; no project file allowed)\n"
+                   "  --exit-after N   Close the window and quit after N seconds (testing)\n"
                    "  -h, --help       Show this help message\n"
                    "  --version        Show version information\n\n"
                    "Arguments:\n"
-                   "  project-file     Path to a .luv project file to open on startup\n\n"
-                   "Environment:\n"
-                   "  NSM_URL          Connect to a Non Session Manager at this OSC address\n");
+                   "  project-file     Path to a .luv project file to open on startup\n"
+#ifdef LUVIE_HAVE_NSM
+                   "\nEnvironment:\n"
+                   "  NSM_URL          Connect to a Non Session Manager at this OSC address\n"
+#endif
+                   );
             return 0;
         } else if (arg == "--version") {
             printf("luvie %s\n", LUVIE_VERSION);
@@ -78,6 +92,18 @@ int main(int argc, char **argv) {
             verbose = true;
         else if (arg == "--test")
             testMode = verbose = true;
+        else if (arg == "--exit-after") {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "Error: --exit-after needs a number of seconds.\n");
+                return 1;
+            }
+            exitAfter = strtof(argv[++i], nullptr);
+            if (!(exitAfter > 0.0f)) {
+                fprintf(stderr, "Error: --exit-after needs a positive number of "
+                                "seconds (got \"%s\").\n", argv[i]);
+                return 1;
+            }
+        }
         else if (!arg.empty() && arg[0] != '-' && projectPath.empty())
             projectPath = arg;   // first non-flag arg treated as project file
         else
@@ -604,6 +630,19 @@ int main(int argc, char **argv) {
     // own defaults (internal transport + debug output), so skip the dialog.
     if (newProject && !nsm.isActive() && !testMode)
         showStartupDialog();
+
+    // --exit-after: close up shop on a timer. Hiding the windows (rather than calling
+    // exit()) drops Fl::run() out of its loop and lets main return normally, so the
+    // locals below Fl::run() are destroyed in the order the comment at the top of this
+    // function describes — which is the part worth testing. Going through hide()
+    // directly, not the window callback, also skips the save prompt, keeping the run
+    // non-interactive. Not wired into the NSM loop below: that one is driven by the
+    // session manager's lifecycle, and this flag is for unmanaged test runs.
+    if (exitAfter > 0.0f) {
+        Fl::add_timeout(exitAfter, [](void*) {
+            while (Fl_Window* w = Fl::first_window()) w->hide();
+        });
+    }
 
     // Under NSM the GUI is optional: hiding it must not end the program (the
     // session manager keeps us running and terminates us with SIGTERM).

@@ -52,8 +52,9 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <unistd.h>
 #include <vector>
+
+#include "stateFile.hpp"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
@@ -421,9 +422,7 @@ static LV2_Handle instantiate(
 
     /* Per-process path: the one-shot load/restore handoff to the UI (same PID — both
        load into the host). Never polled; see file header. */
-    char buf[256];
-    snprintf(buf, sizeof(buf), "/tmp/luvie_state_%d.json", (int)getpid());
-    p->stateFilePath = buf;
+    p->stateFilePath = luvie::stateFilePath();
 
     p->song   = new ObservableSong(120.0f, 4, 4);
     p->engine = new Lv2Engine(sampleRate);

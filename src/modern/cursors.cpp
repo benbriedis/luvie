@@ -3,11 +3,12 @@
 
 #include "cursors.hpp"
 #include <cmath>
-#include <FL/platform.H>   // fl_display (X11), fl_xid()
+#include <FL/platform.H>   // fl_display (X11), fl_xid(), fl_win32_xid()
 
 #ifdef FLTK_USE_X11
 #include <X11/Xlib.h>
 #endif
+// <windows.h> arrives via FL/platform.H -> FL/win32.H.
 
 bool warpPointerTo(Fl_Window* win, int winX, int winY)
 {
@@ -20,8 +21,24 @@ bool warpPointerTo(Fl_Window* win, int winX, int winY)
         return true;
     }
 #endif
+
+#ifdef _WIN32
+    if (win) {
+        HWND hwnd = fl_win32_xid(win);
+        // SetCursorPos is in screen coordinates, so convert from the window's.
+        POINT p = { winX, winY };
+        if (hwnd && ClientToScreen(hwnd, &p) && SetCursorPos(p.x, p.y))
+            return true;
+    }
+#endif
+
     (void)win; (void)winX; (void)winY;
-    return false;   // Wayland: pointer warping isn't permitted — no-op.
+    // Wayland forbids pointer warping outright. macOS permits it (via
+    // CoreGraphics) but that needs a framework this build does not otherwise
+    // link, so it is left unimplemented rather than added untested. Both
+    // callers treat false as "keep the grab where the user put it", which is
+    // a slightly different feel, not a broken drag.
+    return false;
 }
 
 const Fl_RGB_Image* forbiddenCursorImage() {

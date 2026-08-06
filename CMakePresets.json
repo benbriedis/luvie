@@ -26,6 +26,62 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+
+    {
+      "name": "dist",
+      "hidden": true,
+      "description": "Shared base for the three distribution presets. Builds into build-dist/ so it never fights the development build/ tree over CMakeCache.txt, sets no compiler (each platform's default is the right one), and redirects the LV2 bundle to a path *inside* the install prefix so `cpack` can capture it. LV2_INSTALL_DIR is deliberately relative: its normal default is the absolute per-user plug-in directory, which would escape the staging tree.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-dist",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "LV2_INSTALL_DIR": "lib/lv2"
+      }
+    },
+    {
+      "name": "linux-dist",
+      "displayName": "Distribution build (Linux)",
+      "description": "What CI ships for Linux. FLTK's Wayland backend is switched off: main.cpp forces FLTK_BACKEND=x11 at startup anyway, so the Wayland code is never exercised, and leaving it out both drops a pile of libraries the AppImage would have to bundle and defines FLTK_USE_X11 (which the custom window drag/resize in appWindow.cpp needs).",
+      "inherits": "dist",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "FLTK_BACKEND_WAYLAND": "OFF"
+      }
+    },
+    {
+      "name": "macos-dist",
+      "displayName": "Distribution build (macOS, universal)",
+      "description": "Universal x86_64 + arm64 build. The two cache variables propagate into FLTK and RtMidi as well, so every static library in the link is universal too. The deployment target is the oldest macOS the arm64 slice can target.",
+      "inherits": "dist",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0"
+      }
+    },
+    {
+      "name": "windows-dist",
+      "displayName": "Distribution build (Windows, MSYS2/UCRT64)",
+      "description": "Run from an MSYS2 UCRT64 shell. The static link flags matter: without them the .exe and both plugin modules need libstdc++-6.dll, libgcc_s_seh-1.dll and libwinpthread-1.dll from MSYS2's bin/ at runtime, so the zip would only work on a machine that already has MSYS2 installed.",
+      "inherits": "dist",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_EXE_LINKER_FLAGS": "-static-libgcc -static-libstdc++ -static",
+        "CMAKE_MODULE_LINKER_FLAGS": "-static-libgcc -static-libstdc++ -static"
+      }
     }
   ],
   "buildPresets": [
@@ -36,6 +92,41 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "linux-dist",
+      "configurePreset": "linux-dist"
+    },
+    {
+      "name": "macos-dist",
+      "configurePreset": "macos-dist"
+    },
+    {
+      "name": "windows-dist",
+      "configurePreset": "windows-dist"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dist",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": { "stopOnFailure": true }
+    },
+    {
+      "name": "linux-dist",
+      "configurePreset": "linux-dist",
+      "inherits": "dist"
+    },
+    {
+      "name": "macos-dist",
+      "configurePreset": "macos-dist",
+      "inherits": "dist"
+    },
+    {
+      "name": "windows-dist",
+      "configurePreset": "windows-dist",
+      "inherits": "dist"
     }
   ]
 }

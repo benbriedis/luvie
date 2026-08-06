@@ -1,0 +1,19 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+@prefix extui: <http://kxstudio.sf.net/ns/lv2ext/external-ui#> .
+
+# Generated from manifest.ttl.in by CMake. Do not edit the copy in the bundle.
+# The module extension below is CMAKE_SHARED_MODULE_SUFFIX, which is .so on Linux and
+# macOS but .dll on Windows; a manifest naming the wrong file makes the plugin
+# invisible to every host, which is why this is generated rather than written out.
+
+<https://github.com/benbriedis/luvie/luvie_dsp>
+    a lv2:Plugin ;
+    lv2:binary <luvie_dsp@LUVIE_MODULE_SUFFIX@> ;
+    rdfs:seeAlso <luvie_dsp.ttl> .
+
+<https://github.com/benbriedis/luvie/luvie_ui>
+    a extui:Widget ;
+    lv2:binary <luvie_ui@LUVIE_MODULE_SUFFIX@> ;
+    rdfs:seeAlso <luvie_ui.ttl> .

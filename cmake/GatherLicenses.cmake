@@ -13,7 +13,10 @@
 #   liblo  — LGPL-2.1+, linked dynamically and never bundled by us, so under LGPL-2.1
 #            section 5 our binary is "a work that uses the Library" and falls outside the
 #            Library's terms. Acknowledged in NOTICE. Revisit if it is ever vendored.
-#   JACK   — not linked at all; dlopen'd at runtime (see src/jackShim.cpp).
+#   JACK   — not linked at all; dlopen'd at runtime (see src/jackShim.cpp). Its headers
+#            are fetched (jack2) so every platform compiles against the same set, but
+#            headers are a build-time input only: no JACK code ends up in our binaries
+#            and none is redistributed, so there is nothing here to carry.
 # FLTK is gathered even though its exception 4 waives shipping the licence, because that
 # text is also our evidence that statically linking it is permitted.
 
