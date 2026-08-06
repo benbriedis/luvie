@@ -91,17 +91,37 @@ JACK Audio Connection Kit
     libjack at runtime via dlopen (see src/jackShim.cpp), so no JACK code is
     incorporated into or distributed with this product.
 
-liblo
+liblo 0.32
     https://liblo.sourceforge.net
+    https://github.com/radarsat1/liblo
     GNU Lesser General Public License, Version 2.1 or later.
-    Used only for NSM session management (src/nsm.cpp), which is a Linux
-    session-management protocol; the macOS and Windows builds neither link nor
-    contain liblo at all (src/nsmStub.cpp stands in for src/nsm.cpp there).
-    On Linux it is linked dynamically. No liblo code is incorporated into
-    Luvie's binaries: under section 5 of the LGPL such a binary is "a work that
-    uses the Library" and falls outside that licence's terms. Should liblo ever
-    be vendored or statically linked, section 6 would apply and a copy of the
-    LGPL would have to ship with it.
+    Used only for NSM session management (src/nsm.cpp). Fetched at the pinned
+    revision above and LINKED STATICALLY, so Luvie's binaries contain portions
+    of liblo. Licence text: LICENSES/liblo/COPYING
+
+    Static linking places this combination under section 6 of the LGPL rather
+    than section 5. Section 6 permits distributing the combined work "under
+    terms of your choice", provided those terms permit modification for the
+    customer's own use and reverse engineering for debugging — which Apache-2.0
+    does. Luvie's own source therefore remains under the Apache License as set
+    out above; nothing here relicenses it.
+
+    The obligations section 6 does impose are met as follows:
+
+      - Prominent notice that the Library is used and is covered by the LGPL:
+        this entry, which ships with every binary distribution.
+      - A copy of the License: LICENSES/liblo/COPYING, copied out of the pinned
+        source at build time by cmake/GatherLicenses.cmake.
+      - The means to relink against a modified liblo (section 6d): Luvie's
+        complete corresponding source is published at
+        https://github.com/benbriedis/luvie, and the exact liblo revision it was
+        built against is pinned in the top-level CMakeLists.txt. Anyone may
+        substitute a modified liblo and rebuild. Binary releases and source are
+        offered from the same place, which is what 6d asks for.
+
+    A build configured with -DLUVIE_NSM=OFF contains no liblo at all
+    (src/nsmStub.cpp stands in for src/nsm.cpp) and none of the above applies
+    to it.
 
     One distribution format is an exception. The Linux AppImage is a
     self-contained bundle, so it carries a copy of liblo.so alongside the other

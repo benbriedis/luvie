@@ -23,14 +23,17 @@ add_library(luvie_core STATIC
     session/standaloneSession.cpp session/nsmSession.cpp
 )
 
-# NSM (Non Session Manager) is a Linux session-management protocol spoken over OSC, and
-# liblo is pulled in solely to speak it — neither has a counterpart on macOS or Windows.
-# So NsmClient has two implementations of one interface: the real liblo-backed one, and
-# an inert stub that reports "no session manager". Swapping the .cpp rather than
-# #ifdef-ing the call sites keeps main.cpp and NsmSession identical on every platform.
+# NsmClient has two implementations of one interface: the real liblo-backed one, and an
+# inert stub that reports "no session manager" — the state the app already handles, since
+# it is what happens on Linux whenever NSM_URL is unset. Swapping the .cpp rather than
+# #ifdef-ing the call sites keeps main.cpp and NsmSession identical everywhere.
+# LUVIE_NSM is on by default on every platform; see the top-level CMakeLists.txt.
 if(LUVIE_NSM)
     target_sources(luvie_core PRIVATE nsm.cpp)
-    target_link_libraries(luvie_core PUBLIC PkgConfig::LO)
+    # liblo_static, not the system liblo: vendored and statically linked so the binaries
+    # carry no liblo.so dependency (see NOTICE on the LGPL-2.1 section 6 obligations
+    # that come with that).
+    target_link_libraries(luvie_core PUBLIC liblo_static)
     target_compile_definitions(luvie_core PUBLIC LUVIE_HAVE_NSM)
 else()
     target_sources(luvie_core PRIVATE nsmStub.cpp)

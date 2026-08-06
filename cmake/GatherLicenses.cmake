@@ -9,10 +9,9 @@
 #
 # Binary distributions have to carry the licences of the libraries compiled into them:
 # RtMidi and nlohmann/json are MIT and the LV2 headers are ISC, all three requiring the
-# notice to appear in every copy. Not gathered, deliberately:
-#   liblo  — LGPL-2.1+, linked dynamically and never bundled by us, so under LGPL-2.1
-#            section 5 our binary is "a work that uses the Library" and falls outside the
-#            Library's terms. Acknowledged in NOTICE. Revisit if it is ever vendored.
+# notice to appear in every copy. liblo is LGPL-2.1+ and statically linked, so its text
+# is mandatory rather than merely polite — section 6 requires shipping the licence and a
+# prominent notice with any work containing portions of the Library. Not gathered:
 #   JACK   — not linked at all; dlopen'd at runtime (see src/jackShim.cpp). Its headers
 #            are fetched (jack2) so every platform compiles against the same set, but
 #            headers are a build-time input only: no JACK code ends up in our binaries
@@ -69,6 +68,13 @@ luvie_add_library_license(RtMidi        "${rtmidi_SOURCE_DIR}/LICENSE")
 luvie_add_library_license(LV2           "${lv2_SOURCE_DIR}/COPYING"
                                         "${lv2_SOURCE_DIR}/LICENSES")
 luvie_add_library_license(nlohmann_json "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT")
+# liblo ships the LGPL-2.1 text as COPYING. Statically linked, so this is the copy of the
+# License that section 6 obliges us to supply with every binary distribution — but only
+# when it is actually in the binary, hence the guard: a -DLUVIE_NSM=OFF build contains no
+# liblo, and shipping its licence would misstate what the binary is made of.
+if(LUVIE_NSM)
+    luvie_add_library_license(liblo     "${liblo_SOURCE_DIR}/COPYING")
+endif()
 
 # Re-run configure if Luvie's own terms change, so the gathered copies cannot go stale.
 # Editing LICENSE or NOTICE therefore costs one reconfigure — rare enough to be worth the

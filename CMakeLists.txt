@@ -76,6 +76,40 @@ FetchContent_Declare(rtmidi
     EXCLUDE_FROM_ALL
 )
 
+# liblo — OSC, used only by the NSM session-management client (src/nsm.cpp).
+# Fetched and linked statically rather than taken from the system, so NSM works on every
+# platform without a distro package and the binaries carry no liblo.so dependency.
+#
+# liblo is LGPL-2.1-or-later, so static linking is a deliberate licensing choice, not an
+# oversight: section 6 permits distributing the combined work "under terms of your
+# choice" — Luvie's own source stays Apache-2.0 — in exchange for shipping the LGPL text,
+# a prominent notice, and the means to relink against a modified liblo. Luvie's complete
+# source is public, and this pin identifies the exact liblo it was built against, which
+# is what satisfies section 6d. See NOTICE, and cmake/GatherLicenses.cmake, which copies
+# liblo's COPYING into every distribution.
+#
+# Its CMakeLists lives in a cmake/ subdirectory, hence SOURCE_SUBDIR.
+#
+# CACHE ... FORCE rather than plain set(), unlike the other dependencies here: liblo
+# declares cmake_minimum_required(VERSION 3.5), so CMP0077 is OLD *inside its scope* and
+# its option() calls clear same-named normal variables instead of deferring to them.
+# Setting these the ordinary way silently left WITH_STATIC=OFF — no liblo_static target,
+# and the tools, tests and examples all building. The policy in effect is the subproject's
+# own, not ours, so the cache is the only reliable channel.
+set(WITH_STATIC    ON  CACHE BOOL "" FORCE)  # the whole point; target is liblo_static
+set(WITH_TOOLS     OFF CACHE BOOL "" FORCE)  # oscdump/oscsend command-line tools
+set(WITH_TESTS     OFF CACHE BOOL "" FORCE)
+set(WITH_EXAMPLES  OFF CACHE BOOL "" FORCE)
+set(WITH_CPP_TESTS OFF CACHE BOOL "" FORCE)
+set(THREADING      ON  CACHE BOOL "" FORCE)
+FetchContent_Declare(liblo
+    GIT_REPOSITORY https://github.com/radarsat1/liblo.git
+    GIT_TAG        0.32
+    GIT_SHALLOW    TRUE
+    SOURCE_SUBDIR  cmake
+    EXCLUDE_FROM_ALL
+)
+
 # nlohmann/json — header-only; used for project (JSON) load/save in
 # songEditor/timelineIO.cpp. Fetched rather than found on the system so that the
 # header we compile against is pinned (find_package(nlohmann_json 3) accepted any
@@ -92,7 +126,7 @@ FetchContent_Declare(nlohmann_json
     EXCLUDE_FROM_ALL
 )
 
-FetchContent_MakeAvailable(fltk lv2 rtmidi nlohmann_json jack_hdrs)
+FetchContent_MakeAvailable(fltk lv2 rtmidi nlohmann_json jack_hdrs liblo)
 
 # RtMidi's CMakeLists does `target_compile_definitions(rtmidi PRIVATE RTMIDI_EXPORT)`
 # unconditionally, without consulting RTMIDI_BUILD_SHARED_LIBS. On Windows that macro
@@ -124,19 +158,20 @@ target_include_directories(jack_headers INTERFACE ${jack_hdrs_SOURCE_DIR}/common
 # ALSA is no longer a direct dependency: the "native" MIDI backend goes through
 # RtMidi, which finds and links libasound itself.
 
-# ---- System libraries (host-provided; not vendored) ----
-# liblo backs the NSM (Non Session Manager) client, which is a Linux session-management
-# protocol — there is nothing on macOS or Windows to talk to, so both the library and
-# the NSM sources are Linux-only (see src/CMakeLists.txt). Keeping liblo a *system*
-# library also keeps it dynamically linked, which is what LGPL-2.1 section 5 relies on;
-# see NOTICE and cmake/GatherLicenses.cmake.
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(LO REQUIRED IMPORTED_TARGET liblo)
-    set(LUVIE_NSM ON)
-else()
-    set(LUVIE_NSM OFF)
-endif()
+# ---- NSM session management ----
+# The NSM (New/Non Session Manager) client is built everywhere. Nothing about it is
+# Linux-specific: the protocol is OSC over UDP, liblo is vendored above so it needs no
+# distro package, and Fl::add_fd — which src/nsm.cpp watches the OSC socket with — is
+# implemented by FLTK's Darwin and WinAPI drivers as well as the Unix one.
+#
+# In practice the servers that speak the protocol (nsmd, RaySession) are Linux projects,
+# so on macOS and Windows nothing sets NSM_URL and NsmClient::init() returns false — the
+# client sits inert, costing only a little binary size. That is a better trade than
+# compiling it out, because it means Luvie simply works if a server ever does turn up.
+#
+# The option exists to build without it; src/nsmStub.cpp then stands in for src/nsm.cpp
+# and no liblo is linked at all.
+option(LUVIE_NSM "Build the NSM session-management client (links liblo)" ON)
 
 # ---- Licences ----
 # Assembles build/LICENSES/ from LICENSE, NOTICE and the fetched dependency sources.

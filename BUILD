@@ -30,9 +30,8 @@ libjack is present. See src/jackShim.cpp.
 System development libraries (Linux):
 
       - ALSA   (libasound2-dev) -- via RtMidi, for the Native MIDI backend
-      - liblo  (liblo-dev) -- NSM session management only, and Linux-only:
-               the macOS and Windows builds compile src/nsmStub.cpp in place of
-               src/nsm.cpp and need no liblo at all
+      - (liblo is no longer a system dependency -- it is fetched and linked
+        statically; see "NSM and liblo" below)
       - Plus the X11/Wayland/cairo/pango/fontconfig stack FLTK builds
         against (libx11-dev libwayland-dev libxkbcommon-dev libcairo2-dev
         libpango1.0-dev libfontconfig1-dev libdbus-1-dev libgtk-3-dev)
@@ -40,7 +39,7 @@ System development libraries (Linux):
 On Debian/Ubuntu:
 
     sudo apt install build-essential g++-13 cmake ninja-build pkg-config git \
-        libasound2-dev liblo-dev \
+        libasound2-dev \
         libx11-dev libwayland-dev libxkbcommon-dev libcairo2-dev libpango1.0-dev \
         libfontconfig1-dev libdbus-1-dev
 
@@ -48,11 +47,11 @@ On Debian/Ubuntu:
 Vendored dependencies
 ---------------------
 
-FLTK 1.5, the LV2 headers, RtMidi and nlohmann/json are fetched and pinned
-automatically by CMake (FetchContent) during the configure step -- there is no
-separate dependency bootstrap. Pinned revisions live in the top-level
-CMakeLists.txt; sources are cloned into build/_deps/ and FLTK and RtMidi are
-built static in-tree.
+FLTK 1.5, the LV2 headers, the JACK headers, RtMidi, nlohmann/json and liblo are
+fetched and pinned automatically by CMake (FetchContent) during the configure
+step -- there is no separate dependency bootstrap. Pinned revisions live in the
+top-level CMakeLists.txt; sources are cloned into build/_deps/ and FLTK, RtMidi
+and liblo are built static in-tree.
 
 nlohmann/json is fetched rather than taken from the system (it used to be found
 with find_package) for two reasons: find_package accepted any system 3.x, so the
@@ -66,10 +65,10 @@ headers, static libs, pkg-config and CMake config files, man pages and a stray
 fltk-options.desktop into the prefix alongside Luvie. They are still built on
 demand, since our targets link them.
 
-liblo and ALSA are host-provided system libraries, found via pkg-config. JACK is
-provided the same way for its headers only -- the library is not linked but
-dlopen'd at runtime, so JACK is a build-time (header) dependency yet only an
-optional runtime one.
+ALSA is the only remaining host-provided library, and it arrives indirectly:
+RtMidi finds and links libasound itself for the Native MIDI backend. JACK is a
+build-time dependency in the weakest possible sense -- only its headers, and
+those are fetched too; the library is dlopen'd at runtime, never linked.
 
 
 Step 1 -- Configure
@@ -154,9 +153,9 @@ application bundle with its icon and Info.plist, not a bare executable. The LV2
 bundle lands in build-dist/luvie.lv2/ as usual; copy it to
 ~/Library/Audio/Plug-Ins/LV2/.
 
-Neither liblo nor JACK is needed to build. If JACK for macOS is installed at
-runtime, Luvie finds it; if not, it uses its internal transport and CoreMIDI
-(via RtMidi) for output.
+No Homebrew packages beyond ninja are needed: liblo and the JACK headers are
+both fetched by CMake. If JACK for macOS is installed at runtime, Luvie finds
+it; if not, it uses its internal transport and CoreMIDI (via RtMidi) for output.
 
 
 Building on Windows
@@ -226,6 +225,41 @@ including copies compiled into a binary.
 If a dependency bump moves a licence file upstream, configure fails with an
 error naming the file rather than silently omitting it; fix the path in
 cmake/GatherLicenses.cmake.
+
+
+NSM and liblo
+-------------
+
+The NSM (New/Non Session Manager) client is built on every platform, and liblo
+is fetched and linked statically rather than taken from the system. Nothing
+about NSM is Linux-specific: the protocol is OSC over UDP, and Fl::add_fd --
+which src/nsm.cpp uses to watch the OSC socket -- is implemented by FLTK's
+Darwin and WinAPI drivers as well as the Unix one.
+
+In practice the servers that speak the protocol (nsmd, RaySession) are Linux
+projects, so on macOS and Windows nothing sets NSM_URL and the client stays
+inert, costing only a little binary size. That is a better trade than compiling
+it out: Luvie simply works if a server ever does turn up.
+
+Static linking is the deliberate choice here, because liblo is LGPL-2.1+ and
+that has consequences worth understanding rather than stumbling into. Section 6
+of the LGPL permits distributing the combined work "under terms of your choice"
+-- Luvie's own source stays Apache-2.0 -- in exchange for three things: a
+prominent notice, a copy of the LGPL, and the means to relink against a modified
+liblo. All three are met (NOTICE explains exactly how), and the last one is
+nearly free because Luvie's source is public and the liblo revision is pinned.
+
+The upshot is one fewer dynamic dependency everywhere: no liblo-dev to install,
+no liblo7 in the .deb, no liblo.so bundled into the AppImage, and no
+liblo.dylib to carry inside Luvie.app.
+
+To build without it -- no NSM client, no liblo in the binary at all:
+
+    cmake --preset linux-dist -DLUVIE_NSM=OFF
+
+src/nsmStub.cpp then stands in for src/nsm.cpp, and cmake/GatherLicenses.cmake
+drops liblo's licence from the distribution, since the binary no longer contains
+any of it.
 
 
 Plugin symbol exports
@@ -377,9 +411,9 @@ Troubleshooting
     sure you have network access and the X11/Wayland/cairo/pango/fontconfig
     -dev packages (see Prerequisites). Re-run configure after installing them.
 
-  - `Could NOT find liblo` -- install liblo-dev (see Prerequisites). This can
-    only happen on Linux; the macOS and Windows builds do not use liblo. There
-    is no longer a jack check: the JACK headers are fetched, not found.
+  - `Could NOT find jack/liblo` -- these checks no longer exist. Both are
+    fetched by CMake now: the JACK headers because the library is dlopen'd, and
+    liblo because it is linked statically.
 
   - `Licence file for <lib> not found` during configure -- a dependency bump
     moved the file upstream. Correct the path in cmake/GatherLicenses.cmake;

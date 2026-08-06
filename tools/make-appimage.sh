@@ -102,9 +102,9 @@ mkdir -p "${BUNDLED}"
     echo "../NOTICE). All are dynamically linked and can be replaced: extract the AppImage"
     echo "with --appimage-extract, substitute the library in usr/lib/, and repack."
     echo
-    echo "liblo is LGPL-2.1-or-later. Its complete corresponding source is available from"
-    echo "https://github.com/radarsat1/liblo, and the version bundled here is the one"
-    echo "packaged by the distribution named in its copyright file below."
+    echo "Libraries compiled *into* the Luvie binary are covered by ../NOTICE and the"
+    echo "sibling directories of this one, not by the list below. liblo in particular is"
+    echo "statically linked and so does not appear here."
     echo
 } > "${BUNDLED}/README.txt"
 

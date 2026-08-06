@@ -40,6 +40,17 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
+# pkg_check_modules does NOT obey CMAKE_FIND_ROOT_PATH — it just runs pkg-config, which
+# reads the host's default search path. Left alone, configuring with -DLUVIE_NSM=ON here
+# "finds" the host's Linux liblo and feeds -I/usr/include to a Windows compiler, which
+# fails deep in glibc's headers with a confusing missing bits/wordsize.h. Point it at the
+# target sysroot instead, so a package that genuinely isn't available for Windows is
+# reported as missing rather than silently substituted.
+set(ENV{PKG_CONFIG_LIBDIR}
+    "/usr/${TOOLCHAIN_PREFIX}/lib/pkgconfig:/usr/${TOOLCHAIN_PREFIX}/share/pkgconfig")
+unset(ENV{PKG_CONFIG_PATH})
+set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH OFF)
+
 # Match what the windows-dist preset does natively: link the GCC runtime statically so
 # the binaries have no dependency on the toolchain's own DLLs.
 set(CMAKE_EXE_LINKER_FLAGS_INIT    "-static-libgcc -static-libstdc++ -static")

@@ -42,7 +42,7 @@
     {
       "name": "linux-dist",
       "displayName": "Distribution build (Linux)",
-      "description": "What CI ships for Linux. FLTK's Wayland backend is switched off: main.cpp forces FLTK_BACKEND=x11 at startup anyway, so the Wayland code is never exercised, and leaving it out both drops a pile of libraries the AppImage would have to bundle and defines FLTK_USE_X11 (which the custom window drag/resize in appWindow.cpp needs).",
+      "description": "What CI ships for Linux. FLTK's Wayland backend is switched off: main.cpp forces FLTK_BACKEND=x11 at startup anyway, so the Wayland code is never exercised, and leaving it out both drops a pile of libraries the AppImage would have to bundle and defines FLTK_USE_X11 (which the custom window drag/resize in appWindow.cpp needs). The GCC runtime is linked statically for the same reason it is on Windows: a portable Linux binary that carries its own libstdc++ is immune to the runtime being older on the target than on the build host, which is the usual cause of a tarball or AppImage failing on one distro and not another. Both libraries carry the GCC Runtime Library Exception, so this adds no copyleft obligation. Note -static is deliberately NOT used: glibc and the X11/cairo/pango stack must stay dynamic.",
       "inherits": "dist",
       "condition": {
         "type": "equals",
@@ -50,7 +50,9 @@
         "rhs": "Linux"
       },
       "cacheVariables": {
-        "FLTK_BACKEND_WAYLAND": "OFF"
+        "FLTK_BACKEND_WAYLAND": "OFF",
+        "CMAKE_EXE_LINKER_FLAGS": "-static-libgcc -static-libstdc++",
+        "CMAKE_MODULE_LINKER_FLAGS": "-static-libgcc -static-libstdc++"
       }
     },
     {

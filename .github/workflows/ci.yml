@@ -66,7 +66,7 @@ jobs:
           # xvfb is for the smoke test — the runner has no display.
           sudo apt-get install -y --no-install-recommends \
             g++-13 ninja-build pkg-config xvfb \
-            liblo-dev libasound2-dev \
+            libasound2-dev \
             libx11-dev libxkbcommon-dev libxinerama-dev libxcursor-dev libxfixes-dev \
             libxft-dev libcairo2-dev libpango1.0-dev libfontconfig1-dev libdbus-1-dev \
             libgtk-3-dev
@@ -76,8 +76,8 @@ jobs:
       - name: Install macOS dependencies
         if: matrix.name == 'macOS'
         shell: bash
-        # Xcode's clang already covers C++23; FLTK's Cocoa backend needs no extra
-        # libraries, and liblo/JACK are not used on this platform at all.
+        # Xcode's clang already covers C++23, FLTK's Cocoa backend needs no extra
+        # libraries, and liblo and the JACK headers are both fetched by CMake.
         run: brew install ninja
 
       - name: Set up MSYS2
