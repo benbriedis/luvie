@@ -8,7 +8,6 @@
 #include <FL/Fl.H>
 #include "FL/Enumerations.H"
 #include "noteContextPopup.hpp"
-#include <ranges>
 #include <algorithm>
 #include <cmath>
 #include <FL/fl_draw.H>
@@ -339,7 +338,8 @@ void Grid::findNoteForCursor()
     int  resizeIdx  = -1;
     Side resizeSide = Side::Left;
 
-    for (const auto [i, n] : std::views::enumerate(notes)) {
+    for (int i = 0; i < (int)notes.size(); ++i) {
+        const Note& n = notes[i];
         if ((int)n.row != row) continue;
         float leftEdge  = (n.beat - colOffset) * colWidth;
         float rightEdge = (n.beat + n.length - colOffset) * colWidth;
@@ -349,7 +349,7 @@ void Grid::findNoteForCursor()
         } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
-            state = StateHoverMove{(int)i, ex - leftEdge, (float)(ey - rowY((int)n.row))};
+            state = StateHoverMove{i, ex - leftEdge, (float)(ey - rowY((int)n.row))};
             window()->cursor(contextMenuCursorImage(), 0, 0);
             redraw();
             return;
@@ -396,7 +396,8 @@ void Grid::toggleNote()
 int Grid::overlappingCell(int noteIdx) const
 {
     Note a = notes[noteIdx];
-    for (const auto [i, b] : std::views::enumerate(notes)) {
+    for (int i = 0; i < (int)notes.size(); ++i) {
+        const Note& b = notes[i];
         if (i == noteIdx || b.row != a.row) continue;
         if (beatsOverlap(a.beat, a.length, b.beat, b.length)) return i;
     }

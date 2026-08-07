@@ -9,7 +9,6 @@
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
-#include <ranges>
 
 static constexpr Fl_Color kParamRowBg      = 0xF0F4FF00;
 static constexpr Fl_Color kParamLine       = 0x8888CC00;
@@ -806,7 +805,8 @@ int SongGrid::overlappingCell(int noteIdx) const
         }
     }
 
-    for (const auto [i, b] : std::views::enumerate(notes)) {
+    for (int i = 0; i < (int)notes.size(); ++i) {
+        const Note& b = notes[i];
         if (i == noteIdx || b.row != a.row) continue;
         float bStart = b.beat, bEnd = b.beat + b.length;
         float firstEnd    = aStart <= bStart ? aEnd   : bEnd;

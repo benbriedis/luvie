@@ -45,7 +45,7 @@ jobs:
         shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # cmake/GitVersion.cmake and cmake/ProjectVersion.cmake both run
           # `git describe --tags`. The default shallow, tagless checkout would reduce
@@ -99,7 +99,7 @@ jobs:
       # tree turns a ~10 minute configure into seconds. Keyed on the file that holds
       # every pinned revision, so a version bump invalidates it automatically.
       - name: Cache fetched dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build-dist/_deps
           key: deps-${{ matrix.name }}-${{ hashFiles('CMakeLists.txt') }}
@@ -127,7 +127,7 @@ jobs:
       # Unpackaged, for grabbing a build off a branch. release.yml produces the real
       # archives.
       - name: Upload build output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: luvie-${{ matrix.name }}
           if-no-files-found: error
