@@ -10,6 +10,8 @@ The main things that make this sequencer special in the world of Linux audio are
 1. It has decent support for driving drumkits.
 1. It has been redesigned and rebuild ground-up, so hopefully it is a bit easier to understand and use than some earlier efforts.
 
+# Screenshots
+TODO
 
 # Manual
 TODO Link to a manual 
