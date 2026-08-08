@@ -29,6 +29,11 @@ target_link_libraries(luvie_dsp PRIVATE
 add_library(luvie_ui MODULE luvie_ui.cpp)
 target_link_libraries(luvie_ui PRIVATE luvie_core lv2_headers)
 
+# The one symbol each module is allowed to export. Used twice below: to build the
+# export-control link flags, and to assert the finished export table.
+set(luvie_dsp_ENTRY lv2_descriptor)
+set(luvie_ui_ENTRY  lv2ui_descriptor)
+
 # A plugin is dlopen'd into the host's address space, sharing one dynamic-symbol
 # namespace. Exporting our copies of FLTK / libstdc++ / RtMidi risks the dynamic
 # linker interposing them against the host's (or another plugin's) — binding us to
@@ -48,12 +53,12 @@ target_link_libraries(luvie_ui PRIVATE luvie_core lv2_headers)
 # check_linker_flag reports them as supported) but both are ELF concepts and neither has
 # any effect on a PE export table. Selecting by flag-probe alone therefore silently
 # produced a Windows DLL exporting all 87 of RtMidi's C++ symbols while reporting
-# success. Probe each flag still, but only the one that belongs to this format.
+# success. Probe each flag still, but only the one that belongs to this format — except
+# on Mach-O, where the probe itself gives a false negative (see the APPLE branch).
 include(CheckCompilerFlag)
 include(CheckLinkerFlag)
 
 set(LUVIE_VERSION_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/luvie.version")
-set(LUVIE_EXPORTED_SYMBOLS "${CMAKE_CURRENT_SOURCE_DIR}/luvie.exported_symbols")
 
 # -fvisibility=hidden (and the C++ inlines variant) — GCC/Clang; not an MSVC concept.
 # Meaningless on PE (which has no visibility attribute) but harmless there.
@@ -85,17 +90,21 @@ if(WIN32)
 
 elseif(APPLE)
     # Mach-O. ld64 has neither --version-script nor --exclude-libs, and needs neither:
-    # an explicit export list is absolute, so symbols pulled from the static archives
-    # are localized by the same flag.
-    check_linker_flag(CXX "-Wl,-exported_symbols_list,${LUVIE_EXPORTED_SYMBOLS}"
-                      LUVIE_HAVE_EXPORTED_SYMBOLS)
-    if(LUVIE_HAVE_EXPORTED_SYMBOLS)
-        target_link_options(luvie_dsp PRIVATE -Wl,-exported_symbols_list,${LUVIE_EXPORTED_SYMBOLS})
-        target_link_options(luvie_ui  PRIVATE -Wl,-exported_symbols_list,${LUVIE_EXPORTED_SYMBOLS})
-        set_target_properties(luvie_dsp luvie_ui PROPERTIES
-            LINK_DEPENDS "${LUVIE_EXPORTED_SYMBOLS}")
-        set(LUVIE_EXPORTS_CONTROLLED TRUE)
-    endif()
+    # -exported_symbol is absolute — everything not named becomes private extern,
+    # including symbols pulled from the static archives, so there is no --exclude-libs
+    # equivalent to add. The name carries Mach-O's leading underscore.
+    #
+    # Applied without a check_linker_flag probe, deliberately. The probe links a test
+    # *executable*, and restricting its exports to a symbol it does not define makes ld
+    # diagnose the link; the check then reports "unsupported" for a flag ld64 has always
+    # supported, silently dropping it and leaving luvie_ui.so exporting all 4222 of
+    # FLTK's and RtMidi's symbols. Apple's clang/ld64 is the only toolchain that builds
+    # this branch, the flag is its documented mechanism, and the POST_BUILD export check
+    # below is what actually proves the flag took effect.
+    foreach(mod luvie_dsp luvie_ui)
+        target_link_options(${mod} PRIVATE "-Wl,-exported_symbol,_${${mod}_ENTRY}")
+    endforeach()
+    set(LUVIE_EXPORTS_CONTROLLED TRUE)
 
 else()
     # ELF. Two complementary flags:
@@ -146,15 +155,10 @@ else()
 endif()
 
 foreach(mod luvie_dsp luvie_ui)
-    if(mod STREQUAL "luvie_dsp")
-        set(entry lv2_descriptor)
-    else()
-        set(entry lv2ui_descriptor)
-    endif()
     add_custom_command(TARGET ${mod} POST_BUILD
         COMMAND ${CMAKE_COMMAND}
                 -DMODULE=$<TARGET_FILE:${mod}>
-                -DEXPECTED=${entry}
+                -DEXPECTED=${${mod}_ENTRY}
                 -DFORMAT=${LUVIE_EXPORT_FORMAT}
                 -DTOOL=${LUVIE_EXPORT_TOOL}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckExports.cmake
