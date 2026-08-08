@@ -1,0 +1,45 @@
+Manual: what still needs writing
+================================
+
+This was the scratch file the manual grew out of. The user-facing content has
+moved into docs/manual/ (see NOTES/DOCS.txt); what is left here is the work that
+is not itself documentation -- product changes that would make something easier
+to explain, and material that has to be produced before it can be written up.
+
+Anything that is simply "a section that needs writing" lives as a TODO marker
+inside the relevant chapter, not here.
+
+
+Product changes that would make the manual shorter
+--------------------------------------------------
+
+Add a "luvie -h" option. Blocked last time on getting the FLTK options listed
+again alongside ours.
+
+Consider an (info) icon in the application explaining bank select MSB/LSB and
+default program selection, so docs/manual/08-midi-output.md does not have to
+carry the whole explanation.
+
+Consider building the ALSA/JACK MIDI bridge in, rather than telling people to
+run "a2jmidid -e" (docs/manual/09-connecting.md).
+
+
+Material to produce
+-------------------
+
+Screenshots for every chapter that has a TODO asking for one. See NOTES/DOCS.txt
+for the size and re-take rules before committing any.
+
+Videos walking through the software. Write the script notes while testing and
+writing music with it -- that is when the awkward parts are obvious.
+
+
+Facts to verify before publishing
+---------------------------------
+
+docs/manual/03-tempo-and-beats.md: whether the song editor's first beat
+definition and time signature really do serve as the defaults for new patterns.
+The original note was unsure.
+
+docs/manual/09-connecting.md: the Carla-over-JACK-with-PipeWire recipe, on a
+current PipeWire.

@@ -1,0 +1,65 @@
+Writing the manual
+==================
+
+The manual lives in docs/manual/, one Markdown file per chapter, numbered so
+they sort into reading order. docs/manual/README.md is the contents page --
+GitHub shows it automatically when anyone browses the directory, so that link
+is the manual's front door.
+
+Docs sit in the repo rather than in the GitHub wiki deliberately: a tag then
+captures the manual that describes that release, changes go through the same
+review as code, and the files can be shipped inside the packages later.
+
+
+Adding a chapter
+----------------
+
+1. Create docs/manual/NN-name.md, keeping the numbering contiguous.
+2. Add it to the contents list in docs/manual/README.md.
+3. Fix the previous chapter's footer link and add a footer to the new one. Each
+   chapter carries a "prev / Contents / next" line at the top; there is no
+   generator maintaining these yet, so they are hand-edited.
+
+TODO markers are left inline, in the place the missing text belongs, rather
+than collected in a list somewhere. They are meant to read as an outline of
+what the finished section covers.
+
+
+Images
+------
+
+Screenshots go in docs/manual/images/ and are referenced with relative paths:
+
+    ![The song editor](images/song-editor.png)
+
+SVG for diagrams, PNG for screenshots. Keep both small, and be deliberate about
+re-committing them:
+
+  - Git keeps every revision of a binary forever. A 300 KB screenshot retaken
+    twenty times during UI work is 6 MB that cannot be reclaimed without
+    rewriting history. The whole repository is around 26 MB today.
+  - Scale a screenshot to the width it will actually display at BEFORE
+    committing it, then run it through oxipng (or pngcrush). A shot taken on a
+    HiDPI display is typically several times larger than it needs to be.
+  - Retake a screenshot because it is wrong, not because it is old.
+
+Do NOT put these under Git LFS. At this size it buys nothing and costs every
+contributor a bandwidth quota and an extra install step.
+
+Take screenshots at a fixed window size so that a retake is a genuine update
+rather than a differently-shaped image. The smoke test already starts the
+application under xvfb at a known geometry, which is the obvious thing to build
+a capture script on top of when one is wanted.
+
+
+If it outgrows GitHub's rendering
+---------------------------------
+
+Plain GitHub rendering has no search, no sidebar and no next/prev generation.
+When that starts to hurt, mdBook reads these same files unchanged: add a
+book.toml, a SUMMARY.md listing the chapters in order, and a workflow that
+publishes to GitHub Pages. Nothing in docs/manual/ has to be rewritten, which
+is why Markdown was chosen over the alternatives.
+
+At that point the hand-maintained footer links become mdBook's job and can be
+deleted.
