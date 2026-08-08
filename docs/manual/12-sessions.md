@@ -2,6 +2,13 @@
 
 [← Running as an LV2 plugin](10-lv2-plugin.md) · [Contents](README.md)
 
+## Export and import
+
+So you started a project in Carla and now decide you want in Ardour? Or maybe as a standalone?
+This is what export and import is about.
+
+You can also export projects to give you multiple versions, save backups, etc.
+
 ## Song files
 
 TODO: what a `.json` song file contains, saving and opening, and passing one on
@@ -28,3 +35,4 @@ session manager.
 When running as a plugin, the host saves Luvie's state as part of the project;
 there is nothing separate to save. See
 [Running as an LV2 plugin](10-lv2-plugin.md).
+

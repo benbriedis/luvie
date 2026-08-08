@@ -22,8 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Build on the oldest supported distribution: glibc is the one library an
-          # AppImage cannot bundle, so the build host sets the floor for every Linux
+          # Build on the oldest supported distribution. The GCC runtime is linked
+          # statically, so glibc is the remaining library the binaries take from the
+          # host, and it is the build host that sets that floor for every Linux
           # artifact produced here.
           - name: Linux
             os: ubuntu-22.04
@@ -52,7 +53,7 @@ jobs:
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            g++-13 ninja-build pkg-config xvfb file desktop-file-utils \
+            g++-13 ninja-build pkg-config xvfb \
             libasound2-dev \
             libx11-dev libxkbcommon-dev libxinerama-dev libxcursor-dev libxfixes-dev \
             libxft-dev libcairo2-dev libpango1.0-dev libfontconfig1-dev libdbus-1-dev \
@@ -106,9 +107,7 @@ jobs:
       - name: Package (Linux)
         if: matrix.name == 'Linux'
         shell: bash
-        run: |
-          (cd build-dist && cpack)
-          tools/make-appimage.sh build-dist
+        run: (cd build-dist && cpack)
 
       # macOS packaging stages, signs and archives in one script, because the order is
       # load-bearing — see the comments in the script. Signing activates only when the
@@ -210,7 +209,6 @@ jobs:
             build-dist/*.tar.gz
             build-dist/*.zip
             build-dist/*.deb
-            build-dist/*.AppImage
 
   release:
     name: Draft GitHub release
@@ -236,15 +234,18 @@ jobs:
           body: |
             ## Downloads
 
-            | Platform | Standalone | LV2 plugin |
-            | --- | --- | --- |
-            | Linux | `.AppImage` (runs anywhere), `luvie_*.deb`, or `luvie-*.tar.gz` | `luvie-lv2_*.deb` or `luvie-lv2-*.tar.gz` |
-            | macOS | `Luvie-*-macos-universal.zip` — contains both | (same zip) |
-            | Windows | `luvie-*-windows-x86_64.zip` | `luvie-lv2-*-windows-x86_64.zip` |
+            Every download below contains **both** the standalone application and the
+            LV2 plugin.
 
-            Install the LV2 bundle by copying `luvie.lv2` into
-            `~/.lv2` (Linux), `~/Library/Audio/Plug-Ins/LV2` (macOS) or
-            `%APPDATA%\LV2` (Windows).
+            | Platform | Download |
+            | --- | --- |
+            | Linux | `luvie_*.deb`, or `luvie-*-linux-*.tar.gz` |
+            | macOS | `Luvie-*-macos-universal.zip` |
+            | Windows | `luvie-*-windows-x86_64.zip` |
+
+            The `.deb` puts both halves in place for you. From an archive, the plugin is
+            installed by copying `luvie.lv2` into `~/.lv2` (Linux),
+            `~/Library/Audio/Plug-Ins/LV2` (macOS) or `%APPDATA%\LV2` (Windows).
 
             JACK is optional everywhere: Luvie loads it at runtime if present and
             falls back to its internal transport and native MIDI output if not.

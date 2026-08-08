@@ -27,12 +27,4 @@ JACK is optional, but desirable.
 
 Download from the [latest release](https://github.com/benbriedis/luvie/releases/latest).
 
-| Platform | Standalone | LV2 plugin |
-| --- | --- | --- |
-| Linux | `.AppImage` (runs anywhere), `luvie_*.deb`, or `luvie-*.tar.gz` | `luvie-lv2_*.deb` or `luvie-lv2-*.tar.gz` |
-| macOS | `Luvie-*-macos-universal.zip` — contains both | (same zip) |
-| Windows | `luvie-*-windows-x86_64.zip` | `luvie-lv2-*-windows-x86_64.zip` |
-
-Install the LV2 bundle by copying `luvie.lv2` into `~/.lv2` (Linux),
-`~/Library/Audio/Plug-Ins/LV2` (macOS) or `%APPDATA%\LV2` (Windows).
 

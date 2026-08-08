@@ -113,9 +113,10 @@ endif()
 # ---- Install (component: Standalone) -----------------------------------------
 # Was the src/Makefile `install` target. Use a user-local prefix with:
 #   cmake --install build --prefix ~/.local
-# Everything here is tagged COMPONENT Standalone so CPack can produce an app archive
-# separate from the plugin one (see cmake/Packaging.cmake); a plain `cmake --install`
-# with no --component still installs all of it, exactly as before.
+# Everything here is tagged COMPONENT Standalone. The release packages hold the app and
+# the plugin together (see cmake/Packaging.cmake), so no CPack generator selects on the
+# tag any more — but tools/make-macos-zip.sh does, to stage one half of the tree at a
+# time. A plain `cmake --install` installs all of it.
 #
 # BUNDLE DESTINATION only applies on macOS, where the target is a Luvie.app directory
 # rather than a file; RUNTIME covers Linux and Windows.

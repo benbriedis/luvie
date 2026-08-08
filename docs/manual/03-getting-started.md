@@ -12,6 +12,10 @@ by the names used throughout the rest of the manual.
 
 TODO: pattern editor tab, song editor tab, the transport bar along the bottom.
 
+## Song mode vs Loop mode
+
+Distinction from Song Editor and Loop Editor
+
 ## Opening a song from the command line
 
 The standalone application takes a project file as an argument:

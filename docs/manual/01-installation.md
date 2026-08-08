@@ -10,10 +10,8 @@ Download from the [latest release](https://github.com/benbriedis/luvie/releases/
 
 ## Linux
 
-TODO: `.AppImage` (no installation, `chmod +x` and run), `.deb`
-(`sudo apt install ./luvie_*.deb`), and `.tar.gz` (unpack anywhere).
-
-TODO: the two `.deb`s — `luvie` and `luvie-lv2` — install independently.
+TODO: `.deb` (`sudo apt install ./luvie_*.deb`) and `.tar.gz` (unpack anywhere).
+Both contain the application and the plugin.
 
 ## macOS
 

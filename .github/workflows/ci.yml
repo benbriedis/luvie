@@ -28,7 +28,8 @@ jobs:
       matrix:
         include:
           # Ubuntu 22.04 rather than latest: this is also the release build host, and its
-          # older glibc is what makes the AppImage usable on more than the newest distros.
+          # older glibc is what keeps the release binaries usable on more than the
+          # newest distributions.
           - name: Linux
             os: ubuntu-22.04
             preset: linux-dist

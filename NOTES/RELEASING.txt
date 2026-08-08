@@ -32,18 +32,28 @@ Cutting a release
 What gets published
 -------------------
 
-  Luvie-<ver>-x86_64.AppImage             standalone, runs on any recent distro
-  luvie_<ver>_amd64.deb                   standalone, Debian/Ubuntu
-  luvie-lv2_<ver>_amd64.deb               plugin, into /usr/lib/lv2
-  luvie-<ver>-linux-x86_64.tar.gz         standalone, unpack anywhere
-  luvie-lv2-<ver>-linux-x86_64.tar.gz     plugin
-  Luvie-<ver>-macos-universal.zip         Luvie.app + luvie.lv2, x86_64 + arm64
-  luvie-<ver>-windows-x86_64.zip          standalone
-  luvie-lv2-<ver>-windows-x86_64.zip      plugin
+Each package carries the standalone application AND the LV2 plugin. They used to
+be a package each; splitting them asked people to choose between two downloads
+that are useful together and cost nothing to ship as one.
 
-The AppImage's glibc floor is set by the runner it is built on (Ubuntu 22.04,
-glibc 2.35). Moving that job to a newer runner silently drops support for older
-distributions.
+  luvie_<ver>_amd64.deb                   app + plugin, Debian/Ubuntu
+  luvie-<ver>-linux-x86_64.tar.gz         app + plugin, unpack anywhere
+  Luvie-<ver>-macos-universal.zip         Luvie.app + luvie.lv2, x86_64 + arm64
+  luvie-<ver>-windows-x86_64.zip          app + plugin
+
+There was also a Linux AppImage until v0.0.2. It was dropped: with libstdc++
+and libgcc already linked statically, it bundled only the Xft/Xcursor/Xinerama
+group on top of what the tarball needs, shared the tarball's glibc floor exactly
+(an AppImage cannot bundle glibc either), and was the one artifact that could not
+carry the plugin, since a host cannot scan inside a sealed AppImage. The tarball
+covers the same users for none of the machinery.
+
+The Linux binaries' glibc floor is set by the runner they are built on (Ubuntu
+22.04, glibc 2.35). Moving that job to a newer runner silently drops support for
+older distributions.
+
+The .deb declares Replaces/Conflicts on the old luvie-lv2 package, so upgrading
+from v0.0.2 or earlier removes it rather than failing on the shared files.
 
 
 Dry run

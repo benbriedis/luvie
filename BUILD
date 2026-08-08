@@ -257,8 +257,7 @@ liblo. All three are met (NOTICE explains exactly how), and the last one is
 nearly free because Luvie's source is public and the liblo revision is pinned.
 
 The upshot is one fewer dynamic dependency everywhere: no liblo-dev to install,
-no liblo7 in the .deb, no liblo.so bundled into the AppImage, and no
-liblo.dylib to carry inside Luvie.app.
+no liblo7 in the .deb, and no liblo.dylib to carry inside Luvie.app.
 
 To build without it -- no NSM client, no liblo in the binary at all:
 
@@ -362,31 +361,26 @@ build release artifacts. They configure into build-dist/ -- a separate tree, so
 they never fight your development build/ over CMakeCache.txt -- in Release, with
 the LV2 bundle redirected inside the install prefix so packaging can capture it.
 
-Every install rule is tagged with a component, so the app and the plugin can be
-shipped independently. A plain `cmake --install` still installs both. The
-plugin's licence texts are their own components (PluginLicense, inside the
-bundle, and PluginArchiveLicense, at the top of an archive) purely so they can
-be placed differently per format -- cmake/CPackGenerator.cmake picks one, and
-they are packaged with the plugin either way.
+Each platform gets ONE package, holding the standalone app and the LV2 plugin
+together. Install rules are still tagged with a component (Standalone, Plugin),
+but nothing splits packages on those tags -- they exist so a script can stage
+half the tree at a time. A plain `cmake --install` installs everything.
 
     cmake --preset linux-dist
     cmake --build --preset linux-dist
     cd build-dist && cpack        # generators are chosen per platform:
-                                  #   Linux   TGZ + DEB (one .deb per component)
+                                  #   Linux   TGZ + DEB
                                   #   macOS   ZIP
                                   #   Windows ZIP
 
-Two formats need more than CPack can express, so each has a script:
+One format needs more than CPack can express, so it has a script:
 
-    tools/make-appimage.sh        # Linux AppImage (standalone app)
     tools/make-macos-zip.sh       # macOS: Luvie.app + luvie.lv2 in one zip
 
-The AppImage is the only format that redistributes Luvie's shared-library
-dependencies rather than depending on the host's, which changes its licensing
-obligations; the script assembles a LICENSES/bundled/ directory from the
-libraries actually bundled to meet them. See NOTICE. Build it on the oldest
-distribution you intend to support -- glibc is the one library an AppImage
-cannot bundle, so the build host sets the floor. CI uses Ubuntu 22.04.
+Build Linux releases on the oldest distribution you intend to support: libstdc++
+and libgcc are linked statically, which leaves glibc as the library that sets the
+compatibility floor, and that floor comes from the build host. CI uses Ubuntu
+22.04.
 
 The macOS script stages, optionally signs and notarizes, then archives with
 ditto, in that order: a .app's signature covers every byte, so it has to be

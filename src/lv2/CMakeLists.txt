@@ -237,23 +237,12 @@ install(FILES ${LV2_BUNDLE}/manifest.ttl luvie_dsp.ttl luvie_ui.ttl
         DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2 COMPONENT Plugin)
 
 # The gathered licences (Apache-2.0 section 4a/4d, plus the terms of every library
-# compiled into luvie_ui.so) go wherever the top of the finished installation is. That
-# is two different places, which is why there are two rules and a component each:
+# compiled into luvie_ui.so) go *inside* the bundle, and deliberately nowhere else.
 #
-#   PluginLicense         inside the bundle. An installation that ends by itself -- a
-#                         .deb, or `cmake --install` -- leaves luvie.lv2 sitting on the
-#                         LV2 path with nothing further to do, so the licences have to
-#                         be in there to be anywhere at all.
-#   PluginArchiveLicense  the root of the staging tree, so an unpacked tarball or zip
-#                         shows LICENSES/ at the top rather than buried under lib/.
-#                         Copying luvie.lv2 out of it into the LV2 path is a manual step,
-#                         and carrying the licences along is then the user's business.
-#                         EXCLUDE_FROM_ALL keeps this copy out of a normal install, where
-#                         it would drop a LICENSES/ directory straight into the prefix.
-#
-# cmake/Packaging.cmake selects exactly one of the two per CPack generator, so no
-# package ever carries both.
+# luvie.lv2 is the one directory a user copies onto their LV2 path, on its own, away from
+# whatever it arrived in — so anything that has to travel with it has to be in it. The
+# standalone half of the package carries the same texts under share/doc/luvie (see
+# src/CMakeLists.txt); the duplication is a few kilobytes and means neither half depends
+# on the other still being there.
 install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2
-        COMPONENT PluginLicense)
-install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION .
-        COMPONENT PluginArchiveLicense EXCLUDE_FROM_ALL)
+        COMPONENT Plugin)
