@@ -7,6 +7,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
+#include <cstdio>
 
 static constexpr int popupWMax = 194;   // base width; the time-sig row shrinks to hug its content
 static constexpr int tempoW    = 182;   // wide enough for the curve dropdown and its label
@@ -53,7 +54,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		const int fieldX = pad + labelW;
 		const int fieldW = tempoW - fieldX - pad;
 
-		auto* curveLbl = new Fl_Box(pad, curveY, labelW, row1H, "Curve");
+		auto* curveLbl = new Fl_Box(pad, curveY, labelW, row1H, "Type");
 		curveLbl->labelcolor(popupText);
 		curveLbl->box(FL_NO_BOX);
 		curveLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -75,6 +76,14 @@ MarkerPopup::MarkerPopup(Kind k)
 		input1->range(timeSettings::bpmMin, timeSettings::bpmMax);
 		input1->step(1);
 		styleInput(input1);
+
+		// A ramp starts from the tempo already in force, so there is nothing to
+		// type: this stands in for input1 and shows that tempo (see layoutTempo).
+		startValue = new Fl_Box(fieldX, startY, fieldW, row1H);
+		startValue->labelcolor(popupText);
+		startValue->box(FL_NO_BOX);
+		startValue->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+		startValue->hide();
 
 		endLabel = new Fl_Box(pad, endY, labelW, row1H, "End");
 		endLabel->labelcolor(popupText);
@@ -155,7 +164,7 @@ void MarkerPopup::doDelete()
 void MarkerPopup::doOk()
 {
 	if (kind == TEMPO) {
-		if (onOkTempo) onOkTempo(curve(), bpmOf(input1), bpmOf(endBpmInput));
+		if (onOkTempo) onOkTempo(curve(), startBpm(), bpmOf(endBpmInput));
 	} else {
 		if (onOkTimeSig) onOkTimeSig(numerator(), denomChoice->denominator(),
 		                             denomChoice->beatUnit());
@@ -207,9 +216,36 @@ void MarkerPopup::layoutTempo()
 {
 	bool ramp = curve() == timeSettings::TempoCurve::Linear;
 	bpmLabel->label(ramp ? "Start" : "BPM");
+
+	if (startIsInherited()) {
+		char buf[16];
+		std::snprintf(buf, sizeof(buf), "%g", inheritedBpm);
+		startValue->copy_label(buf);
+		input1->hide();
+		startValue->show();
+		// The field the user was in has just gone; End is the only one left.
+		// (contains(), not ==: the focus sits on Fl_Value_Input's inner Fl_Input.)
+		if (input1->contains(Fl::focus())) endBpmInput->take_focus();
+	} else {
+		startValue->hide();
+		input1->show();
+	}
+
 	if (ramp) { endLabel->show(); endBpmInput->show(); }
 	else      { endLabel->hide(); endBpmInput->hide(); }
 	relayout(deleteFixed, showingDelete);
+}
+
+// A ramp's start is the tempo it inherits — the user only supplies one on the
+// first marker, which has no earlier tempo to ramp away from.
+bool MarkerPopup::startIsInherited() const
+{
+	return curve() == timeSettings::TempoCurve::Linear && inheritedBpm > 0.0;
+}
+
+double MarkerPopup::startBpm() const
+{
+	return startIsInherited() ? inheritedBpm : bpmOf(input1);
 }
 
 timeSettings::TempoCurve MarkerPopup::curve() const
@@ -228,9 +264,11 @@ double MarkerPopup::bpmOf(const Fl_Value_Input* inp) const
 
 void MarkerPopup::openTempo(int wx, int wy, bool fixed, bool showDelete,
                              timeSettings::TempoCurve c, double bpm, double endBpm,
+                             double inherited,
                              std::function<void(timeSettings::TempoCurve, double, double)> onOk,
                              std::function<void()> onDelete)
 {
+	inheritedBpm = inherited;
 	curveChoice->value(c == timeSettings::TempoCurve::Linear ? 1 : 0);
 	input1->value(bpm);
 	endBpmInput->value(endBpm > 0.0 ? endBpm : bpm);
@@ -239,7 +277,8 @@ void MarkerPopup::openTempo(int wx, int wy, bool fixed, bool showDelete,
 	layoutTempo();
 	onOkTempo  = std::move(onOk);
 	onDeleteCb = std::move(onDelete);
-	openEditor(wx, wy, input1);
+	// Start is read-only on a ramp, so End is the field to land in.
+	openEditor(wx, wy, startIsInherited() ? (Fl_Widget*)endBpmInput : (Fl_Widget*)input1);
 }
 
 void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool showDelete,

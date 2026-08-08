@@ -44,6 +44,9 @@ public:
     int   resizeBpmRamp(int bar, int newBar, int newEndBar);
 
     const BpmMarker* bpmMarkerAt(int bar) const;   // exact match on bar, or null
+    // The tempo in force immediately before `bar`, ignoring any marker sitting on
+    // it — what a ramp starting there ramps away from. 0 when nothing precedes it.
+    float inheritedBpmAt(int bar) const;
     // The bars a marker's ramp may be dragged between: no overlap with the
     // markers either side, and no longer than timeSettings::rampMaxBars.
     int   minRampStartBar(int bar) const;

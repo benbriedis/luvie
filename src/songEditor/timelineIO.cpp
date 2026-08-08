@@ -221,10 +221,14 @@ static ParamLane paramLaneFromJson(const json& j) {
 
 static json timelineToJson(const Timeline& tl) {
     json jbpms = json::array();
-    for (const auto& b : tl.bpms) {
+    for (size_t i = 0; i < tl.bpms.size(); i++) {
+        const BpmMarker& b = tl.bpms[i];
         // The ramp fields are written only for a ramp, so an ordinary tempo
         // marker keeps the shape it has always had in the file.
-        json jb = {{"bar", b.bar}, {"bpm", b.bpm}};
+        json jb = {{"bar", b.bar}};
+        // A ramp's start tempo is derived from the marker before it, so it is
+        // redundant here — except on the first marker, which has none.
+        if (!b.isRamp() || i == 0) jb["bpm"] = b.bpm;
         if (b.isRamp()) {
             jb["curve"]      = (int)b.curve;
             jb["lengthBars"] = b.lengthBars;
@@ -275,7 +279,10 @@ static json timelineToJson(const Timeline& tl) {
 static Timeline timelineFromJson(const json& j) {
     Timeline tl;
     for (const auto& jb : j.value("bpms", json::array())) {
-        BpmMarker m{jb.at("bar"), (float)jb.at("bpm")};
+        // A ramp other than the first marker has no "bpm": loadTimeline() derives
+        // it from the marker before. Older files that still carry one are simply
+        // overwritten there.
+        BpmMarker m{jb.at("bar"), jb.value("bpm", (float)timeSettings::bpmDefault)};
         // Absent in files written before tempo ramps existed: an immediate marker.
         if (jb.value("curve", 0) == (int)timeSettings::TempoCurve::Linear) {
             m.curve      = timeSettings::TempoCurve::Linear;

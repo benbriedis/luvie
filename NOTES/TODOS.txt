@@ -38,9 +38,6 @@ FUTURE FUNCTIONALITY
 
 - Pianoroll and drum patterns - should support recording of patterns..
 
-- Maybe allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
-  Likely to lead on to sample filters, envelopes, trimming, ...
-
 - cf Is pitch randomisation possible for drums?
 
 - Maybe add some "basic backups" - see DESIGN_DECISIONS.txt
@@ -79,6 +76,12 @@ MIDI 2:
 		https://en.wikipedia.org/wiki/List_of_musical_scales_and_modes
 		https://en.wikipedia.org/wiki/List_of_chords 
 		https://en.wikipedia.org/wiki/Viennese_trichord - NB a class of chords
+
+OUT OF SCOPE
+============
+Sampler... could allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
+	Likely to lead on to sample filters, envelopes, trimming, ...
+
 
 LIMITATION
 ==========

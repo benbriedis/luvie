@@ -169,7 +169,10 @@ void MarkerRuler::openPopupFor(Kind k, int bar, bool showDelete)
 			endBpm = m->endBpm;
 		}
 
+		// A ramp starts from the tempo already in force, so the popup shows that
+		// rather than asking for it. Bar 0 has none: there it stays the user's.
 		popup->openTempo(pos.x, pos.y, isFixed(bar), showDelete, curve, bpm, endBpm,
+			timeline->inheritedBpmAt(bar),
 			[this, bar](timeSettings::TempoCurve c, double bpm, double endBpm) {
 				// A ramp keeps whatever length it already had; a marker becoming
 				// one for the first time gets the default single bar.

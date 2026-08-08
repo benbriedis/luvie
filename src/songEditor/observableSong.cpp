@@ -324,9 +324,16 @@ void ObservableSong::sortBpms()
     // A ramp may never reach into the marker that follows it — bpmAtBar() and the
     // tempo map both assume one marker governs each stretch. Enforced here, once,
     // so no caller can produce an overlap by moving a marker into a ramp's path.
+    // This is also where a ramp's start tempo is derived from the marker before
+    // it, so no caller has to supply a value the song already knows.
     for (size_t i = 0; i < data.bpms.size(); i++) {
         BpmMarker& m = data.bpms[i];
         if (!m.isRamp()) continue;
+        // The first marker has no earlier tempo to ramp away from; it keeps its own.
+        if (i > 0) {
+            const BpmMarker& prev = data.bpms[i - 1];
+            m.bpm = prev.isRamp() ? prev.endBpm : prev.bpm;
+        }
         int room = (i + 1 < data.bpms.size() ? data.bpms[i + 1].bar : m.bar + timeSettings::rampMaxBars)
                  - m.bar;
         m.lengthBars = std::clamp(m.lengthBars, 1,
@@ -343,10 +350,12 @@ void ObservableSong::sortTimeSigs()
 void ObservableSong::setBpm(int bar, float bpm)
 {
     reanchoringTempo([&] {
-        for (auto& m : data.bpms) {
-            if (m.bar == bar) { m.bpm = bpm; notify(); return; }
-        }
-        data.bpms.push_back({bar, bpm});
+        BpmMarker* m = nullptr;
+        for (auto& b : data.bpms)
+            if (b.bar == bar) { m = &b; break; }
+        if (m) m->bpm = bpm;
+        else   data.bpms.push_back({bar, bpm});
+        // Also re-derives the start of any ramp that follows this marker.
         sortBpms();
         notify();
     });
@@ -367,13 +376,17 @@ void ObservableSong::setBpmMarker(int bar, float bpm, timeSettings::TempoCurve c
                 if (b.bar == bar) { m = &b; break; }
         }
 
+        // A ramp's bpm is derived below, so what is passed in only matters for an
+        // immediate marker — or for the first marker, which has nothing to inherit.
         m->bpm   = bpm;
         m->curve = curve;
         if (curve == timeSettings::TempoCurve::Linear) {
             m->lengthBars = std::max(1, lengthBars);
             m->endBpm     = endBpm;
         }
-        sortBpms();   // shortens the ramp if it does not fit before the next marker
+        // Derives the ramp's start, and shortens it if it does not fit before the
+        // next marker.
+        sortBpms();
         notify();
     });
 }
@@ -442,6 +455,16 @@ const BpmMarker* ObservableSong::bpmMarkerAt(int bar) const
     for (const auto& m : data.bpms)
         if (m.bar == bar) return &m;
     return nullptr;
+}
+
+float ObservableSong::inheritedBpmAt(int bar) const
+{
+    float bpm = 0.0f;
+    for (const auto& m : data.bpms) {
+        if (m.bar >= bar) break;          // relies on bpms being sorted
+        bpm = m.isRamp() ? m.endBpm : m.bpm;
+    }
+    return bpm;
 }
 
 int ObservableSong::minRampStartBar(int bar) const

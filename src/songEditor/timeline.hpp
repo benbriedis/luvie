@@ -28,6 +28,11 @@ struct Instrument {
 // endBpm is the tempo in force from bar + lengthBars onwards. The ramp therefore
 // ends flush with the end of bar (bar + lengthBars - 1). The three ramp fields
 // are ignored — and not written to the song file — when curve is Immediate.
+//
+// A ramp's bpm is derived, not chosen: it is the tempo already in force where
+// the ramp starts, so ObservableSong::sortBpms() recomputes it from the previous
+// marker and the song file leaves it out. The one exception is the very first
+// marker, which has no earlier tempo to inherit and so owns its bpm outright.
 struct BpmMarker {
 	int   bar;
 	float bpm;

@@ -22,8 +22,13 @@ public:
 	// A tempo marker is either an instantaneous change (curve Immediate, endBpm
 	// unused) or a ramp from bpm to endBpm — see BpmMarker. The popup only edits
 	// the tempos and the curve; a ramp's length is set by dragging it on the ruler.
+	//
+	// inheritedBpm is the tempo already in force where the marker sits: a ramp
+	// starts from it, so the Start row shows it read-only instead of asking for a
+	// value. Pass 0 when there is none (the first marker) and Start stays an input.
 	void openTempo(int wx, int wy, bool fixed, bool showDelete,
 	               timeSettings::TempoCurve curve, double bpm, double endBpm,
+	               double inheritedBpm,
 	               std::function<void(timeSettings::TempoCurve, double, double)> onOk,
 	               std::function<void()>                                        onDelete);
 
@@ -44,6 +49,10 @@ private:
 	void layoutTempo();
 	void relayout(bool fixed, bool showDelete);
 	double bpmOf(const Fl_Value_Input* inp) const;
+	// The tempo the marker starts at: inherited for a ramp, typed otherwise.
+	double startBpm() const;
+	// Whether the Start row shows the inherited tempo rather than an input.
+	bool   startIsInherited() const;
 	timeSettings::TempoCurve curve() const;
 
 	Kind             kind;
@@ -51,10 +60,12 @@ private:
 	Fl_Value_Input*  endBpmInput = nullptr;   // TEMPO + Linear only
 	Fl_Box*          bpmLabel    = nullptr;
 	Fl_Box*          endLabel    = nullptr;
+	Fl_Box*          startValue  = nullptr;   // stands in for input1 on a ramp
 	ModernChoice*    curveChoice = nullptr;   // TEMPO only
 	DenomBeatChoice* denomChoice = nullptr;   // TIME_SIG only
 	ModernButton*    deleteBtn   = nullptr;
 
+	double inheritedBpm  = 0.0;   // TEMPO only; 0 = nothing precedes this marker
 	bool showingDelete = false;
 	bool deleteFixed   = false;
 	int  deleteY       = 0;
