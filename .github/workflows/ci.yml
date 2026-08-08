@@ -31,12 +31,16 @@ jobs:
           - name: Linux
             os: ubuntu-22.04
             preset: linux-dist
+            binary: build-dist/src/luvie
           - name: macOS
             os: macos-14
             preset: macos-dist
+            # A macOS build produces an application bundle, not a bare executable.
+            binary: build-dist/src/Luvie.app
           - name: Windows
             os: windows-latest
             preset: windows-dist
+            binary: build-dist/src/luvie.exe
 
     defaults:
       run:
@@ -126,13 +130,21 @@ jobs:
       # ---- Artifacts -------------------------------------------------------------
       # Unpackaged, for grabbing a build off a branch. release.yml produces the real
       # archives.
+      #
+      # Staged into a directory first rather than uploaded straight out of the build
+      # tree: upload-artifact roots the archive at the common ancestor of the paths it
+      # matches, so build-dist/src/luvie would arrive under a src/ directory that means
+      # nothing to whoever downloads it. Staging names the layout instead.
+      - name: Stage artifact
+        run: |
+          set -eu
+          mkdir -p artifact/standalone
+          cp -R "${{ matrix.binary }}" artifact/standalone/
+          cp -R build-dist/luvie.lv2 build-dist/LICENSES artifact/
+
       - name: Upload build output
         uses: actions/upload-artifact@v7
         with:
           name: luvie-${{ matrix.name }}
           if-no-files-found: error
-          path: |
-            build-dist/src/luvie
-            build-dist/src/luvie.exe
-            build-dist/src/Luvie.app
-            build-dist/luvie.lv2
+          path: artifact

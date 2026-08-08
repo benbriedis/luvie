@@ -6,7 +6,7 @@ Luvie builds with CMake (>= 3.28) and produces three artifacts:
   - build/src/luvie            the standalone application
   - build/src/libluvie_core.a  the shared core static library
   - build/luvie.lv2/           the LV2 plugin bundle (luvie_dsp.so,
-                               luvie_ui.so, *.ttl, LICENSES/)
+                               luvie_ui.so, *.ttl)
   - build/LICENSES/            licence texts (see "Licences" below)
 
 
@@ -215,8 +215,15 @@ Third-party licence texts are NOT checked in: build/LICENSES/ is assembled
 during configure, copying them out of the already-fetched dependency sources in
 build/_deps/ so the text always matches the version actually linked. It holds
 Luvie's LICENSE and NOTICE at the top, then FLTK/, LV2/, RtMidi/ and
-nlohmann_json/ subdirectories, and is installed alongside the app and inside the
-plugin bundle.
+nlohmann_json/ subdirectories.
+
+Wherever an installation finishes on its own, LICENSES/ ends up at the top of
+what was installed: inside luvie.lv2 for the plugin (a .deb or `cmake --install`
+leaves it on the LV2 path, and that is the end of the procedure), and under
+share/doc/luvie for the app. An archive is not an installation, so a .tar.gz or
+.zip carries LICENSES/ at its top level instead, beside the luvie.lv2 directory
+you then copy onward by hand -- taking the licences with it is your business at
+that point, and for practical purposes nothing turns on it.
 
 This matters for binary distribution: RtMidi and nlohmann/json are MIT and the
 LV2 headers are ISC, and all three require their notice to appear in every copy,
@@ -355,9 +362,12 @@ build release artifacts. They configure into build-dist/ -- a separate tree, so
 they never fight your development build/ over CMakeCache.txt -- in Release, with
 the LV2 bundle redirected inside the install prefix so packaging can capture it.
 
-Every install rule is tagged with a component, Standalone or Plugin, so the app
-and the plugin can be shipped independently. A plain `cmake --install` still
-installs both.
+Every install rule is tagged with a component, so the app and the plugin can be
+shipped independently. A plain `cmake --install` still installs both. The
+plugin's licence texts are their own components (PluginLicense, inside the
+bundle, and PluginArchiveLicense, at the top of an archive) purely so they can
+be placed differently per format -- cmake/CPackGenerator.cmake picks one, and
+they are packaged with the plugin either way.
 
     cmake --preset linux-dist
     cmake --build --preset linux-dist

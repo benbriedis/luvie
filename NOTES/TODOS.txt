@@ -315,6 +315,4 @@ FEATURE: when the last time signature or tempo is off screen show it on the far 
 
 BUG: looping to start of song causes a gap.
 
-The linear tempo ramp doesn't really want a 'start'. Can maybe show starting tempo without editting.
-+ change 'Curve' to 'Type'.
 

@@ -196,22 +196,6 @@ foreach(f IN LISTS LV2_BUNDLE_FILES)
     list(APPEND LV2_BUNDLE_COPIES ${LV2_BUNDLE}/${fname})
 endforeach()
 
-# The gathered licences go in whole: a bundle is distributed on its own, so it has
-# to carry its own terms (Apache-2.0 section 4a/4d) and those of the libraries linked
-# into luvie_ui.so, rather than relying on the source tree around it. Tracked with a
-# stamp because a directory is not a usable custom-command OUTPUT; the DEPENDS list is
-# the exact set of gathered files, so a dependency bump that changes a licence
-# refreshes the bundle copy too.
-set(LV2_LICENSE_STAMP ${CMAKE_CURRENT_BINARY_DIR}/licenses.stamp)
-add_custom_command(
-    OUTPUT  ${LV2_LICENSE_STAMP}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${LUVIE_LICENSE_DIR} ${LV2_BUNDLE}/LICENSES
-    COMMAND ${CMAKE_COMMAND} -E touch ${LV2_LICENSE_STAMP}
-    DEPENDS ${LUVIE_LICENSE_FILES}
-    COMMENT "Copying LICENSES into luvie.lv2"
-    VERBATIM)
-list(APPEND LV2_BUNDLE_COPIES ${LV2_LICENSE_STAMP})
-
 add_custom_target(luvie_lv2_bundle ALL DEPENDS ${LV2_BUNDLE_COPIES})
 
 # Install the .lv2 bundle (was the root Makefile `install-lv2` target).
@@ -247,5 +231,25 @@ install(TARGETS luvie_dsp luvie_ui
 # The generated manifest, not the template. luvie_dsp.ttl / luvie_ui.ttl are static.
 install(FILES ${LV2_BUNDLE}/manifest.ttl luvie_dsp.ttl luvie_ui.ttl
         DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2 COMPONENT Plugin)
+
+# The gathered licences (Apache-2.0 section 4a/4d, plus the terms of every library
+# compiled into luvie_ui.so) go wherever the top of the finished installation is. That
+# is two different places, which is why there are two rules and a component each:
+#
+#   PluginLicense         inside the bundle. An installation that ends by itself -- a
+#                         .deb, or `cmake --install` -- leaves luvie.lv2 sitting on the
+#                         LV2 path with nothing further to do, so the licences have to
+#                         be in there to be anywhere at all.
+#   PluginArchiveLicense  the root of the staging tree, so an unpacked tarball or zip
+#                         shows LICENSES/ at the top rather than buried under lib/.
+#                         Copying luvie.lv2 out of it into the LV2 path is a manual step,
+#                         and carrying the licences along is then the user's business.
+#                         EXCLUDE_FROM_ALL keeps this copy out of a normal install, where
+#                         it would drop a LICENSES/ directory straight into the prefix.
+#
+# cmake/Packaging.cmake selects exactly one of the two per CPack generator, so no
+# package ever carries both.
 install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${LV2_INSTALL_DIR}/luvie.lv2
-        COMPONENT Plugin)
+        COMPONENT PluginLicense)
+install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION .
+        COMPONENT PluginArchiveLicense EXCLUDE_FROM_ALL)

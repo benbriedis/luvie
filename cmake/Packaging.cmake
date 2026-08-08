@@ -1,10 +1,10 @@
 # Binary packaging via CPack.
 #
 # Luvie ships as two independent things — the standalone application and the LV2 plugin
-# bundle — and people want one without the other, so every install() rule is tagged
-# COMPONENT Standalone or COMPONENT Plugin (see src/CMakeLists.txt and src/lv2/) and
-# CPACK_ARCHIVE_COMPONENT_INSTALL turns each component into its own archive. A plain
-# `cmake --install` is unaffected and still installs both.
+# bundle — and people want one without the other, so every install() rule is tagged with
+# a component (see src/CMakeLists.txt and src/lv2/) and CPACK_ARCHIVE_COMPONENT_INSTALL
+# turns each one into its own archive. A plain `cmake --install` is unaffected and still
+# installs both.
 #
 # Usage, from a configured build tree:
 #     cpack --config build/CPackConfig.cmake            # every generator listed below
@@ -28,12 +28,26 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "luvie")
 set(CPACK_STRIP_FILES             TRUE)
 
 # Component metadata (shown by the DEB generator and by `cpack --help-component`).
-set(CPACK_COMPONENTS_ALL Standalone Plugin)
+set(CPACK_COMPONENTS_ALL Standalone Plugin PluginLicense PluginArchiveLicense)
 set(CPACK_COMPONENT_STANDALONE_DISPLAY_NAME "Luvie standalone application")
 set(CPACK_COMPONENT_PLUGIN_DISPLAY_NAME     "Luvie LV2 plugin")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-# One archive per component rather than one containing both.
-set(CPACK_COMPONENTS_GROUPING IGNORE)
+
+# The plug-in's payload and its licences are separate components only so that the
+# licences can land in a different place per generator (see src/lv2/CMakeLists.txt);
+# they still belong in one package, hence the shared group and ONE_PER_GROUP. Standalone
+# is left ungrouped, which under ONE_PER_GROUP still gives it a package of its own.
+#
+# Every CPACK_*_<NAME>_* variable below keys off the group name for the plug-in and the
+# component name for the app -- both spelled the same as before this split.
+set(CPACK_COMPONENTS_GROUPING ONE_PER_GROUP)
+set(CPACK_COMPONENT_PLUGIN_GROUP               plugin)
+set(CPACK_COMPONENT_PLUGINLICENSE_GROUP        plugin)
+set(CPACK_COMPONENT_PLUGINARCHIVELICENSE_GROUP plugin)
+
+# CPack reads this once per generator, with CPACK_GENERATOR naming that one generator,
+# which is the only point at which the two licence components can be told apart.
+set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/CPackGenerator.cmake")
 
 # ---- Per-platform generators and file naming --------------------------------------
 # Archive names carry the *full* git description (not just X.Y.Z) plus platform and

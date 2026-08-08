@@ -81,8 +81,3 @@ endif()
 # guarantee that what ships matches what is in the tree.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/LICENSE" "${CMAKE_SOURCE_DIR}/NOTICE")
-
-# Everything that was gathered, so build steps that copy this directory onward (the LV2
-# bundle) can depend on the exact file list. Globbing is accurate here because the gather
-# above just ran.
-file(GLOB_RECURSE LUVIE_LICENSE_FILES "${LUVIE_LICENSE_DIR}/*")
