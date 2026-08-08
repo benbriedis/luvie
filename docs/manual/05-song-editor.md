@@ -2,7 +2,7 @@
 
 [← Tempo, beats and bars](03-tempo-and-beats.md) · [Contents](README.md) · [The pattern editors →](05-pattern-editors.md)
 
-TODO: screenshot of the song editor with tracks, lanes and placed patterns.
+TODO: screenshot of the song editor with tracks, lanes and placed patterns. Inc parameters.
 
 The song editor arranges patterns along a timeline. Each track holds one
 instrument's worth of material; patterns are placed into it as instances, so the
