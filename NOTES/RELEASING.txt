@@ -9,7 +9,9 @@ drafting the release -- is automatic.
 Cutting a release
 -----------------
 
-1. Make sure main is green (the CI workflow runs on every push).
+1. Make sure main is green. Note the CI workflow does NOT run on every push --
+   that trigger is commented out in .github/workflows/ci.yml -- so unless the
+   commits arrived by pull request, run it by hand from the Actions tab first.
 
 2. Tag and push:
 
@@ -81,11 +83,27 @@ that are useful together and cost nothing to ship as one.
 
   luvie_<ver>_amd64.deb                   app + plugin, Debian/Ubuntu
   luvie-<ver>-1.x86_64.rpm                app + plugin, Fedora/openSUSE
-  Luvie-<ver>-macos-universal.zip         Luvie.app + luvie.lv2, x86_64 + arm64
+  Luvie-<ver>-macos-universal.dmg         Luvie.app + luvie.lv2, x86_64 + arm64
+  luvie-<ver>-windows-x86_64-setup.exe    app + plugin, per-user installer
   luvie-<ver>-windows-x86_64.zip          app + plugin
 
 Arch is served by the AUR recipe (below). Any other Linux distribution builds
 from source; BUILD covers it.
+
+Windows gets two artifacts on purpose. Neither is signed, so both raise the same
+SmartScreen warning -- but browsers block unsigned .exe downloads far more
+readily than .zip ones, so the zip is the download that always works while the
+installer is the one that puts the plugin where hosts look. A third route,
+packaging/scoop/, raises no warning at all, because Scoop does not set
+mark-of-the-web on what it downloads; it needs no per-release work, since the
+manifest carries checkver/autoupdate. See packaging/scoop/README.
+
+macOS went from a zip to a disk image at v0.0.5: the image can hold an
+/Applications symlink to drag onto, shows its README.txt on opening, and is the
+only one of the two that can carry a stapled notarization ticket if signing is
+ever turned on. A .pkg was considered and rejected -- it needs a second Apple
+certificate type ("Developer ID Installer") and an unsigned one cannot be opened
+at all on current macOS.
 
 Two Linux artifacts have been dropped along the way, both for the same reason --
 they hand someone a directory of files and leave the installing to them.
@@ -157,13 +175,60 @@ gated on a tag push, so nothing is published. Use this to check a packaging
 change without spending a tag.
 
 
-Code signing (optional)
------------------------
+Code signing
+------------
 
-Unsigned builds work. macOS users get "unidentified developer" on first launch
-and have to right-click -> Open once; Windows users get a SmartScreen warning.
-Configuring the secrets below makes those go away; leaving them unset skips the
-signing steps entirely, so a fork with no secrets still produces usable builds.
+Luvie is published unsigned, deliberately: signing costs money on both platforms
+and the only free option covers just one of them. What that costs users is
+documented in the release notes body (see the end of release.yml) and in the
+README.txt inside each archive.
+
+  Windows   SmartScreen says "Windows protected your PC" -> More info -> Run
+            anyway. Same for the installer and for the .exe in the zip, since
+            signing is what removes it, not the choice of download. Installing
+            through Scoop avoids it entirely (packaging/scoop/README).
+
+  macOS     The app: first launch is refused, then System Settings -> Privacy &
+            Security offers "Open Anyway". Note that right-click -> Open, which
+            older instructions everywhere still recommend, was removed in macOS
+            15 -- do not put it back.
+
+            The plugin is the real cost. A quarantined, un-notarized bundle is
+            not merely warned about, it is silently not loaded: the host lists
+            nothing and reports nothing, so there is no symptom to search for.
+            The fix is one command and it is spelled out at the top of the .dmg's
+            README.txt, which is the main reason that file exists:
+
+                xattr -dr com.apple.quarantine \
+                    ~/Library/Audio/Plug-Ins/LV2/luvie.lv2
+
+Where the money goes, checked August 2026:
+
+  Apple     USD 99/year, recurring, for the Developer Program. It is the only
+            source of a "Developer ID Application" certificate and there is no
+            open-source exemption, no one-off purchase and no other vendor.
+            Notarization is what removes both macOS problems above, including
+            the plugin one.
+
+  Windows   SignPath Foundation (signpath.org) gives free OV code signing to
+            open-source projects, issued by Sectigo and driven from CI. Luvie
+            qualifies: public repository, recognised licence, and the same person
+            owning the repository and the signing. This is the one free option
+            and applying is a one-off. Certum's open-source certificate (EUR
+            25-90) is the fallback if that falls through, but certificates are
+            capped at 459 days from February 2026, making it an annual renewal.
+
+            Azure Trusted Signing (now "Artifact Signing", USD 9.99/month) looks
+            attractive and is not available: individual onboarding is paused, and
+            organisations must have three years of verifiable history in the US
+            or Canada.
+
+Turning signing on is a matter of adding secrets and changing no code -- the
+workflow already implements both paths and skips them when unconfigured, which
+is also what keeps forks building. Windows signing runs through
+tools/sign-windows.ps1, called twice: over luvie.exe and the two plugin modules
+before packaging, and over setup.exe afterwards. Signing the installer is where
+it does the most good, being the file users actually execute.
 
 Repository secrets (Settings -> Secrets and variables -> Actions):
 
@@ -182,6 +247,13 @@ Repository secrets (Settings -> Secrets and variables -> Actions):
 Signing is only as good as the certificate: macOS notarization specifically
 requires a "Developer ID Application" certificate from a paid Apple Developer
 account. A self-signed certificate will sign but will not satisfy Gatekeeper.
+
+The two WINDOWS_ secrets suit a certificate you hold the key for. SignPath does
+not work that way -- it holds the key and signs on request -- so going that route
+means replacing the calls to tools/sign-windows.ps1 with SignPath's
+submit-signing-request action, whose origin verification ties each signature to a
+specific workflow run. That is a change to make once the application is approved,
+not before.
 
 
 If something fails

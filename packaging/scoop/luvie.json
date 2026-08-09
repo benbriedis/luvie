@@ -1,0 +1,56 @@
+{
+    "##": [
+        "Master copy -- see packaging/scoop/README. The version, url, hash and extract_dir",
+        "below are a starting point only: `scoop checkver luvie . -u` rewrites all four from",
+        "the autoupdate block at the bottom, so the hash placeholder is expected to be wrong",
+        "until it has been run once against a published release."
+    ],
+    "version": "0.0.4",
+    "description": "Pattern-based MIDI sequencer, as a standalone application and an LV2 plugin",
+    "homepage": "https://github.com/benbriedis/luvie",
+    "license": "Apache-2.0",
+    "notes": [
+        "The LV2 plugin has been installed to %APPDATA%\\LV2\\luvie.lv2 -- rescan your",
+        "plugins in Reaper, Ardour or Carla and Luvie will appear.",
+        "",
+        "JACK is optional: Luvie uses the native Windows MIDI API on its own, and picks up",
+        "JACK transport and JACK MIDI ports at runtime if JACK is installed."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/benbriedis/luvie/releases/download/v0.0.4/luvie-v0.0.4-windows-x86_64.zip",
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "extract_dir": "luvie-v0.0.4-windows-x86_64"
+        }
+    },
+    "bin": "bin\\luvie.exe",
+    "shortcuts": [
+        [
+            "bin\\luvie.exe",
+            "Luvie"
+        ]
+    ],
+    "post_install": [
+        "# Scoop keeps the app in its own directory, but a host will only look for plugin",
+        "# bundles in the standard places -- so this half cannot stay where it was unpacked.",
+        "$lv2 = \"$env:APPDATA\\LV2\"",
+        "New-Item -ItemType Directory -Force -Path $lv2 | Out-Null",
+        "Copy-Item -Recurse -Force \"$dir\\lib\\lv2\\luvie.lv2\" $lv2"
+    ],
+    "uninstaller": {
+        "script": [
+            "Remove-Item -Recurse -Force \"$env:APPDATA\\LV2\\luvie.lv2\" -ErrorAction SilentlyContinue"
+        ]
+    },
+    "checkver": {
+        "github": "https://github.com/benbriedis/luvie"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/benbriedis/luvie/releases/download/v$version/luvie-v$version-windows-x86_64.zip",
+                "extract_dir": "luvie-v$version-windows-x86_64"
+            }
+        }
+    }
+}

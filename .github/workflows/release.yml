@@ -173,47 +173,52 @@ jobs:
               --password "$APPLE_APP_PASSWORD"
             export MACOS_NOTARY_PROFILE=luvie-notary
           fi
-          tools/make-macos-zip.sh build-dist
+          tools/make-macos-dmg.sh build-dist
 
-      # Signing has to happen before packaging, so the archives contain signed binaries;
-      # unlike macOS there is nothing to stage first, as signtool works on the built
-      # files in place. Skipped entirely when no certificate is configured, leaving an
-      # unsigned but perfectly functional build (users see a SmartScreen warning).
+      # Signing the payload has to happen before packaging, so both the archive and the
+      # installer contain signed binaries; unlike macOS there is nothing to stage first, as
+      # signtool works on the built files in place. The installer itself is signed further
+      # down, once it exists. tools/sign-windows.ps1 does nothing when no certificate is
+      # configured, so an unsigned but perfectly functional build still comes out (users
+      # see a SmartScreen warning).
       - name: Sign Windows binaries
         if: matrix.name == 'Windows'
         shell: pwsh
         env:
-          CERT_P12: ${{ secrets.WINDOWS_CERT_P12 }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          WINDOWS_CERT_P12: ${{ secrets.WINDOWS_CERT_P12 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
-          if (-not $env:CERT_P12) {
-            Write-Host "WINDOWS_CERT_P12 not set - this build will be unsigned"
-            exit 0
-          }
-          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_P12))
-          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
-                      Sort-Object FullName | Select-Object -Last 1
-          # A timestamp is what keeps the signature valid after the certificate expires.
-          Get-ChildItem -Path build-dist -Recurse -Include luvie.exe,luvie_dsp.dll,luvie_ui.dll |
-            ForEach-Object {
-              & $signtool.FullName sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 `
-                /tr http://timestamp.digicert.com /td SHA256 $_.FullName
-              if ($LASTEXITCODE -ne 0) { throw "signtool failed on $($_.FullName)" }
-            }
-          Remove-Item $pfx
+          ./tools/sign-windows.ps1 `
+            build-dist/src/luvie.exe `
+            build-dist/luvie.lv2/luvie_dsp.dll `
+            build-dist/luvie.lv2/luvie_ui.dll
 
       - name: Package (Windows)
         if: matrix.name == 'Windows'
         run: |
-          # The zips must be self-contained: the dist preset links the GCC runtime
-          # statically precisely so no MSYS2 DLL has to ship. Catch a regression here
-          # rather than in a bug report from someone without MSYS2 installed.
+          # The zip and the installer must be self-contained: the dist preset links the GCC
+          # runtime statically precisely so no MSYS2 DLL has to ship. Catch a regression
+          # here rather than in a bug report from someone without MSYS2 installed.
           if ldd build-dist/src/luvie.exe | grep -iE 'msys|ucrt64/bin'; then
             echo "::error::luvie.exe depends on MSYS2 DLLs; the static link flags are not taking effect"
             exit 1
           fi
           (cd build-dist && cpack)
+          # Both are published, and they are not redundant. The installer places the plug-in
+          # in %APPDATA%\LV2, adds a Start menu entry, registers .luv and can uninstall
+          # itself. The zip is the download that always works: browsers block unsigned .exe
+          # downloads far more readily than .zip ones.
+          tools/make-windows-installer.sh build-dist
+
+      # Now that setup.exe exists, sign that too. It is the file users actually execute, so
+      # it is where a signature does the most good.
+      - name: Sign Windows installer
+        if: matrix.name == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_P12: ${{ secrets.WINDOWS_CERT_P12 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: ./tools/sign-windows.ps1 build-dist/*-setup.exe
 
       - name: Upload packages
         uses: actions/upload-artifact@v7
@@ -222,6 +227,8 @@ jobs:
           if-no-files-found: error
           path: |
             build-dist/*.zip
+            build-dist/*-setup.exe
+            build-dist/*.dmg
             build-dist/*.deb
             build-dist/*.rpm
 
@@ -419,15 +426,39 @@ jobs:
             | Debian / Ubuntu | `luvie_*.deb` |
             | Fedora / openSUSE | `luvie-*.x86_64.rpm` |
             | Arch Linux | [`luvie`](https://aur.archlinux.org/packages/luvie) in the AUR |
-            | macOS | `Luvie-*-macos-universal.zip` |
-            | Windows | `luvie-*-windows-x86_64.zip` |
+            | macOS | `Luvie-*-macos-universal.dmg` |
+            | Windows | `luvie-*-windows-x86_64-setup.exe`, or the `.zip` |
 
             On another Linux distribution, build from source — see
             [BUILD](https://github.com/benbriedis/luvie/blob/main/BUILD).
 
-            The `.deb` and `.rpm` put both halves in place for you. From an archive, the plugin is
-            installed by copying `luvie.lv2` into `~/Library/Audio/Plug-Ins/LV2` (macOS)
-            or `%APPDATA%\LV2` (Windows).
+            The `.deb`, `.rpm` and the Windows installer put both halves in place for you.
+            From the `.zip`, copy `luvie.lv2` into `%APPDATA%\LV2` yourself.
+
+            ### Luvie is not code-signed
+
+            Signing certificates cost money on both platforms — an Apple Developer
+            subscription for macOS, annually — so both operating systems will question these
+            downloads. Nothing is wrong with them; here is what to do.
+
+            **Windows.** SmartScreen says "Windows protected your PC": click **More info**,
+            then **Run anyway**. You get the same warning from the installer and from the
+            `.exe` in the zip. To skip it entirely, install through
+            [Scoop](https://scoop.sh) instead:
+
+            ```
+            scoop bucket add luvie https://github.com/benbriedis/scoop-luvie
+            scoop install luvie
+            ```
+
+            **macOS.** Open the `.dmg` and read `README.txt` — it has both steps. In short:
+
+            - **The plugin needs one command**, or your DAW will not list it and will not say
+              why:
+              `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/LV2/luvie.lv2`
+            - **The app**: on first launch macOS refuses, then offers **Open Anyway** under
+              System Settings → Privacy & Security. (Right-click → Open no longer works on
+              macOS 15 and later.)
 
             JACK is optional everywhere: Luvie loads it at runtime if present and
             falls back to its internal transport and native MIDI output if not.

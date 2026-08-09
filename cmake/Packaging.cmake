@@ -6,7 +6,7 @@
 # built from the same tree anyway.
 #
 # The install() rules keep their COMPONENT tags (see src/CMakeLists.txt and src/lv2/):
-# tools/make-macos-zip.sh still selects one at a time with
+# tools/make-macos-dmg.sh still selects one at a time with
 # `cmake --install --component`. CPack simply does not split on them — with no
 # CPACK_<GEN>_COMPONENT_INSTALL set, every generator below produces one monolithic package
 # containing everything (bar install rules marked EXCLUDE_FROM_ALL).
@@ -40,11 +40,11 @@ if(WIN32)
     set(CPACK_GENERATOR "ZIP")
     set(LUVIE_PLATFORM_TAG "windows-x86_64")
 elseif(APPLE)
-    # ZIP is what macOS users expect, and what `ditto` produces. Note the release
-    # artifact is *not* built by CPack: a .app has to be code-signed after staging and
-    # before archiving, and stripping (below) would invalidate the signature — so
-    # tools/make-macos-zip.sh stages, signs and archives in the right order instead.
-    # These settings only matter if someone runs cpack here directly.
+    # The release artifact is a .dmg and is *not* built by CPack: a .app has to be
+    # code-signed after staging and before archiving, and stripping (below) would
+    # invalidate the signature — so tools/make-macos-dmg.sh stages, signs and archives in
+    # the right order instead. ZIP here is only a sane fallback for a developer running
+    # cpack in this tree directly; nothing ships it.
     set(CPACK_GENERATOR "ZIP")
     set(CPACK_STRIP_FILES FALSE)
     # A universal build has two architectures; say so rather than naming one of them.
@@ -159,8 +159,8 @@ on its own or sit inside a DAW.")
 #     if(CPACK_PACKAGE_RELOCATABLE OR CPACK_RPM_PACKAGE_RELOCATABLE)
 # — the generic one defaults to true, so on its own the RPM-specific one cannot turn
 # this off. Clearing the generic one costs nothing here: the only other thing that reads
-# it is CPack's productbuild/PackageMaker plist, and the macOS artifact is a ZIP built by
-# tools/make-macos-zip.sh.
+# it is CPack's productbuild/PackageMaker plist, and the macOS artifact is a disk image
+# built by tools/make-macos-dmg.sh.
 set(CPACK_PACKAGE_RELOCATABLE     OFF)
 set(CPACK_RPM_PACKAGE_RELOCATABLE OFF)
 

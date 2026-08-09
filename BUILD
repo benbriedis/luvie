@@ -370,7 +370,7 @@ half the tree at a time. A plain `cmake --install` installs everything.
     cmake --build --preset linux-dist
     cd build-dist && cpack        # generators are chosen per platform:
                                   #   Linux   DEB + RPM
-                                  #   macOS   ZIP
+                                  #   macOS   ZIP (fallback only, see below)
                                   #   Windows ZIP
 
 RPM is included only when rpmbuild is on PATH (Debian/Ubuntu package `rpm`);
@@ -381,18 +381,38 @@ Ubuntu runner as the .deb.
 There is no generic Linux .tar.gz. Distributions other than Debian, Ubuntu,
 Fedora, openSUSE and Arch build from source, which is what this file is for.
 
-One format needs more than CPack can express, so it has a script:
+Two formats need more than CPack can express, so each has a script. Both stage
+the two install components with `cmake --install --component` and work from the
+result:
 
-    tools/make-macos-zip.sh       # macOS: Luvie.app + luvie.lv2 in one zip
+    tools/make-macos-dmg.sh          # macOS:   Luvie.app + luvie.lv2 in one .dmg
+    tools/make-windows-installer.sh  # Windows: per-user setup.exe (Inno Setup 6)
+
+The macOS script stages, optionally signs and notarizes, then builds the image,
+in that order: a .app's signature covers every byte, so it has to be signed after
+assembly and before archiving. The disk image replaces what used to be a zip --
+it can hold an /Applications symlink to drag onto and, unlike a zip, can carry a
+stapled notarization ticket. A .pkg would need a second Apple certificate type
+and, unsigned, could not be opened at all on current macOS.
+
+The Windows installer needs Inno Setup 6 (`choco install innosetup`); the script
+finds ISCC.exe on PATH or under Program Files. It installs per-user, without
+elevation, so there is no UAC prompt: luvie.exe under %LOCALAPPDATA%\Programs,
+the plugin in %APPDATA%\LV2, a Start menu entry, a .luv file association and an
+uninstaller. The script drives packaging/windows/luvie.iss, which is where all of
+that is declared. CPack does have an INNOSETUP generator, but only from CMake
+3.30, and this project requires 3.28.
+
+Windows publishes the .zip as well as the installer, and they are not redundant:
+neither is signed, so both raise the same SmartScreen warning, but browsers block
+unsigned .exe downloads far more readily than .zip ones. The zip is the download
+that always works. packaging/scoop/ holds a third option that raises no warning
+at all -- see the README there.
 
 Build Linux releases on the oldest distribution you intend to support: libstdc++
 and libgcc are linked statically, which leaves glibc as the library that sets the
 compatibility floor, and that floor comes from the build host. CI uses Ubuntu
 22.04.
-
-The macOS script stages, optionally signs and notarizes, then archives with
-ditto, in that order: a .app's signature covers every byte, so it has to be
-signed after assembly and before archiving.
 
 Icons are pre-generated and committed (logo/luvie.ico, logo/luvie.icns), so no
 icon toolchain is needed to build. Regenerate them after changing the logo:

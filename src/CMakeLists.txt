@@ -159,7 +159,7 @@ endif()
 #   cmake --install build --prefix ~/.local
 # Everything here is tagged COMPONENT Standalone. The release packages hold the app and
 # the plugin together (see cmake/Packaging.cmake), so no CPack generator selects on the
-# tag any more — but tools/make-macos-zip.sh does, to stage one half of the tree at a
+# tag any more — but tools/make-macos-dmg.sh does, to stage one half of the tree at a
 # time. A plain `cmake --install` installs all of it.
 #
 # BUNDLE DESTINATION only applies on macOS, where the target is a Luvie.app directory
@@ -173,6 +173,19 @@ install(TARGETS luvie
 # the licences of the libraries compiled into the binary.
 install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${CMAKE_INSTALL_DOCDIR}
         COMPONENT Standalone)
+
+if(WIN32)
+    # The .zip is the one artifact that hands someone a directory tree and leaves the
+    # installing to them, so it is the one that has to explain itself: where luvie.lv2 goes,
+    # and why SmartScreen complains. (The .dmg carries the same thing, written by
+    # tools/make-macos-dmg.sh; the installer and the Linux packages need none of it because
+    # they put the files in place themselves.) At the archive root, where it is the first
+    # thing visible on opening it — and picked up from there by packaging/windows/luvie.iss.
+    configure_file(${CMAKE_SOURCE_DIR}/packaging/windows/README.txt.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/README.txt @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/README.txt
+            DESTINATION . COMPONENT Standalone)
+endif()
 
 # Desktop integration below is XDG — Linux-only by construction. macOS carries the
 # same information in Luvie.app's Info.plist and .icns, Windows in the executable's

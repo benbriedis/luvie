@@ -5,10 +5,12 @@
 
 ## Installation
 
-Installers are provided for all major supported systems. 
-I recommend you use one of these.
+Installers are provided for most major supported systems. 
+I recommend you use one of these if possible.
 Note that standalone and a plugin version of Luvie will be installed.
-It is also possible to install Luvie from the source code.
+
+It is also possible to install Luvie from the source code. This should be quick
+and painless - the codebase is small and almost all dependencies are static.
 
 ## JACK
 

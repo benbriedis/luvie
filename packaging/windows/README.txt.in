@@ -1,0 +1,43 @@
+Luvie @LUVIE_VERSION@
+
+A pattern-based MIDI sequencer: https://github.com/benbriedis/luvie
+
+This archive holds both halves of Luvie. Nothing here needs installing to run, but the
+plug-in has to be in a place your host looks.
+
+  bin\luvie.exe          the standalone application - run it from here if you like
+  lib\lv2\luvie.lv2      the LV2 plug-in bundle
+  LICENSES\              Apache-2.0, and the licences of the libraries built in
+
+
+Installing the plug-in
+----------------------
+
+Copy the whole luvie.lv2 folder into your per-user LV2 directory:
+
+    %APPDATA%\LV2\luvie.lv2
+
+Create the LV2 folder if it is not there. Restart your host, or tell it to rescan, and
+Luvie will appear among your plug-ins. Reaper, Ardour and Carla all read this location.
+
+
+"Windows protected your PC"
+---------------------------
+
+Luvie is not code-signed yet, so SmartScreen warns about it the first time you run it.
+Click "More info" and then "Run anyway". You will see the same warning whether you run the
+.exe from this archive or use the installer -- signing is what removes it, not the choice
+of download.
+
+If you would rather not see it at all, install through Scoop instead:
+
+    scoop bucket add luvie https://github.com/benbriedis/scoop-luvie
+    scoop install luvie
+
+
+MIDI and JACK
+-------------
+
+Luvie drives MIDI hardware and software instruments through the native Windows MIDI API
+with no extra setup. JACK is optional: if it is installed, Luvie finds it at runtime and
+offers JACK transport and JACK MIDI ports as well.

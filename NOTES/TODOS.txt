@@ -357,3 +357,8 @@ TOCHECK
 Luvie -> dont put the binary in 'src'. cf 'standalone/' or 'app/'
 Move LICENCES out of the LV2 directory and into the top directory
 
+
+Apply at signpath.org — one-off, takes days to weeks. Requirements Luvie already meets:
+	public repository, recognised OSS licence, project functionality described on the download
+	page, and the same person owning both the repo and the signing.
+
