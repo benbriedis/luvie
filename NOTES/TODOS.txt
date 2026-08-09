@@ -322,9 +322,6 @@ BUG: looping to start of song causes a gap (plugin or standalone or both?)
 Try Helvum
 
 
-Test .deb
-Don't like the structure of the linux .tar.gz file.
-   Probably remove it and provide .yum, .aur and the source files instead.
 Don't like having the installation instructions in the download directory.
    If we continue to have .zip, then put instructions in there.
 

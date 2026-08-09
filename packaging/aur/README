@@ -46,9 +46,12 @@ is definitely there.
        cd ../aur-luvie
        # edit pkgver / pkgrel
 
-2. Build it. This is also the only real test the PKGBUILD gets, so do not skip
-   it -- and prefer the clean-chroot form, which catches a dependency that is
-   missing from `depends` but happens to be installed on your machine:
+2. Build it. The release workflow's test-aur-package job already built this
+   recipe in an Arch container and installed and ran the result (see
+   NOTES/RELEASING.txt), so this is a second opinion rather than the only test
+   it gets -- but the clean-chroot form still catches something CI does not: a
+   dependency missing from `depends` that happens to be installed on your
+   machine, and on CI's:
 
        makepkg -si                     # quick check, uses your installed packages
        extra-x86_64-build              # clean chroot (devtools package)

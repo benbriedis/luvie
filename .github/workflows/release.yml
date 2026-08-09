@@ -104,11 +104,11 @@ jobs:
         run: ctest --preset ${{ matrix.preset }}
 
       # ---- Package ---------------------------------------------------------------
-      # cmake/Packaging.cmake already selects each platform's generators (TGZ, DEB and RPM
+      # cmake/Packaging.cmake already selects each platform's generators (DEB and RPM
       # here), so plain `cpack` is enough.
       #
       # The RPM generator is added only when rpmbuild is present, so that a developer
-      # without it still gets the other two. In CI its absence would instead mean silently
+      # without it still gets the .deb. In CI its absence would instead mean silently
       # shipping one artifact fewer, so check for the file rather than trusting the run to
       # have installed everything.
       - name: Package (Linux)
@@ -117,7 +117,7 @@ jobs:
         run: |
           set -eu
           (cd build-dist && cpack)
-          for ext in tar.gz deb rpm; do
+          for ext in deb rpm; do
             if ! compgen -G "build-dist/*.$ext" > /dev/null; then
               echo "::error::cpack produced no .$ext"
               exit 1
@@ -221,14 +221,175 @@ jobs:
           name: packages-${{ matrix.name }}
           if-no-files-found: error
           path: |
-            build-dist/*.tar.gz
             build-dist/*.zip
             build-dist/*.deb
             build-dist/*.rpm
 
+  # ---- Install tests -----------------------------------------------------------------
+  # Everything above builds and tests Luvie on the build host. These two jobs install the
+  # finished packages the way a user would, on the distributions they target, and check
+  # the result works. That catches the class of bug a build-tree test cannot see: a
+  # missing dependency the build host happened to have, a file in the wrong prefix, an
+  # LV2 bundle a host cannot find. The checks themselves live in tools/test-installed.sh,
+  # shared by all three package formats and runnable by hand.
+  test-packages:
+    name: Install test (${{ matrix.name }})
+    needs: package
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+      # jackd keeps its buffers in /dev/shm, and Docker's 64 MB default is too small for
+      # the server to start.
+      options: --shm-size=512m
+    strategy:
+      fail-fast: false        # which distributions fail is the interesting part
+      matrix:
+        include:
+          # Two .deb targets because they differ where it matters: bookworm is close to
+          # the Ubuntu 22.04 build host, noble is past the 64-bit-time_t library renames,
+          # so it exercises whether the package's dependencies still resolve.
+          - name: Debian 12
+            image: debian:12
+            format: deb
+          - name: Ubuntu 24.04
+            image: ubuntu:24.04
+            format: deb
+          # Unpinned: an old Fedora tag stops being installable the moment its repos are
+          # retired, and a package-install test that cannot install anything is worse
+          # than one that drifts forward.
+          - name: Fedora
+            image: fedora:latest
+            format: rpm
+
+    steps:
+      # Before checkout, which needs git in the container.
+      - name: Install test dependencies (Debian/Ubuntu)
+        if: matrix.format == 'deb'
+        run: |
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          # Ubuntu's container image configures dpkg to throw away /usr/share/doc as it
+          # unpacks, which a real installation does not do -- and that is where the
+          # licence files Apache-2.0 requires us to ship end up. Restore normal
+          # behaviour, or the test would check a system no user has.
+          rm -f /etc/dpkg/dpkg.cfg.d/excludes
+          apt-get update
+          # xauth: xvfb-run uses it, and it is only a Recommends of xvfb.
+          # lilv-utils: lv2ls, for the plugin-discovery check.
+          apt-get install -y --no-install-recommends \
+            ca-certificates git xvfb xauth jalv jackd2 lilv-utils
+
+      - name: Install test dependencies (Fedora)
+        if: matrix.format == 'rpm'
+        run: |
+          set -eux
+          # lilv supplies lv2ls (the plugin-discovery check) and jack-tools supplies
+          # jack_wait; on Debian those live in lilv-utils and jackd2 respectively.
+          dnf -y install git xorg-x11-server-Xvfb xorg-x11-xauth jalv \
+            jack-audio-connection-kit jack-tools lilv
+
+      - uses: actions/checkout@v7
+        # Only tools/test-installed.sh is wanted here; the packages come from the build
+        # job, so there is nothing to version and no need for the tags.
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages-Linux
+          path: packages
+
+      # Installing through the package manager rather than `dpkg -i` / `rpm -i` is the
+      # point: it resolves the package's declared dependencies, so a dependency the
+      # package failed to declare surfaces as an unresolved library in the next step.
+      - name: Install the package
+        run: |
+          set -eux
+          if [ "${{ matrix.format }}" = deb ]; then
+            DEBIAN_FRONTEND=noninteractive apt-get install -y ./packages/luvie_*.deb
+          else
+            # tsflags= undoes the image's nodocs setting, for the same reason the
+            # Debian step drops dpkg's excludes file.
+            dnf -y --setopt=tsflags= install ./packages/luvie-*.rpm
+          fi
+
+      - name: Test the installed package
+        env:
+          # On a tag build, the tag must have reached the binary. Empty otherwise: a
+          # dispatch run has no tag to check against.
+          LUVIE_EXPECT_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+        run: tools/test-installed.sh
+
+  # Arch gets no artifact from this workflow -- the AUR ships a PKGBUILD that each user's
+  # makepkg compiles locally -- so the thing to test is the recipe. This builds it exactly
+  # as a user would and then installs and runs the result, which is otherwise only ever
+  # checked by hand at release time (see packaging/aur/README).
+  test-aur-package:
+    name: Install test (Arch, AUR PKGBUILD)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+      options: --shm-size=512m
+    steps:
+      - name: Install build and test dependencies
+        run: |
+          set -eux
+          # lilv-tools, not lilv: Arch splits lv2ls and friends out of the library
+          # package, and without them the plugin-discovery check silently skips itself.
+          pacman -Syu --noconfirm --needed git namcap sudo \
+            jalv jack2 lilv-tools xorg-server-xvfb xorg-xauth
+          # makepkg refuses to run as root, and --syncdeps needs sudo to install
+          # the PKGBUILD's own dependencies.
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+
+      - uses: actions/checkout@v7
+
+      - name: Build with makepkg
+        run: |
+          set -eux
+          cp packaging/aur/PKGBUILD /home/builder/
+          # The PKGBUILD builds from the git tag named by pkgver, and that field is
+          # bumped by hand only *after* a release goes out (packaging/aur/README). Point
+          # it at the tag being released so this tests the code in hand; on a dispatch
+          # run there is no tag, so it stays as written and re-tests the last release.
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            sed -i "s/^pkgver=.*/pkgver=${GITHUB_REF_NAME#v}/" /home/builder/PKGBUILD
+          fi
+          chown -R builder /home/builder
+          # -s installs depends, makedepends and checkdepends; the PKGBUILD's own check()
+          # runs the build-tree smoke test under xvfb before packaging.
+          sudo -u builder --login makepkg --syncdeps --noconfirm
+
+      - name: Lint with namcap
+        # Advisory: namcap flags conventions, not breakage, and its warnings should not
+        # hold up a release.
+        continue-on-error: true
+        run: |
+          namcap /home/builder/PKGBUILD
+          namcap /home/builder/luvie-[0-9]*.pkg.tar.zst
+
+      - name: Install the built package
+        run: |
+          set -eux
+          # Arch's container image, like Debian's and Fedora's, keeps itself small by
+          # discarding documentation as it unpacks -- here through NoExtract, which would
+          # silently drop the licence files this package is required to ship. Only now,
+          # so the dependency installs above stayed lean.
+          sed -i '/^NoExtract/d' /etc/pacman.conf
+          # luvie-*, not luvie-*-debug: stock makepkg.conf has `debug` in OPTIONS, so
+          # every build also produces a detached-symbols package. It is not what an AUR
+          # user installs to run Luvie, and it is 80 MB.
+          pacman -U --noconfirm /home/builder/luvie-[0-9]*.pkg.tar.zst
+
+      - name: Test the installed package
+        env:
+          LUVIE_EXPECT_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+        run: tools/test-installed.sh
+
   release:
     name: Draft GitHub release
-    needs: package
+    # The install tests gate the draft: an artifact that does not install is not a
+    # release, and finding that out after publishing is worse than a slower workflow.
+    needs: [package, test-packages, test-aur-package]
     runs-on: ubuntu-latest
     # Only a real tag push publishes anything; workflow_dispatch stops after building,
     # which is what makes it usable as a dry run.
@@ -258,13 +419,15 @@ jobs:
             | Debian / Ubuntu | `luvie_*.deb` |
             | Fedora / openSUSE | `luvie-*.x86_64.rpm` |
             | Arch Linux | [`luvie`](https://aur.archlinux.org/packages/luvie) in the AUR |
-            | Other Linux | `luvie-*-linux-*.tar.gz` |
             | macOS | `Luvie-*-macos-universal.zip` |
             | Windows | `luvie-*-windows-x86_64.zip` |
 
+            On another Linux distribution, build from source — see
+            [BUILD](https://github.com/benbriedis/luvie/blob/main/BUILD).
+
             The `.deb` and `.rpm` put both halves in place for you. From an archive, the plugin is
-            installed by copying `luvie.lv2` into `~/.lv2` (Linux),
-            `~/Library/Audio/Plug-Ins/LV2` (macOS) or `%APPDATA%\LV2` (Windows).
+            installed by copying `luvie.lv2` into `~/Library/Audio/Plug-Ins/LV2` (macOS)
+            or `%APPDATA%\LV2` (Windows).
 
             JACK is optional everywhere: Luvie loads it at runtime if present and
             falls back to its internal transport and native MIDI output if not.

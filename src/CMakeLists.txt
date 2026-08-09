@@ -212,8 +212,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${CMAKE_SOURCE_DIR}/packaging/com.benbriedis.luvie.metainfo.xml
             DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo
             COMPONENT Standalone)
-    # Debian Policy 12.5: every package must ship this exact path. Harmless in a
-    # tarball install, where it sits beside the LICENSES/ tree it summarises.
+    # Debian Policy 12.5: every package must ship this exact path. Harmless anywhere
+    # else — a plain `cmake --install` leaves it beside the LICENSES/ tree it
+    # summarises, and packaging/aur/PKGBUILD deletes it, Arch having its own
+    # convention for the same thing.
     install(FILES ${CMAKE_SOURCE_DIR}/packaging/copyright
             DESTINATION ${CMAKE_INSTALL_DOCDIR}
             COMPONENT Standalone)

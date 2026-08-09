@@ -220,10 +220,10 @@ nlohmann_json/ subdirectories.
 Wherever an installation finishes on its own, LICENSES/ ends up at the top of
 what was installed: inside luvie.lv2 for the plugin (a .deb or `cmake --install`
 leaves it on the LV2 path, and that is the end of the procedure), and under
-share/doc/luvie for the app. An archive is not an installation, so a .tar.gz or
-.zip carries LICENSES/ at its top level instead, beside the luvie.lv2 directory
-you then copy onward by hand -- taking the licences with it is your business at
-that point, and for practical purposes nothing turns on it.
+share/doc/luvie for the app. An archive is not an installation, so the macOS and
+Windows .zip carries LICENSES/ at its top level instead, beside the luvie.lv2
+directory you then copy onward by hand -- taking the licences with it is your
+business at that point, and for practical purposes nothing turns on it.
 
 This matters for binary distribution: RtMidi and nlohmann/json are MIT and the
 LV2 headers are ISC, and all three require their notice to appear in every copy,
@@ -369,14 +369,17 @@ half the tree at a time. A plain `cmake --install` installs everything.
     cmake --preset linux-dist
     cmake --build --preset linux-dist
     cd build-dist && cpack        # generators are chosen per platform:
-                                  #   Linux   TGZ + DEB + RPM
+                                  #   Linux   DEB + RPM
                                   #   macOS   ZIP
                                   #   Windows ZIP
 
 RPM is included only when rpmbuild is on PATH (Debian/Ubuntu package `rpm`);
-without it configure says so and cpack produces the other two. rpmbuild does not
+without it configure says so and cpack produces just the .deb. rpmbuild does not
 care what distribution it runs on, so release CI builds the .rpm on the same
 Ubuntu runner as the .deb.
+
+There is no generic Linux .tar.gz. Distributions other than Debian, Ubuntu,
+Fedora, openSUSE and Arch build from source, which is what this file is for.
 
 One format needs more than CPack can express, so it has a script:
 

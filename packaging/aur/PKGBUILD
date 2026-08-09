@@ -15,14 +15,23 @@ pkgdesc="Pattern-based MIDI sequencer, standalone and LV2 plugin"
 arch=('x86_64')
 url="https://github.com/benbriedis/luvie"
 license=('Apache-2.0')
-# One entry per library the built binaries actually name in DT_NEEDED, and nothing else:
-# freetype2, libxext and the rest arrive through libxft and friends. FLTK, RtMidi, liblo
-# and nlohmann/json are fetched and linked statically by the build (see the FetchContent
-# block in CMakeLists.txt), so they are deliberately absent -- there is no system
-# dependency on any of them. Note also that FLTK 1.5 is unreleased and pinned to a commit,
-# so extra/fltk could not serve here even if the build were changed to look for it.
-depends=('alsa-lib' 'fontconfig' 'gcc-libs' 'glibc' 'libpng' 'libx11' 'libxcursor'
-         'libxfixes' 'libxft' 'libxinerama' 'libxrender' 'zlib')
+# One entry per library the built binaries actually name in DT_NEEDED, plus the one data
+# dependency below, and nothing else: freetype2, libxext and the rest arrive through
+# libxft and friends. FLTK, RtMidi, liblo and nlohmann/json are fetched and linked
+# statically by the build (see the FetchContent block in CMakeLists.txt), so they are
+# deliberately absent -- there is no system dependency on any of them. Note also that
+# FLTK 1.5 is unreleased and pinned to a commit, so extra/fltk could not serve here even
+# if the build were changed to look for it.
+#
+# hicolor-icon-theme is the data dependency: it owns /usr/share/icons/hicolor/index.theme,
+# without which the hicolor tree this package drops icons into is not a theme at all and
+# nothing looks inside it -- so the desktop entry loses its icon. (The window icon is
+# unaffected; src/CMakeLists.txt embeds the PNGs in the executable.) Most applications get
+# this package for free through gtk3 or qt6; Luvie is FLTK and none of the libraries above
+# pulls it in, so on a minimal install it would genuinely be missing. The .deb and .rpm
+# declare it too -- see CPACK_DEBIAN_PACKAGE_DEPENDS in cmake/Packaging.cmake.
+depends=('alsa-lib' 'fontconfig' 'gcc-libs' 'glibc' 'hicolor-icon-theme' 'libpng'
+         'libx11' 'libxcursor' 'libxfixes' 'libxft' 'libxinerama' 'libxrender' 'zlib')
 # git is a build dependency twice over: makepkg needs it for the source below, and the
 # build itself runs `git describe` for the version string and FetchContent for the
 # vendored libraries.

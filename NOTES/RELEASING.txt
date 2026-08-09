@@ -22,11 +22,54 @@ Cutting a release
    prints) run `git describe --tags`.
 
 3. Wait for the workflow. It builds and smoke-tests on Ubuntu 22.04, macOS 14
-   and Windows, packages each, and creates a DRAFT release with everything
-   attached.
+   and Windows, packages each, installs the Linux packages on the
+   distributions they target (see "Install tests" below), and creates a DRAFT
+   release with everything attached.
 
 4. Review the draft on GitHub, then publish it. Nothing is downloadable until
    you do -- that click is the only manual gate.
+
+
+Install tests
+-------------
+
+Building and running Luvie on the build host proves the code works. It does not
+prove the *package* works, and the two fail differently: a dependency the build
+host happened to have installed and the package never declared, a file in a
+prefix the target distribution does not use, an LV2 bundle no host can find.
+None of that shows up until someone installs the thing.
+
+So after packaging, release.yml installs each Linux package the way a user
+would -- through the package manager, in a container of the target distribution
+-- and runs tools/test-installed.sh against the result:
+
+  test-packages       .deb on Debian 12 and Ubuntu 24.04, .rpm on Fedora. The
+                      two .deb targets are not redundant: bookworm is close to
+                      the Ubuntu 22.04 build host, noble is past the
+                      64-bit-time_t library renames, so it checks the
+                      dependencies still resolve there.
+
+  test-aur-package    Builds packaging/aur/PKGBUILD with makepkg in an Arch
+                      container exactly as an AUR user would, lints it with
+                      namcap, then installs and tests the result. This is the
+                      only automated check that recipe gets -- previously it was
+                      built by hand at release time and nowhere else.
+
+The script checks that luvie is on PATH and reports the version the tag says it
+should, that every file the package promises is installed, that no binary has an
+unresolved shared library, that the standalone starts and exits cleanly under
+xvfb, and that an LV2 host (jalv, against a dummy-driver JACK server) finds the
+plugin on its default search path and runs it.
+
+The draft release is gated on all of it: an artifact that does not install is
+not a release. It also runs standalone -- install a package by hand, then:
+
+    sudo tools/test-installed.sh
+
+Note the AUR job builds from the git tag named in the PKGBUILD, which is bumped
+by hand only after a release goes out. On a tag build the workflow overrides
+pkgver with the tag being released, so it tests the code in hand; on a
+workflow_dispatch dry run there is no tag and it re-tests the last release.
 
 
 What gets published
@@ -38,16 +81,26 @@ that are useful together and cost nothing to ship as one.
 
   luvie_<ver>_amd64.deb                   app + plugin, Debian/Ubuntu
   luvie-<ver>-1.x86_64.rpm                app + plugin, Fedora/openSUSE
-  luvie-<ver>-linux-x86_64.tar.gz         app + plugin, unpack anywhere
   Luvie-<ver>-macos-universal.zip         Luvie.app + luvie.lv2, x86_64 + arm64
   luvie-<ver>-windows-x86_64.zip          app + plugin
 
-There was also a Linux AppImage until v0.0.2. It was dropped: with libstdc++
-and libgcc already linked statically, it bundled only the Xft/Xcursor/Xinerama
-group on top of what the tarball needs, shared the tarball's glibc floor exactly
-(an AppImage cannot bundle glibc either), and was the one artifact that could not
-carry the plugin, since a host cannot scan inside a sealed AppImage. The tarball
-covers the same users for none of the machinery.
+Arch is served by the AUR recipe (below). Any other Linux distribution builds
+from source; BUILD covers it.
+
+Two Linux artifacts have been dropped along the way, both for the same reason --
+they hand someone a directory of files and leave the installing to them.
+
+An AppImage, until v0.0.2: with libstdc++ and libgcc already linked statically it
+bundled only the Xft/Xcursor/Xinerama group on top of what a plain archive needs,
+could not improve on the glibc floor (an AppImage cannot bundle glibc either),
+and was the one artifact that could not carry the plugin at all, since a host
+cannot scan inside a sealed AppImage.
+
+A generic .tar.gz, until v0.0.4: it installed nothing, owned nothing, and could
+not be upgraded or removed. Every question it raised -- where does luvie.lv2 go,
+why is there no menu entry, why is the icon missing -- is one the .deb and .rpm
+answer by construction, and building from source is no more work than unpacking
+an archive into the right places by hand.
 
 The Linux binaries' glibc floor is set by the runner they are built on (Ubuntu
 22.04, glibc 2.35). Moving that job to a newer runner silently drops support for
@@ -60,18 +113,25 @@ from v0.0.2 or earlier removes it rather than failing on the shared files. The
 The .rpm is built on the same Ubuntu runner as the .deb, by CPack's RPM
 generator (Debian's `rpm` package supplies rpmbuild). rpmbuild does not care
 what distribution it runs on, and the dependencies it derives are soname-based,
-so they resolve against the target system rather than the build host. Note it
-puts the plugin in /usr/lib/lv2, not the %{_libdir}/lv2 that Fedora packages
-use -- see the reasoning in cmake/Packaging.cmake.
+so they resolve against the target system rather than the build host.
+
+It is the one package that puts the plugin in /usr/lib64/lv2 rather than
+/usr/lib/lv2: Fedora and openSUSE compile lilv with a search path that has no
+/usr/lib/lv2 entry, so a bundle there is invisible to every host on the system.
+Since all three Linux packages come out of one `cpack` over one build, the .rpm
+gets there by moving the staged files -- cmake/RelocateLv2ForRpm.cmake, wired in
+from cmake/Packaging.cmake. This was found by the Fedora install test below, and
+the comment in cmake/Packaging.cmake used to assert the opposite.
 
 
 Arch Linux (manual)
 -------------------
 
-Arch is served through the AUR, which is not part of the release workflow and
-does not produce an artifact: an AUR package is a PKGBUILD that each user's
-`makepkg` compiles from the release tag on their own machine. Nothing to build
-in CI, nothing to attach to the release.
+Arch is served through the AUR, which produces no release artifact: an AUR
+package is a PKGBUILD that each user's `makepkg` compiles from the release tag
+on their own machine. So there is nothing to attach to the release -- but the
+recipe itself is tested, by the test-aur-package job described above. Publishing
+it is still manual.
 
 The recipe lives at packaging/aur/PKGBUILD; packaging/aur/README has the
 publishing procedure. In short, after publishing the GitHub release:

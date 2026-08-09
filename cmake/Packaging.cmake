@@ -13,7 +13,7 @@
 #
 # Usage, from a configured build tree:
 #     cpack --config build/CPackConfig.cmake            # every generator listed below
-#     cpack --config build/CPackConfig.cmake -G TGZ     # just one
+#     cpack --config build/CPackConfig.cmake -G DEB     # just one
 #
 # Note that the plugin component only lands inside the prefix if LV2_INSTALL_DIR points
 # there — its default is the absolute per-user LV2 directory, which is right for a
@@ -54,11 +54,17 @@ elseif(APPLE)
         set(LUVIE_PLATFORM_TAG "macos-${CMAKE_SYSTEM_PROCESSOR}")
     endif()
 else()
-    set(CPACK_GENERATOR "TGZ;DEB")
+    # Packages only — no TGZ. A generic Linux tarball was published until v0.0.4 and
+    # dropped: it installed nothing, owned nothing and could not be upgraded or removed,
+    # so every question it answered ("where does the plugin go?", "why does the icon not
+    # appear?") was one the .deb and .rpm answer by construction. Anyone those two do not
+    # cover is better served by the AUR recipe or by building from source, which BUILD
+    # documents and which is no harder than unpacking an archive to the right places.
+    set(CPACK_GENERATOR "DEB")
     # RPM only if rpmbuild is installed: the generator shells out to it, and cpack fails
     # outright when it is missing. Debian's `rpm` package provides it, so release CI gets
     # a .rpm off the same Ubuntu runner as the .deb, while a developer without it still
-    # gets the other two from a plain `cpack`.
+    # gets the .deb from a plain `cpack`.
     find_program(RPMBUILD_EXECUTABLE rpmbuild)
     if(RPMBUILD_EXECUTABLE)
         list(APPEND CPACK_GENERATOR "RPM")
@@ -71,7 +77,9 @@ endif()
 # CPACK_PACKAGE_FILE_NAME, not CPACK_ARCHIVE_FILE_NAME: the archive generator only reads
 # the latter when it is packaging per component, and these packages are monolithic. The
 # DEB and RPM generators ignore this and use their distributions' own naming conventions
-# (DEB-DEFAULT / RPM-DEFAULT, set below).
+# (DEB-DEFAULT / RPM-DEFAULT, set below) — so since the Linux tarball went, this names
+# the macOS and Windows zips and nothing else. It is still set unconditionally because
+# CPack falls back to it for the staging directory name whatever the generator.
 set(CPACK_PACKAGE_FILE_NAME "luvie-${LUVIE_VERSION}-${LUVIE_PLATFORM_TAG}")
 
 # The SPDX identifier, shared by both Linux package formats and matching project_license
@@ -171,9 +179,9 @@ set(CPACK_RPM_SPEC_MORE_DEFINE "%define _build_id_links none")
 # ownership, and CPack's default file list claims every directory the payload passes
 # through — which would have Luvie co-owning the XDG trees that filesystem(1) and
 # hicolor-icon-theme are responsible for. Own only what is genuinely ours: /usr/bin/luvie,
-# /usr/share/doc/luvie, and /usr/lib/lv2 (see the note on that path below).
-# CPack's built-in exclusion list already covers /usr, /usr/bin, /usr/share, /usr/lib and
-# /usr/share/doc; this adds the rest.
+# /usr/share/doc/luvie, and /usr/lib64/lv2 (see the note on that path below).
+# CPack's built-in exclusion list already covers /usr, /usr/bin, /usr/share, /usr/lib,
+# /usr/lib64 and /usr/share/doc; this adds the rest.
 set(LUVIE_RPM_DATADIR "/usr/${CMAKE_INSTALL_DATADIR}")
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     "${LUVIE_RPM_DATADIR}/applications"
@@ -187,15 +195,24 @@ foreach(sz scalable 16x16 24x24 32x32 48x48 64x64 128x128 256x256)
         "${LUVIE_RPM_DATADIR}/icons/hicolor/${sz}/apps")
 endforeach()
 
-# A note on the LV2 path, since it is the one place this package knowingly departs from
-# RPM-distribution convention: Fedora and openSUSE put LV2 bundles in %{_libdir}/lv2, i.e.
-# /usr/lib64/lv2 on x86_64, and the plug-in stays in /usr/lib/lv2 here. That is what the
-# LV2 specification names as the system location, it is what an upstream-default lilv
-# searches (so a downloaded Ardour or Carla build finds it on any distribution), and
-# Fedora's own lilv has /usr/lib/lv2 on its default path as well — whereas /usr/lib64/lv2
-# is found only by hosts built against a lib64-aware lilv. One path, found everywhere,
-# beats the locally idiomatic one. It also keeps a single staging tree serving all three
-# Linux packages.
+# A note on the LV2 path. The other two Linux packages put the bundle in /usr/lib/lv2 —
+# the system location the LV2 specification names, and what an upstream-default lilv
+# searches, so a downloaded Ardour or Carla build finds it whatever the distribution. The
+# .rpm cannot follow them: Fedora and openSUSE build lilv with
+#     ~/.lv2:/usr/local/lib64/lv2:/usr/lib64/lv2
+# compiled in, and that list has no /usr/lib/lv2 entry, so a bundle installed there is
+# found by nothing. (This block used to claim the opposite, on the strength of it being
+# the specification's path; the install test added in .github/workflows/release.yml
+# showed `lv2ls` listing nothing on a Fedora container, which is what settled it.)
+#
+# So the RPM alone follows %{_libdir}, and does it by moving the staged files rather than
+# by configuring a second build: one `cpack` run serves all three generators from one
+# configured project, but each generator stages separately, so the rename touches only
+# this package. See cmake/RelocateLv2ForRpm.cmake.
+#
+# /usr/lib64 itself is already in CPackRPM's built-in exclusion list, so the package owns
+# /usr/lib64/lv2 downwards and does not claim the directory above it.
+set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_SOURCE_DIR}/cmake/RelocateLv2ForRpm.cmake")
 
 # ---- Guard: packaging layout -------------------------------------------------------
 # Checked when cpack runs rather than at configure time, because the value it rejects is
