@@ -37,6 +37,7 @@ be a package each; splitting them asked people to choose between two downloads
 that are useful together and cost nothing to ship as one.
 
   luvie_<ver>_amd64.deb                   app + plugin, Debian/Ubuntu
+  luvie-<ver>-1.x86_64.rpm                app + plugin, Fedora/openSUSE
   luvie-<ver>-linux-x86_64.tar.gz         app + plugin, unpack anywhere
   Luvie-<ver>-macos-universal.zip         Luvie.app + luvie.lv2, x86_64 + arm64
   luvie-<ver>-windows-x86_64.zip          app + plugin
@@ -53,7 +54,15 @@ The Linux binaries' glibc floor is set by the runner they are built on (Ubuntu
 older distributions.
 
 The .deb declares Replaces/Conflicts on the old luvie-lv2 package, so upgrading
-from v0.0.2 or earlier removes it rather than failing on the shared files.
+from v0.0.2 or earlier removes it rather than failing on the shared files. The
+.rpm carries no equivalent -- luvie-lv2 was never published as one.
+
+The .rpm is built on the same Ubuntu runner as the .deb, by CPack's RPM
+generator (Debian's `rpm` package supplies rpmbuild). rpmbuild does not care
+what distribution it runs on, and the dependencies it derives are soname-based,
+so they resolve against the target system rather than the build host. Note it
+puts the plugin in /usr/lib/lv2, not the %{_libdir}/lv2 that Fedora packages
+use -- see the reasoning in cmake/Packaging.cmake.
 
 
 Dry run

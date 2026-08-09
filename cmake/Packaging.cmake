@@ -55,13 +55,28 @@ elseif(APPLE)
     endif()
 else()
     set(CPACK_GENERATOR "TGZ;DEB")
+    # RPM only if rpmbuild is installed: the generator shells out to it, and cpack fails
+    # outright when it is missing. Debian's `rpm` package provides it, so release CI gets
+    # a .rpm off the same Ubuntu runner as the .deb, while a developer without it still
+    # gets the other two from a plain `cpack`.
+    find_program(RPMBUILD_EXECUTABLE rpmbuild)
+    if(RPMBUILD_EXECUTABLE)
+        list(APPEND CPACK_GENERATOR "RPM")
+    else()
+        message(STATUS "rpmbuild not found - cpack will not produce a .rpm")
+    endif()
     set(LUVIE_PLATFORM_TAG "linux-${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
 # CPACK_PACKAGE_FILE_NAME, not CPACK_ARCHIVE_FILE_NAME: the archive generator only reads
 # the latter when it is packaging per component, and these packages are monolithic. The
-# DEB generator ignores this and uses DEB-DEFAULT naming (set below).
+# DEB and RPM generators ignore this and use their distributions' own naming conventions
+# (DEB-DEFAULT / RPM-DEFAULT, set below).
 set(CPACK_PACKAGE_FILE_NAME "luvie-${LUVIE_VERSION}-${LUVIE_PLATFORM_TAG}")
+
+# The SPDX identifier, shared by both Linux package formats and matching project_license
+# in packaging/com.benbriedis.luvie.metainfo.xml.
+set(LUVIE_LICENSE_SPDX "Apache-2.0")
 
 # ---- Debian package ----------------------------------------------------------------
 # A single `luvie` package carrying both halves.
@@ -93,10 +108,94 @@ set(CPACK_DEBIAN_PACKAGE_SUGGESTS "jackd2 | jackd, pipewire-jack")
 # GNOME Software (and so Ubuntu's "double-click the .deb" flow) reads a License field
 # straight out of the control file, and shows "Unknown license" without one. CPack
 # cannot emit a non-standard field, so it is patched in after the fact — see
-# cmake/DebLicenseField.cmake for the detail. The SPDX identifier is what AppStream
-# expects, and matches project_license in packaging/com.benbriedis.luvie.metainfo.xml.
-set(CPACK_LUVIE_DEB_LICENSE "Apache-2.0")
+# cmake/DebLicenseField.cmake for the detail. (RPM needs none of this: License is a
+# first-class spec field, set in the RPM section below.)
+set(CPACK_LUVIE_DEB_LICENSE "${LUVIE_LICENSE_SPDX}")
 set(CPACK_POST_BUILD_SCRIPTS "${CMAKE_SOURCE_DIR}/cmake/DebLicenseField.cmake")
+
+# ---- RPM package --------------------------------------------------------------------
+# The Fedora/openSUSE counterpart of the .deb above, and built on the same Ubuntu runner:
+# rpmbuild does not care what distribution it runs on, and the dependencies it derives
+# below are soname-based, so they resolve on the target rather than the build host.
+set(CPACK_RPM_FILE_NAME       RPM-DEFAULT)
+set(CPACK_RPM_PACKAGE_LICENSE "${LUVIE_LICENSE_SPDX}")
+set(CPACK_RPM_PACKAGE_GROUP   "Applications/Multimedia")
+# Same reasoning as CPACK_DEBIAN_PACKAGE_DEPENDS: these two own the file triggers that
+# rebuild the icon and desktop caches, so the entry and icons this package installs are
+# picked up without a scriptlet of our own. Fedora and openSUSE both use these names.
+set(CPACK_RPM_PACKAGE_REQUIRES "hicolor-icon-theme, desktop-file-utils")
+# No Obsoletes for luvie-lv2, unlike the .deb: that package only ever existed as a .deb,
+# so there is no RPM-side upgrade path to smooth over.
+#
+# Nor is there a Suggests for JACK to match CPACK_DEBIAN_PACKAGE_SUGGESTS. CPackRPM
+# decides whether rpmbuild understands weak dependencies by running `${RPM_EXECUTABLE}
+# --suggests` — a variable it never sets (checked against CMake 3.28) — so the probe
+# fails, the tag is dropped and an author warning is printed however new the rpmbuild is.
+# RPM's Suggests is advisory in any case: dnf acts on Recommends, not Suggests.
+
+# Without a description of its own the package gets CPack's "This is an installer created
+# using CPack" boilerplate, which is what `dnf info luvie` would then show. Abridged from
+# packaging/com.benbriedis.luvie.metainfo.xml, the same text software centres display.
+set(CPACK_RPM_PACKAGE_DESCRIPTION
+"Luvie is a MIDI sequencer built around patterns: short musical phrases you edit
+once and then arrange along a song timeline. It ships both as a standalone JACK
+application and as an LV2 plugin, so the same editor can drive a rack of synths
+on its own or sit inside a DAW.")
+
+# Not relocatable. CPack makes every RPM relocatable by default, which puts a
+# `Prefix: /usr` in the header and invites `rpm --relocate`; the desktop entry, icon
+# lookups and LV2 path all assume the paths they were built with, so moving the payload
+# would half-work at best. Distribution packages are not relocatable either.
+#
+# Both variables, because CPackRPM decides with
+#     if(CPACK_PACKAGE_RELOCATABLE OR CPACK_RPM_PACKAGE_RELOCATABLE)
+# — the generic one defaults to true, so on its own the RPM-specific one cannot turn
+# this off. Clearing the generic one costs nothing here: the only other thing that reads
+# it is CPack's productbuild/PackageMaker plist, and the macOS artifact is a ZIP built by
+# tools/make-macos-zip.sh.
+set(CPACK_PACKAGE_RELOCATABLE     OFF)
+set(CPACK_RPM_PACKAGE_RELOCATABLE OFF)
+
+# xz payload: the default gzip makes the .rpm roughly twice the size of the equivalent
+# .deb for identical contents. Every rpm since 4.8 (2010) reads xz.
+set(CPACK_RPM_COMPRESSION_TYPE "xz")
+
+# Suppress the /usr/lib/.build-id/** symlink farm rpmbuild adds to any package containing
+# ELF binaries. Those links belong to a debuginfo package, which this is not (CPack
+# disables debuginfo generation by default), so here they are just files in a shared
+# directory no ordinary package should be touching. There is no CPack variable for it;
+# CPACK_RPM_SPEC_MORE_DEFINE is the supported way to inject spec preamble lines.
+set(CPACK_RPM_SPEC_MORE_DEFINE "%define _build_id_links none")
+
+# Directories every package on the system shares. RPM, unlike dpkg, records directory
+# ownership, and CPack's default file list claims every directory the payload passes
+# through — which would have Luvie co-owning the XDG trees that filesystem(1) and
+# hicolor-icon-theme are responsible for. Own only what is genuinely ours: /usr/bin/luvie,
+# /usr/share/doc/luvie, and /usr/lib/lv2 (see the note on that path below).
+# CPack's built-in exclusion list already covers /usr, /usr/bin, /usr/share, /usr/lib and
+# /usr/share/doc; this adds the rest.
+set(LUVIE_RPM_DATADIR "/usr/${CMAKE_INSTALL_DATADIR}")
+set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+    "${LUVIE_RPM_DATADIR}/applications"
+    "${LUVIE_RPM_DATADIR}/metainfo"
+    "${LUVIE_RPM_DATADIR}/pixmaps"
+    "${LUVIE_RPM_DATADIR}/icons"
+    "${LUVIE_RPM_DATADIR}/icons/hicolor")
+foreach(sz scalable 16x16 24x24 32x32 48x48 64x64 128x128 256x256)
+    list(APPEND CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+        "${LUVIE_RPM_DATADIR}/icons/hicolor/${sz}"
+        "${LUVIE_RPM_DATADIR}/icons/hicolor/${sz}/apps")
+endforeach()
+
+# A note on the LV2 path, since it is the one place this package knowingly departs from
+# RPM-distribution convention: Fedora and openSUSE put LV2 bundles in %{_libdir}/lv2, i.e.
+# /usr/lib64/lv2 on x86_64, and the plug-in stays in /usr/lib/lv2 here. That is what the
+# LV2 specification names as the system location, it is what an upstream-default lilv
+# searches (so a downloaded Ardour or Carla build finds it on any distribution), and
+# Fedora's own lilv has /usr/lib/lv2 on its default path as well — whereas /usr/lib64/lv2
+# is found only by hosts built against a lib64-aware lilv. One path, found everywhere,
+# beats the locally idiomatic one. It also keeps a single staging tree serving all three
+# Linux packages.
 
 # ---- Guard: packaging layout -------------------------------------------------------
 # Checked when cpack runs rather than at configure time, because the value it rejects is

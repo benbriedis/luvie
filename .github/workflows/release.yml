@@ -52,8 +52,10 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
+          # `rpm` is packaging-only (it provides rpmbuild, which CPack's RPM generator
+          # shells out to) — hence its absence from ci.yml, which does not package.
           sudo apt-get install -y --no-install-recommends \
-            g++-13 ninja-build pkg-config xvfb \
+            g++-13 ninja-build pkg-config xvfb rpm \
             libasound2-dev \
             libx11-dev libxkbcommon-dev libxinerama-dev libxcursor-dev libxfixes-dev \
             libxft-dev libcairo2-dev libpango1.0-dev libfontconfig1-dev libdbus-1-dev \
@@ -102,12 +104,25 @@ jobs:
         run: ctest --preset ${{ matrix.preset }}
 
       # ---- Package ---------------------------------------------------------------
-      # cmake/Packaging.cmake already selects each platform's generators (TGZ + DEB here),
-      # so plain `cpack` is enough.
+      # cmake/Packaging.cmake already selects each platform's generators (TGZ, DEB and RPM
+      # here), so plain `cpack` is enough.
+      #
+      # The RPM generator is added only when rpmbuild is present, so that a developer
+      # without it still gets the other two. In CI its absence would instead mean silently
+      # shipping one artifact fewer, so check for the file rather than trusting the run to
+      # have installed everything.
       - name: Package (Linux)
         if: matrix.name == 'Linux'
         shell: bash
-        run: (cd build-dist && cpack)
+        run: |
+          set -eu
+          (cd build-dist && cpack)
+          for ext in tar.gz deb rpm; do
+            if ! compgen -G "build-dist/*.$ext" > /dev/null; then
+              echo "::error::cpack produced no .$ext"
+              exit 1
+            fi
+          done
 
       # macOS packaging stages, signs and archives in one script, because the order is
       # load-bearing — see the comments in the script. Signing activates only when the
@@ -209,6 +224,7 @@ jobs:
             build-dist/*.tar.gz
             build-dist/*.zip
             build-dist/*.deb
+            build-dist/*.rpm
 
   release:
     name: Draft GitHub release
@@ -239,11 +255,13 @@ jobs:
 
             | Platform | Download |
             | --- | --- |
-            | Linux | `luvie_*.deb`, or `luvie-*-linux-*.tar.gz` |
+            | Debian / Ubuntu | `luvie_*.deb` |
+            | Fedora / openSUSE | `luvie-*.x86_64.rpm` |
+            | Other Linux | `luvie-*-linux-*.tar.gz` |
             | macOS | `Luvie-*-macos-universal.zip` |
             | Windows | `luvie-*-windows-x86_64.zip` |
 
-            The `.deb` puts both halves in place for you. From an archive, the plugin is
+            The `.deb` and `.rpm` put both halves in place for you. From an archive, the plugin is
             installed by copying `luvie.lv2` into `~/.lv2` (Linux),
             `~/Library/Audio/Plug-Ins/LV2` (macOS) or `%APPDATA%\LV2` (Windows).
 

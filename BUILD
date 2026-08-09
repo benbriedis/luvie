@@ -369,9 +369,14 @@ half the tree at a time. A plain `cmake --install` installs everything.
     cmake --preset linux-dist
     cmake --build --preset linux-dist
     cd build-dist && cpack        # generators are chosen per platform:
-                                  #   Linux   TGZ + DEB
+                                  #   Linux   TGZ + DEB + RPM
                                   #   macOS   ZIP
                                   #   Windows ZIP
+
+RPM is included only when rpmbuild is on PATH (Debian/Ubuntu package `rpm`);
+without it configure says so and cpack produces the other two. rpmbuild does not
+care what distribution it runs on, so release CI builds the .rpm on the same
+Ubuntu runner as the .deb.
 
 One format needs more than CPack can express, so it has a script:
 
