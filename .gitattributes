@@ -1,0 +1,23 @@
+# Keep every checkout byte-for-byte what was committed, on every platform.
+#
+# Without this, Git for Windows converts text files to CRLF as it checks them out — its
+# installer sets core.autocrlf=true system-wide, and that is the git GitHub's windows
+# runners use for actions/checkout. The build then runs under MSYS2, whose separate git
+# has autocrlf off, so it compares CRLF working files against the LF blobs in the index
+# and reports the entire tree as modified.
+#
+# The symptom was release artifacts named luvie-v0.0.5-dirty-windows-x86_64.* :
+# cmake/ProjectVersion.cmake asks `git describe --tags --dirty` at configure time, and got
+# "dirty" back for a checkout nobody had touched.
+#
+# eol=lf rather than text=auto alone, so the answer does not depend on which git reads it.
+# Nothing here is committed with CRLF, so this normalises no existing content.
+* text=auto eol=lf
+
+# Never eligible for conversion. text=auto already detects these by content, but stating
+# it means a corrupted image can never be blamed on line-ending handling.
+*.png   binary
+*.ico   binary
+*.icns  binary
+*.dmg   binary
+*.zip   binary

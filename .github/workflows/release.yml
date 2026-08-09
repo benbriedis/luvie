@@ -88,6 +88,22 @@ jobs:
           key: deps-${{ matrix.name }}-${{ hashFiles('CMakeLists.txt') }}
 
       # ---- Build and test --------------------------------------------------------
+      # A fresh checkout has nothing modified in it, so anything here means the version
+      # about to be stamped on the artifacts is wrong. It went unnoticed once already:
+      # Git for Windows checked the tree out with CRLF while the MSYS2 git the build calls
+      # reads LF, so every file came out "modified" and the packages shipped as
+      # luvie-v0.0.5-dirty-... . .gitattributes pins the line endings now; this is what
+      # would have said so. It runs in the job's own shell, and after the toolchain step,
+      # so on Windows it asks the same MSYS2 git that cmake/ProjectVersion.cmake will.
+      - name: Check the checkout is clean
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            git config --get core.autocrlf || echo "core.autocrlf: unset"
+            echo "::error::working tree is dirty; version strings would be tagged -dirty"
+            exit 1
+          fi
+
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
 

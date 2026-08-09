@@ -59,6 +59,13 @@ fi
 # Native paths: ISCC is a Windows program and does not understand MSYS2's /c/... form.
 winpath() { cygpath -w "$1"; }
 
+# MSYS2_ARG_CONV_EXCL: without it MSYS2 mangles every /D switch on its way to ISCC, which
+# is a native Windows program -- an argument starting with a slash is assumed to be a POSIX
+# path and is rewritten to C:\msys64\DAppVersion=... . ISCC then sees arguments that no
+# longer begin with /, treats each as a script filename, and stops with "You may not
+# specify more than one script filename". Excluding * disables the rewriting for this one
+# command; the paths below are already converted explicitly by winpath.
+MSYS2_ARG_CONV_EXCL='*' \
 "${ISCC}" \
     "/DAppVersion=${VERSION}" \
     "/DNumericVersion=${NUMERIC}" \
