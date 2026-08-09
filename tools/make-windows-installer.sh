@@ -21,6 +21,13 @@ BUILD="${1:-${ROOT}/build-dist}"
 
 [ -d "${BUILD}" ] || { echo "no build directory at ${BUILD} — configure first" >&2; exit 1; }
 
+# Absolute from here on. A relative argument (the release workflow passes plain
+# "build-dist") would reach ISCC still relative, and Inno resolves relative paths against
+# the directory holding the .iss -- so StageDir would be read as packaging\windows\build-dist
+# and nothing would be found there. cygpath preserves relativeness, so it cannot fix this
+# later; the only place to settle it is here.
+BUILD="$(cd "${BUILD}" && pwd)"
+
 VERSION="$(git -C "${ROOT}" describe --tags --always --dirty 2>/dev/null || echo unknown)"
 # The .iss needs a plain X.Y.Z as well, for the fields Windows itself parses: a description
 # like v0.0.5-3-gabc1234 is fine as a display name but not as a VersionInfoVersion. Strip

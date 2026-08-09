@@ -5,7 +5,45 @@
 TODO: screenshot of the whole window with the main areas labelled, referred to
 by the names used throughout the rest of the manual.
 
-## The parts of the window
+## Songs, Loops and Patterns
+
+Luvie can play in one of two modes: Song Mode and Loop Mode.
+
+When in Song Mode a "song" is played from start to end. 
+It's likely to contain many bars and run for some minutes, but don't let me limit you.
+A song consists of multiple patterns that are turned on and off at strategic moments
+so as to produce auditory bliss, or otherwise.
+
+Loop Mode accesses the same pool of patterns as Song Mode but in this case the patterns
+are manually enabled and disabled by the user.
+
+Loop Mode is more of a "live" experience whereas "Song Mode" is more pre-baked.
+
+The Song/Loop mode toggle button is found on the top left.
+The Song Editor displays what is to be played when in Song Mode and
+the Loop Editor displays what is playing when in Loop Mode.
+
+## The Pattern Editors
+
+There are three different types of pattern editor: the harmony editor,
+the pianoroll editor and the drum editor.
+
+
+nb patterns can contain multiple bars [MAYBE]
+nb smooth transition [MAYBE]
+
+## Context Popups
+
+## The Settings Nav
+
+## Instruments and Outputs
+
+
+## The Song Editor 
+
+## The Control Bar
+
+## The Transport Bar
 
 TODO: pattern editor tab, song editor tab, the transport bar along the bottom.
 

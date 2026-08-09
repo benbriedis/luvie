@@ -23,3 +23,4 @@ JACK is optional, but desirable.
 # Distribution
 [![Latest release](https://img.shields.io/github/v/release/benbriedis/luvie)](https://github.com/benbriedis/luvie/releases/latest)
 
+Download from the [latest release](https://github.com/benbriedis/luvie/releases/latest). 
