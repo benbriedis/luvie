@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: Ben Briedis -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  AppStream metadata. This is what software centres (GNOME Software, KDE Discover,
+  Ubuntu App Center) read to describe an *installed* application: without it Luvie
+  shows up with no description and no licence.
+
+  The <id> matches MACOSX_BUNDLE_GUI_IDENTIFIER in src/CMakeLists.txt, and the file
+  name has to match the <id> — AppStream requires that. It deliberately does not
+  match luvie.desktop, which stays named for the binary because the desktop entry
+  doubles as the WM_CLASS match target (StartupWMClass) and as what NSM/RaySession
+  look up; <launchable> is the supported way to tie the two together.
+-->
+<component type="desktop-application">
+  <id>com.benbriedis.luvie</id>
+
+  <!-- The licence of this metadata file, which is not the licence of the program;
+       both are required, and a permissive one is expected here. -->
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+
+  <name>Luvie</name>
+  <summary>Pattern-based MIDI sequencer</summary>
+
+  <description>
+    <p>
+      Luvie is a MIDI sequencer built around patterns: short musical phrases you
+      edit once and then arrange along a song timeline. It ships both as a
+      standalone JACK application and as an LV2 plugin, so the same editor can
+      drive a rack of synths on its own or sit inside a DAW.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Pattern editor with piano-roll, drum and harmony views</li>
+      <li>Song arranger for placing, resizing and looping pattern instances</li>
+      <li>Per-pattern time signatures and tempo, with tempo and meter markers</li>
+      <li>Parameter lanes for automating pitch and controllers</li>
+      <li>JACK transport sync, or a built-in transport when JACK is absent</li>
+      <li>NSM session-manager support, including optional-GUI show/hide</li>
+      <li>MIDI output to JACK or native (ALSA) ports</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">luvie.desktop</launchable>
+  <provides>
+    <binary>luvie</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/benbriedis/luvie</url>
+  <url type="bugtracker">https://github.com/benbriedis/luvie/issues</url>
+
+  <developer id="com.benbriedis">
+    <name>Ben Briedis</name>
+  </developer>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+    <category>Sequencer</category>
+    <category>Midi</category>
+  </categories>
+
+  <!-- No objectionable content of any kind; software centres hide applications
+       with no rating at all behind a "not rated" warning. -->
+  <content_rating type="oars-1.1"/>
+</component>

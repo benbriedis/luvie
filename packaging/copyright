@@ -1,0 +1,105 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Luvie
+Upstream-Contact: Ben Briedis <benbriedis@gmail.com>
+Source: https://github.com/benbriedis/luvie
+Comment:
+ Debian Policy 12.5 requires every package to ship this file at
+ /usr/share/doc/<package>/copyright. It summarises the licensing that NOTICE
+ sets out in full; NOTICE and the verbatim licence texts of everything linked
+ in are installed alongside it, under LICENSES/. Where the two disagree,
+ NOTICE is the authoritative statement.
+ .
+ Only the components actually present in a built binary are listed here. JACK
+ is deliberately absent: Luvie compiles against its headers and resolves
+ libjack through dlopen at runtime, so no JACK code is distributed.
+
+Files: *
+Copyright: 2025-2026 Ben Briedis
+License: Apache-2.0
+Comment:
+ Applies to those files carrying "SPDX-License-Identifier: Apache-2.0", and to
+ no others; see the SCOPE OF THIS LICENCE section of NOTICE.
+
+Files: src/lv2/lv2_external_ui.h
+Copyright: Filipe Coelho (falkTX), Nedko Arnaudov
+License: public-domain
+ The upstream header states: "LV2 External UI extension. This work is in
+ public domain. This file is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+
+Files: src/lv2/.clang-tidy
+Copyright: 2020-2025 David Robillard <d@drobilla.net>
+License: 0BSD or ISC
+ A static-analysis configuration file taken from the LV2 project. It
+ contributes no code to any built artefact.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ use this file except in compliance with the License. You may obtain a copy of
+ the License at
+ .
+     http://www.apache.org/licenses/LICENSE-2.0
+ .
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ License for the specific language governing permissions and limitations under
+ the License.
+ .
+ On Debian systems the complete text of the Apache License version 2.0 can be
+ found in /usr/share/common-licenses/Apache-2.0, and is also installed with
+ this package as LICENSES/LICENSE.
+
+License: 0BSD or ISC
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ PERFORMANCE OF THIS SOFTWARE.
+
+License: public-domain
+ The author has placed this work in the public domain. It is distributed in
+ the hope that it will be useful, but WITHOUT ANY WARRANTY.
+
+Comment: Third-party libraries linked into the binaries
+ The following are separate works, statically linked or compiled in. Their
+ terms govern those libraries alone and do not alter the terms on which
+ Luvie's own source is offered. Verbatim texts are installed under LICENSES/,
+ copied out of the pinned dependency sources at build time.
+ .
+ FLTK 1.5 (LICENSES/FLTK/COPYING)
+   Copyright 1998-2025 Bill Spitzak and others.
+   GNU Library General Public License, Version 2, with the FLTK exceptions.
+   Exception 3 provides that static linking does not create a derivative work
+   and does not require distribution of application source. Exception 4
+   requires that use of FLTK be identified, so: Luvie is based in part on the
+   work of the FLTK project (https://www.fltk.org).
+ .
+ liblo 0.32 (LICENSES/liblo/COPYING)
+   GNU Lesser General Public License, Version 2.1 or later. Linked statically
+   for NSM session management, which places the combination under LGPL section
+   6 rather than section 5. Section 6 permits distribution under terms of your
+   choice provided they allow modification for the customer's own use and
+   reverse engineering for debugging, which Apache-2.0 does. The means to
+   relink against a modified liblo is satisfied by publishing Luvie's complete
+   corresponding source, with the exact liblo revision pinned, at
+   https://github.com/benbriedis/luvie. A build configured with
+   -DLUVIE_NSM=OFF contains no liblo at all. See NOTICE for the full statement.
+ .
+ RtMidi 6.0.0 (LICENSES/RtMidi/LICENSE)
+   Copyright (c) 2003-2023 Gary P. Scavone. MIT-style licence.
+ .
+ nlohmann/json 3.11.3 (LICENSES/nlohmann_json/LICENSE.MIT)
+   Copyright (c) 2013-2022 Niels Lohmann. MIT Licence.
+ .
+ LV2 1.18.10 (LICENSES/LV2/)
+   Copyright 2006-2022 David Robillard, Steve Harris and others. Every LV2
+   header Luvie includes is under the ISC Licence; upstream's full licence set
+   is gathered alongside it. No LV2 library is linked.

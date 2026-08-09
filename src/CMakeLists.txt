@@ -73,10 +73,54 @@ add_custom_target(luvie_version ALL
     VERBATIM
 )
 
-add_executable(luvie main.cpp)
+add_executable(luvie main.cpp appIcon.cpp)
 add_dependencies(luvie luvie_version)
 target_include_directories(luvie PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(luvie PRIVATE luvie_core)
+
+# ---- Embedded window icon ----
+# Every window has to carry its own icon, on top of the desktop-entry and .app/.rc
+# metadata below: those only apply once the desktop has matched a window back to an
+# installed entry, and nothing is installed when the app runs from a build tree or an
+# unpacked tarball. See src/appIcon.hpp for why an unset icon is worse than no icon.
+#
+# The PNGs are embedded rather than read from the install prefix at runtime, so the
+# icon does not depend on having been installed, or on finding its own datadir.
+# Attached to the executable only: the LV2 UI is a child widget inside the host's
+# window and never owns a toplevel, so luvie_core has no use for the bytes.
+set(LUVIE_ICON_SIZES 16 32 48 64 128 256)
+set(LUVIE_ICON_DECLS "")
+set(LUVIE_ICON_TABLE "")
+foreach(sz ${LUVIE_ICON_SIZES})
+    set(png "${CMAKE_SOURCE_DIR}/logo/png/luvie-${sz}.png")
+    file(READ "${png}" hex HEX)
+    # Wrap at 16 bytes a line. Done by slicing the hex string (2 chars a byte, so
+    # 32 a line) rather than by regex: CMake's regex engine has no {n} repetition
+    # operator, and a "{16}" written there matches literally and silently leaves
+    # the whole array on one multi-kilobyte line.
+    string(LENGTH "${hex}" hexLen)
+    set(bytes "")
+    set(pos 0)
+    while(pos LESS hexLen)
+        math(EXPR remaining "${hexLen} - ${pos}")
+        set(take 32)
+        if(remaining LESS 32)
+            set(take ${remaining})
+        endif()
+        string(SUBSTRING "${hex}" ${pos} ${take} line)
+        string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," line "${line}")
+        string(APPEND bytes "\t${line}\n")
+        math(EXPR pos "${pos} + 32")
+    endwhile()
+    string(APPEND LUVIE_ICON_DECLS
+           "static const unsigned char luvieIcon${sz}[] = {\n${bytes}};\n\n")
+    string(APPEND LUVIE_ICON_TABLE
+           "\t{ ${sz}, luvieIcon${sz}, (int)sizeof(luvieIcon${sz}) },\n")
+    # configure_file() below re-runs when the template changes, but not when a PNG
+    # does; this is what makes a re-exported logo actually reach the binary.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${png}")
+endforeach()
+configure_file(appIconData.h.in ${CMAKE_CURRENT_BINARY_DIR}/appIconData.h @ONLY)
 
 # ---- Platform application metadata ----
 # Linux gets its identity from luvie.desktop + the hicolor icon theme (installed below).
@@ -161,6 +205,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${CMAKE_SOURCE_DIR}/logo/logo.svg
             DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps
             RENAME luvie.svg
+            COMPONENT Standalone)
+    # AppStream metadata: what software centres read for the description, the
+    # licence and the category listing. Without it an installed Luvie appears
+    # with a blank description and "Unknown license".
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/com.benbriedis.luvie.metainfo.xml
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo
+            COMPONENT Standalone)
+    # Debian Policy 12.5: every package must ship this exact path. Harmless in a
+    # tarball install, where it sits beside the LICENSES/ tree it summarises.
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/copyright
+            DESTINATION ${CMAKE_INSTALL_DOCDIR}
             COMPONENT Standalone)
 endif()
 

@@ -78,9 +78,32 @@ set(CPACK_DEBIAN_PACKAGE_CONFLICTS  "luvie-lv2")
 # will *not* list JACK: it is dlopen'd, never linked, which is exactly the intent — JACK
 # stays an optional runtime dependency (see src/jackShim.cpp).
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# The desktop entry and hicolor icons this package installs are only picked up once the
+# icon and desktop caches are rebuilt. That happens through dpkg file triggers on
+# /usr/share/icons/hicolor and /usr/share/applications, owned by the two packages below —
+# which is why debhelper emits no maintainer script for hicolor and neither do we.
+# Depending on them guarantees the triggers exist on the target system; shlibdeps above
+# contributes the library dependencies, and CPack merges the two lists.
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "hicolor-icon-theme, desktop-file-utils")
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 # jackd is genuinely optional (the app falls back to its internal transport), so it is a
 # Suggests, not a Depends.
 set(CPACK_DEBIAN_PACKAGE_SUGGESTS "jackd2 | jackd, pipewire-jack")
+
+# GNOME Software (and so Ubuntu's "double-click the .deb" flow) reads a License field
+# straight out of the control file, and shows "Unknown license" without one. CPack
+# cannot emit a non-standard field, so it is patched in after the fact — see
+# cmake/DebLicenseField.cmake for the detail. The SPDX identifier is what AppStream
+# expects, and matches project_license in packaging/com.benbriedis.luvie.metainfo.xml.
+set(CPACK_LUVIE_DEB_LICENSE "Apache-2.0")
+set(CPACK_POST_BUILD_SCRIPTS "${CMAKE_SOURCE_DIR}/cmake/DebLicenseField.cmake")
+
+# ---- Guard: packaging layout -------------------------------------------------------
+# Checked when cpack runs rather than at configure time, because the value it rejects is
+# the correct default for a development build tree. See cmake/CheckPackagingLayout.cmake
+# for what goes wrong. Forwarded through a CPACK_-prefixed variable because that is the
+# only kind CPack copies into CPackConfig.cmake for the script to read.
+set(CPACK_LUVIE_LV2_INSTALL_DIR "${LV2_INSTALL_DIR}")
+set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/CheckPackagingLayout.cmake")
 
 include(CPack)

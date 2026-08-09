@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include "appIcon.hpp"
 #include "appWindow.hpp"
 #include "simpleTransport.hpp"
 #include "jackTransport.hpp"
@@ -123,6 +124,10 @@ int main(int argc, char **argv) {
     // Match the WM_CLASS to luvie.desktop so the desktop/dock shows the Luvie
     // icon for our windows (and drops it when the window is hidden under NSM).
     Fl_Window::default_xclass("luvie");
+    // ...and give the windows the icon directly too, for the desktops and the
+    // run-from-anywhere cases where that match never happens. Must precede the
+    // first show(); FLTK only writes the icon property when a window is mapped.
+    setAppIcon();
 
     ObservableSong songTimeline(120.0f, 4, 4);
     ObservablePattern patternObs(&songTimeline);

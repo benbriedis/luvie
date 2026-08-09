@@ -317,3 +317,46 @@ BUG: looping to start of song causes a gap (plugin or standalone or both?)
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
 
+
+------------------------------------
+Try Helvum
+
+
+Test .deb
+Don't like the structure of the linux .tar.gz file.
+   Probably remove it and provide .yum, .aur and the source files instead.
+Don't like having the installation instructions in the download directory.
+   If we continue to have .zip, then put instructions in there.
+
+
+How to sign Mac and Windows?
+Replace all distributables with installers - .deb, .rpm, .aur
+
+
+
+  rm -rf ~/.lv2/luvie.lv2 ~/.lv2/luvie_dsp.so ~/.lv2/luvie_dsp.ttl \
+         ~/.lv2/luvie_ui.so ~/.lv2/luvie_ui.ttl ~/.lv2/manifest.ttl
+  rm -f  ~/.local/share/applications/luvie.desktop \
+         ~/.local/share/pixmaps/luvie.png ~/.local/share/pixmaps/luvie.svg \
+         ~/.local/share/icons/hicolor/*/apps/luvie.png \
+         ~/.local/share/icons/hicolor/scalable/apps/luvie.svg
+  sudo rm -f /usr/local/share/applications/luvie.desktop \
+             /usr/local/share/pixmaps/luvie.png /usr/local/share/pixmaps/luvie.svg \
+             /usr/local/share/icons/hicolor/*/apps/luvie.png \
+             /usr/local/share/icons/hicolor/scalable/apps/luvie.svg
+  update-desktop-database ~/.local/share/applications 2>/dev/null
+  sudo update-desktop-database /usr/local/share/applications 2>/dev/null
+  rm -f /tmp/luvie_state_*.json
+
+
+Deb installer says 'Unknown license'.  Also, no screenshots
+Icon is missing in the system sidebar tray thingy.
+TEST: cleanup
+
+Could maybe test Window version using Wine? or a local VM?
+
+
+TOCHECK
+Luvie -> dont put the binary in 'src'. cf 'standalone/' or 'app/'
+Move LICENCES out of the LV2 directory and into the top directory
+

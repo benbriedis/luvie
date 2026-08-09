@@ -13,6 +13,17 @@ endif()
 include(GNUInstallDirs)
 include(FetchContent)
 
+# Directories that install(FILES ...) creates on the way to a DESTINATION otherwise inherit
+# the build user's umask, which on a typical developer account is 002 — so a package built
+# there ships group-writable 0775 directories and lintian flags every one of them
+# (non-standard-dir-perm). Pin them to the 0755 Debian Policy expects. This covers only
+# implicitly-created directories; install(DIRECTORY ...) copies carry their own mode, and
+# the LICENSES trees are already 0755.
+set(CMAKE_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE)
+
 # Sets LUVIE_VERSION / LUVIE_VERSION_NUMERIC / LUVIE_VERSION_COMMAS from `git describe`,
 # for package file names and the Windows VERSIONINFO resource. (The version *compiled into*
 # the binary comes from cmake/GitVersion.cmake, which re-runs every build.)

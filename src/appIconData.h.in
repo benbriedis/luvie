@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: Ben Briedis
+// SPDX-License-Identifier: Apache-2.0
+//
+// GENERATED at configure time by src/CMakeLists.txt from logo/png/luvie-*.png.
+// Do not edit; edit the PNGs (or the size list in src/CMakeLists.txt) instead.
+
+#ifndef APPICONDATA_H
+#define APPICONDATA_H
+
+@LUVIE_ICON_DECLS@
+struct LuvieIconPng {
+	int                  size;   // square edge in pixels, for readability only
+	const unsigned char *data;
+	int                  bytes;
+};
+
+static const LuvieIconPng luvieIconPngs[] = {
+@LUVIE_ICON_TABLE@};
+
+#endif
