@@ -322,14 +322,6 @@ BUG: looping to start of song causes a gap (plugin or standalone or both?)
 Try Helvum
 
 
-Don't like having the installation instructions in the download directory.
-   If we continue to have .zip, then put instructions in there.
-
-
-How to sign Mac and Windows?
-Replace all distributables with installers - .deb, .rpm, .aur
-
-
 
   rm -rf ~/.lv2/luvie.lv2 ~/.lv2/luvie_dsp.so ~/.lv2/luvie_dsp.ttl \
          ~/.lv2/luvie_ui.so ~/.lv2/luvie_ui.ttl ~/.lv2/manifest.ttl
@@ -361,4 +353,6 @@ Move LICENCES out of the LV2 directory and into the top directory
 Apply at signpath.org — one-off, takes days to weeks. Requirements Luvie already meets:
 	public repository, recognised OSS licence, project functionality described on the download
 	page, and the same person owning both the repo and the signing.
+
+BUG 'Add automation' is missing its right-pointing triangle icon
 

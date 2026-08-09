@@ -143,7 +143,7 @@ jobs:
       # macOS packaging stages, signs and archives in one script, because the order is
       # load-bearing — see the comments in the script. Signing activates only when the
       # secrets exist, so a fork or an unconfigured repo still produces a usable
-      # (unsigned) zip rather than failing.
+      # (unsigned) disk image rather than failing.
       - name: Import macOS signing certificate
         if: matrix.name == 'macOS'
         shell: bash
@@ -212,18 +212,15 @@ jobs:
       - name: Package (Windows)
         if: matrix.name == 'Windows'
         run: |
-          # The zip and the installer must be self-contained: the dist preset links the GCC
-          # runtime statically precisely so no MSYS2 DLL has to ship. Catch a regression
-          # here rather than in a bug report from someone without MSYS2 installed.
+          # The installer must be self-contained: the dist preset links the GCC runtime
+          # statically precisely so no MSYS2 DLL has to ship. Catch a regression here
+          # rather than in a bug report from someone without MSYS2 installed.
           if ldd build-dist/src/luvie.exe | grep -iE 'msys|ucrt64/bin'; then
             echo "::error::luvie.exe depends on MSYS2 DLLs; the static link flags are not taking effect"
             exit 1
           fi
-          (cd build-dist && cpack)
-          # Both are published, and they are not redundant. The installer places the plug-in
-          # in %APPDATA%\LV2, adds a Start menu entry, registers .luv and can uninstall
-          # itself. The zip is the download that always works: browsers block unsigned .exe
-          # downloads far more readily than .zip ones.
+          # No cpack step, unlike the other two platforms: Windows ships the installer
+          # alone, so cmake/Packaging.cmake registers no CPack generator for it.
           tools/make-windows-installer.sh build-dist
 
       # Now that setup.exe exists, sign that too. It is the file users actually execute, so
@@ -241,8 +238,10 @@ jobs:
         with:
           name: packages-${{ matrix.name }}
           if-no-files-found: error
+          # One line per artifact that actually ships. No *.zip: the Windows zip was
+          # dropped in favour of the installer alone, and the zip cmake/Packaging.cmake
+          # still names on macOS is a developer fallback that no release publishes.
           path: |
-            build-dist/*.zip
             build-dist/*-setup.exe
             build-dist/*.dmg
             build-dist/*.deb
@@ -443,13 +442,13 @@ jobs:
             | Fedora / openSUSE | `luvie-*.x86_64.rpm` |
             | Arch Linux | [`luvie`](https://aur.archlinux.org/packages/luvie) in the AUR |
             | macOS | `Luvie-*-macos-universal.dmg` |
-            | Windows | `luvie-*-windows-x86_64-setup.exe`, or the `.zip` |
+            | Windows | `luvie-*-windows-x86_64-setup.exe` |
 
             On another Linux distribution, build from source — see
             [BUILD](https://github.com/benbriedis/luvie/blob/main/BUILD).
 
-            The `.deb`, `.rpm` and the Windows installer put both halves in place for you.
-            From the `.zip`, copy `luvie.lv2` into `%APPDATA%\LV2` yourself.
+            Every one of these puts both halves in place for you — on Windows the plugin
+            goes to `%APPDATA%\LV2`, where Reaper, Ardour and Carla look for it.
 
             ### Luvie is not code-signed
 
@@ -458,14 +457,7 @@ jobs:
             downloads. Nothing is wrong with them; here is what to do.
 
             **Windows.** SmartScreen says "Windows protected your PC": click **More info**,
-            then **Run anyway**. You get the same warning from the installer and from the
-            `.exe` in the zip. To skip it entirely, install through
-            [Scoop](https://scoop.sh) instead:
-
-            ```
-            scoop bucket add luvie https://github.com/benbriedis/scoop-luvie
-            scoop install luvie
-            ```
+            then **Run anyway**.
 
             **macOS.** Open the `.dmg` and read `README.txt` — it has both steps. In short:
 

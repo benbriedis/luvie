@@ -9,11 +9,12 @@
 ;     iscc /DAppVersion=v0.0.5 /DStageDir=..\..\build-dist\win-stage \
 ;          /DOutDir=..\..\build-dist packaging\windows\luvie.iss
 ;
-; Why an installer at all, given it is unsigned and so shows the same SmartScreen warning
-; as the .zip does? Not for the warning -- for what it does. It puts luvie.lv2 where hosts
-; look, adds a Start menu entry, registers .luv, and can uninstall itself. The zip stays
-; published alongside it because browsers block unsigned .exe downloads far more readily
-; than .zip ones, so it is the download that always works.
+; This is the whole of the Windows distribution -- there is no .zip beside it any more
+; (dropped after v0.0.6, see cmake/Packaging.cmake). One artifact is what makes signing
+; meaningful: an unsigned second download beside a signed one is the one people would
+; reach for when the signed one gives them any trouble. It also earns its place on its
+; own, by putting luvie.lv2 where hosts look, adding a Start menu entry, registering .luv,
+; and being able to uninstall itself.
 
 #ifndef AppVersion
   #error AppVersion must be passed in with /DAppVersion=
@@ -46,7 +47,7 @@ AppUpdatesURL=https://github.com/benbriedis/luvie/releases
 ; PrivilegesRequired=lowest there is no UAC prompt, and so no "Unknown publisher" shield
 ; on an unsigned build -- only SmartScreen, which no installer design can avoid. It also
 ; means the LV2 bundle and the .luv association land in the per-user locations that need no
-; administrator, matching where a hand-unpacked zip would have gone.
+; administrator, matching where a developer build would have put them.
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\Luvie
 DefaultGroupName=Luvie

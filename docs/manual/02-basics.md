@@ -26,11 +26,14 @@ the Loop Editor displays what is playing when in Loop Mode.
 ## The Pattern Editors
 
 There are three different types of pattern editor: the harmony editor,
-the pianoroll editor and the drum editor.
+the pianoroll editor and the drum editor. 
+
+There is only one Pattern Editor tab - which type of pattern editor shown
+depends on which pattern is selected when you open the Pattern Editor.
+Alternatively it's possible to open the Pattern Editor by right clicking on the
+etc...
 
 
-nb patterns can contain multiple bars [MAYBE]
-nb smooth transition [MAYBE]
 
 ## Context Popups
 

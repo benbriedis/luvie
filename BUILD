@@ -220,10 +220,10 @@ nlohmann_json/ subdirectories.
 Wherever an installation finishes on its own, LICENSES/ ends up at the top of
 what was installed: inside luvie.lv2 for the plugin (a .deb or `cmake --install`
 leaves it on the LV2 path, and that is the end of the procedure), and under
-share/doc/luvie for the app. An archive is not an installation, so the macOS and
-Windows .zip carries LICENSES/ at its top level instead, beside the luvie.lv2
-directory you then copy onward by hand -- taking the licences with it is your
-business at that point, and for practical purposes nothing turns on it.
+share/doc/luvie for the app. The macOS .dmg is the exception: an archive is not
+an installation, so it carries LICENSES/ at its top level instead, beside the
+luvie.lv2 directory you then copy onward by hand -- taking the licences with it
+is your business at that point, and for practical purposes nothing turns on it.
 
 This matters for binary distribution: RtMidi and nlohmann/json are MIT and the
 LV2 headers are ISC, and all three require their notice to appear in every copy,
@@ -371,7 +371,10 @@ half the tree at a time. A plain `cmake --install` installs everything.
     cd build-dist && cpack        # generators are chosen per platform:
                                   #   Linux   DEB + RPM
                                   #   macOS   ZIP (fallback only, see below)
-                                  #   Windows ZIP
+                                  #   Windows none -- cpack will say it cannot
+                                  #           find CPackConfig.cmake, because
+                                  #           the installer script is the whole
+                                  #           of the Windows distribution
 
 RPM is included only when rpmbuild is on PATH (Debian/Ubuntu package `rpm`);
 without it configure says so and cpack produces just the .deb. rpmbuild does not
@@ -403,11 +406,13 @@ uninstaller. The script drives packaging/windows/luvie.iss, which is where all o
 that is declared. CPack does have an INNOSETUP generator, but only from CMake
 3.30, and this project requires 3.28.
 
-Windows publishes the .zip as well as the installer, and they are not redundant:
-neither is signed, so both raise the same SmartScreen warning, but browsers block
-unsigned .exe downloads far more readily than .zip ones. The zip is the download
-that always works. packaging/scoop/ holds a third option that raises no warning
-at all -- see the README there.
+The installer is the only Windows artifact. A .zip was published beside it up to
+v0.0.6, on the reasoning that browsers block unsigned .exe downloads more
+readily than .zip ones, and a Scoop bucket in packaging/scoop/ offered a third
+route that raised no SmartScreen warning at all. Both went when signing did the
+job properly: a signed installer is worth nothing if an unsigned copy of the
+same thing sits next to it for people to fall back on. The scoop-luvie
+repository is archived.
 
 Build Linux releases on the oldest distribution you intend to support: libstdc++
 and libgcc are linked statically, which leaves glibc as the library that sets the

@@ -175,12 +175,12 @@ install(DIRECTORY ${LUVIE_LICENSE_DIR} DESTINATION ${CMAKE_INSTALL_DOCDIR}
         COMPONENT Standalone)
 
 if(WIN32)
-    # The .zip is the one artifact that hands someone a directory tree and leaves the
-    # installing to them, so it is the one that has to explain itself: where luvie.lv2 goes,
-    # and why SmartScreen complains. (The .dmg carries the same thing, written by
-    # tools/make-macos-dmg.sh; the installer and the Linux packages need none of it because
-    # they put the files in place themselves.) At the archive root, where it is the first
-    # thing visible on opening it — and picked up from there by packaging/windows/luvie.iss.
+    # A plain-text README installed beside luvie.exe, saying where the plug-in went and
+    # why SmartScreen complained on the way in — the two things the installer does that a
+    # user may want to undo or repeat by hand. (The .dmg carries its own, written by
+    # tools/make-macos-dmg.sh; the Linux packages need none, as their desktop integration
+    # answers the same questions.) Staged at the prefix root, and picked up from there by
+    # packaging/windows/luvie.iss.
     configure_file(${CMAKE_SOURCE_DIR}/packaging/windows/README.txt.in
                    ${CMAKE_CURRENT_BINARY_DIR}/README.txt @ONLY)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/README.txt

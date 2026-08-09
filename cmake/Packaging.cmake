@@ -37,8 +37,23 @@ set(CPACK_STRIP_FILES             TRUE)
 # architecture, so a downloaded file is self-identifying and two builds of the same tag
 # from different runners can't be confused for each other.
 if(WIN32)
-    set(CPACK_GENERATOR "ZIP")
-    set(LUVIE_PLATFORM_TAG "windows-x86_64")
+    # Nothing for CPack to do. Windows ships exactly one artifact, the Inno Setup
+    # installer built by tools/make-windows-installer.sh, so that it is the one file
+    # SignPath signs — a second, unsigned download beside a signed one only invites people
+    # to take the one with no publisher on it.
+    #
+    # A .zip was published alongside it up to v0.0.6, on the reasoning that browsers block
+    # unsigned .exe downloads more readily than .zip ones. Signing is what actually
+    # answers that, and it removes the reason to hand anyone a directory tree and a page
+    # of instructions for placing luvie.lv2 by hand.
+    #
+    # Returning before include(CPack) is deliberate and cannot be replaced by clearing
+    # CPACK_GENERATOR: CPack.cmake fills an empty generator list with its own per-platform
+    # defaults, which on Windows is exactly the ZIP being removed here. No
+    # CPackConfig.cmake is written, so `cpack` in a Windows build tree now says it cannot
+    # find one, rather than quietly producing an archive nobody ships.
+    message(STATUS "Windows: no CPack package; run tools/make-windows-installer.sh")
+    return()
 elseif(APPLE)
     # The release artifact is a .dmg and is *not* built by CPack: a .app has to be
     # code-signed after staging and before archiving, and stripping (below) would
@@ -77,9 +92,10 @@ endif()
 # CPACK_PACKAGE_FILE_NAME, not CPACK_ARCHIVE_FILE_NAME: the archive generator only reads
 # the latter when it is packaging per component, and these packages are monolithic. The
 # DEB and RPM generators ignore this and use their distributions' own naming conventions
-# (DEB-DEFAULT / RPM-DEFAULT, set below) — so since the Linux tarball went, this names
-# the macOS and Windows zips and nothing else. It is still set unconditionally because
-# CPack falls back to it for the staging directory name whatever the generator.
+# (DEB-DEFAULT / RPM-DEFAULT, set below) — so with the Linux tarball and the Windows zip
+# both gone, this names the macOS developer fallback zip and nothing else. It is still set
+# unconditionally because CPack falls back to it for the staging directory name whatever
+# the generator.
 set(CPACK_PACKAGE_FILE_NAME "luvie-${LUVIE_VERSION}-${LUVIE_PLATFORM_TAG}")
 
 # The SPDX identifier, shared by both Linux package formats and matching project_license

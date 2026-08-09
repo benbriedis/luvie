@@ -2,37 +2,35 @@ Luvie @LUVIE_VERSION@
 
 A pattern-based MIDI sequencer: https://github.com/benbriedis/luvie
 
-This archive holds both halves of Luvie. Nothing here needs installing to run, but the
-plug-in has to be in a place your host looks.
+The installer has put both halves of Luvie in place. Nothing further is needed to run it.
 
-  bin\luvie.exe          the standalone application - run it from here if you like
-  lib\lv2\luvie.lv2      the LV2 plug-in bundle
-  LICENSES\              Apache-2.0, and the licences of the libraries built in
+  luvie.exe                      the standalone application, here beside this file
+  %APPDATA%\LV2\luvie.lv2        the LV2 plug-in bundle
+  LICENSES\                      Apache-2.0, and the licences of the libraries built in
+
+Uninstall from Settings > Apps, or from the Start menu entry, which removes both.
 
 
-Installing the plug-in
-----------------------
+The plug-in
+-----------
 
-Copy the whole luvie.lv2 folder into your per-user LV2 directory:
+%APPDATA%\LV2 is the per-user plug-in directory Reaper, Ardour and Carla all read, so
+Luvie appears among your plug-ins once the host rescans. If it does not, check that
 
     %APPDATA%\LV2\luvie.lv2
 
-Create the LV2 folder if it is not there. Restart your host, or tell it to rescan, and
-Luvie will appear among your plug-ins. Reaper, Ardour and Carla all read this location.
+exists and holds luvie_dsp.dll, luvie_ui.dll and manifest.ttl, then rescan again.
+
+Note that Luvie has MIDI outputs and no audio ports, so a host that groups plug-ins by
+type may file it under "Other" rather than with the instruments.
 
 
 "Windows protected your PC"
 ---------------------------
 
-Luvie is not code-signed yet, so SmartScreen warns about it the first time you run it.
-Click "More info" and then "Run anyway". You will see the same warning whether you run the
-.exe from this archive or use the installer -- signing is what removes it, not the choice
-of download.
-
-If you would rather not see it at all, install through Scoop instead:
-
-    scoop bucket add luvie https://github.com/benbriedis/scoop-luvie
-    scoop install luvie
+Luvie is not code-signed yet, so SmartScreen warns about the installer the first time it
+is run. Click "More info" and then "Run anyway". Signing is what removes that warning, and
+nothing about the download can substitute for it.
 
 
 MIDI and JACK

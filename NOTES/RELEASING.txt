@@ -85,18 +85,25 @@ that are useful together and cost nothing to ship as one.
   luvie-<ver>-1.x86_64.rpm                app + plugin, Fedora/openSUSE
   Luvie-<ver>-macos-universal.dmg         Luvie.app + luvie.lv2, x86_64 + arm64
   luvie-<ver>-windows-x86_64-setup.exe    app + plugin, per-user installer
-  luvie-<ver>-windows-x86_64.zip          app + plugin
 
 Arch is served by the AUR recipe (below). Any other Linux distribution builds
 from source; BUILD covers it.
 
-Windows gets two artifacts on purpose. Neither is signed, so both raise the same
-SmartScreen warning -- but browsers block unsigned .exe downloads far more
-readily than .zip ones, so the zip is the download that always works while the
-installer is the one that puts the plugin where hosts look. A third route,
-packaging/scoop/, raises no warning at all, because Scoop does not set
-mark-of-the-web on what it downloads; it needs no per-release work, since the
-manifest carries checkver/autoupdate. See packaging/scoop/README.
+Windows gets exactly one artifact, and that is the point: it is the file
+SignPath signs, and a signature is only worth as much as the absence of an
+unsigned alternative beside it. Two others were dropped at v0.0.7 --
+
+  the .zip           published since the first release, on the reasoning that
+                     browsers block unsigned .exe downloads far more readily
+                     than .zip ones. Signing is the real answer to that.
+
+  packaging/scoop/   a Scoop bucket, which raised no SmartScreen warning at all
+                     because Scoop does not set mark-of-the-web on what it
+                     downloads. It unpacked the .zip, so it could not outlive
+                     it; pointing it at the installer instead would have meant
+                     depending on innounp, which is unmaintained and unreliable
+                     against Inno Setup 6.4 and later. The published bucket at
+                     github.com/benbriedis/scoop-luvie is archived.
 
 macOS went from a zip to a disk image at v0.0.5: the image can hold an
 /Applications symlink to drag onto, shows its README.txt on opening, and is the
@@ -181,12 +188,13 @@ Code signing
 Luvie is published unsigned, deliberately: signing costs money on both platforms
 and the only free option covers just one of them. What that costs users is
 documented in the release notes body (see the end of release.yml) and in the
-README.txt inside each archive.
+README.txt each platform ships -- at the top of the .dmg on macOS, installed
+beside luvie.exe on Windows.
 
   Windows   SmartScreen says "Windows protected your PC" -> More info -> Run
-            anyway. Same for the installer and for the .exe in the zip, since
-            signing is what removes it, not the choice of download. Installing
-            through Scoop avoids it entirely (packaging/scoop/README).
+            anyway. Signing is what removes this, not the choice of download --
+            which is why the .zip and the Scoop bucket that once dodged it are
+            both gone, and the installer alone is left to be signed.
 
   macOS     The app: first launch is refused, then System Settings -> Privacy &
             Security offers "Open Anyway". Note that right-click -> Open, which

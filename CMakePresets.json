@@ -73,7 +73,7 @@
     {
       "name": "windows-dist",
       "displayName": "Distribution build (Windows, MSYS2/UCRT64)",
-      "description": "Run from an MSYS2 UCRT64 shell. The static link flags matter: without them the .exe and both plugin modules need libstdc++-6.dll, libgcc_s_seh-1.dll and libwinpthread-1.dll from MSYS2's bin/ at runtime, so the zip would only work on a machine that already has MSYS2 installed.",
+      "description": "Run from an MSYS2 UCRT64 shell. The static link flags matter: without them the .exe and both plugin modules need libstdc++-6.dll, libgcc_s_seh-1.dll and libwinpthread-1.dll from MSYS2's bin/ at runtime, so the installer would only work on a machine that already has MSYS2 installed.",
       "inherits": "dist",
       "condition": {
         "type": "equals",
