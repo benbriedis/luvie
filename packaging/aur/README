@@ -1,0 +1,96 @@
+Publishing Luvie to the AUR
+===========================
+
+The Arch User Repository is not a package format -- it is a collection of git
+repositories, each holding a PKGBUILD (a build recipe) and a generated .SRCINFO
+(its metadata, in a form the AUR web front end can parse). There is no artifact
+for CI to build and attach to a release: `makepkg` turns the PKGBUILD into a
+.pkg.tar.zst on the *user's* machine, at install time.
+
+So unlike the .deb and .rpm, this is published by hand, and the file beside this
+one is the master copy. It is versioned here rather than only in the AUR repo so
+that a change to the build -- a new dependency, a new install path, a moved
+CMake option -- can be made in the same commit as the change that caused it.
+
+
+One-time setup
+--------------
+
+1. Make an account at https://aur.archlinux.org and add an SSH public key to it
+   (My Account -> SSH Public Key).
+
+2. Point ssh at the right key and user:
+
+       # ~/.ssh/config
+       Host aur.archlinux.org
+           User aur
+           IdentityFile ~/.ssh/aur
+
+3. Clone the (initially empty) package repository. Cloning a name that does not
+   exist yet is how a new AUR package is created:
+
+       git clone ssh://aur@aur.archlinux.org/luvie.git aur-luvie
+
+
+At each release
+---------------
+
+Do this after the GitHub release is published, so the tag the PKGBUILD points at
+is definitely there.
+
+1. Copy the PKGBUILD across and set the version. pkgver is the tag without its
+   leading "v"; pkgrel goes back to 1 for a new version, and is bumped instead
+   when the packaging changes but the version does not.
+
+       cp packaging/aur/PKGBUILD ../aur-luvie/
+       cd ../aur-luvie
+       # edit pkgver / pkgrel
+
+2. Build it. This is also the only real test the PKGBUILD gets, so do not skip
+   it -- and prefer the clean-chroot form, which catches a dependency that is
+   missing from `depends` but happens to be installed on your machine:
+
+       makepkg -si                     # quick check, uses your installed packages
+       extra-x86_64-build              # clean chroot (devtools package)
+
+   Then lint it:
+
+       namcap PKGBUILD
+       namcap luvie-*.pkg.tar.zst
+
+3. Regenerate .SRCINFO. It is derived entirely from the PKGBUILD and the AUR
+   rejects a push whose .SRCINFO does not match, so this is not optional and
+   must be redone every time the PKGBUILD changes:
+
+       makepkg --printsrcinfo > .SRCINFO
+
+4. Commit and push. Only PKGBUILD and .SRCINFO belong in the repository -- not
+   the built package, not the sources, not src/ or pkg/:
+
+       git add PKGBUILD .SRCINFO
+       git commit -m "Update to 0.0.5"
+       git push
+
+5. Copy any edits back to packaging/aur/PKGBUILD in this repository, so the two
+   do not drift.
+
+
+Notes on the recipe
+-------------------
+
+It builds from the git tag, not from a release tarball, because the version
+string comes from `git describe --tags` (cmake/ProjectVersion.cmake and
+cmake/GitVersion.cmake) -- a plain source archive has no git metadata and would
+produce a binary reporting 0.0.0.
+
+The build downloads FLTK, LV2, RtMidi, liblo and nlohmann/json at configure
+time, so it needs network access during build(), which AUR reviewers do not love
+but is unavoidable while FLTK 1.5 remains unreleased and pinned to a commit.
+
+CMAKE_POLICY_VERSION_MINIMUM=3.5 is there because CMake 4 -- which is what Arch
+ships -- refuses to configure a project declaring a cmake_minimum_required below
+3.5, and nlohmann/json v3.11.3 declares "3.1...3.14". Bumping that pin to
+v3.11.4 or later would let the flag go.
+
+The plugin goes to /usr/lib/lv2, which is both the LV2 specification's system
+location and where Arch's own LV2 packages put their bundles.

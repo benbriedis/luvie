@@ -65,6 +65,29 @@ puts the plugin in /usr/lib/lv2, not the %{_libdir}/lv2 that Fedora packages
 use -- see the reasoning in cmake/Packaging.cmake.
 
 
+Arch Linux (manual)
+-------------------
+
+Arch is served through the AUR, which is not part of the release workflow and
+does not produce an artifact: an AUR package is a PKGBUILD that each user's
+`makepkg` compiles from the release tag on their own machine. Nothing to build
+in CI, nothing to attach to the release.
+
+The recipe lives at packaging/aur/PKGBUILD; packaging/aur/README has the
+publishing procedure. In short, after publishing the GitHub release:
+
+    cp packaging/aur/PKGBUILD ../aur-luvie/     # edit pkgver, reset pkgrel to 1
+    cd ../aur-luvie
+    extra-x86_64-build                          # build in a clean chroot
+    namcap luvie-*.pkg.tar.zst
+    makepkg --printsrcinfo > .SRCINFO
+    git commit -am "Update to 0.0.5" && git push
+
+Keep packaging/aur/PKGBUILD in step with anything that changes what Luvie links
+or where it installs -- that copy is the master, and the AUR repository holds a
+copy of it.
+
+
 Dry run
 -------
 

@@ -257,6 +257,7 @@ jobs:
             | --- | --- |
             | Debian / Ubuntu | `luvie_*.deb` |
             | Fedora / openSUSE | `luvie-*.x86_64.rpm` |
+            | Arch Linux | [`luvie`](https://aur.archlinux.org/packages/luvie) in the AUR |
             | Other Linux | `luvie-*-linux-*.tar.gz` |
             | macOS | `Luvie-*-macos-universal.zip` |
             | Windows | `luvie-*-windows-x86_64.zip` |

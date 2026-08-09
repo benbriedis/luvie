@@ -1,0 +1,93 @@
+# Maintainer: Ben Briedis <benbriedis@gmail.com>
+#
+# The canonical copy of this file lives in Luvie's own tree, at packaging/aur/PKGBUILD.
+# The AUR repository (ssh://aur@aur.archlinux.org/luvie.git) holds a copy of it plus a
+# generated .SRCINFO -- see the README beside this file for the publishing procedure.
+#
+# This builds Luvie from its release tag. Unlike the .deb and .rpm, which are built once
+# by CI and downloaded, an AUR package is compiled on the user's machine, so the notes
+# below concern themselves with matching Arch conventions rather than portability.
+
+pkgname=luvie
+pkgver=0.0.4
+pkgrel=1
+pkgdesc="Pattern-based MIDI sequencer, standalone and LV2 plugin"
+arch=('x86_64')
+url="https://github.com/benbriedis/luvie"
+license=('Apache-2.0')
+# One entry per library the built binaries actually name in DT_NEEDED, and nothing else:
+# freetype2, libxext and the rest arrive through libxft and friends. FLTK, RtMidi, liblo
+# and nlohmann/json are fetched and linked statically by the build (see the FetchContent
+# block in CMakeLists.txt), so they are deliberately absent -- there is no system
+# dependency on any of them. Note also that FLTK 1.5 is unreleased and pinned to a commit,
+# so extra/fltk could not serve here even if the build were changed to look for it.
+depends=('alsa-lib' 'fontconfig' 'gcc-libs' 'glibc' 'libpng' 'libx11' 'libxcursor'
+         'libxfixes' 'libxft' 'libxinerama' 'libxrender' 'zlib')
+# git is a build dependency twice over: makepkg needs it for the source below, and the
+# build itself runs `git describe` for the version string and FetchContent for the
+# vendored libraries.
+makedepends=('cmake' 'git' 'ninja')
+checkdepends=('xorg-server-xvfb')
+# JACK is never linked -- src/jackShim.cpp dlopen's libjack at runtime and falls back to
+# the internal transport and ALSA MIDI when it is absent. Both jack2 and pipewire-jack
+# provide `jack`.
+optdepends=('jack: JACK transport and MIDI ports')
+source=("$pkgname::git+$url.git#tag=v$pkgver")
+# A git tag is not a fixed artifact, so there is nothing to checksum; makepkg verifies
+# the tag name instead.
+sha256sums=('SKIP')
+
+build() {
+    # -DCMAKE_BUILD_TYPE=None is the Arch convention: it stops CMake adding optimization
+    # flags of its own, so the CFLAGS/CXXFLAGS/LDFLAGS in makepkg.conf are what the
+    # package is actually built with.
+    #
+    # FLTK's Wayland backend is switched off for the same reason release CI switches it
+    # off: src/main.cpp forces FLTK_BACKEND=x11 at startup, so the Wayland code is never
+    # reached, and disabling it defines FLTK_USE_X11, which the custom window drag and
+    # resize in src/appWindow.cpp needs.
+    #
+    # LV2_INSTALL_DIR defaults to the per-user ~/.lv2, which is right for a developer
+    # install and wrong for a package; made relative it resolves under the prefix, giving
+    # /usr/lib/lv2 -- where Arch's LV2 hosts look.
+    #
+    # CMAKE_POLICY_VERSION_MINIMUM is for the fetched dependencies, not for Luvie: CMake 4
+    # refuses to configure a project whose cmake_minimum_required is below 3.5, and
+    # nlohmann/json v3.11.3 declares `3.1...3.14` (liblo declares a bare 3.5, which is
+    # accepted but deprecated). Arch ships CMake 4, so without this the configure step
+    # fails outright. Older CMake ignores the variable. It can go once those two pins move
+    # forward -- json fixed this in v3.11.4.
+    #
+    # The configure step downloads the pinned FLTK, LV2, JACK header, RtMidi, liblo and
+    # nlohmann/json sources, so this build needs network access.
+    cmake -S "$pkgname" -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DLV2_INSTALL_DIR=lib/lv2 \
+        -DFLTK_BACKEND_WAYLAND=OFF \
+        -Wno-dev
+    cmake --build build
+}
+
+check() {
+    # One test: start the application, show its window, quit through the normal teardown
+    # path. --test (passed by the test itself) keeps it off JACK and routes MIDI to the
+    # console, but it still needs an X display, which a clean chroot has not got.
+    xvfb-run -a ctest --test-dir build --output-on-failure
+}
+
+package() {
+    DESTDIR="$pkgdir" cmake --install build
+
+    # The install rules put the full licence set -- Apache-2.0, NOTICE, and the terms of
+    # every library compiled into the binaries -- under /usr/share/doc/luvie/LICENSES and
+    # inside the LV2 bundle. Arch expects the package licence at this path as well; link
+    # rather than copy so there is one copy of each text on disk.
+    install -d "$pkgdir/usr/share/licenses/$pkgname"
+    ln -s /usr/share/doc/$pkgname/LICENSES "$pkgdir/usr/share/licenses/$pkgname/LICENSES"
+
+    # Debian Policy requires this file; on Arch it is just a second, less complete copy of
+    # what LICENSES/ already says.
+    rm -f "$pkgdir/usr/share/doc/$pkgname/copyright"
+}
