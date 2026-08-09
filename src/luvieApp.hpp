@@ -115,7 +115,13 @@ public:
                ObservableInstrument* instruments, ITransport* transport);
     void pushInstruments();
 
+    // Fits the pattern editors above the control panel, whose height varies with
+    // how many rows the panel has folded into.
+    void layoutPatternTab();
+
 private:
+    bool layingOutPatternTab = false;
+
     ObservableSong*      song_        = nullptr;
     ObservablePattern*   pattern_     = nullptr;
     ObservableInstrument* instruments_ = nullptr;

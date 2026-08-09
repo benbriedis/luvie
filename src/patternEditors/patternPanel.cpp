@@ -32,6 +32,8 @@ static constexpr int barsLabelW    = 36;
 static constexpr int barsInputW    = 40;
 static constexpr int outChoiceW    = 155;
 static constexpr int rapidBtnW     = 52;
+static constexpr int rapidFoldedGap = 20;   // sets Rapid apart from the Out dropdown
+static constexpr int colouredRowIndent = 6;  // left inset of the folded coloured row
 static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
 static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 
@@ -203,17 +205,15 @@ int PatternPanel::computeZoomFactor() const
 PatternPanel::PatternPanel(int x, int y, int w, int h)
     : Fl_Group(x, y, w, h),
       input          (0, 0, nameW,       ctrlH),
-      controlRow     (x, y, w, h,        Fl_Flex::HORIZONTAL),
       recentreBtn    (0, 0, recentreBtnW,ctrlH),
       zoomChoice     (0, 0, zoomChoiceW, ctrlH),
       patternName    (0, 0, nameW,       ctrlH),
       outChoice      (0, 0, outChoiceW,  ctrlH),
       harmonyControls(0, 0, ctrlH),
       timeControls   (0, 0, ctrlH),
-      rapidBtn       (0, 0, rapidBtnW,   ctrlH, "Rapid"),
-      spacer         (0, 0, 0,           0)
+      rapidBtn       (0, 0, rapidBtnW,   ctrlH, "Rapid")
 {
-    initControlRowLayout();
+    initControls();
     initPatternName();
     initHarmonyControls();
     initZoomChoice();
@@ -222,29 +222,122 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     initRapidBtn();
     initInput();
     end();
+    relayout();
 }
 
-void PatternPanel::initControlRowLayout()
+void PatternPanel::initControls()
 {
-    // Group ctors called begin()/end() internally; controlRow is still current.
-    controlRow.gap(sg);
-    controlRow.margin(pad, 2, pad, 2);
-
-    controlRow.fixed(&recentreBtn,     recentreBtnW);
-    controlRow.fixed(&zoomChoice,      zoomChoiceW);
-    controlRow.fixed(&patternName,     nameW);
-    controlRow.fixed(&outChoice,       outChoiceW);
-    controlRow.fixed(&harmonyControls, HarmonyControls::kWidth);
-    controlRow.fixed(&timeControls,    TimeControls::kWidth);
-    // spacer is flexible — fills space between controls and rapidBtn
-    controlRow.fixed(&rapidBtn,        rapidBtnW);
-    controlRow.end();
-
-    // Move input after controlRow so it renders on top (z-order)
+    // Move the inline editor to the end of the child list so it renders on top
+    // of the control it overlays (z-order).
     remove(&input);
     add(&input);
 
     box(FL_NO_BOX);
+}
+
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+// Which controls go on which row at this width. The controls on the dark panel
+// background travel together as one run, the two coloured groups as another;
+// when they no longer fit side by side the coloured run moves to its own row
+// below the dark one.
+std::vector<PanelRow> PatternPanel::buildLayout(int availW)
+{
+    const std::vector<PanelItem> dark = {
+        {&recentreBtn, recentreBtnW},
+        {&zoomChoice,  zoomChoiceW},
+        {&patternName, nameW},
+        {&outChoice,   outChoiceW},
+    };
+    const std::vector<PanelItem> coloured = {
+        {&harmonyControls, HarmonyControls::kWidth},
+        {&timeControls,    TimeControls::kWidth},
+    };
+    const PanelItem rapid{&rapidBtn, rapidBtnW};
+
+    PanelRow single;
+    single.left = dark;
+    single.left.insert(single.left.end(), coloured.begin(), coloured.end());
+    single.left.push_back(rapid);
+
+    if (!canFold || rowWidth(single) <= availW)
+        return { single };
+
+    // A small inset so a little of the dark panel shows to the left of the
+    // coloured background.
+    PanelRow colouredRow;
+    colouredRow.left   = coloured;
+    colouredRow.indent = colouredRowIndent;
+
+    // Rapid keeps company with the instrument dropdown, set apart by a wider gap.
+    PanelRow darkRow;
+    darkRow.left = dark;
+    darkRow.left.push_back({ rapid.widget, rapid.width, rapidFoldedGap });
+
+    return { darkRow, colouredRow };
+}
+
+static int gapFor(const PanelItem& it)
+{
+    return it.gapBefore >= 0 ? it.gapBefore : sg;
+}
+
+// The width this row needs, hidden items excluded (they take no slot).
+int PatternPanel::rowWidth(const PanelRow& row)
+{
+    int total = 2 * pad + row.indent;
+    bool first = true;
+    for (const auto* run : { &row.left, &row.right })
+        for (const auto& it : *run) {
+            if (!it.widget->visible()) continue;
+            if (!first) total += gapFor(it);
+            total += it.width;
+            first  = false;
+        }
+    return total;
+}
+
+void PatternPanel::applyLayout(const std::vector<PanelRow>& rows)
+{
+    int ry = y() + vMargin;
+    for (const auto& row : rows) {
+        int lx    = x() + pad + row.indent;
+        bool first = true;
+        for (const auto& it : row.left) {
+            if (!it.widget->visible()) continue;
+            if (!first) lx += gapFor(it);
+            it.widget->resize(lx, ry, it.width, rowH);
+            lx   += it.width;
+            first = false;
+        }
+        int rx = x() + w() - pad;
+        for (auto it = row.right.rbegin(); it != row.right.rend(); ++it) {
+            if (!it->widget->visible()) continue;
+            rx -= it->width;
+            it->widget->resize(std::max(rx, lx + (first ? 0 : gapFor(*it))), ry, it->width, rowH);
+            rx -= gapFor(*it);
+        }
+        ry += rowH + rowGap;
+    }
+}
+
+int PatternPanel::heightForWidth(int width)
+{
+    return rowsHeight((int)buildLayout(width).size());
+}
+
+void PatternPanel::relayout()
+{
+    auto rows = buildLayout(w());
+    applyLayout(rows);
+    if (editingPatId >= 0)
+        input.resize(patternName.x(), patternName.y(), patternName.w(), patternName.h());
+
+    int wanted = rowsHeight((int)rows.size());
+    if (wanted != h() && onHeightChanged) onHeightChanged(wanted);
+    redraw();
 }
 
 void PatternPanel::initPatternName()
@@ -756,8 +849,8 @@ void PatternPanel::configureHarmonyRow()
     harmonyControls.show();
     rapidBtn.show();
     zoomChoice.activate();
-    controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
-    redraw();
+    canFold = true;
+    relayout();
 }
 
 void PatternPanel::configureDrumRow()
@@ -770,8 +863,8 @@ void PatternPanel::configureDrumRow()
     }
     rapidBtn.hide();
     zoomChoice.activate();
-    controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
-    redraw();
+    canFold = false;
+    relayout();
 }
 
 void PatternPanel::configurePianorollRow()
@@ -784,8 +877,8 @@ void PatternPanel::configurePianorollRow()
     }
     rapidBtn.hide();
     zoomChoice.activate();
-    controlRow.resize(controlRow.x(), controlRow.y(), controlRow.w(), controlRow.h());
-    redraw();
+    canFold = false;
+    relayout();
 }
 
 void PatternPanel::onTimelineChanged()
@@ -885,9 +978,7 @@ void PatternPanel::cancelEdit()
 void PatternPanel::resize(int x, int y, int w, int h)
 {
     Fl_Widget::resize(x, y, w, h);
-    controlRow.resize(x, y, w, h);
-    if (editingPatId >= 0)
-        input.resize(patternName.x(), patternName.y(), patternName.w(), patternName.h());
+    relayout();
 }
 
 void PatternPanel::draw()

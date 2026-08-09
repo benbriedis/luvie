@@ -4,6 +4,23 @@
 
 TODO: screenshot of the outputs panel.
 
+## MIDI Output ports and channels
+
+Instrument settings ... Complicated? You better believe it...
+
+OK, so the world of MIDI outputs is complicated, but Luvie is set up in such a way
+as the isolate the complexity in this one GUI and then the rest of the app can 
+continue on in blissful ignorance.
+
+Note too that most of the settings are not required most of the time.
+
+## Instruments
+
+Instruments are Luvie's way of bringing some sanity to the work of MIDI outputs.
+You take a MIDI Output Port and specify a MIDI channel and give it an instrument name.
+Then throughout the rest of the application you can refer to instruments by name and
+forget about MIDI ports and channels.
+
 ## Output ports
 
 Each port sends to one destination. Luvie can drive JACK MIDI ports, the

@@ -37,7 +37,40 @@
 #include "transposePopup.hpp"
 #include "patternParamGrid.hpp"
 
+// The pattern tab's control panel is bottom-anchored and can change height (it
+// folds into two rows once the window is too narrow for one), so the editors
+// above it have to be re-fitted after every resize rather than by the plain
+// Fl_Group resizable() rule.
+class PatternTabGroup : public Fl_Group {
+public:
+    std::function<void()> onLayout;
+    PatternTabGroup(int x, int y, int w, int h, const char* l)
+        : Fl_Group(x, y, w, h, l) {}
+    void resize(int x, int y, int w, int h) override {
+        Fl_Group::resize(x, y, w, h);
+        if (onLayout) onLayout();
+    }
+};
+
 std::string LuvieApp::lastFileDir;
+
+void LuvieApp::layoutPatternTab()
+{
+    if (!patternTab || !patternPanel) return;
+    // The panel's height request depends on its own width, which this very call
+    // sets — the guard keeps the callback it fires from recursing.
+    if (layingOutPatternTab) return;
+    layingOutPatternTab = true;
+
+    const int panelHeight = patternPanel->heightForWidth(patternTab->w());
+    const int editorH     = std::max(0, patternTab->h() - panelHeight);
+    for (Fl_Widget* e : { (Fl_Widget*)harmonyEd, (Fl_Widget*)drumEd, (Fl_Widget*)pianorollEd })
+        if (e) e->resize(patternTab->x(), patternTab->y(), patternTab->w(), editorH);
+    patternPanel->resize(patternTab->x(), patternTab->y() + editorH,
+                         patternTab->w(), panelHeight);
+
+    layingOutPatternTab = false;
+}
 
 void LuvieApp::ChangeNotifier::onTimelineChanged() {
     if (app->outputsOverlay) app->outputsOverlay->refreshInstrumentButtons();
@@ -209,7 +242,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tabs->add(*tabLoop);
 
     // ---- Pattern Editor tab ----
-    auto* tab2 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
+    auto* tab2 = new PatternTabGroup(0, off + tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2->end();
     tab2->color(bgColor);
     patternTab = tab2;
@@ -228,17 +261,18 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     tab2->add(pianorollEd);
     pianorollEd->hide();
 
-    // Stretch the editors down to the control panel so their vertical
-    // scrollbars meet it (this resize also forces a relayout that fills them).
-    const int patEditorH = tabsH - tabBarH - panelH;
-    harmonyEd->resize(0, off + tabBarH, winW, patEditorH);
-    drumEd->resize(0, off + tabBarH, winW, patEditorH);
-    pianorollEd->resize(0, off + tabBarH, winW, patEditorH);
-
     patternPanel = new PatternPanel(0, off + tabsH - panelH, winW, panelH);
     patternPanel->setPattern(pattern);
     tab2->add(patternPanel);
     tab2->resizable(harmonyEd);
+
+    // Stretch the editors down to the control panel so their vertical scrollbars
+    // meet it (this resize also forces a relayout that fills them). The panel
+    // may want more than panelH once it folds, so ask it rather than assume.
+    tab2->onLayout               = [this] { layoutPatternTab(); };
+    patternPanel->onHeightChanged = [this](int) { layoutPatternTab(); };
+    layoutPatternTab();
+
     tabs->add(*tab2);
 
     // ---- Transport bar ----

@@ -7,6 +7,8 @@ Suggestions for Carla (install newest first)
    adding 200px to each sides.
    Maybe a layout button.
 
+2. More prominent settings button.
+
 
 Suggestions for RaySession (install newest first)
 ==========================
@@ -141,12 +143,7 @@ cf being able to select a group of notes? cf picking the tool from the context m
 cf Show recent projects - Probably need program settings to remember between runs...
    Ditto if I want to remember the last Save As / Export / Import directory.
 
-TODO review the format of the JSON file cf a Zod-like description? cf a version number?
-
 Allow the window close to be clicked even if a popup of menu is showing.
-
-Implement undo/redo (possible on an editor-by-editor basis? or current edit only?)
-    Only enable Save & Save As if a change has been made (and not undone).
 
 .........................
 
@@ -213,18 +210,6 @@ Conversion routine to clone a regular pattern to pianoroll?
 	The opposite way would be harder, but something could be attempted in time maybe.
 
 
---------
-
-
-Create a shortcut mechanism and menu...  (cf dividing by editor type) 
-   cf start/stop    - map to space
-      open pattern  - eg map to <Enter>
-      open context? - eg context button  (currently not working)
-      solo? mute?
-	  Rewind could be '<' and/or ','
-   Generally prefer to have 1 good set of bindings though...
-      
-
 //////////////////////////////////////
 
 MINOR BUG: clicking on Instrument selector highlights it as if it were a text field
@@ -289,9 +274,19 @@ Try Valgrind again
 
 ============================
 
-Any way to try building and/or running on Windows or Mac?
+Implement undo/redo (possible on an editor-by-editor basis? or current edit only?)
+    Only enable Save & Save As if a change has been made (and not undone).
 
-'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
+Create a shortcut mechanism and menu...  (cf dividing by editor type) 
+   cf start/stop    - map to space
+      open pattern  - eg map to <Enter>
+      open context? - eg context button  (currently not working)
+      solo? mute?
+	  Rewind could be '<' and/or ','
+   Generally prefer to have 1 good set of bindings though...
+      
+TODO review the format of the JSON file cf a Zod-like description? cf a version number?
+
 
 Add a better-looking flat symbol, and maybe sharp, using SVG.  
 
@@ -301,6 +296,11 @@ Add more hover over notes for controls
 
 DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
 
+Any way to try testing on Windows or Mac?
+
+
+SOMETIMES there's a row of extra space under the pattern grids. Inconsistent.
+
 
 
 TO CHECK MORE: Not totally sure about how bonus notes are transformed when moving to more complicated chords.
@@ -308,11 +308,12 @@ TO CHECK MORE: Not totally sure about how bonus notes are transformed when movin
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
 
-Normal pattern editor: think put coloured items under the dark bar.
-
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
-BUG: looping to start of song causes a gap.
+
+BUG: looping to start of song causes a gap (plugin or standalone or both?)
+
+'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
 
