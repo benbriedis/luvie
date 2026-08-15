@@ -17,11 +17,11 @@ Add a "luvie -h" option. Blocked last time on getting the FLTK options listed
 again alongside ours.
 
 Consider an (info) icon in the application explaining bank select MSB/LSB and
-default program selection, so docs/manual/08-midi-output.md does not have to
+default program selection, so docs/manual/03-outputs.md does not have to
 carry the whole explanation.
 
 Consider building the ALSA/JACK MIDI bridge in, rather than telling people to
-run "a2jmidid -e" (docs/manual/09-connecting.md).
+run "a2jmidid -e" (docs/manual/01-configuration.md).
 
 
 Material to produce
@@ -37,9 +37,9 @@ writing music with it -- that is when the awkward parts are obvious.
 Facts to verify before publishing
 ---------------------------------
 
-docs/manual/03-tempo-and-beats.md: whether the song editor's first beat
+docs/manual/07-tempo-and-beats.md: whether the song editor's first beat
 definition and time signature really do serve as the defaults for new patterns.
 The original note was unsure.
 
-docs/manual/09-connecting.md: the Carla-over-JACK-with-PipeWire recipe, on a
+docs/manual/01-configuration.md: the Carla-over-JACK-with-PipeWire recipe, on a
 current PipeWire.

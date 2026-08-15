@@ -1,12 +1,12 @@
 # Harmony patterns
 
-[← The pattern editors](05-pattern-editors.md) · [Contents](README.md) · [Loops →](07-loops.md)
+[← Loops](08-loop-editor.md) · [Contents](README.md) · [The pianoroll editor →](10-pianoroll-editor.md)
 
 A harmony pattern does not store fixed pitches. It stores positions within a
 chord or scale, and the pitches come out of how that is currently interpreted.
 Change the interpretation and the same pattern plays different notes.
 
-TODO: screenshot of the harmony editor with the purple control panel visible.
+<img src="images/harmonyEditor.png" alt="The Luvie harmony editor" width="800">
 
 ## Pitch interpretation
 

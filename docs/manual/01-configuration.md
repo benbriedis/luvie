@@ -1,7 +1,7 @@
 
 # Configuration
 
-[← MIDI output and instruments](08-midi-output.md) · [Contents](README.md) · [Running as an LV2 plugin →](10-lv2-plugin.md)
+[Contents](README.md) · [Getting started →](02-basics.md)
 
 ## Installation
 

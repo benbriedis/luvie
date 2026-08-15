@@ -1,6 +1,6 @@
 # Getting started
 
-[← Installation](01-installation.md) · [Contents](README.md) · [Tempo, beats and bars →](03-tempo-and-beats.md)
+[← Configuration](01-configuration.md) · [Contents](README.md) · [MIDI output and instruments →](03-outputs.md)
 
 TODO: screenshot of the whole window with the main areas labelled, referred to
 by the names used throughout the rest of the manual.
@@ -76,6 +76,6 @@ in Loop editor they will keep on playing until either you or the Song Editor tur
 
 ## Where to go next
 
-- [The song editor](04-song-editor.md) — arranging patterns into a song
-- [The pattern editors](05-pattern-editors.md) — writing the patterns themselves
-- [MIDI output and instruments](08-midi-output.md) — getting sound out of Luvie
+- [The song editor](05-song-editor.md) — arranging patterns into a song
+- [The pattern editors](06-intro-pattern-editors.md) — writing the patterns themselves
+- [MIDI output and instruments](03-outputs.md) — getting sound out of Luvie

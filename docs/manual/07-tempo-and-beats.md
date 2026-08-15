@@ -1,6 +1,6 @@
 # Tempo, beats and bars
 
-[← Getting started](02-getting-started.md) · [Contents](README.md) · [The song editor →](04-song-editor.md)
+[← The pattern editors](06-intro-pattern-editors.md) · [Contents](README.md) · [Loops →](08-loop-editor.md)
 
 ## BPM is not "crotchets per minute"
 

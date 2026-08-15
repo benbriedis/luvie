@@ -1,6 +1,6 @@
 # Sessions and saving
 
-[← Running as an LV2 plugin](10-lv2-plugin.md) · [Contents](README.md)
+[← The drumkit editor](11-drumkit-editor.md) · [Contents](README.md)
 
 ## Export and import
 
@@ -12,7 +12,7 @@ You can also export projects to give you multiple versions, save backups, etc.
 ## Song files
 
 TODO: what a `.json` song file contains, saving and opening, and passing one on
-the command line (see [Getting started](02-getting-started.md)).
+the command line (see [Getting started](02-basics.md)).
 
 ## Auto-save
 
@@ -34,5 +34,5 @@ session manager.
 
 When running as a plugin, the host saves Luvie's state as part of the project;
 there is nothing separate to save. See
-[Running as an LV2 plugin](10-lv2-plugin.md).
+[Configuration](01-configuration.md).
 

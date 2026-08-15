@@ -1,6 +1,8 @@
 
 # A simple walk through
 
+[← MIDI output and instruments](03-outputs.md) · [Contents](README.md) · [The song editor →](05-song-editor.md)
+
 NOTE assumptions
 
 CAN always use ```luvie --test``` for soundless experience.

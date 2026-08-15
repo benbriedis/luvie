@@ -1,6 +1,6 @@
 # The song editor
 
-[← Tempo, beats and bars](03-tempo-and-beats.md) · [Contents](README.md) · [The pattern editors →](05-pattern-editors.md)
+[← A simple walk through](04-walkthrough.md) · [Contents](README.md) · [The pattern editors →](06-intro-pattern-editors.md)
 
 <img src="images/songEditor.png" alt="Luvie song editor" width="800">
 

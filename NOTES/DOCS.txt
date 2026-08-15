@@ -30,7 +30,7 @@ Images
 
 Screenshots go in docs/manual/images/ and are referenced with relative paths:
 
-    ![The song editor](images/song-editor.png)
+    ![The song editor](images/songEditor.png)
 
 SVG for diagrams, PNG for screenshots. Keep both small, and be deliberate about
 re-committing them:

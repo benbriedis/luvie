@@ -1,8 +1,11 @@
 # Loops
 
-[← Harmony patterns](06-harmony.md) · [Contents](README.md) · [MIDI output and instruments →](08-midi-output.md)
+[← Tempo, beats and bars](07-tempo-and-beats.md) · [Contents](README.md) · [Harmony patterns →](09-harmony-editor.md)
 
-TODO: screenshot of the loop panel.
+<img src="images/loopEditor.png" alt="The Luvie loop editor" width="800">
+
+Each column is an instrument and each row is a loop slot; the highlighted cells
+are the patterns currently playing.
 
 TODO: what a loop is, and how it differs from a pattern instance in the song.
 
@@ -21,4 +24,4 @@ TODO: creating, naming and deleting loops; the loop ruler; the context menu.
 
 TODO: the loop panel is BPM-only — it has no time signature of its own, because
 each pattern brings its own. Cross-reference
-[Tempo, beats and bars](03-tempo-and-beats.md).
+[Tempo, beats and bars](07-tempo-and-beats.md).

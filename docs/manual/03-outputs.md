@@ -1,8 +1,11 @@
 # MIDI output and instruments
 
-[← Loops](07-loops.md) · [Contents](README.md) · [Connecting to other software →](09-connecting.md)
+[← Getting started](02-basics.md) · [Contents](README.md) · [A simple walk through →](04-walkthrough.md)
 
-TODO: screenshot of the outputs panel.
+The gear icon at the top right of the window opens the **Instruments & Outputs**
+dialog, where everything in this chapter is set up:
+
+<img src="images/settings.png" alt="The Instruments and Outputs dialog" width="800">
 
 ## MIDI Output ports and channels
 
@@ -44,4 +47,4 @@ instance — and for those, none of this needs touching.
 ## Drum kits
 
 TODO: naming drum instruments and reusing a kit across patterns.
-Cross-reference [The pattern editors](05-pattern-editors.md).
+Cross-reference [The drumkit editor](11-drumkit-editor.md).
