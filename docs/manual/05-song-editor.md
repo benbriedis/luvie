@@ -2,7 +2,7 @@
 
 [← Tempo, beats and bars](03-tempo-and-beats.md) · [Contents](README.md) · [The pattern editors →](05-pattern-editors.md)
 
-<img src="images/songEditor.png" alt="Luvie song editor" width="800">
+<img src="images/songEditor.png" alt="Luvie song editor" width="1000">
 
 ## Tracks
 
@@ -10,11 +10,9 @@ The user can create many patterns for a given instrument and these can be enable
 at various times thoughout the song. The song editor organises these patterns using "tracks", 
 with each track containing the entire arrangement of patterns for a given instrument.  
 A track in turn is divided into multiple "lanes" with each lane controlling 
-one pattern.
+a single pattern.
 
-TODO: adding, renaming (double-click the label), reordering, solo and mute,
-deleting. Selecting a track is what chooses which pattern the pattern editor
-shows.
+Tracks can be muted or soloed using the S and M buttons that sit in the first lane of each track.
 
 ## Placing pattern blocks
 
@@ -24,8 +22,8 @@ Having added a pattern block you can move it by clicking and dragging,
 and resize it by clicking and dragging the left or right edge.
 
 One feature of the Luvie song editor is that it's possible to start patterns part way
-through one of the song editor's bars. Ticks have been added to pattern blocks 
-to indicate where patterns start. Another reason for this feature is that 
+through one of the song editor's patterns or even bars. Ticks have been added to pattern blocks 
+to indicate where patterns start. One reason including this feature is that 
 patterns can have different time signatures that don't necessarily match
 the current time signature of the song.
 
@@ -43,24 +41,20 @@ This menu allows you to add and remove patterns and automation.
 ## Automation 
 
 "Automation" describes modifying things like pitch, modulation, panning, expression and 
-volume using MIDI parameters.  You can add an automation lane through the context menu
+volume using MIDI parameters.  You can add an automation lane via the context menu
 descibed above. 
 
-An automation lane contain rubberbands used for modifying the chosen parameter.
-New points can be added to a rubberband by single-clicking. 
-To delete a point right-click a dot and select Delete from the popup menu.
+Automation lanes use rubberbands.
+New change points can be added to a rubberband by single-clicking. 
+To delete a change point right-click a dot and select Delete from the popup menu.
 
 ## Rulers and markers
 
 At the top of the song editor there are a number or "rulers". These are
 the time signature ruler, the tempo ruler, the loop ruler, and the transport ruler.
 
-<img src="images/rulers.png" alt="Luvie song editor" width="700">
+<img src="images/rulers.png" alt="Luvie song editor" width="600">
 
-To add, remove or markers in the rulers right-click over the rulers. 
+To add, remove or modify markers in the rulers right-click a ruler. 
 Most markers can are movable using click-and-drag.
-
-
-Cross-reference
-[Tempo, beats and bars](07-tempo-and-beats.md).
 
