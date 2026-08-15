@@ -8,9 +8,9 @@ name: CI
 
 on:
   # Push-triggered CI is off for now — re-enable by uncommenting this block.
-  # push:
-  #   branches: ['**']
-  #   tags-ignore: ['**']    # tag pushes are release.yml's job, not a duplicate CI run
+  push:
+    branches: ['**']
+    tags-ignore: ['**']    # tag pushes are release.yml's job, not a duplicate CI run
   pull_request:
   workflow_dispatch:
 

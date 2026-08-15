@@ -86,8 +86,10 @@ that are useful together and cost nothing to ship as one.
   Luvie-<ver>-macos-universal.dmg         Luvie.app + luvie.lv2, x86_64 + arm64
   luvie-<ver>-windows-x86_64-setup.exe    app + plugin, per-user installer
 
-Arch is served by the AUR recipe (below). Any other Linux distribution builds
-from source; BUILD covers it.
+Arch builds from source like any other distribution not listed above; BUILD
+covers it. The AUR recipe below is written and tested but not published, so the
+release notes deliberately promise no Arch package -- do not add one back to
+that table until packaging/aur/README has actually been carried out.
 
 Windows gets exactly one artifact, and that is the point: it is the file
 SignPath signs, and a signature is only worth as much as the absence of an

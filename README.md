@@ -1,4 +1,4 @@
-<img src="/logo/logo.svg" alt="Luvie logo" width="200" height="200">
+<img src="logo/logo.svg" alt="Luvie logo" width="200" height="200">
 
 # Description
 A free music sequencer for Linux, Mac and Windows. (On Mac and Windows the window cannot yet
@@ -12,7 +12,38 @@ The main things that make this sequencer special in the world of Linux audio are
 1. It has been redesigned and rebuild ground-up, so hopefully it is a bit easier to understand and use than some earlier efforts.
 
 # Screenshots
-TODO
+
+### Song Editor
+Arrange pattern instances across tracks, with tempo and time signature markers on the rulers,
+and automation lanes for continuous controllers.
+
+<img src="screenshots/songEditor.png" alt="Luvie song editor" width="800">
+
+### Pattern Editor — harmony
+Notes are placed against a chord and scale (here D maj7), so the pattern transposes with the
+harmony rather than being locked to fixed pitches.
+
+<img src="screenshots/harmonyEditor.png" alt="Luvie harmony pattern editor" width="700">
+
+### Pattern Editor — piano roll
+The same pattern editor in plain piano-roll mode, with a modulation lane underneath.
+
+<img src="screenshots/pianorollEditor.png" alt="Luvie piano roll pattern editor" width="700">
+
+### Pattern Editor — drums
+A row per drum, named from the loaded drum map, each with its own solo and mute.
+
+<img src="screenshots/drumsEditor.png" alt="Luvie drum pattern editor" width="700">
+
+### Loop Editor
+Launch and stop patterns live, one column per track, without touching the song arrangement.
+
+<img src="screenshots/loopEditor.png" alt="Luvie loop editor" width="700">
+
+### Instruments &amp; Outputs
+Define MIDI output ports and map instruments and drumkits onto them.
+
+<img src="screenshots/settings.png" alt="Luvie instruments and outputs settings" width="700">
 
 # Manual
 For details please consult the [Luvie manual](docs/manual/README.md) 
