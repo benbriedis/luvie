@@ -26,17 +26,17 @@ harmony rather than being locked to fixed pitches.
 <img src="screenshots/harmonyEditor.png" alt="Luvie harmony pattern editor" width="700">
 
 ### Pattern Editor — piano roll
-The same pattern editor in plain piano-roll mode, with a modulation lane underneath.
+An alternative pattern editor that uses absolute pitches. Also shown is a modulation lane underneath.
 
 <img src="screenshots/pianorollEditor.png" alt="Luvie piano roll pattern editor" width="700">
 
 ### Pattern Editor — drums
-A row per drum, named from the loaded drum map, each with its own solo and mute.
+A drum editor. It supports creating and saving your own drum maps.
 
 <img src="screenshots/drumsEditor.png" alt="Luvie drum pattern editor" width="700">
 
 ### Loop Editor
-Launch and stop patterns live, one column per track, without touching the song arrangement.
+Launch and stop patterns live without touching the song arrangement.
 
 <img src="screenshots/loopEditor.png" alt="Luvie loop editor" width="700">
 

@@ -2,32 +2,65 @@
 
 [← Tempo, beats and bars](03-tempo-and-beats.md) · [Contents](README.md) · [The pattern editors →](05-pattern-editors.md)
 
-TODO: screenshot of the song editor with tracks, lanes and placed patterns. Inc parameters.
-
-The song editor arranges patterns along a timeline. Each track holds one
-instrument's worth of material; patterns are placed into it as instances, so the
-same pattern can appear many times without being copied.
+<img src="images/songEditor.png" alt="Luvie song editor" width="800">
 
 ## Tracks
+
+The user can create many patterns for a given instrument and these can be enabled
+at various times thoughout the song. The song editor organises these patterns using "tracks", 
+with each track containing the entire arrangement of patterns for a given instrument.  
+A track in turn is divided into multiple "lanes" with each lane controlling 
+one pattern.
 
 TODO: adding, renaming (double-click the label), reordering, solo and mute,
 deleting. Selecting a track is what chooses which pattern the pattern editor
 shows.
 
-## Placing patterns
+## Placing pattern blocks
 
-TODO: creating an instance, moving it, resizing it from either end, and what
-the start offset does when you resize from the left.
+You indicate a pattern is to play by using what I'm going to call "pattern blocks".
+To add a pattern block simply click somewhere in the grid.
+Having added a pattern block you can move it by clicking and dragging,
+and resize it by clicking and dragging the left or right edge.
 
-TODO: the tick marks that show where the pattern's own beat 0 falls, which is
-how you tell a shifted instance from an aligned one.
+One feature of the Luvie song editor is that it's possible to start patterns part way
+through one of the song editor's bars. Ticks have been added to pattern blocks 
+to indicate where patterns start. Another reason for this feature is that 
+patterns can have different time signatures that don't necessarily match
+the current time signature of the song.
 
-## Tempo and time signature markers
+To delete a pattern block either hover the mouse over the block and press Delete or 
+right-click the block and select Delete from the context menu.
 
-TODO: the two ruler strips above the grid — left-click to create and drag,
-right-click for the menu. Cross-reference
-[Tempo, beats and bars](03-tempo-and-beats.md).
+## Pattern operations
 
-## The transport bar
+Right-clicking the column on the left hand side pops up this context menu:
 
-TODO: play/stop, the bar/beat readout, the time signature and BPM displays.
+<img src="images/contextMenu.png" alt="Song editor context menu" width="400">
+
+This menu allows you to add and remove patterns and automation.
+
+## Automation 
+
+"Automation" describes modifying things like pitch, modulation, panning, expression and 
+volume using MIDI parameters.  You can add an automation lane through the context menu
+descibed above. 
+
+An automation lane contain rubberbands used for modifying the chosen parameter.
+New points can be added to a rubberband by single-clicking. 
+To delete a point right-click a dot and select Delete from the popup menu.
+
+## Rulers and markers
+
+At the top of the song editor there are a number or "rulers". These are
+the time signature ruler, the tempo ruler, the loop ruler, and the transport ruler.
+
+<img src="images/rulers.png" alt="Luvie song editor" width="700">
+
+To add, remove or markers in the rulers right-click over the rulers. 
+Most markers can are movable using click-and-drag.
+
+
+Cross-reference
+[Tempo, beats and bars](07-tempo-and-beats.md).
+

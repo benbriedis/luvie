@@ -49,6 +49,8 @@ etc...
 ## The Transport Bar
 
 TODO: pattern editor tab, song editor tab, the transport bar along the bottom.
+TODO: play/stop, etc
+
 
 ## Song mode vs Loop mode
 
