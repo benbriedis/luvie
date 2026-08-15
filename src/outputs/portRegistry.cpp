@@ -5,6 +5,7 @@
 #include "jackPort.hpp"
 #include "rtMidiPort.hpp"
 #include "debugPort.hpp"
+#include "pluginOutPort.hpp"
 #include "jackTransport.hpp"
 #include <algorithm>
 #include <utility>
@@ -19,6 +20,8 @@ std::unique_ptr<Port> PortRegistry::make(const JackOutput& o)
             p->pitchName = debugPitchName;
             return p;
         }
+        case MidiBackend::Plugin:
+            return std::make_unique<PluginOutPort>(o.portName);
         case MidiBackend::Jack:
             break;
     }

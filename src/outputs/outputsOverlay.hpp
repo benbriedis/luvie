@@ -24,6 +24,10 @@ class OutputsOverlay : public OverlayWindow {
     Fl_Choice*    defaultTypeChoice = nullptr;  // "Default port type" for new ports
 
     int nextPortId_ = 1;
+    // True when hosted as an LV2 plugin. Decides which backends the port dropdowns
+    // offer: the ones this mode cannot drive stay listed but greyed, so a project
+    // moved between standalone and plugin still shows what it was set to.
+    bool pluginMode_ = false;
     MidiBackend defaultBackend_ = MidiBackend::Jack;  // type assigned to newly added ports
     ObservableInstrument* instrObs_ = nullptr;
 
@@ -138,7 +142,7 @@ class OutputsOverlay : public OverlayWindow {
     int  handle(int event) override;
 
 public:
-    OutputsOverlay(int x, int y, int w, int h);
+    OutputsOverlay(int x, int y, int w, int h, bool pluginMode);
     void show() override;
     void hide() override;
 

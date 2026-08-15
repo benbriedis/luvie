@@ -38,6 +38,7 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "observablePattern.hpp"
 #include "observableInstrument.hpp"
 #include "outputsOverlay.hpp"
+#include "pluginPorts.hpp"
 #include "patternPanel.hpp"
 #include "luvieApp.hpp"
 #include "timelineIO.hpp"
@@ -366,22 +367,27 @@ static void sendLoopState(LuvieUI* ui)
 }
 
 /* Send one raw MIDI message (1-3 bytes) to the DSP as a `luvie_midi` atom on
-   control_in; the DSP re-emits it on midi_out this cycle. Used to audition a note
-   when a row label is clicked — the plugin equivalent of the standalone's direct
-   port write (there is no local PortRegistry when hosted). */
-static void sendAuditionMidi(LuvieUI* ui, const uint8_t* bytes, int len)
+   control_in; the DSP re-emits it on the given MIDI output this cycle. Used to
+   audition a note when a row label is clicked — the plugin equivalent of the
+   standalone's direct port write (there is no local PortRegistry when hosted).
+
+   Atom body: one output-index byte, then the MIDI bytes. The index is resolved
+   here because the UI is the side that holds the port list; the DSP applies the
+   same pluginPortIndex() rule to the notes it sequences itself. */
+static void sendAuditionMidi(LuvieUI* ui, int portIdx, const uint8_t* bytes, int len)
 {
     if (!ui->writeFunc || !ui->luvie_midi_urid || !ui->atom_eventTransfer) return;
     if (len < 1 || len > 3) return;
 
-    uint8_t buf[sizeof(LV2_Atom) + 3];
+    uint8_t buf[sizeof(LV2_Atom) + 1 + 3];
     auto* atom = reinterpret_cast<LV2_Atom*>(buf);
-    atom->size = static_cast<uint32_t>(len);
+    atom->size = static_cast<uint32_t>(len + 1);
     atom->type = ui->luvie_midi_urid;
-    std::memcpy(buf + sizeof(LV2_Atom), bytes, len);
+    buf[sizeof(LV2_Atom)] = static_cast<uint8_t>(portIdx);
+    std::memcpy(buf + sizeof(LV2_Atom) + 1, bytes, len);
 
     ui->writeFunc(ui->controller, PORT_CONTROL_IN,
-                  static_cast<uint32_t>(sizeof(LV2_Atom) + len),
+                  static_cast<uint32_t>(sizeof(LV2_Atom) + 1 + len),
                   ui->atom_eventTransfer, buf);
 }
 
@@ -563,14 +569,18 @@ static LV2UI_Handle instantiate(
     });
 
     /* Emit auditioned notes (and their note-offs) to the DSP as raw MIDI. */
-    ui->app.auditioner.setMidiSink([ui](int ch, int midi, int vel, bool on) {
-        uint8_t m[3] = {
-            static_cast<uint8_t>((on ? 0x90 : 0x80) | (ch & 0x0F)),
-            static_cast<uint8_t>(midi & 0x7F),
-            static_cast<uint8_t>(on ? (vel & 0x7F) : 0),
-        };
-        sendAuditionMidi(ui, m, 3);
-    });
+    ui->app.auditioner.setMidiSink(
+        [ui](const std::string& portName, int ch, int midi, int vel, bool on) {
+            uint8_t m[3] = {
+                static_cast<uint8_t>((on ? 0x90 : 0x80) | (ch & 0x0F)),
+                static_cast<uint8_t>(midi & 0x7F),
+                static_cast<uint8_t>(on ? (vel & 0x7F) : 0),
+            };
+            int portIdx = 0;
+            if (auto* ov = ui->app.outputsOverlay)
+                portIdx = pluginPortIndex(ov->getOutputsFull(), portName);
+            sendAuditionMidi(ui, portIdx, m, 3);
+        });
 
     /* ---- JACK transport control (Issue #2) ----
        The transport buttons start disabled (disableTransportButtons above). When a
@@ -604,10 +614,11 @@ static LV2UI_Handle instantiate(
 
     /* ---- Wire port management ---- */
     if (auto* overlay = ui->app.outputsOverlay) {
-        /* No new-project dialog in the plugin; default MIDI output is Jack. The DSP
-           engine reconciles its JACK ports from the project state, so every change
-           just re-sends the current state atom. */
-        overlay->setDefaultBackend(MidiBackend::Jack);
+        /* No new-project dialog in the plugin, so seed the default backend here:
+           hosted, the only one that reaches an output is Plugin. The DSP reconciles
+           its routing from the project state, so every change just re-sends the
+           current state atom. */
+        overlay->setDefaultBackend(MidiBackend::Plugin);
         overlay->onPortAdded   = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };
         overlay->onPortRemoved = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };
         overlay->onPortRenamed = [ui](const std::string&, const std::string&) { if (!ui->restoringState) sendState(ui); };

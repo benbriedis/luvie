@@ -156,8 +156,23 @@ public:
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
-OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
-    : OverlayWindow(x, y, w, h, "Instruments & Outputs")
+// Item order must match the MidiBackend enum: both dropdowns treat the item index
+// as the enum value. Backends the current mode cannot drive are added but greyed,
+// so a port keeps showing (and keeps) the setting it was saved with.
+static void fillBackendChoice(ModernChoice* c, bool pluginMode)
+{
+    static const char* const names[] = { "Jack", "Native", "Debug", "Plugin" };
+    for (int i = 0; i < (int)(sizeof(names) / sizeof(names[0])); i++) {
+        c->add(names[i]);
+        if (!backendSupported(static_cast<MidiBackend>(i), pluginMode))
+            c->mode(i, c->mode(i) | FL_MENU_INACTIVE);
+    }
+}
+
+OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
+    : OverlayWindow(x, y, w, h, "Instruments & Outputs"),
+      pluginMode_(pluginMode),
+      defaultBackend_(defaultBackendFor(pluginMode))
 {
     begin();
 
@@ -168,9 +183,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h)
     dtc->setBorderColor(borderCol);
     dtc->setArrowColor(subTextCol);
     dtc->setHoverColor(0xF3F4F600);
-    dtc->add("Jack");
-    dtc->add("Native");
-    dtc->add("Debug");
+    fillBackendChoice(dtc, pluginMode_);
     dtc->value(static_cast<int>(defaultBackend_));
     dtc->callback(defaultTypeChoiceCb, this);
     defaultTypeChoice = dtc;
@@ -285,7 +298,7 @@ void OutputsOverlay::onResized() {
 void OutputsOverlay::setOutputs(const std::vector<std::string>& portNames) {
     outputs_.clear();
     for (const auto& n : portNames)
-        if (!n.empty()) outputs_.push_back({nextPortId_++, n});
+        if (!n.empty()) outputs_.push_back({nextPortId_++, n, defaultBackend_});
     if (outputs_.empty())
         addDefaultOutputs();
     rebuildRows();
@@ -315,6 +328,10 @@ std::vector<JackOutput> OutputsOverlay::getOutputsFull() const {
 }
 
 void OutputsOverlay::setDefaultBackend(MidiBackend backend) {
+    // A project saved in the other mode can carry a default this one cannot drive;
+    // new ports would then be created dead. Fall back to this mode's own default.
+    if (!backendSupported(backend, pluginMode_))
+        backend = defaultBackendFor(pluginMode_);
     defaultBackend_ = backend;
     if (defaultTypeChoice) defaultTypeChoice->value(static_cast<int>(backend));
 }
@@ -488,9 +505,7 @@ void OutputsOverlay::rebuildRows() {
         be->setBorderColor(borderCol);
         be->setArrowColor(subTextCol);
         be->setHoverColor(0xF3F4F600);
-        be->add("Jack");
-        be->add("Native");
-        be->add("Debug");
+        fillBackendChoice(be, pluginMode_);
         be->value(static_cast<int>(outputs_[i].backend));
         be->callback(backendChoiceCb, this);
 
