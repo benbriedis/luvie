@@ -771,6 +771,9 @@ void PatternPanel::commitHarmony()
         for (const auto& p : pattern->get().patterns)
             if (p.id == patId) { oldHash = p.chordHash; break; }
         std::string newHash = chordHash();
+        // One chord change is one edit: batch so the remap that follows it is
+        // not a second notification, nor a second thing to undo.
+        ObservableSong::Batch batch(pattern->song());
         pattern->setPatternHarmony(patId, rootPitch(), newHash, useSharp);
         int oldSize = chordDefForHash(oldHash).size;
         int newSize = chordDefForHash(newHash).size;

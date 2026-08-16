@@ -36,9 +36,6 @@ public:
     void resizeNoteRight(int noteId, float newLength);
     void resizeNoteLeft(int noteId, float newStart, float newLength);
     void setNoteVelocity(int noteId, float velocity);
-    void transposePattern(int patternId, int semitones);
-    // Lowest/highest MIDI pitch a pianoroll pattern uses; {-1,-1} when it has no notes.
-    std::pair<int,int> patternPitchExtent(int patternId) const;
 
     // Where a note sits in the harmony editor's row space. `row` is the abs_row
     // for an ordinary note and the pitch group for a bonus one, as Note documents.
@@ -48,7 +45,6 @@ public:
         bool bonus;
         int  bonusDegree;
     };
-    void setNoteRows(int patternId, const std::vector<NoteRowSlot>& slots);
     // Move one note in both axes at once: `slot` carries the row it lands on, which
     // may be an ordinary row or a bonus one.
     void moveNoteToSlot(float newStart, const NoteRowSlot& slot);
@@ -58,6 +54,8 @@ public:
     // Drum note CRUD
     void addDrumNote(int patternId, int note, float beat, float velocity = 0.8f);
     void removeDrumNote(int drumNoteId);
+    // Move a drum note without changing its id, so one drag is one edit.
+    void moveDrumNote(int drumNoteId, int note, float beat);
     void setDrumNoteVelocity(int drumNoteId, float velocity);
     std::vector<DrumNote> buildDrumPatternNotes(int patternId) const;
     void setDrumNoteSolo(int patternId, int note, bool solo);

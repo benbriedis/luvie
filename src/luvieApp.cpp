@@ -34,7 +34,6 @@
 #include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
-#include "transposePopup.hpp"
 #include "patternParamGrid.hpp"
 
 // The pattern tab's control panel is bottom-anchored and can change height (it
@@ -150,6 +149,20 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     pattern_      = pattern;
     instruments_  = instruments;
 
+    window->onUndo = [song]() { song->undo(); };
+    window->onRedo = [song]() { song->redo(); };
+    // Only one editor is visible at a time, so clearing all of them is both
+    // correct and simpler than working out which one has the cursor.
+    window->onEscape = [this]() {
+        bool cleared = false;
+        for (ISelectionHost* h : { songEd     ? songEd->selectionHost()      : nullptr,
+                                   harmonyEd  ? harmonyEd->selectionHost()   : nullptr,
+                                   pianorollEd? pianorollEd->selectionHost() : nullptr,
+                                   drumEd     ? drumEd->selectionHost()      : nullptr })
+            if (h && h->hasSelection()) { h->clearSelection(); cleared = true; }
+        return cleared;
+    };
+
     const int off        = 0;
     const int tabsH      = defaultWinH() - bottomH;
     const int drumRowH   = 20;
@@ -171,8 +184,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* pdPop      = new ParamDotPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
     auto* settingsPop = new SettingsMenuPopup;
-    auto* patTransposePop   = new TransposePopup("Rows:");
-    auto* pianoTransposePop = new TransposePopup("Semitones:");
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -409,8 +420,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
-    harmonyEd->setTransposePopup(patTransposePop);
-    pianorollEd->setTransposePopup(pianoTransposePop);
     harmonyEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);
@@ -467,8 +476,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
     window->add(settingsPop); window->registerPopup(settingsPop);
-    window->add(patTransposePop);   window->registerPopup(patTransposePop);
-    window->add(pianoTransposePop); window->registerPopup(pianoTransposePop);
     // Hover popup: a positioned sub-window, but NOT registered — registering
     // would route mouse-moves through AppWindow's click-away logic and break the
     // indicator's enter/leave tracking.

@@ -59,6 +59,8 @@ public:
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
     std::function<void(int numCols)>               onNumColsChanged;
 
+    ISelectionHost* selectionHost() { return &songGrid; }
+
     void setSongPopup(PatternInstanceContextPopup* p)         { songGrid.setSongPopup(p); }
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }
 

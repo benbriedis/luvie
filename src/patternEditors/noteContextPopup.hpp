@@ -16,13 +16,9 @@ class NoteContextPopup : public ContextMenuPopup {
 public:
 	NoteContextPopup();
 
-	// onTranspose is called with this popup's position so the caller can open
-	// the transpose popup in its place; when null the Transpose item is hidden
-	// (song grid, drum grid).
 	void open(int selected, std::vector<Note>* notes, Grid* grid,
 	          std::function<void()> onDelete = nullptr,
-	          std::function<void(float)> onVelocity = nullptr,
-	          std::function<void(int,int)> onTranspose = nullptr);
+	          std::function<void(float)> onVelocity = nullptr);
 
 	// Variant used by drum grid: caller provides the dot's pixel position.
 	void openForDot(int dotX, int dotY, Fl_Widget* w, int rowH, float velocity,
@@ -33,17 +29,14 @@ public:
 
 private:
 	void onVelocityChanged();
-	void showTranspose(bool on);
 
 	int selected;
 	std::vector<Note>* notes;
 	Grid* grid;
 	VelocityRow*  velRow;
 	ModernSlider* velSlider;
-	ModernButton* transposeItem;
 	std::function<void()> onDeleteFn;
 	std::function<void(float)> onVelocityFn;
-	std::function<void(int,int)> onTransposeFn;
 };
 
 #endif

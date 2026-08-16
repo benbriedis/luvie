@@ -15,6 +15,9 @@ class HarmonyEditor : public BasePatternEditor {
 
     HarmonyLabels  harmonyLabels;
     HarmonyGrid harmonyGrid;
+public:
+    ISelectionHost* selectionHost() { return &harmonyGrid; }
+private:
     int         rootPitch       = 0;
     int         chordIndex      = 0;   // resolved from the pattern's chord hash
 
@@ -53,7 +56,6 @@ public:
     void setSnap(float s) override { harmonyGrid.setSnap(s); BasePatternEditor::setSnap(s); }
     void setDivisions(int d) override { harmonyGrid.setDivisions(d); }
     void setRapidMode(bool r)      { harmonyGrid.setRapidMode(r); }
-    void setTransposePopup(TransposePopup* p) { harmonyGrid.setTransposePopup(p); }
 };
 
 #endif

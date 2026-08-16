@@ -74,6 +74,23 @@ protected:
     void onCommitResize(const StateDragResize& s) override;
     void onNoteDoubleClick(int noteIdx) override;
     void toggleNote() override;
+
+    // Instances move sideways only: a lane change is a different operation, and
+    // allowing it would make a collapsed track's lanes indistinguishable.
+    bool allowsVerticalDrag() const override { return false; }
+    std::unordered_set<int> liveItemIds() const override;
+    void selectAll() override;
+    void deleteSelection() override;
+    void groupDragLimits(float& minDBeat, float& maxDBeat,
+                         int& minDRow, int& maxDRow) const override;
+    bool groupMoveBlocked(float dBeat, int dRow) const override;
+    void onCommitGroupMove(float dBeat, int dRow) override;
+
+    // Automation dots share the selection with pattern instances here, because
+    // they are rows of this same grid. Both are keyed by their model id, and
+    // the id spaces never overlap (one nextId counter issues both).
+    void addBandHitExtras() override;
+    void drawParamSelection(int laneIdx, int rowY) const;
     // Song blocks are placed one whole bar long, at the bar the click lands in;
     // beat subdivisions do not apply here.
     float newNoteLength() const override { return 1.0f; }

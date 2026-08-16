@@ -67,6 +67,9 @@ class DrumPatternEditor : public BasePatternEditor {
     DrumNoteLabels  drumLabels;
     DrumRowControls drumRowControls;
     DrumGrid        drumGrid;
+public:
+    ISelectionHost* selectionHost() { return &drumGrid; }
+private:
     InlineInput     drumLabelInput;
     int             editingMidiNote = -1;
 

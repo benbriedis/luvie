@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "pianorollGrid.hpp"
-#include "transposePopup.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"
 #include <FL/Fl.H>
@@ -99,19 +98,93 @@ std::function<void(float)> PianorollGrid::makeVelocityCallback(int noteIdx)
     return [this, id](float v) { pattern->setNoteVelocity(id, v); };
 }
 
-// Transpose applies to the whole pattern, not the clicked note: an octave either
-// way, narrowed to the shifts that keep every note inside the MIDI range.
-std::function<void(int,int)> PianorollGrid::makeTransposeCallback(int noteIdx)
+// ---------------------------------------------------------------------------
+// Multi-selection. A visual row is one semitone, and the grid is drawn highest
+// pitch first, so moving DOWN the screen by dRow rows means SUBTRACTING dRow
+// from the MIDI note. Everything below reads the pattern rather than `notes`,
+// which holds only the rows currently on screen.
+// ---------------------------------------------------------------------------
+
+std::unordered_set<int> PianorollGrid::liveItemIds() const
 {
-    if (!pattern || !transposePopup || patternId < 0) return nullptr;
-    (void)noteIdx;
-    return [this](int px, int py) {
-        auto [lo, hi] = pattern->patternPitchExtent(patternId);
-        if (lo < 0) return;
-        transposePopup->open(px, py,
-            {std::max(-maxSemitones, -lo), std::min(maxSemitones, totalRows - 1 - hi)},
-            [this](int semitones) { pattern->transposePattern(patternId, semitones); });
-    };
+    std::unordered_set<int> ids;
+    if (!pattern || patternId < 0) return ids;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) ids.insert(n.id);
+    return ids;
+}
+
+void PianorollGrid::selectAll()
+{
+    selection.clear();
+    if (!pattern || patternId < 0) return;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) selection.add(n.id);
+}
+
+void PianorollGrid::deleteSelection()
+{
+    if (!pattern || selection.empty()) return;
+    std::vector<int> doomed(selection.ids().begin(), selection.ids().end());
+    selection.clear();
+    ObservableSong::Batch batch(pattern->song());
+    for (int id : doomed) pattern->removeNote(id);
+}
+
+void PianorollGrid::groupDragLimits(float& minDBeat, float& maxDBeat,
+                                    int& minDRow, int& maxDRow) const
+{
+    minDBeat = maxDBeat = 0.0f;
+    minDRow  = maxDRow  = 0;
+    if (!pattern || patternId < 0) return;
+
+    bool first = true;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) {
+        if (!selection.contains(n.id)) continue;
+        // Beat: the note must stay inside [0, numCols].
+        float bLo = -n.beat;
+        float bHi = (float)numCols - (n.beat + n.length);
+        // Pitch: 0 <= n.row - dRow <= 127.
+        int rLo = n.row - (totalRows - 1);
+        int rHi = n.row;
+        if (first) { minDBeat = bLo; maxDBeat = bHi; minDRow = rLo; maxDRow = rHi; first = false; }
+        else {
+            minDBeat = std::max(minDBeat, bLo);
+            maxDBeat = std::min(maxDBeat, bHi);
+            minDRow  = std::max(minDRow,  rLo);
+            maxDRow  = std::min(maxDRow,  rHi);
+        }
+    }
+}
+
+bool PianorollGrid::groupMoveBlocked(float dBeat, int dRow) const
+{
+    if (!pattern || patternId < 0) return false;
+    auto all = pattern->buildPatternNotes(patternId);
+    for (const Note& n : all) {
+        if (!selection.contains(n.id)) continue;
+        const float beat = n.beat + dBeat;
+        const int   midi = n.row  - dRow;
+        for (const Note& other : all) {
+            // Selected notes all move by the same delta, so their relative
+            // geometry is unchanged and they cannot newly collide with one
+            // another. Only unselected notes can be in the way.
+            if (selection.contains(other.id)) continue;
+            if (other.row != midi) continue;
+            if (beatsOverlap(beat, n.length, other.beat, other.length)) return true;
+        }
+    }
+    return false;
+}
+
+void PianorollGrid::onCommitGroupMove(float dBeat, int dRow)
+{
+    if (!pattern || patternId < 0) return;
+    std::vector<Note> sel;
+    for (const Note& n : pattern->buildPatternNotes(patternId))
+        if (selection.contains(n.id)) sel.push_back(n);
+
+    ObservableSong::Batch batch(pattern->song());
+    for (const Note& n : sel)
+        pattern->moveNote(n.id, n.beat + dBeat, (float)(n.row - dRow));
 }
 
 void PianorollGrid::onCommitMove(const StateDragMove& s)

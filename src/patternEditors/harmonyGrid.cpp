@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "harmonyGrid.hpp"
-#include "transposePopup.hpp"
 #include "editor.hpp"
 #include "playhead.hpp"
 #include <FL/Fl.H>
@@ -183,8 +182,8 @@ int HarmonyGrid::virtualPosOf(const Note& n) const
 }
 
 // A row's note-slot: a chord degree in the lower part of each pitch group, or one
-// of the greyed-out bonus rows above it. A transposed note takes on the character
-// of the row it lands on, which is what "move everything up N rows" means visually.
+// of the greyed-out bonus rows above it. A note takes on the character of the row
+// it lands on, which is what "move everything up N rows" means visually.
 ObservablePattern::NoteRowSlot HarmonyGrid::slotForVirtualPos(int noteId, int virtualPos) const
 {
     int pitchGroup = virtualPos / pitchGroupSize;
@@ -194,55 +193,109 @@ ObservablePattern::NoteRowSlot HarmonyGrid::slotForVirtualPos(int noteId, int vi
     return {noteId, pitchGroup, true, bonusDegrees[pos - chordSize]};
 }
 
-// Lowest/highest virtual row the pattern's notes occupy; {-1,-1} when it has
-// none. Taken from the pattern, not `notes`, which holds only the visible rows.
-std::pair<int,int> HarmonyGrid::virtualPosExtent() const
+// ---------------------------------------------------------------------------
+// Multi-selection. The vertical axis is virtual rows (chord degrees interleaved
+// with bonus rows), and the grid draws the highest pitch at the top, so moving
+// DOWN the screen by dRow rows SUBTRACTS dRow from the virtual position.
+// Dragging a selection vertically is what replaced the Transpose dialog.
+// ---------------------------------------------------------------------------
+
+std::unordered_set<int> HarmonyGrid::liveItemIds() const
 {
-    int lo = -1, hi = -1;
-    for (const auto& n : pattern->buildPatternNotes(patternId)) {
-        int vp = virtualPosOf(n);
-        if (vp < 0) continue;
-        if (lo < 0 || vp < lo) lo = vp;
-        if (vp > hi) hi = vp;
-    }
-    return {lo, hi};
+    std::unordered_set<int> ids;
+    if (!pattern || patternId < 0) return ids;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) ids.insert(n.id);
+    return ids;
 }
 
-void HarmonyGrid::transposeRows(int rows)
+void HarmonyGrid::selectAll()
 {
-    if (!pattern || patternId < 0 || rows == 0 || pitchGroupSize <= 0) return;
+    selection.clear();
+    if (!pattern || patternId < 0) return;
+    // Bonus notes are ordinary members of the selection; only a note whose
+    // degree has fallen out of the layout entirely has nowhere to sit.
+    for (const Note& n : pattern->buildPatternNotes(patternId))
+        if (virtualPosOf(n) >= 0) selection.add(n.id);
+}
 
+void HarmonyGrid::deleteSelection()
+{
+    if (!pattern || selection.empty()) return;
+    std::vector<int> doomed(selection.ids().begin(), selection.ids().end());
+    selection.clear();
+    ObservableSong::Batch batch(pattern->song());
+    for (int id : doomed) pattern->removeNote(id);
+}
+
+void HarmonyGrid::groupDragLimits(float& minDBeat, float& maxDBeat,
+                                  int& minDRow, int& maxDRow) const
+{
+    minDBeat = maxDBeat = 0.0f;
+    minDRow  = maxDRow  = 0;
+    if (!pattern || patternId < 0 || totalTones <= 0) return;
+
+    bool first = true;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) {
+        if (!selection.contains(n.id)) continue;
+        int vp = virtualPosOf(n);
+        if (vp < 0) continue;
+        float bLo = -n.beat;
+        float bHi = (float)numCols - (n.beat + n.length);
+        // 0 <= vp - dRow <= totalTones - 1
+        int rLo = vp - (totalTones - 1);
+        int rHi = vp;
+        if (first) { minDBeat = bLo; maxDBeat = bHi; minDRow = rLo; maxDRow = rHi; first = false; }
+        else {
+            minDBeat = std::max(minDBeat, bLo);
+            maxDBeat = std::min(maxDBeat, bHi);
+            minDRow  = std::max(minDRow,  rLo);
+            maxDRow  = std::min(maxDRow,  rHi);
+        }
+    }
+}
+
+bool HarmonyGrid::groupMoveBlocked(float dBeat, int dRow) const
+{
+    if (!pattern || patternId < 0) return false;
+    auto all = pattern->buildPatternNotes(patternId);
+    for (const Note& n : all) {
+        if (!selection.contains(n.id)) continue;
+        int vp = virtualPosOf(n);
+        if (vp < 0) continue;
+        const int   destVp = vp - dRow;
+        const float beat   = n.beat + dBeat;
+        if (!validVirtualPos(destVp)) return true;
+        for (const Note& other : all) {
+            if (selection.contains(other.id)) continue;
+            if (virtualPosOf(other) != destVp) continue;
+            if (beatsOverlap(beat, n.length, other.beat, other.length)) return true;
+        }
+    }
+    return false;
+}
+
+void HarmonyGrid::onCommitGroupMove(float dBeat, int dRow)
+{
+    if (!pattern || patternId < 0) return;
     std::vector<ObservablePattern::NoteRowSlot> slots;
-    for (const auto& n : pattern->buildPatternNotes(patternId)) {
+    std::vector<float> beats;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) {
+        if (!selection.contains(n.id)) continue;
         int vp = virtualPosOf(n);
         if (vp < 0) continue;
-        vp += rows;
-        if (vp < 0 || vp >= totalTones) return;  // the offered range rules this out
-        slots.push_back(slotForVirtualPos(n.id, vp));
+        int destVp = vp - dRow;
+        if (!validVirtualPos(destVp)) return;   // the clamp should have prevented this
+        slots.push_back(slotForVirtualPos(n.id, destVp));
+        beats.push_back(n.beat + dBeat);
     }
-    pattern->setNoteRows(patternId, slots);
+    ObservableSong::Batch batch(pattern->song());
+    for (size_t i = 0; i < slots.size(); ++i)
+        pattern->moveNoteToSlot(beats[i], slots[i]);
 }
 
-// Transpose applies to the whole pattern, not the clicked note, and counts GUI
-// rows: one pitch group is pitchGroupSize rows, which is the most we offer either
-// way. Bonus notes move with the rest.
-std::function<void(int,int)> HarmonyGrid::makeTransposeCallback(int noteIdx)
-{
-    if (!pattern || !transposePopup || patternId < 0 || pitchGroupSize <= 0 || totalTones <= 0)
-        return nullptr;
-    (void)noteIdx;
-    return [this](int px, int py) {
-        auto [lo, hi] = virtualPosExtent();
-        if (lo < 0) return;
-        transposePopup->open(px, py,
-            {std::max(-pitchGroupSize, -lo), std::min(pitchGroupSize, totalTones - 1 - hi)},
-            [this](int rows) { transposeRows(rows); });
-    };
-}
-
-// A dragged note takes on the character of the row it is dropped on — the same
-// rule transpose follows — so a note dragged onto a bonus row becomes a bonus
-// note, and one dragged off a bonus row becomes an ordinary one.
+// A dragged note takes on the character of the row it is dropped on, so a note
+// dragged onto a bonus row becomes a bonus note, and one dragged off a bonus row
+// becomes an ordinary one.
 void HarmonyGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern) return;
@@ -273,6 +326,7 @@ void HarmonyGrid::setRapidMode(bool r)
 {
     rapidMode           = r;
     rapidRemovedOnClick = false;
+    rapidUndo.reset();
     rapidCells.clear();
     rapidLast    = std::nullopt;
     rapidPending = std::nullopt;
@@ -356,6 +410,7 @@ int HarmonyGrid::handle(int event)
         rapidCells.clear();
         rapidLast    = std::nullopt;
         rapidPending = std::nullopt;
+        if (pattern) rapidUndo.emplace(pattern->song());
 
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             int row, absCol;
@@ -401,6 +456,7 @@ int HarmonyGrid::handle(int event)
         rapidRemovedOnClick = false;
         rapidCells.clear();
         rapidLast = std::nullopt;
+        rapidUndo.reset();
         return 1;
     case FL_ENTER:
         window()->cursor(FL_CURSOR_CROSS);

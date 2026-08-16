@@ -649,6 +649,12 @@ int main(int argc, char **argv) {
         });
     }
 
+    // Everything above built the song through the ordinary mutators — the
+    // default tracks, a loaded project, the instrument reconciliation. None of
+    // it is an edit the user made, so it must not be sitting on the undo stack
+    // when they press ctrl-Z for the first time.
+    songTimeline.clearHistory();
+
     // Under NSM the GUI is optional: hiding it must not end the program (the
     // session manager keeps us running and terminates us with SIGTERM).
     //

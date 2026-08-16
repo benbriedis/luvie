@@ -6,6 +6,7 @@
 
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Window.H>
+#include <functional>
 #include <vector>
 
 class AppWindow : public Fl_Double_Window {
@@ -27,6 +28,19 @@ public:
 	AppWindow(int w, int h) : Fl_Double_Window(w, h) {}
 
 	void registerPopup(Fl_Window* p) { popups.push_back(p); }
+
+	// Undo/redo are window-level accelerators rather than grid ones: the grids
+	// never take keyboard focus, so there is no widget to hang them off. An
+	// inline text input that does hold focus sees ctrl-Z first and consumes it,
+	// so its own undo still works.
+	std::function<void()> onUndo;
+	std::function<void()> onRedo;
+
+	// Escape clears any active multi-selection. It has to be routed through the
+	// window because the grids never take keyboard focus and the window swallows
+	// Escape before FLTK's shortcut fallback would reach them. Returns true when
+	// something was actually cleared; the key is consumed either way, as before.
+	std::function<bool()> onEscape;
 
 	void openPopup(Fl_Window* p) {
 		for (auto* q : popups)

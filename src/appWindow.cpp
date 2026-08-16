@@ -247,8 +247,19 @@ int AppWindow::handle(int event)
         }
     }
 
-    if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape)
+    // FL_COMMAND is ctrl everywhere but macOS, where it is the Command key.
+    // Accept both cases of the key: whether shift folds it is platform-dependent.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) && (Fl::event_state() & FL_COMMAND) &&
+        (Fl::event_key() == 'z' || Fl::event_key() == 'Z')) {
+        if (Fl::event_state() & FL_SHIFT) { if (onRedo) onRedo(); }
+        else                              { if (onUndo) onUndo(); }
         return 1;
+    }
+
+    if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape) {
+        if (onEscape) onEscape();
+        return 1;
+    }
 
     switch (event) {
     case FL_PUSH:
