@@ -78,4 +78,25 @@ on the command line.
 If you are using Jack you would normally start it before Luvie. 
 Luvie is chill though and should cope with Jack starting late or disappearing and reappearing.
 
+## Running in Carla
+
+Luvie can be run in Carla as a plugin. Here's a quick walk through.
+1. Start JACK if necessary.
+1. To start from the console use:
+```
+carla-jack-single mySession.carxp
+```
+Carla actually has four modes it can start in: 'carla-patchbay', 'carla-jack-single', 'carla-jack-multi', and 'carla-rack'.
+Trap: plain 'carla' is an alias for 'carla-patchbay' and currently this form does NOT work with Luvie as this form of Carla does not
+support plugins that have multiple MIDI outputs. Note that 'carla-jack-multi' also works nicely.
+1. TODO set up transport
+1. TODO add Luvie
+1. TODO add ACE Reasonable Synth
+1. TODO add AVL Drum
+1. Hook them up
+1. Add notes to pattern
+1. Swap to Loop mode and enable both loops
+1. add some notes to both patterns
+1. Press play
+
 
