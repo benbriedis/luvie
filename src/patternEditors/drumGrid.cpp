@@ -499,7 +499,16 @@ void DrumGrid::beginGroupDrag(int idx, int grabX, int grabY)
     for (int i = 0; i < (int)notes.size(); ++i)
         if (selection.contains(notes[i].id))
             groupOrig.push_back({i, notes[i].beat, notes[i].note});
-    state = DrumStateDragGroup{grabX, grabY, notes[idx].beat, notes[idx].note, 0.0f, 0, false};
+
+    // Resolve the travel limits now, from the untouched starting positions —
+    // the same reasoning as Grid::beginGroupDrag.
+    float minDB, maxDB; int minDN, maxDN;
+    groupDragLimits(minDB, maxDB, minDN, maxDN);
+    includeZero(minDB, maxDB);
+    includeZero(minDN, maxDN);
+
+    state = DrumStateDragGroup{grabX, grabY, notes[idx].beat, notes[idx].note,
+                               minDB, maxDB, minDN, maxDN, 0.0f, 0, false};
 }
 
 void DrumGrid::movingGroup(DrumStateDragGroup& d)
@@ -514,10 +523,9 @@ void DrumGrid::movingGroup(DrumStateDragGroup& d)
     int rowDelta = (ey - (d.grabY - y())) / rowHeight;
     int dNote    = rowDelta;   // screen-down is a lower MIDI note; see header comment
 
-    float minDB, maxDB; int minDN, maxDN;
-    groupDragLimits(minDB, maxDB, minDN, maxDN);
-    dBeat = std::clamp(dBeat, minDB, maxDB);
-    dNote = std::clamp(dNote, minDN, maxDN);
+    // Limits were fixed when the drag began.
+    dBeat = std::clamp(dBeat, d.minDBeat, d.maxDBeat);
+    dNote = std::clamp(dNote, d.minDNote, d.maxDNote);
 
     d.dBeat   = dBeat;
     d.dNote   = dNote;

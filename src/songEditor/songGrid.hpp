@@ -90,6 +90,7 @@ protected:
     // they are rows of this same grid. Both are keyed by their model id, and
     // the id spaces never overlap (one nextId counter issues both).
     void addBandHitExtras() override;
+    void previewGroupExtras(float dBeat) override;
     void drawParamSelection(int laneIdx, int rowY) const;
     // Song blocks are placed one whole bar long, at the bar the click lands in;
     // beat subdivisions do not apply here.

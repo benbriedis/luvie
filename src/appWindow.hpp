@@ -29,10 +29,10 @@ public:
 
 	void registerPopup(Fl_Window* p) { popups.push_back(p); }
 
-	// Undo/redo are window-level accelerators rather than grid ones: the grids
-	// never take keyboard focus, so there is no widget to hang them off. An
-	// inline text input that does hold focus sees ctrl-Z first and consumes it,
-	// so its own undo still works.
+	// Undo (ctrl-Z) and redo (ctrl-Y) are window-level accelerators rather than
+	// grid ones: the grids never take keyboard focus, so there is no widget to
+	// hang them off. An inline text input that does hold focus sees ctrl-Z first
+	// and consumes it, so its own undo still works.
 	std::function<void()> onUndo;
 	std::function<void()> onRedo;
 

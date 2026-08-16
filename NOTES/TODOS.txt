@@ -127,9 +127,6 @@ Do we get warning if deleting the plugin and notes have been added?
   In standalone probably want a warning too.
 
 
-cf being able to select a group of notes? cf picking the tool from the context menu?
-
-
 ------------------------------TODOs---------------------------
 
 1. Transport
@@ -278,9 +275,6 @@ Try Valgrind again
 
 Try Helvum
 
-Implement undo/redo (possible on an editor-by-editor basis? or current edit only?)
-    Only enable Save & Save As if a change has been made (and not undone).
-
 Create a shortcut mechanism and menu...  (cf dividing by editor type) 
    cf start/stop    - map to space
       open pattern  - eg map to <Enter>
@@ -369,6 +363,28 @@ BUG: I suspect 'Loop mode' + current loops are not being saved.
 
 TODO .luv ==> .luvie
 
-
 BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
+TODO move 'Add automation' to second last in the menu
+
+
+
+Document
+ Ctrl-click  select/deselect
+ Shift-click  slection area
+ Ctrl-A      select all
+ Ctrl-Z    undo
+ Ctrl-Y    redo
+ 
+ Maybe add an optional "Tools" toolbar?
+ 
+ 
+cf copy/paste cloning of selection  
+
+Change tab when undoing/redoing when necessary (+ scroll? cf recenter? cf storing position when editing?) 
+Multi-select - selection box shouldn't be opaque
+
+TODO check undo and multi-select in LV2 mode
+TODO In pattern editors some notes may sit at divisions not currently supported.
+     Should have a consistent policy for how to deal with dragging in this case.
+     Seems a bit ad hoc at the moment.
 

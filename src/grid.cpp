@@ -267,6 +267,9 @@ int Grid::handle(int event)
                     onCommitGroupMove(drag.dBeat, drag.dRow);
                 else
                     redraw();          // snap the preview back
+                // Whether the move committed or not, the model is now the truth
+                // for the items previewed outside `notes`.
+                previewGroupExtras(0.0f);
                 groupOrig.clear();
                 window()->cursor(FL_CURSOR_DEFAULT);
                 return 1;
@@ -407,6 +410,11 @@ void Grid::onCommitGroupMove(float, int) {}
 void Grid::beginGroupDrag(int noteIdx, float grabX, float grabY)
 {
     onBeginDrag(noteIdx);
+    beginGroupDrag(Point{(int)notes[noteIdx].row, notes[noteIdx].beat}, grabX, grabY);
+}
+
+void Grid::beginGroupDrag(Point original, float grabX, float grabY)
+{
     // No pointer warp here. Snapping the cursor to one block's centre is a
     // helpful cue when that block is the only thing moving, and disorienting
     // when it is one of fifty.
@@ -415,8 +423,17 @@ void Grid::beginGroupDrag(int noteIdx, float grabX, float grabY)
         if (selection.contains(notes[i].id))
             groupOrig.push_back({i, notes[i].beat, (int)notes[i].row});
 
-    Point orig = {(int)notes[noteIdx].row, notes[noteIdx].beat};
-    state = StateDragGroup{noteIdx, grabX, grabY, orig, 0.0f, 0, false};
+    // Resolve the travel limits now, from the untouched starting positions.
+    // They must not be recomputed while the drag runs: some of the inputs are
+    // the preview positions themselves, so the bound would slide along with the
+    // selection instead of holding it.
+    float minDB, maxDB; int minDR, maxDR;
+    groupDragLimits(minDB, maxDB, minDR, maxDR);
+    includeZero(minDB, maxDB);
+    includeZero(minDR, maxDR);
+
+    state = StateDragGroup{grabX, grabY, original, minDB, maxDB, minDR, maxDR,
+                           0.0f, 0, false};
 }
 
 void Grid::movingGroup(StateDragGroup& s)
@@ -436,15 +453,14 @@ void Grid::movingGroup(StateDragGroup& s)
     }
 
     // Clamp the delta so no member of the selection leaves the grid, rather
-    // than clamping each note as it goes — that would squash the shape.
-    float minDB, maxDB; int minDR, maxDR;
-    groupDragLimits(minDB, maxDB, minDR, maxDR);
-    dBeat = std::clamp(dBeat, minDB, maxDB);
-    dRow  = std::clamp(dRow,  minDR, maxDR);
+    // than clamping each note as it goes — that would squash the shape. The
+    // limits were fixed when the drag began.
+    dBeat = std::clamp(dBeat, s.minDBeat, s.maxDBeat);
+    dRow  = std::clamp(dRow,  s.minDRow,  s.maxDRow);
     if (snap > 0.0f) {
         // Re-snap after clamping: the limit itself is rarely on a grid line.
         float snapped = std::round(dBeat / snap) * snap;
-        if (snapped >= minDB && snapped <= maxDB) dBeat = snapped;
+        if (snapped >= s.minDBeat && snapped <= s.maxDBeat) dBeat = snapped;
     }
 
     s.dBeat   = dBeat;
@@ -456,6 +472,7 @@ void Grid::movingGroup(StateDragGroup& s)
         notes[g.idx].beat = g.beat + dBeat;
         notes[g.idx].row  = g.row  + dRow;
     }
+    previewGroupExtras(dBeat);
 
     if (s.blocked) window()->cursor(forbiddenCursorImage(), 11, 11);
     else           window()->cursor(FL_CURSOR_HAND);

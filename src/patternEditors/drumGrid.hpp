@@ -35,6 +35,10 @@ struct DrumStateDragGroup {
     int   grabX, grabY;     // pixel position the drag was anchored at
     float origBeat;
     int   origNote;
+    // How far the selection may travel, resolved once when the drag begins.
+    // See beginGroupDrag for why it is not recomputed as the drag proceeds.
+    float minDBeat = 0.0f, maxDBeat = 0.0f;
+    int   minDNote = 0,    maxDNote = 0;
     float dBeat   = 0.0f;
     int   dNote   = 0;
     bool  blocked = false;

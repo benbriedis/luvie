@@ -250,10 +250,10 @@ int AppWindow::handle(int event)
     // FL_COMMAND is ctrl everywhere but macOS, where it is the Command key.
     // Accept both cases of the key: whether shift folds it is platform-dependent.
     if ((event == FL_KEYBOARD || event == FL_SHORTCUT) && (Fl::event_state() & FL_COMMAND) &&
-        (Fl::event_key() == 'z' || Fl::event_key() == 'Z')) {
-        if (Fl::event_state() & FL_SHIFT) { if (onRedo) onRedo(); }
-        else                              { if (onUndo) onUndo(); }
-        return 1;
+        !(Fl::event_state() & FL_SHIFT)) {
+        const int key = Fl::event_key();
+        if (key == 'z' || key == 'Z') { if (onUndo) onUndo(); return 1; }
+        if (key == 'y' || key == 'Y') { if (onRedo) onRedo(); return 1; }
     }
 
     // Same key routing as undo: a focused text input sees it first and keeps its

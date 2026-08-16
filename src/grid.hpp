@@ -51,11 +51,16 @@ struct StateBandSelect { bool additive; };
 
 // Dragging a whole selection. The grabbed item is the primary — it is the one
 // that follows the cursor under the usual snapping rules — and the delta it
-// ends up with is applied to every other selected item.
+// ends up with is applied to every other selected item. The primary is not
+// named here: it may not be in `notes` at all (the song grid's automation dots),
+// and everything the drag needs is its start position.
 struct StateDragGroup {
-    int   primaryIdx;
     float grabX, grabY;
     Point original;      // primary's start position, so the delta is absolute
+    // How far the selection may travel, resolved once when the drag begins.
+    // See beginGroupDrag for why it is not recomputed as the drag proceeds.
+    float minDBeat = 0.0f, maxDBeat = 0.0f;
+    int   minDRow  = 0,    maxDRow  = 0;
     float dBeat = 0.0f;
     int   dRow  = 0;
     bool  blocked = false;   // the move would collide with something unselected
@@ -143,10 +148,17 @@ protected:
     // Runs while the band geometry is still live, for grids whose selectable
     // items are not all in `notes` (the song grid's automation dots).
     virtual void addBandHitExtras() {}
+    // Preview the group drag for selected items that are not in `notes`, which
+    // movingGroup shifts on its own. Called with 0 when the drag ends, to put
+    // them back where the model says they are.
+    virtual void previewGroupExtras(float dBeat) { (void)dBeat; }
     // Recompute the preview positions of the dragged selection.
     void movingGroup(StateDragGroup& s);
     // Shared by FL_PUSH: begin a group drag anchored on `noteIdx`.
     void beginGroupDrag(int noteIdx, float grabX, float grabY);
+    // Same, for a primary that is not in `notes` — the caller passes its start
+    // position and the grab offset within it.
+    void beginGroupDrag(Point original, float grabX, float grabY);
 
     // Virtual row geometry — override in subclasses for variable-height rows
     virtual int rowY(int r) const         { return r * rowHeight; }

@@ -514,10 +514,28 @@ void SongGrid::groupDragLimits(float& minDBeat, float& maxDBeat,
             for (const auto& p : l.patterns)
                 if (selection.contains(p.id))
                     span(-p.startBar, (float)numCols - (p.startBar + p.length));
-    for (const auto& lane : timeline->get().paramLanes)
-        for (const auto& pt : lane.points)
-            if (!pt.anchor && selection.contains(pt.id))
-                span(-pt.beat, (float)numCols - pt.beat);
+    // A dot may not pass a neighbour that is staying put, so every selected dot
+    // bounds the whole group: the drag stops against the neighbour instead of
+    // running past it and being refused at the end. Selected dots keep their
+    // spacing and so can never cross each other — only unselected ones count.
+    // Points are held in beat order, and beat 0 belongs to the lane's anchor,
+    // which is never selectable, so it is always the left wall of the first dot.
+    for (const auto& lane : timeline->get().paramLanes) {
+        const auto& pts = lane.points;
+        for (int i = 0; i < (int)pts.size(); i++) {
+            if (pts[i].anchor || !selection.contains(pts[i].id)) continue;
+            float lo = -pts[i].beat, hi = (float)numCols - pts[i].beat;
+            for (int j = i - 1; j >= 0; j--)
+                if (!selection.contains(pts[j].id)) { lo = pts[j].beat - pts[i].beat; break; }
+            for (int j = i + 1; j < (int)pts.size(); j++)
+                if (!selection.contains(pts[j].id)) { hi = std::min(hi, pts[j].beat - pts[i].beat); break; }
+            // Landing on beat 0 is not allowed — that slot is the anchor's — so
+            // a dot walled in by the anchor stops one snap step short of it.
+            if (snap > 0.0f)
+                lo = std::max(lo, std::min(snap, pts[i].beat) - pts[i].beat);
+            span(lo, hi);
+        }
+    }
 }
 
 bool SongGrid::groupMoveBlocked(float dBeat, int) const
@@ -536,19 +554,9 @@ bool SongGrid::groupMoveBlocked(float dBeat, int) const
                     if (beatsOverlap(start, p.length, q.startBar, q.length)) return true;
                 }
             }
-    // Param points may not cross their neighbours; moveParamPoint would clamp
-    // them into a heap otherwise.
-    for (const auto& lane : timeline->get().paramLanes) {
-        const auto& pts = lane.points;
-        for (int i = 0; i < (int)pts.size(); i++) {
-            if (pts[i].anchor || !selection.contains(pts[i].id)) continue;
-            float dest = pts[i].beat + dBeat;
-            if (dest <= 0.0f) return true;   // beat 0 belongs to the anchor
-            if (i > 0 && !selection.contains(pts[i - 1].id) && dest < pts[i - 1].beat) return true;
-            if (i + 1 < (int)pts.size() && !selection.contains(pts[i + 1].id) &&
-                dest > pts[i + 1].beat) return true;
-        }
-    }
+    // Dots crossing their neighbours is handled in groupDragLimits, which stops
+    // the drag at the neighbour rather than letting it run on and then refusing
+    // the whole move; moveParamPoint would clamp them into a heap otherwise.
     return false;
 }
 
@@ -607,6 +615,26 @@ void SongGrid::addBandHitExtras()
             int dotX = (int)((pt.beat - colOffset) * colWidth);
             int dotY = rowTop + dotR + (int)((maxVal - pt.value) * totalRange / (float)maxVal);
             if (selection.bandContainsPoint(dotX, dotY)) selection.add(pt.id);
+        }
+    }
+}
+
+// Dots are drawn from localParamLanes, a copy of the model, so a group drag
+// previews by shifting the selected ones there — movingGroup only knows how to
+// move `notes`. The original beat comes from the model rather than a snapshot
+// taken at the start of the drag: nothing edits the timeline while a drag is in
+// progress, so the model IS the original, and the preview cannot drift.
+void SongGrid::previewGroupExtras(float dBeat)
+{
+    if (!timeline) return;
+    for (const auto& lane : timeline->get().paramLanes) {
+        auto it = std::find_if(localParamLanes.begin(), localParamLanes.end(),
+                               [&](const ParamLaneLocal& l) { return l.id == lane.id; });
+        if (it == localParamLanes.end()) continue;
+        for (const auto& src : lane.points) {
+            if (src.anchor || !selection.contains(src.id)) continue;
+            for (auto& pt : it->points)
+                if (pt.id == src.id) { pt.beat = std::max(0.0f, src.beat + dBeat); break; }
         }
     }
 }
@@ -745,8 +773,30 @@ int SongGrid::handleParamEvent(int event)
         }
         if (ptIdx >= 0) {
             auto& pt = localParamLanes[laneIdx].points[ptIdx];
+            if (!pt.anchor && selection.contains(pt.id)) {
+                // Grabbing a dot that is part of a selection drags the whole of
+                // it, instances included — the same rule as grabbing a selected
+                // pattern block. Grid runs the drag from here on; the dot is the
+                // primary, so the grab offset is measured from its centre.
+                int dotX = (int)((pt.beat - colOffset) * colWidth);
+                int vr   = visualRowForLaneId(localParamLanes[laneIdx].id);
+                beginGroupDrag(Point{vr, pt.beat},
+                               (float)(Fl::event_x() - x() - dotX), 0.0f);
+                if (window()) window()->cursor(FL_CURSOR_HAND);
+                return 1;
+            }
+            // Grabbing anything else drops the selection and moves that dot
+            // alone, as it does for a pattern block.
+            if (!selection.empty()) { selection.clear(); redraw(); }
             paramState = ParamDragState{laneIdx, ptIdx, pt.beat, pt.value};
             if (window()) window()->cursor(FL_CURSOR_HAND);
+        } else if (!selection.empty()) {
+            // A plain click on empty lane space with a selection active only
+            // dismisses it. Adding a dot as well would make the selection
+            // impossible to drop without editing something.
+            selection.clear();
+            paramState = ParamIdle{};
+            redraw();
         } else {
             // Check virtual dot before creating a new one
             bool hitVirtual = false;
@@ -960,7 +1010,10 @@ void SongGrid::onTimelineChanged()
 {
     if (!isActiveDrag())
         rebuildNotes();
-    if (!std::holds_alternative<ParamDragState>(paramState) &&
+    // A group drag previews the dots in localParamLanes too, so rebuilding it
+    // mid-drag would wipe the preview just as it would for the notes.
+    if (!isActiveDrag() &&
+        !std::holds_alternative<ParamDragState>(paramState) &&
         !std::holds_alternative<ParamVirtualDrag>(paramState))
         rebuildParamLanes();
     redraw();
@@ -1120,6 +1173,28 @@ int SongGrid::handle(int event)
     // happened to start over a param lane would be swallowed by the dot editor.
     if (isActiveDrag())
         return Grid::handle(event);
+
+    // Ctrl-click over an automation lane toggles the dot under the cursor.
+    // Grid's own ctrl-click reads the hovered item out of `notes`, which holds
+    // pattern instances only, so the dot has to be resolved here. Shift still
+    // goes to Grid: a band sweeps both kinds of row at once.
+    if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE &&
+        (Fl::event_state() & FL_COMMAND) && !(Fl::event_state() & FL_SHIFT) &&
+        !localParamLanes.empty() && timeline) {
+        int laneIdx = laneIdxForAbsRow(rowAtPixelY(Fl::event_y() - y()) + rowOffset);
+        if (laneIdx >= 0) {
+            int ptIdx = findParamPointAtCursor(laneIdx);
+            // Anchors are pinned to beat 0 and cannot move or be deleted, so
+            // they stay out of selections — see selectAll().
+            if (ptIdx >= 0 && !localParamLanes[laneIdx].points[ptIdx].anchor) {
+                selection.toggle(localParamLanes[laneIdx].points[ptIdx].id);
+                redraw();
+            }
+            paramState = ParamIdle{};   // and the release must not create a dot
+            return 1;
+        }
+    }
+
     if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE &&
         (Fl::event_state() & (FL_SHIFT | FL_COMMAND)))
         return Grid::handle(event);

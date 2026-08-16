@@ -144,6 +144,12 @@ int SongEditor::computeNumCols() const
         maxEnd = std::max(maxEnd, (float)m.rampEndBar());
     for (const auto& m : data.timeSigs)
         maxEnd = std::max(maxEnd, (float)m.bar);
+    // Automation dots count too. A dot past the last instance would otherwise
+    // sit outside the grid: invisible, unreachable, and — since the drag limits
+    // are measured against numCols — able to wreck a group drag it is part of.
+    for (const auto& lane : data.paramLanes)
+        for (const auto& pt : lane.points)
+            maxEnd = std::max(maxEnd, pt.beat);
     int rounded = (int)(std::ceil(maxEnd / step) * step);
     return std::max(minCols, rounded + step);
 }

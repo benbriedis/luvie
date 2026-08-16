@@ -74,6 +74,16 @@ private:
     std::unordered_set<int> ids_;
 };
 
+// Force a drag-limit interval to contain zero. Every grid builds its limits by
+// intersecting one range per selected item, and an item that is already out of
+// bounds — an instance extending past the last column, say — contributes a range
+// that excludes zero, which can leave the intersection empty. Clamping a delta
+// to an empty interval is undefined and in practice shoves the whole selection
+// the other way, off the front of the song. An out-of-bounds item simply cannot
+// move further out; it must never force the selection to move.
+template <typename T>
+inline void includeZero(T& lo, T& hi) { lo = std::min(lo, T{}); hi = std::max(hi, T{}); }
+
 // Implemented by every grid that owns a Selection, so window-level commands
 // (Escape to clear, click-away to clear) can reach whichever grid is showing
 // without the caller knowing which kind of grid it is. DrumGrid is not a Grid —
