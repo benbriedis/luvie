@@ -2,12 +2,25 @@
 
 Suggestions for Carla (install newest first)
 =====================
+1. Carla projects should store the mode they were created in and then start up in the 
+   appropriate mode. Eg if 'carla-jack-single' was used to create a project then running
+   'carla myProject.carla' should automatically flip to that mode.
+      Currently what will happen is users will forget what they used and even forget about the
+   intricacies of starting Carla if they don't use it for a while. Starting in the wrong mode will
+   look like you have a broken project.
+	  Luvie follows Ardour's lead and presents the user with a startup settings box when creating
+   new projects. This is nice solution for this kind of thing.
+
+1. 'Recent projects' would be useful.  Otherwise is it assumed we have to use RaySession?
+
 1. Canvas - simplify somehow.
    Possible algorithm - reduce its size by creating a binding box around current items and 
    adding 200px to each sides.
    Maybe a layout button.
 
-2. More prominent settings button.
+2. carla-patchbay currently can't be used because it doesn't support MIDI plugins  
+   with multiple outputs.
+
 
 
 Suggestions for RaySession (install newest first)
@@ -18,6 +31,8 @@ Suggestions for LV2
 ===================
 1. Add support for transport commands.
    That way removes advantages Clap might have wrt integration with Ardour.
+
+- Is there some way to avoid the blank-bar-at-the-front workaround? Whose responsibility is that?
 
 FUTURE FUNCTIONALITY
 ====================
@@ -338,11 +353,3 @@ Can I add to Arch AUR myself?
 
 
 
-
--------
-TO ADD TO MANUAL - Carla use
-----------------------------
-Probably want/need  'carla-jack-multi' as Luvie provides multiple MIDI outputs
-       and carla-patchbay (= the default 'carla') doesn't current support this.
-       carla-rack presumably folds the outputs together or just uses the first one I guess  (TODO check)
-       NOT sure about carla-jack-single  (TODO check)
