@@ -78,6 +78,11 @@ on the command line.
 If you are using Jack you would normally start it before Luvie. 
 Luvie is chill though and should cope with Jack starting late or disappearing and reappearing.
 
+TODO Add a walkthrough here
+
+TODO Add an NSM walkthrough  ?
+TODO Add a no-NSM walkthrough ?
+
 ## Running in Carla
 
 Luvie can be run in Carla as a plugin. Here's a quick walk through.
@@ -107,9 +112,13 @@ Luvie can be run in Carla as a plugin. Here's a quick walk through.
     of the synth plugins. Clicking on the piano keys should produce sound.
 9. Create and test a quick test song in the Song Editor - see below (TODO add link)
 
+## Running in Ardour
+
+TODO check 'Strict I/O' setting
+
 ## Simple Luvie test
 1. Create a quick song in the Song Editor (TODO screenshot)
+   NOTE: inset the song start a little when in plugin mode i think due to limitation. + Move 'Start' marker
 1. add some notes to both patterns
 1. (Transport seems to be happily using Jack)
-
 
