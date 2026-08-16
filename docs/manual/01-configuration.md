@@ -84,12 +84,11 @@ Luvie can be run in Carla as a plugin. Here's a quick walk through.
 1. Start JACK if necessary.
 1. To start from the console use:
 ```
-carla-jack-single mySession.carxp
+carla-jack-single
 ```
 Carla actually has four modes it can start in: 'carla-patchbay', 'carla-jack-single', 'carla-jack-multi', and 'carla-rack'.
 Trap: plain 'carla' is an alias for 'carla-patchbay' and currently this form does NOT work with Luvie as this form of Carla does not
 support plugins that have multiple MIDI outputs. Note that 'carla-jack-multi' also works nicely.
-1. TODO set up transport
 1. TODO add Luvie
 1. TODO add ACE Reasonable Synth
 1. TODO add AVL Drum
@@ -97,6 +96,9 @@ support plugins that have multiple MIDI outputs. Note that 'carla-jack-multi' al
 1. Add notes to pattern
 1. Create a quick song in the Song Editor (TODO screenshot)
 1. add some notes to both patterns
+1. (Transport seems to be happily using Jack)
 1. Press play
+1. Save the project if you want to keep it.
+It may be worth creating a handy alias or program launcher for carla-jack-single or carla-jack-multi.
 
 
