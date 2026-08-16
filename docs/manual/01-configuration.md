@@ -81,24 +81,35 @@ Luvie is chill though and should cope with Jack starting late or disappearing an
 ## Running in Carla
 
 Luvie can be run in Carla as a plugin. Here's a quick walk through.
-1. Start JACK if necessary.
-1. To start from the console use:
-```
-carla-jack-single
-```
-Carla actually has four modes it can start in: 'carla-patchbay', 'carla-jack-single', 'carla-jack-multi', and 'carla-rack'.
-Trap: plain 'carla' is an alias for 'carla-patchbay' and currently this form does NOT work with Luvie as this form of Carla does not
-support plugins that have multiple MIDI outputs. Note that 'carla-jack-multi' also works nicely.
-1. TODO add Luvie
-1. TODO add ACE Reasonable Synth
-1. TODO add AVL Drum
-1. Hook them up
-1. Add notes to pattern
+1. Install the AVL Drums LV2 plugins. Most Linux distributions contains these in their repositories.
+2. Start JACK if necessary.
+3. To start from the console use:
+   ```
+     carla-jack-single
+   ```
+   Carla actually has four modes it can start in... 'carla-patchbay', 'carla-jack-single', 'carla-jack-multi', and 'carla-rack'. <br>
+   **There's a trap!...** plain 'carla' is an alias for 'carla-patchbay' and currently this form does NOT work with Luvie as this form of Carla does not
+   support plugins that have multiple MIDI outputs. <br>
+   Note that 'carla-jack-multi' is a working alternative to 'carla-jack-single'.
+   It may be worth creating a handy alias or program launcher for carla-jack-single or carla-jack-multi.
+4. Add the Luvie plugin
+5. Add the "ACE Reasonable Synth" plugin
+6. Add the "Black Pearl Drumkit" plugin (one of the AVL Drum plugins)
+7. Open the Patchbay tab. Now the details here are liable to vary somewhat over time and between systems, but
+   you'll need to make something like the following connections:
+     1. Luvie MIDI Out 1 to ACE Reasonable Synth: events-in
+     1. Luvie MIDI Out 2 to Black Pearl Drumkit: events-in
+     1. ACE Reasonable Synth: Left output to playback_1
+     1. ACE Reasonable Synth: Right output to playback_2
+     1. Black Pearl Drumkit: Output Left to playback_1
+     1. Black Pearl Drumkit: Output Right to playback_2
+8. You can test that your synth connections make sound by returning to the Rack tab and clicking the spanner icons
+    of the synth plugins. Clicking on the piano keys should produce sound.
+9. Create and test a quick test song in the Song Editor - see below (TODO add link)
+
+## Simple Luvie test
 1. Create a quick song in the Song Editor (TODO screenshot)
 1. add some notes to both patterns
 1. (Transport seems to be happily using Jack)
-1. Press play
-1. Save the project if you want to keep it.
-It may be worth creating a handy alias or program launcher for carla-jack-single or carla-jack-multi.
 
 
