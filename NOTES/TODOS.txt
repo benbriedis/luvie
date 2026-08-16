@@ -2,12 +2,25 @@
 
 Suggestions for Carla (install newest first)
 =====================
+1. Carla projects should store the mode they were created in and then start up in the 
+   appropriate mode. Eg if 'carla-jack-single' was used to create a project then running
+   'carla myProject.carla' should automatically flip to that mode.
+      Currently what will happen is users will forget what they used and even forget about the
+   intricacies of starting Carla if they don't use it for a while. Starting in the wrong mode will
+   look like you have a broken project.
+	  Luvie follows Ardour's lead and presents the user with a startup settings box when creating
+   new projects. This is nice solution for this kind of thing.
+
+1. 'Recent projects' would be useful.  Otherwise is it assumed we have to use RaySession?
+
 1. Canvas - simplify somehow.
    Possible algorithm - reduce its size by creating a binding box around current items and 
    adding 200px to each sides.
    Maybe a layout button.
 
-2. More prominent settings button.
+2. carla-patchbay currently can't be used because it doesn't support MIDI plugins  
+   with multiple outputs.
+
 
 
 Suggestions for RaySession (install newest first)
@@ -18,6 +31,8 @@ Suggestions for LV2
 ===================
 1. Add support for transport commands.
    That way removes advantages Clap might have wrt integration with Ardour.
+
+- Is there some way to avoid the blank-bar-at-the-front workaround? Whose responsibility is that?
 
 FUTURE FUNCTIONALITY
 ====================
@@ -92,21 +107,6 @@ LIMITATION
 Currently only one Luvie instance per Ardour will work. 
    cf checking to see if any others exist.
    Otherwise options exist I think. Look a bit involved.
-
-
-
-DISTRO TODOs?
-==============
-
-- Add support for Debian build
-
-- Snap, Flatpak, AppImage? - research which is best for audio plugins (if any. NB LV2 plugin install might be more complex)
-
-- Icon installation needs to be included. Currently should work OK for all major Linux distros according to Claude.
-
-Cross Plaform:
-	CMake combined with a GitHub multi-platform configuration file (.github/workflows/build.yml):
-
 
 
 Monitor preformance
@@ -298,8 +298,6 @@ Add more hover over notes for controls
 
 DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
 
-Any way to try testing on Windows or Mac?
-
 
 SOMETIMES there's a row of extra space under the pattern grids. Inconsistent.
 
@@ -320,12 +318,22 @@ BUG: looping to start of song causes a gap (plugin or standalone or both?)
 
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
+BUG 'Add automation' is missing its right-pointing triangle icon (installed via .deb)
+  - if there's a problem maybe provide my own svgs?
+
+------------------------------------
+Try Helvum
+
+
+Deb installer says 'Unknown license'.  Also, no screenshots
+
+TEST Windows and MacOS manually somehow?
+
 BUG: resizing window on left often causes an unwanted pattern instance block to be added on release.
 
 BUG: all popups should be escapable using Esc
 
 TODO hover over an automation dot - should be able to press Delete
-
 
 
 ------------------------------------
@@ -340,14 +348,17 @@ Apply at signpath.org — one-off, takes days to weeks. Requirements Luvie alrea
 	public repository, recognised OSS licence, project functionality described on the download
 	page, and the same person owning both the repo and the signing.
 
-BUG 'Add automation' is missing its right-pointing triangle icon
+Can I add to Arch AUR myself?
+
+
+TODO create a multi-select click and drag tool + copy for use in Song Editor.
+     + probably pattern editors
+     - May be able to remove the transposition option then too...
+     
+
+BUG: I suspect 'Loop mode' + current loops are not being saved.
+
+TODO .luv ==> .luvie
 
 
 
--------
-TO ADD TO MANUAL - Carla use
-----------------------------
-Probably want/need  'carla-jack-multi' as Luvie provides multiple MIDI outputs
-       and carla-patchbay (= the default 'carla') doesn't current support this.
-       carla-rack presumably folds the outputs together or just uses the first one I guess  (TODO check)
-       NOT sure about carla-jack-single  (TODO check)
