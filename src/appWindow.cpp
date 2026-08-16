@@ -256,6 +256,22 @@ int AppWindow::handle(int event)
         return 1;
     }
 
+    // Same key routing as undo: a focused text input sees it first and keeps its
+    // own select-all.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) && (Fl::event_state() & FL_COMMAND) &&
+        (Fl::event_key() == 'a' || Fl::event_key() == 'A')) {
+        if (onSelectAll) onSelectAll();
+        return 1;
+    }
+
+    // Not consumed when nothing is selected: falling through lets FLTK carry on
+    // to the shortcut broadcast, which is how the hovered grid gets its chance
+    // to delete the note under the cursor.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
+        (Fl::event_key() == FL_Delete || Fl::event_key() == FL_BackSpace)) {
+        if (onDeleteSelection && onDeleteSelection()) return 1;
+    }
+
     if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape) {
         if (onEscape) onEscape();
         return 1;
@@ -306,5 +322,11 @@ int AppWindow::handle(int event)
     default:
         break;
     }
+
+    // Past the popup handling, so the click that dismisses a popup is spent on
+    // that alone.
+    if (event == FL_PUSH && onClick)
+        onClick(Fl::event_x(), Fl::event_y());
+
     return Fl_Double_Window::handle(event);
 }

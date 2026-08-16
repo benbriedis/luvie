@@ -205,7 +205,12 @@ public:
 
     // ISelectionHost
     void clearSelection() override     { if (!selection.empty()) { selection.clear(); redraw(); } }
+    void selectAllItems() override     { selectAll(); redraw(); }
+    void deleteSelectedItems() override;
     bool hasSelection() const override { return !selection.empty(); }
+    bool showing() const override      { return visible_r(); }
+    bool ownsWindowPoint(int wx, int wy) const override
+    { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }
 
     void setPlayhead(Playhead* p) { playhead  = p; }
     void setColOffset(int off)    { colOffset = off; redraw(); }

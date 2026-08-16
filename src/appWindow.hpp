@@ -42,6 +42,24 @@ public:
 	// something was actually cleared; the key is consumed either way, as before.
 	std::function<bool()> onEscape;
 
+	// Ctrl-A selects everything in the editor that is showing. Window-level for
+	// the same reason as Escape: the grids never take focus, so FLTK only reaches
+	// them by broadcasting the shortcut, and each one then has to work out
+	// whether it was the intended target from where the cursor happens to be.
+	std::function<void()> onSelectAll;
+
+	// Delete/BackSpace with a multi-selection active, same reasoning again.
+	// Returns false when there was nothing selected, in which case the key is
+	// left to travel on: the grids also delete the single note under the cursor,
+	// and that one genuinely does depend on where the cursor is.
+	std::function<bool()> onDeleteSelection;
+
+	// Every left/right press that reaches the window, in window coordinates,
+	// before the widget under it sees it. Used to dismiss a multi-selection when
+	// the click lands anywhere but the grid that owns it — the grid itself never
+	// hears about clicks on its neighbours.
+	std::function<void(int, int)> onClick;
+
 	void openPopup(Fl_Window* p) {
 		for (auto* q : popups)
 			if (q != p) q->hide();

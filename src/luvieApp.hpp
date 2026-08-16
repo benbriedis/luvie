@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
+#include <array>
 #include <functional>
 #include <string>
 #include <FL/Fl_Group.H>
@@ -18,6 +19,7 @@ class ObservablePattern;
 class ObservableInstrument;
 
 class AppWindow;
+class ISelectionHost;
 class ModernTabs;
 class SettingsButton;
 class SettingsMenuPopup;
@@ -120,6 +122,10 @@ public:
     void layoutPatternTab();
 
 private:
+    // Every grid that can hold a multi-selection. Entries are null before build()
+    // has created that editor.
+    std::array<ISelectionHost*, 4> selectionHosts() const;
+
     bool layingOutPatternTab = false;
 
     ObservableSong*      song_        = nullptr;

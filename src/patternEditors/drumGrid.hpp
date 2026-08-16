@@ -59,6 +59,11 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
     DrumState  state;
     Selection  selection;
 
+    // Set by a press that must not create a note when the button comes back up —
+    // a ctrl-click, or a plain click that only dismissed a selection. Cleared on
+    // release, mirroring Grid.
+    bool creationForbidden = false;
+
     // Local copy of notes in view — temporarily modified during drag
     std::vector<DrumNote> notes;
 
@@ -118,7 +123,12 @@ public:
 
     // ISelectionHost
     void clearSelection() override     { if (!selection.empty()) { selection.clear(); redraw(); } }
+    void selectAllItems() override     { selectAllNotes(); redraw(); }
+    void deleteSelectedItems() override;
     bool hasSelection() const override { return !selection.empty(); }
+    bool showing() const override      { return visible_r(); }
+    bool ownsWindowPoint(int wx, int wy) const override
+    { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }
 
     int getRowOffset() const { return rowOffset; }
     int getPadX() const { return padX; }

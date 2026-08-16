@@ -75,14 +75,25 @@ private:
 };
 
 // Implemented by every grid that owns a Selection, so window-level commands
-// (Escape to clear) can reach whichever grid is showing without the caller
-// knowing which kind of grid it is. DrumGrid is not a Grid — it is a separate
-// widget over a different item type — so a shared base class will not do.
+// (Escape to clear, click-away to clear) can reach whichever grid is showing
+// without the caller knowing which kind of grid it is. DrumGrid is not a Grid —
+// it is a separate widget over a different item type — so a shared base class
+// will not do.
 class ISelectionHost {
 public:
     virtual ~ISelectionHost() = default;
-    virtual void clearSelection()     = 0;
-    virtual bool hasSelection() const = 0;
+    virtual void clearSelection()      = 0;
+    virtual void selectAllItems()      = 0;
+    // Remove every selected item, in one batched edit.
+    virtual void deleteSelectedItems() = 0;
+    virtual bool hasSelection() const  = 0;
+    // True when this host's widget is on screen. Only one editor shows at a time,
+    // so it is what picks the grid a window-level command was meant for.
+    virtual bool showing() const = 0;
+    // True when this point, in window coordinates, lies inside the widget that
+    // owns the selection. A click outside it dismisses the selection; a click
+    // inside is the grid's own business (band drags, ctrl-toggles, drags).
+    virtual bool ownsWindowPoint(int wx, int wy) const = 0;
 };
 
 #endif

@@ -143,6 +143,13 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     saveAppState(state, path);
 }
 
+std::array<ISelectionHost*, 4> LuvieApp::selectionHosts() const {
+    return { songEd      ? songEd->selectionHost()      : nullptr,
+             harmonyEd   ? harmonyEd->selectionHost()   : nullptr,
+             pianorollEd ? pianorollEd->selectionHost() : nullptr,
+             drumEd      ? drumEd->selectionHost()      : nullptr };
+}
+
 void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
                      ObservableInstrument* instruments, ITransport* transport) {
     song_         = song;
@@ -155,12 +162,32 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // correct and simpler than working out which one has the cursor.
     window->onEscape = [this]() {
         bool cleared = false;
-        for (ISelectionHost* h : { songEd     ? songEd->selectionHost()      : nullptr,
-                                   harmonyEd  ? harmonyEd->selectionHost()   : nullptr,
-                                   pianorollEd? pianorollEd->selectionHost() : nullptr,
-                                   drumEd     ? drumEd->selectionHost()      : nullptr })
+        for (ISelectionHost* h : selectionHosts())
             if (h && h->hasSelection()) { h->clearSelection(); cleared = true; }
         return cleared;
+    };
+
+    // Ctrl-A goes to whichever editor is on screen, wherever the cursor sits.
+    window->onSelectAll = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing()) h->selectAllItems();
+    };
+
+    // Delete acts on the selection wherever the cursor is; with nothing selected
+    // it says so, and the grid under the cursor deletes the note it is hovering.
+    window->onDeleteSelection = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->hasSelection()) { h->deleteSelectedItems(); return true; }
+        return false;
+    };
+
+    // A click anywhere but the grid holding the selection dismisses it. Clicks
+    // inside that grid are left alone: it has its own rules for them (band
+    // sweeps, ctrl-toggles, dragging the selection).
+    window->onClick = [this](int wx, int wy) {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->hasSelection() && !h->ownsWindowPoint(wx, wy))
+                h->clearSelection();
     };
 
     const int off        = 0;

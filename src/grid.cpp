@@ -313,23 +313,15 @@ int Grid::handle(int event)
         case FL_SHORTCUT: {
             int key = Fl::event_key();
             // These are unfocused grids, so FLTK broadcasts the shortcut to all
-            // of them; the cursor decides which one it was meant for. That is
-            // the same rule the Delete-on-hover path below has always used.
+            // of them; the cursor decides which one it was meant for. Only the
+            // hover-delete below needs that rule, and it is all that is left
+            // here: the commands that act on the grid as a whole — Ctrl-A, and
+            // Delete with a selection — are handled by AppWindow, so the cursor
+            // can be anywhere in the window.
             if (!Fl::event_inside(this))
                 return 0;
-            if ((Fl::event_state() & FL_COMMAND) && (key == 'a' || key == 'A')) {
-                selectAll();
-                redraw();
-                return 1;
-            }
             if (key != FL_Delete && key != FL_BackSpace)
                 return 0;
-            if (!selection.empty()) {
-                deleteSelection();
-                state = StateIdle{};
-                window()->cursor(FL_CURSOR_DEFAULT);
-                return 1;
-            }
             int idx = -1;
             if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
             else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
@@ -363,6 +355,15 @@ std::unordered_set<int> Grid::liveItemIds() const
 
 void Grid::selectAll()       { selection.clear(); for (const Note& n : notes) selection.add(n.id); }
 void Grid::deleteSelection() {}
+
+// Delete arrives from AppWindow, which knows nothing of hover, so the state has
+// to be dropped here: it may name a note that no longer exists.
+void Grid::deleteSelectedItems()
+{
+    deleteSelection();
+    state = StateIdle{};
+    if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+}
 
 void Grid::groupDragLimits(float& minDBeat, float& maxDBeat, int& minDRow, int& maxDRow) const
 {

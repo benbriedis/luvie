@@ -192,6 +192,7 @@ int DrumGrid::handle(int evt)
         if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_SHIFT)) {
             selection.beginBand(Fl::event_x() - x(), Fl::event_y() - y());
             state = DrumStateBand{(mods & FL_COMMAND) != 0};
+            creationForbidden = true;
             redraw();
             return 1;
         }
@@ -201,6 +202,7 @@ int DrumGrid::handle(int evt)
                 redraw();
             }
             state = DrumStateIdle{};
+            creationForbidden = true;   // never create on a ctrl-click
             return 1;
         }
 
@@ -252,12 +254,15 @@ int DrumGrid::handle(int evt)
         } else if (!selection.empty()) {
             // A plain click on empty space with a selection active clears it and
             // creates nothing, so a selection can be dismissed without editing.
+            // The release still arrives, so it has to be told to stay its hand.
             selection.clear();
             state = DrumStateIdle{};
+            creationForbidden = true;
             redraw();
             return 1;
         } else {
             state = DrumStateIdle{};
+            creationForbidden = false;
         }
         return 1;
     }
@@ -306,6 +311,7 @@ int DrumGrid::handle(int evt)
             bool additive = b->additive;
             state = DrumStateIdle{};
             applyBand(additive);
+            creationForbidden = false;
             if (window()) window()->cursor(FL_CURSOR_DEFAULT);
             return 1;
         }
@@ -339,8 +345,9 @@ int DrumGrid::handle(int evt)
         } else {
             state = DrumStateIdle{};
             // Click on empty space → create note
-            if (Fl::event_button() == FL_LEFT_MOUSE)
+            if (Fl::event_button() == FL_LEFT_MOUSE && !creationForbidden)
                 createNote();
+            creationForbidden = false;
         }
         if (window()) window()->cursor(FL_CURSOR_DEFAULT);
         return 1;
@@ -370,22 +377,13 @@ int DrumGrid::handle(int evt)
     case FL_SHORTCUT: {
         int key = Fl::event_key();
         // Unfocused widget: FLTK broadcasts the shortcut, so the cursor decides
-        // which grid it was meant for — the same rule the hover-delete uses.
+        // which grid it was meant for — the rule the hover-delete needs. The
+        // whole-grid commands (Ctrl-A, Delete with a selection) are window-level
+        // in AppWindow, so they don't care where the cursor is.
         if (!Fl::event_inside(this))
             return 0;
-        if ((Fl::event_state() & FL_COMMAND) && (key == 'a' || key == 'A')) {
-            selectAllNotes();
-            redraw();
-            return 1;
-        }
         if (key != FL_Delete && key != FL_BackSpace)
             return 0;
-        if (!selection.empty()) {
-            deleteSelection();
-            state = DrumStateIdle{};
-            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
-            return 1;
-        }
         auto* h = std::get_if<DrumStateHover>(&state);
         if (!h || !pattern)
             return 0;
@@ -416,6 +414,15 @@ void DrumGrid::selectAllNotes()
     if (!pattern || patternId < 0) return;
     for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId))
         selection.add(n.id);
+}
+
+// Delete arrives from AppWindow, which knows nothing of hover, so the state has
+// to be dropped here: it may name a note that no longer exists.
+void DrumGrid::deleteSelectedItems()
+{
+    deleteSelection();
+    state = DrumStateIdle{};
+    if (window()) window()->cursor(FL_CURSOR_DEFAULT);
 }
 
 void DrumGrid::deleteSelection()
