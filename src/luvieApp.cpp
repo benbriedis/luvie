@@ -478,7 +478,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     {
         const int oy = 20;
         const int om = 20;
-        outputsOverlay = new OutputsOverlay(om, oy, winW - 2*om, window->h() - oy - om);
+        outputsOverlay = new OutputsOverlay(om, oy, winW - 2*om, window->h() - oy - om,
+                                            pluginMode);
         outputsOverlay->isInstrumentInUse = [this](int instrId) {
             for (const auto& p : song_->get().patterns)
                 if (p.instrumentId == instrId) return true;

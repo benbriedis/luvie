@@ -98,6 +98,9 @@ public:
                 self->onTransportChanged(static_cast<Fl_Choice*>(wd)->value());
         }, this);
 
+        // This is the new-project dialog, which only ever appears standalone, so it
+        // offers the standalone backends only — MidiBackend::Plugin is deliberately
+        // absent rather than greyed. Item index is still the enum value.
         backendChoice_ = makeChoice(choiceX, row1Y);
         backendChoice_->add("Jack");
         backendChoice_->add("Native");

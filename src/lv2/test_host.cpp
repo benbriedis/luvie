@@ -114,14 +114,17 @@ int main(int argc, char** argv) {
     }
     if (chunkBytes == 0) chunkBytes = 1;
 
-    // Port buffers: control_in (0) and the single merged output (1). control_in is
-    // sized to hold every chunk atom this harness emits in cycle 0 (a real host
-    // would instead spread them across cycles), so even tiny --chunk sizes fit.
+    // Port buffers: control_in (0) and every MIDI output (1 .. LUVIE_NUM_MIDI_OUTS).
+    // control_in is sized to hold every chunk atom this harness emits in cycle 0 (a
+    // real host would instead spread them across cycles), so even tiny --chunk sizes fit.
     const size_t numChunks  = (json.size() + chunkBytes - 1) / chunkBytes;
     const size_t perChunk   = sizeof(LuvieStateChunk) + chunkBytes + 64;  // + event/atom overhead
-    std::vector<uint8_t> ctrlBuf(json.size() + numChunks * perChunk + 8192), midiBuf(8192);
+    std::vector<uint8_t> ctrlBuf(json.size() + numChunks * perChunk + 8192);
+    std::vector<std::vector<uint8_t>> midiBuf(LUVIE_NUM_MIDI_OUTS,
+                                              std::vector<uint8_t>(8192));
     d->connect_port(inst, 0, ctrlBuf.data());
-    d->connect_port(inst, 1, midiBuf.data());
+    for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
+        d->connect_port(inst, (uint32_t)(PORT_OUT + o), midiBuf[o].data());
 
     if (d->activate) d->activate(inst);
 
@@ -138,6 +141,7 @@ int main(int argc, char** argv) {
 
     int64_t frame = 0;
     int totalEmitted = 0;
+    int perPort[LUVIE_NUM_MIDI_OUTS] = {};
     const int cycles = 1000;  // ~5.3 s at 256 frames / 48 kHz
     for (int c = 0; c < cycles; c++) {
         // Build control_in: a Sequence. On cycle 0 it carries the project state blob
@@ -185,31 +189,40 @@ int main(int argc, char** argv) {
         }
         lv2_atom_forge_pop(&forge, &seqF);
 
-        // Output port: host sets capacity in atom.size before run().
-        LV2_Atom_Sequence* mo = (LV2_Atom_Sequence*)midiBuf.data();
-        mo->atom.size = midiBuf.size() - sizeof(LV2_Atom);
-        mo->atom.type = uSeq;
+        // Output ports: host sets capacity in atom.size before run().
+        for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
+            LV2_Atom_Sequence* mo = (LV2_Atom_Sequence*)midiBuf[o].data();
+            mo->atom.size = midiBuf[o].size() - sizeof(LV2_Atom);
+            mo->atom.type = uSeq;
+        }
 
         d->run(inst, nframes);
 
-        // Dump the merged output: MIDI events (and note Position objects exist too).
+        // Dump each output separately, so it is visible which port a note went to.
         int posThisCycle = 0;
-        LV2_ATOM_SEQUENCE_FOREACH(mo, ev) {
-            if (ev->body.type == uMidi) {
-                const uint8_t* m = (const uint8_t*)(ev + 1);
-                printf("cycle %d frame %ld @%ld: ", c, (long)frame, (long)ev->time.frames);
-                for (uint32_t i = 0; i < ev->body.size; i++) printf("%02X ", m[i]);
-                printf("\n");
-                totalEmitted++;
-            } else if (ev->body.type == uObj) {
-                posThisCycle++;
+        for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
+            LV2_Atom_Sequence* mo = (LV2_Atom_Sequence*)midiBuf[o].data();
+            LV2_ATOM_SEQUENCE_FOREACH(mo, ev) {
+                if (ev->body.type == uMidi) {
+                    const uint8_t* m = (const uint8_t*)(ev + 1);
+                    printf("cycle %d frame %ld @%ld out%d: ",
+                           c, (long)frame, (long)ev->time.frames, o + 1);
+                    for (uint32_t i = 0; i < ev->body.size; i++) printf("%02X ", m[i]);
+                    printf("\n");
+                    totalEmitted++;
+                    perPort[o]++;
+                } else if (ev->body.type == uObj) {
+                    posThisCycle++;
+                }
             }
         }
-        if (c == 0) printf("cycle 0: %d non-MIDI (Position/State) atoms on the port\n", posThisCycle);
+        if (c == 0) printf("cycle 0: %d non-MIDI (Position/State) atoms on the ports\n", posThisCycle);
         frame += nframes;
     }
 
     printf("TOTAL MIDI events emitted: %d\n", totalEmitted);
+    for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
+        if (perPort[o]) printf("  midi_out %d: %d events\n", o + 1, perPort[o]);
     if (d->cleanup) d->cleanup(inst);
     dlclose(h);
     return 0;

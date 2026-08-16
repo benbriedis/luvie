@@ -24,6 +24,10 @@ class OutputsOverlay : public OverlayWindow {
     Fl_Choice*    defaultTypeChoice = nullptr;  // "Default port type" for new ports
 
     int nextPortId_ = 1;
+    // True when hosted as an LV2 plugin. Decides which backends the port dropdowns
+    // offer: the ones this mode cannot drive stay listed but greyed, so a project
+    // moved between standalone and plugin still shows what it was set to.
+    bool pluginMode_ = false;
     MidiBackend defaultBackend_ = MidiBackend::Jack;  // type assigned to newly added ports
     ObservableInstrument* instrObs_ = nullptr;
 
@@ -97,6 +101,13 @@ class OutputsOverlay : public OverlayWindow {
     void rebuildPortChoices();
     void syncFromInputs();
 
+    // What a port is shown as. Hosted, a Plugin-backed port is displayed as the LV2
+    // output it actually drives ("MIDI Out 2") rather than its own name, and its
+    // name field is disabled — the mapping is positional, so the name is not the
+    // user's to choose there. Display only: outputs_[i].portName stays the routing
+    // key and keeps its meaning when the project goes back to the standalone app.
+    std::string displayPortName(int i) const;
+
     // Vertical layout of the ports section (depends on whether the JACK warning shows).
     int defaultTypeRowY() const;  // top Y of the "Default port type" row
     int portsColY()       const;  // top Y of the "PORT NAME" column header
@@ -138,7 +149,7 @@ class OutputsOverlay : public OverlayWindow {
     int  handle(int event) override;
 
 public:
-    OutputsOverlay(int x, int y, int w, int h);
+    OutputsOverlay(int x, int y, int w, int h, bool pluginMode);
     void show() override;
     void hide() override;
 

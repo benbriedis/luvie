@@ -27,8 +27,36 @@ forget about MIDI ports and channels.
 ## Output ports
 
 Each port sends to one destination. Luvie can drive JACK MIDI ports, the
-platform's native MIDI interface, or a debug output that prints what would have
-been sent.
+platform's native MIDI interface, a debug output that prints what would have
+been sent, or — when Luvie is running as an LV2 plugin — one of the plugin's own
+MIDI outputs.
+
+Which of those a port can use depends on how Luvie is running, so the dropdown
+only offers the ones that work here and greys out the rest:
+
+- **Standalone**: Jack, Native and Debug. Plugin is greyed out.
+- **As an LV2 plugin**: Plugin only. Jack, Native and Debug are greyed out —
+  the host owns the audio thread, and the plugin has no ports of its own outside it.
+
+A port keeps whatever backend it was saved with even when this mode cannot drive
+it, so moving a project between the standalone app and a host does not lose the
+setting.
+
+### Plugin outputs
+
+The plugin has eight MIDI outputs, and the ports set to **Plugin** are handed to
+them in list order: the first such port drives *MIDI Out 1* in the host, the
+second drives *MIDI Out 2*, and so on. Ports on any other backend, and anything
+past the eighth, fall back to *MIDI Out 1*.
+
+Because the mapping is positional there is nothing to name, so a Plugin port is
+listed under the output it drives — *MIDI Out 1*, *MIDI Out 2* — and its name box
+is greyed out. Instruments show the same name, so both halves of the panel agree
+on where a note ends up.
+
+That name is only what you see here. The port keeps whatever name it was given,
+so a project taken back to the standalone app still has its own port names and
+switching a port to Jack, Native or Debug shows them again.
 
 TODO: adding a port, choosing its backend, and what appears at the other end for
 each.

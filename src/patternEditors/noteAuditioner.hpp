@@ -24,8 +24,11 @@ public:
 
     // Alternative sink used when there is no local PortRegistry (LV2 plugin mode):
     // the note is emitted by the host instead, e.g. forwarded to the DSP's MIDI out.
-    // (ch, midi, velocity, on) — on=false is the matching note-off.
-    void setMidiSink(std::function<void(int, int, int, bool)> s) { midiSink = std::move(s); }
+    // (portName, ch, midi, velocity, on) — on=false is the matching note-off. The
+    // port name is passed through so the sink can pick the right output, exactly as
+    // the PortRegistry path does.
+    using MidiSink = std::function<void(const std::string&, int, int, int, bool)>;
+    void setMidiSink(MidiSink s) { midiSink = std::move(s); }
 
     // Note-on to the instrument's port now; note-off after `seconds`.
     void play(int instrumentId, int midi, int velocity, float seconds);
@@ -37,7 +40,7 @@ private:
 
     PortRegistry*                      portReg = nullptr;
     std::function<MidiInstrRoute(int)> instrRoute;
-    std::function<void(int, int, int, bool)> midiSink;   // plugin-mode emission
+    MidiSink                           midiSink;   // plugin-mode emission
     std::vector<Pending*>              pending;   // outstanding timeout payloads
 };
 

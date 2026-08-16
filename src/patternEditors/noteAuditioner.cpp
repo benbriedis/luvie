@@ -9,7 +9,7 @@
 
 void NoteAuditioner::sendOff(const Pending* p)
 {
-    if (midiSink) { midiSink(p->channel, p->pitch, 0, false); return; }
+    if (midiSink) { midiSink(p->portName, p->channel, p->pitch, 0, false); return; }
     if (portReg)
         if (Port* port = portReg->find(p->portName)) port->noteOff(p->channel, p->pitch);
 }
@@ -31,7 +31,7 @@ void NoteAuditioner::play(int instrumentId, int midi, int velocity, float second
 
     if (midiSink) {
         // Plugin mode: the host emits the note (no local PortRegistry).
-        midiSink(r.channel0, midi, velocity, true);
+        midiSink(r.portName, r.channel0, midi, velocity, true);
     } else {
         if (!portReg || r.portName.empty()) return;
         Port* port = portReg->find(r.portName);

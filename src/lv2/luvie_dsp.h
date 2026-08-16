@@ -20,14 +20,21 @@
 
 /* Port indices.
 
-   A single atom output port carries everything: MIDI events (for the host to
-   route to the instrument), plus a time:Position (for the UI playhead) and
-   state:StateChanged (for the host). One output port — like a normal MIDI
-   generator — is what hosts (Ardour) reliably route; a separate notify/atom
-   output sitting ahead of the MIDI port confused Ardour's MIDI routing. */
+   LUVIE_NUM_MIDI_OUTS atom output ports, contiguous from PORT_OUT. A project's
+   own output ports are mapped onto them by pluginPorts.hpp; the count is fixed
+   here because LV2 port counts come from the TTL and cannot follow the project.
+
+   The FIRST output carries everything the single output used to: MIDI events (for
+   the host to route to the instrument), plus a time:Position (for the UI playhead)
+   and state:StateChanged (for the host). Keeping a MIDI port first matters — a
+   separate notify/atom output sitting ahead of the MIDI port confused Ardour's
+   MIDI routing. The rest are plain MIDI. */
+#define LUVIE_NUM_MIDI_OUTS 8
+
 enum {
     PORT_CONTROL_IN = 0,
-    PORT_OUT        = 1
+    PORT_OUT        = 1,   /* .. PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1 */
+    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1
 };
 
 /* The UI sends the project JSON to control_in as one or more `luvie_state` atoms.

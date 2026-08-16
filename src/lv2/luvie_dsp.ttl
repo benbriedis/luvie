@@ -35,6 +35,11 @@
         # host must size the buffer big enough to hold an entire session per event.
         rsz:minimumSize 524288
     ] , [
+        # Output 1 is the original single output and keeps its symbol, so sessions
+        # saved before the extra ports existed still connect. It alone carries the
+        # time:Position (UI playhead) and state:StateChanged (host dirty flag);
+        # outputs 2..8 are plain MIDI. Nothing may be inserted BEFORE this port —
+        # an atom output ahead of it breaks Ardour's MIDI routing.
         a lv2:OutputPort, atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         atom:supports midi:MidiEvent ;
@@ -42,7 +47,56 @@
         atom:supports state:StateChanged ;
         lv2:index 1 ;
         lv2:symbol "midi_out" ;
-        lv2:name "MIDI Out"
+        lv2:name "MIDI Out 1"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 2 ;
+        lv2:symbol "midi_out_2" ;
+        lv2:name "MIDI Out 2"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 3 ;
+        lv2:symbol "midi_out_3" ;
+        lv2:name "MIDI Out 3"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 4 ;
+        lv2:symbol "midi_out_4" ;
+        lv2:name "MIDI Out 4"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 5 ;
+        lv2:symbol "midi_out_5" ;
+        lv2:name "MIDI Out 5"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 6 ;
+        lv2:symbol "midi_out_6" ;
+        lv2:name "MIDI Out 6"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 7 ;
+        lv2:symbol "midi_out_7" ;
+        lv2:name "MIDI Out 7"
+    ] , [
+        a lv2:OutputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 8 ;
+        lv2:symbol "midi_out_8" ;
+        lv2:name "MIDI Out 8"
     ] ;
 
     ui:ui <https://github.com/benbriedis/luvie/luvie_ui> .
