@@ -95,7 +95,7 @@ support plugins that have multiple MIDI outputs. Note that 'carla-jack-multi' al
 1. TODO add AVL Drum
 1. Hook them up
 1. Add notes to pattern
-1. Swap to Loop mode and enable both loops
+1. Create a quick song in the Song Editor (TODO screenshot)
 1. add some notes to both patterns
 1. Press play
 
