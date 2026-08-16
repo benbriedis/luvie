@@ -101,6 +101,13 @@ class OutputsOverlay : public OverlayWindow {
     void rebuildPortChoices();
     void syncFromInputs();
 
+    // What a port is shown as. Hosted, a Plugin-backed port is displayed as the LV2
+    // output it actually drives ("MIDI Out 2") rather than its own name, and its
+    // name field is disabled — the mapping is positional, so the name is not the
+    // user's to choose there. Display only: outputs_[i].portName stays the routing
+    // key and keeps its meaning when the project goes back to the standalone app.
+    std::string displayPortName(int i) const;
+
     // Vertical layout of the ports section (depends on whether the JACK warning shows).
     int defaultTypeRowY() const;  // top Y of the "Default port type" row
     int portsColY()       const;  // top Y of the "PORT NAME" column header

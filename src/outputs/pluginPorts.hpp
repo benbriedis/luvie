@@ -26,6 +26,15 @@
  */
 inline constexpr int kMaxPluginOutputs = 8;
 
+// Name of LV2 MIDI output `idx`. Must match the port's lv2:name in luvie_dsp.ttl,
+// because the Outputs panel shows a Plugin-backed port under this name (in place of
+// its own) so the row says where the MIDI actually comes out. Display only — the
+// port's stored name is untouched and stays its routing key.
+inline std::string pluginOutputName(int idx)
+{
+    return "MIDI Out " + std::to_string(idx + 1);
+}
+
 // LV2 MIDI output index (0-based) for `name`; always in [0, kMaxPluginOutputs).
 inline int pluginPortIndex(const std::vector<JackOutput>& outs, const std::string& name)
 {

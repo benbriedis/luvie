@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "outputsOverlay.hpp"
+#include "pluginPorts.hpp"
 #include "observableInstrument.hpp"
 #include "midnamParser.hpp"
 #include "modernButton.hpp"
@@ -130,8 +131,11 @@ static int parseOptionalInt(const char* v, int lo, int hi) {
 class NameInput : public Fl_Input {
     void draw() override {
         Fl_Input::draw();
-        fl_color(Fl::focus() == this ? 0x3B82F600 : borderCol);
-        fl_line_style(FL_SOLID, Fl::focus() == this ? 2 : 1);
+        // Fl_Input greys its own text when deactivated; the border is ours, so it has
+        // to be greyed to match or a read-only field still looks editable.
+        const bool foc = Fl::focus() == this;
+        fl_color(!active_r() ? fl_inactive(borderCol) : (foc ? 0x3B82F600 : borderCol));
+        fl_line_style(FL_SOLID, foc ? 2 : 1);
         fl_rect(x(), y(), w(), h());
         fl_line_style(0);
     }
@@ -454,9 +458,24 @@ std::string OutputsOverlay::nextDefaultInstrName(bool isDrum) const {
     }
 }
 
+std::string OutputsOverlay::displayPortName(int i) const {
+    if (!pluginMode_ || outputs_[i].backend != MidiBackend::Plugin)
+        return outputs_[i].portName;
+    // Positional, exactly as the DSP resolves it: count the Plugin-backed ports
+    // ahead of this one. Keep the two in step — pluginPorts.hpp owns the rule.
+    int slot = 0;
+    for (int j = 0; j < i; j++)
+        if (outputs_[j].backend == MidiBackend::Plugin) slot++;
+    if (slot >= kMaxPluginOutputs) slot = kMaxPluginOutputs - 1;   // overflow shares the last
+    return pluginOutputName(slot);
+}
+
 void OutputsOverlay::syncFromInputs() {
     for (int i = 0; i < (int)rows_.size() && i < (int)outputs_.size(); i++)
-        if (rows_[i].input) outputs_[i].portName = rows_[i].input->value();
+        // Skip a disabled input: it is showing a derived name, not the port's own,
+        // so reading it back would overwrite the real name with the LV2 output's.
+        if (rows_[i].input && rows_[i].input->active())
+            outputs_[i].portName = rows_[i].input->value();
 }
 
 int OutputsOverlay::defaultTypeRowY() const {
@@ -494,8 +513,13 @@ void OutputsOverlay::rebuildRows() {
         inp->color(inputBgCol);
         inp->textcolor(textCol);
         inp->textsize(12);
-        inp->value(outputs_[i].portName.c_str());
+        inp->value(displayPortName(i).c_str());
         inp->callback(inputCb, this);
+        // Hosted, a Plugin port's name is the LV2 output it drives, so it is shown
+        // rather than entered. syncFromInputs() skips inactive inputs, which is what
+        // keeps the port's real name from being overwritten by the displayed one.
+        if (pluginMode_ && outputs_[i].backend == MidiBackend::Plugin)
+            inp->deactivate();
 
         const int backendX = pad + inputW + backendGap;
         auto* be = new ModernChoice(backendX, iy, backendW, inputH);
@@ -842,7 +866,10 @@ void OutputsOverlay::rebuildPortChoices() {
         ch->clear();
         int selIdx = 0;
         for (int j = 0; j < (int)outputs_.size(); j++) {
-            ch->add(outputs_[j].portName.c_str());
+            // Shown the same way as the port row, so the two never disagree about
+            // what a port is called. Selection is still by index and the value
+            // stored below is the port's real name, so routing is unaffected.
+            ch->add(displayPortName(j).c_str());
             if (outputs_[j].portName == instruments_[i].portName) selIdx = j;
         }
         if (!outputs_.empty()) {
@@ -890,6 +917,10 @@ void OutputsOverlay::backendChoiceCb(Fl_Widget* w, void* d) {
         int idx = static_cast<Fl_Choice*>(w)->value();
         if (idx < 0) return;
         self->outputs_[i].backend = static_cast<MidiBackend>(idx);
+        // Switching to/from Plugin changes whether the name is the port's own or the
+        // LV2 output's, so both the row and the instrument dropdowns are redrawn.
+        self->rebuildRows();
+        self->rebuildPortChoices();
         if (self->onPortBackendChanged) self->onPortBackendChanged();
         return;
     }

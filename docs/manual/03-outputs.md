@@ -46,9 +46,14 @@ them in list order: the first such port drives *MIDI Out 1* in the host, the
 second drives *MIDI Out 2*, and so on. Ports on any other backend, and anything
 past the eighth, fall back to *MIDI Out 1*.
 
-The host names these outputs itself — an LV2 plugin's port names are fixed when
-it is built, so they cannot follow the names you give your ports. Your port names
-decide the *order*, not the labels the host shows.
+Because the mapping is positional there is nothing to name, so a Plugin port is
+listed under the output it drives — *MIDI Out 1*, *MIDI Out 2* — and its name box
+is greyed out. Instruments show the same name, so both halves of the panel agree
+on where a note ends up.
+
+That name is only what you see here. The port keeps whatever name it was given,
+so a project taken back to the standalone app still has its own port names and
+switching a port to Jack, Native or Debug shows them again.
 
 TODO: adding a port, choosing its backend, and what appears at the other end for
 each.

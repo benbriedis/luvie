@@ -351,5 +351,3 @@ Probably want/need  'carla-jack-multi' as Luvie provides multiple MIDI outputs
        and carla-patchbay (= the default 'carla') doesn't current support this.
        carla-rack presumably folds the outputs together or just uses the first one I guess  (TODO check)
        NOT sure about carla-jack-single  (TODO check)
-Note that when 'plugin' is use as output the 
-       
