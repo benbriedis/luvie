@@ -187,6 +187,58 @@ void PianorollGrid::onCommitGroupMove(float dBeat, int dRow)
         pattern->moveNote(n.id, n.beat + dBeat, (float)(n.row - dRow));
 }
 
+// A copy carries the visual row rather than the MIDI note, so the paste lands
+// under the cursor rather than back at the pitch it came from. rowOffset cancels
+// out once the items are rebased, so scrolling between copy and paste changes
+// nothing.
+std::vector<ClipItem> PianorollGrid::selectedForClipboard() const
+{
+    std::vector<ClipItem> items;
+    if (!pattern || patternId < 0) return items;
+    for (const Note& n : pattern->buildPatternNotes(patternId))
+        if (selection.contains(n.id))
+            items.push_back({(rowOffset + numRows - 1) - n.row, n.beat, n.length, n.velocity, 0.0f});
+    return items;
+}
+
+bool PianorollGrid::pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat)
+{
+    if (!pattern || patternId < 0 || items.empty()) return false;
+
+    struct Place { int midi; float beat, length, velocity; };
+    std::vector<Place> places;
+    places.reserve(items.size());
+    for (const auto& it : items) {
+        int midi = rowOffset + numRows - 1 - (visualRow + it.dRow);
+        if (midi < 0 || midi >= totalRows) return false;
+        float b = beat + it.dBeat;
+        if (b < 0.0f || b + it.length > (float)numCols) return false;
+        places.push_back({midi, b, it.length, it.velocity});
+    }
+
+    // Every note the pattern already holds is in the way, the copied ones
+    // included: nothing is vacating its place, unlike a group move.
+    auto all = pattern->buildPatternNotes(patternId);
+    for (const auto& p : places)
+        for (const Note& n : all)
+            if (n.row == p.midi && beatsOverlap(p.beat, p.length, n.beat, n.length))
+                return false;
+
+    std::vector<int> pasted;
+    pasted.reserve(places.size());
+    {
+        ObservableSong::Batch batch(pattern->song());
+        for (const auto& p : places)
+            pasted.push_back(pattern->addNote(patternId, p.beat, p.midi, p.length, p.velocity));
+    }
+    // The copies take the selection over from the notes they were made from,
+    // once the batch has closed and they are in the model to be selected.
+    selection.clear();
+    for (int id : pasted) if (id > 0) selection.add(id);
+    redraw();
+    return true;
+}
+
 void PianorollGrid::onCommitMove(const StateDragMove& s)
 {
     if (!pattern) return;

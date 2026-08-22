@@ -25,11 +25,13 @@ public:
     ObservableSong*  song() const { return song_; }
     const Timeline&  get()  const { return song_->get(); }
 
-    // Pattern note CRUD
-    void addNote(int patternId, float start, int pitch, float length, float velocity = 0.8f);
+    // Pattern note CRUD. The two adders return the new note's id, or 0 when there
+    // is no such pattern — a paste selects what it just placed, and that is the
+    // only way to know what it was.
+    int  addNote(int patternId, float start, int pitch, float length, float velocity = 0.8f);
     // A note placed directly on one of the harmony editor's bonus rows: `pitchGroup`
     // and `bonusDegree` are the row's coordinates, as Note documents.
-    void addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
+    int  addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
                       float length, float velocity = 0.8f);
     void removeNote(int noteId);
     void moveNote(int noteId, float newStart, float newPitch);
@@ -52,7 +54,7 @@ public:
     void remapPatternNotes(int patId, int oldSize, int newSize);
 
     // Drum note CRUD
-    void addDrumNote(int patternId, int note, float beat, float velocity = 0.8f);
+    int  addDrumNote(int patternId, int note, float beat, float velocity = 0.8f);
     void removeDrumNote(int drumNoteId);
     // Move a drum note without changing its id, so one drag is one edit.
     void moveDrumNote(int drumNoteId, int note, float beat);

@@ -145,13 +145,12 @@ void HarmonyGrid::toggleNote()
 
 // Create a note on `virtualPos`, whichever kind of row that turns out to be: a
 // bonus row takes a note carrying that row's degree, so it sounds as labelled.
-void HarmonyGrid::addNoteAt(int virtualPos, float col, float length)
+int HarmonyGrid::addNoteAt(int virtualPos, float col, float length, float velocity)
 {
     auto slot = slotForVirtualPos(0, virtualPos);
     if (slot.bonus)
-        pattern->addBonusNote(patternId, col, slot.row, slot.bonusDegree, length);
-    else
-        pattern->addNote(patternId, col, slot.row, length);
+        return pattern->addBonusNote(patternId, col, slot.row, slot.bonusDegree, length, velocity);
+    return pattern->addNote(patternId, col, slot.row, length, velocity);
 }
 
 std::function<void()> HarmonyGrid::makeDeleteCallback(int noteIdx)
@@ -291,6 +290,64 @@ void HarmonyGrid::onCommitGroupMove(float dBeat, int dRow)
     ObservableSong::Batch batch(pattern->song());
     for (size_t i = 0; i < slots.size(); ++i)
         pattern->moveNoteToSlot(beats[i], slots[i]);
+}
+
+// A copy carries the visual row rather than the note's own coordinates, so a
+// pasted note takes on the character of the row it lands on — becoming a bonus
+// note or an ordinary one — exactly as a dragged one does.
+std::vector<ClipItem> HarmonyGrid::selectedForClipboard() const
+{
+    std::vector<ClipItem> items;
+    if (!pattern || patternId < 0) return items;
+    for (const Note& n : pattern->buildPatternNotes(patternId)) {
+        if (!selection.contains(n.id)) continue;
+        int vp = virtualPosOf(n);
+        if (vp < 0) continue;   // a bonus degree that has fallen out of the layout
+        items.push_back({(rowOffset + numRows - 1) - vp, n.beat, n.length, n.velocity, 0.0f});
+    }
+    return items;
+}
+
+bool HarmonyGrid::pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat)
+{
+    if (!pattern || patternId < 0 || items.empty()) return false;
+
+    struct Place { int vp; float beat, length, velocity; };
+    std::vector<Place> places;
+    places.reserve(items.size());
+    for (const auto& it : items) {
+        int vp = rowOffset + numRows - 1 - (visualRow + it.dRow);
+        if (!validVirtualPos(vp)) return false;
+        float b = beat + it.dBeat;
+        if (b < 0.0f || b + it.length > (float)numCols) return false;
+        places.push_back({vp, b, it.length, it.velocity});
+    }
+
+    // Every note the pattern already holds is in the way, the copied ones
+    // included: nothing is vacating its place, unlike a group move.
+    auto all = pattern->buildPatternNotes(patternId);
+    for (const auto& p : places)
+        for (const Note& n : all)
+            if (virtualPosOf(n) == p.vp && beatsOverlap(p.beat, p.length, n.beat, n.length))
+                return false;
+
+    // The batch keeps the layout still while the notes go in: a bonus degree
+    // that this pattern does not have yet would otherwise resize the pitch
+    // groups mid-paste, and the rows resolved above would stop meaning what
+    // they meant when they were checked.
+    std::vector<int> pasted;
+    pasted.reserve(places.size());
+    {
+        ObservableSong::Batch batch(pattern->song());
+        for (const auto& p : places)
+            pasted.push_back(addNoteAt(p.vp, p.beat, p.length, p.velocity));
+    }
+    // The copies take the selection over from the notes they were made from,
+    // once the batch has closed and they are in the model to be selected.
+    selection.clear();
+    for (int id : pasted) if (id > 0) selection.add(id);
+    redraw();
+    return true;
 }
 
 // A dragged note takes on the character of the row it is dropped on, so a note

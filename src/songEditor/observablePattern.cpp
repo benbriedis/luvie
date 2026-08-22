@@ -41,29 +41,33 @@ void ObservablePattern::onTimelineChanged()
 // ---------------------------------------------------------------------------
 // Note CRUD
 
-void ObservablePattern::addNote(int patternId, float start, int pitch, float length, float velocity)
+int ObservablePattern::addNote(int patternId, float start, int pitch, float length, float velocity)
 {
     for (auto& pat : song_->data.patterns) {
         if (pat.id == patternId) {
-            pat.notes.push_back({song_->nextId++, pitch, start, length, velocity});
+            int id = song_->nextId++;
+            pat.notes.push_back({id, pitch, start, length, velocity});
             song_->notify();
-            return;
+            return id;
         }
     }
+    return 0;
 }
 
-void ObservablePattern::addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
-                                     float length, float velocity)
+int ObservablePattern::addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
+                                    float length, float velocity)
 {
-    if (bonusDegree < 0) return;
+    if (bonusDegree < 0) return 0;
     for (auto& pat : song_->data.patterns) {
         if (pat.id == patternId) {
-            pat.notes.push_back({song_->nextId++, pitchGroup, start, length, velocity,
+            int id = song_->nextId++;
+            pat.notes.push_back({id, pitchGroup, start, length, velocity,
                                  true, bonusDegree});
             song_->notify();
-            return;
+            return id;
         }
     }
+    return 0;
 }
 
 void ObservablePattern::removeNote(int noteId)
@@ -193,15 +197,17 @@ void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
 // ---------------------------------------------------------------------------
 // Drum note CRUD
 
-void ObservablePattern::addDrumNote(int patternId, int note, float beat, float velocity)
+int ObservablePattern::addDrumNote(int patternId, int note, float beat, float velocity)
 {
     for (auto& pat : song_->data.patterns) {
         if (pat.id == patternId) {
-            pat.drumNotes.push_back({song_->nextId++, note, beat, velocity});
+            int id = song_->nextId++;
+            pat.drumNotes.push_back({id, note, beat, velocity});
             song_->notify();
-            return;
+            return id;
         }
     }
+    return 0;
 }
 
 void ObservablePattern::removeDrumNote(int drumNoteId)

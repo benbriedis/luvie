@@ -36,7 +36,8 @@ class HarmonyGrid : public Grid, public ITimelineObserver {
     std::optional<ObservableSong::UndoGroup> rapidUndo;
 
     void rebuildNotes();
-    void addNoteAt(int virtualPos, float col, float length);
+    // Returns the new note's id, or 0 if it could not be created.
+    int  addNoteAt(int virtualPos, float col, float length, float velocity = 0.8f);
     bool screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const;
     void rapidTryCreate(int visualRow, int absCol);
     void processRapidCell(RapidCell cur);
@@ -75,6 +76,10 @@ protected:
                          int& minDRow, int& maxDRow) const override;
     bool groupMoveBlocked(float dBeat, int dRow) const override;
     void onCommitGroupMove(float dBeat, int dRow) override;
+
+    ClipKind clipKind() const override { return ClipKind::HarmonyNotes; }
+    std::vector<ClipItem> selectedForClipboard() const override;
+    bool pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat) override;
 
     int handle(int event) override;
 

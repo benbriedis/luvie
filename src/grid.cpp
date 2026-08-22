@@ -137,6 +137,8 @@ int Grid::handle(int event)
 {
     if (popup.visible())
         return 0;
+    if (selectionPopup && selectionPopup->visible())
+        return 0;
 
     switch (event) {
         case FL_PUSH: {
@@ -360,6 +362,57 @@ void Grid::deleteSelectedItems()
     deleteSelection();
     state = StateIdle{};
     if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard
+// ---------------------------------------------------------------------------
+
+// The base reads `notes`, which is right for a grid that shows all of its rows
+// at once. The scrolling grids override this and read their model instead, so a
+// selection reaching above or below the viewport is copied whole.
+std::vector<ClipItem> Grid::selectedForClipboard() const
+{
+    std::vector<ClipItem> items;
+    for (const Note& n : notes)
+        if (selection.contains(n.id))
+            items.push_back({(int)n.row, n.beat, n.length, n.velocity, 0.0f});
+    return items;
+}
+
+float Grid::pasteAnchorBeat() const
+{
+    float fcol = (float)(Fl::event_x() - x()) / (float)colWidth + colOffset;
+    return newNoteStart(fcol);
+}
+
+void Grid::copySelection()
+{
+    if (clipKind() == ClipKind::None || selection.empty()) return;
+    clipboard().set(clipKind(), selectedForClipboard());
+}
+
+void Grid::pasteClipboard()
+{
+    const Clipboard& cb = clipboard();
+    // Nothing of this grid's kind to paste, or nowhere here it would fit: either
+    // way nothing happens, and the cursor is what says so.
+    if (!cb.holds(clipKind()) ||
+        !pasteAt(cb.items, rowAtPixelY(Fl::event_y() - y()), pasteAnchorBeat()))
+        flashForbiddenCursor(window());
+}
+
+bool Grid::openSelectionMenu(int noteIdx)
+{
+    // Right-clicking a member of a multi-selection is a different question from
+    // right-clicking one item, so it gets its own menu. Right-clicking anything
+    // else falls through to the caller's.
+    if (!selectionPopup || !selection.contains(notes[noteIdx].id)) return false;
+    selectionPopup->open(this,
+        [this]() { cutSelection(); redraw(); },
+        [this]() { copySelection(); },
+        [this]() { deleteSelectedItems(); redraw(); });
+    return true;
 }
 
 void Grid::groupDragLimits(float& minDBeat, float& maxDBeat, int& minDRow, int& maxDRow) const
@@ -759,6 +812,7 @@ int Grid::overlappingCell(int noteIdx) const
 
 void Grid::openContextMenu(int idx)
 {
+    if (openSelectionMenu(idx)) return;
     popup.open(idx, &notes, this, makeDeleteCallback(idx), makeVelocityCallback(idx));
 }
 

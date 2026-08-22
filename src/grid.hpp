@@ -4,8 +4,10 @@
 #ifndef GRID_HPP
 #define GRID_HPP
 
+#include "clipboard.hpp"
 #include "noteContextPopup.hpp"
 #include "selection.hpp"
+#include "selectionContextPopup.hpp"
 #include "timeline.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
@@ -93,6 +95,7 @@ public:
 protected:
     float             snap;
     NoteContextPopup&            popup;
+    SelectionContextPopup*       selectionPopup = nullptr;
     std::vector<Note> notes;
 
     GridState state;
@@ -183,6 +186,32 @@ protected:
     virtual void onCommitGroupMove(float dBeat, int dRow);
     // Some grids lock an axis.
     virtual bool allowsVerticalDrag() const { return true; }
+
+    // ── Clipboard ────────────────────────────────────────────────────────────
+    // Copying takes a snapshot of the selection and nothing else happens until a
+    // paste asks for it: the destination is chosen by where the cursor is when
+    // ctrl-V arrives, so there is no gesture in between for the grid to be in.
+
+    // What this grid's items are on the shared clipboard. None keeps it out of
+    // copy and paste altogether.
+    virtual ClipKind clipKind() const { return ClipKind::None; }
+    // The selection as clipboard items, in absolute screen coordinates (visual
+    // row, beat) — copySelection() rebases them. Grids that can scroll read the
+    // model rather than `notes`, which holds only the rows on screen.
+    virtual std::vector<ClipItem> selectedForClipboard() const;
+    // Place `items` with their top-left corner on (visualRow, beat). All or
+    // nothing: false means something would not fit and nothing was placed.
+    // A paste that succeeds takes the selection with it — the copies end up
+    // selected and the originals do not — so the pasted block can be dragged
+    // into place straight away, which is usually the next thing wanted.
+    virtual bool pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat)
+    { (void)items; (void)visualRow; (void)beat; return false; }
+    // The beat a paste anchors on: the grid line at or before the cursor.
+    virtual float pasteAnchorBeat() const;
+
+    // Opens the selection menu if the right-click landed on a member of the
+    // selection, in which case the caller must not open its own menu as well.
+    bool openSelectionMenu(int noteIdx);
 
     // Selected items are outlined rather than filled differently, so velocity
     // shading and the song editor's stacked-lane tinting stay readable under it.
@@ -283,6 +312,9 @@ public:
     void selectAllItems() override     { selectAll(); redraw(); }
     void deleteSelectedItems() override;
     bool hasSelection() const override { return !selection.empty(); }
+    void copySelection() override;
+    void pasteClipboard() override;
+    void setSelectionPopup(SelectionContextPopup* p) override { selectionPopup = p; }
     bool showing() const override      { return visible_r(); }
     bool ownsWindowPoint(int wx, int wy) const override
     { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }

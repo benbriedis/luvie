@@ -77,6 +77,30 @@ const Fl_RGB_Image* forbiddenCursorImage() {
 	return img;
 }
 
+// How long the forbidden cursor stays up. Long enough to be read as an answer to
+// the key that was just pressed, short enough not to leave the pointer looking
+// broken.
+static constexpr double forbiddenFlashSecs = 1.0;
+
+// The window the flash is running on, so a second flash replaces the first
+// rather than letting the older timeout clear the newer cursor.
+static Fl_Window* flashWindow = nullptr;
+
+static void endForbiddenFlash(void*)
+{
+	if (flashWindow) flashWindow->cursor(FL_CURSOR_DEFAULT);
+	flashWindow = nullptr;
+}
+
+void flashForbiddenCursor(Fl_Window* win)
+{
+	if (!win) return;
+	Fl::remove_timeout(endForbiddenFlash);
+	flashWindow = win;
+	win->cursor(forbiddenCursorImage(), 11, 11);
+	Fl::add_timeout(forbiddenFlashSecs, endForbiddenFlash);
+}
+
 const Fl_RGB_Image* contextMenuCursorImage() {
 	static const int W = 20;
 	static const int H = 22;

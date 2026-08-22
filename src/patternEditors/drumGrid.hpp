@@ -4,9 +4,11 @@
 #ifndef DRUM_GRID_HPP
 #define DRUM_GRID_HPP
 
+#include "clipboard.hpp"
 #include "observablePattern.hpp"
 #include "noteContextPopup.hpp"
 #include "selection.hpp"
+#include "selectionContextPopup.hpp"
 #include <FL/Fl_Box.H>
 #include <vector>
 #include <variant>
@@ -59,7 +61,8 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
     float               snap;
     int                 divisions = 1;  // beat subdivisions; 1 = None, so no extra lines
 
-    NoteContextPopup&     popup;
+    NoteContextPopup&      popup;
+    SelectionContextPopup* selectionPopup = nullptr;
     DrumState  state;
     Selection  selection;
 
@@ -92,6 +95,9 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
     void movingGroup(DrumStateDragGroup& d);
     void applyBand(bool additive);
     int  dotRadius() const { return std::max(2, rowHeight / 3); }
+    // Place `items` with their top-left corner where the cursor is. All or
+    // nothing: false means one of them would not fit and none were placed.
+    bool pasteAt(const std::vector<ClipItem>& items);
 
     bool isActiveDrag() const {
         return std::holds_alternative<DrumStateDrag>(state) ||
@@ -130,6 +136,9 @@ public:
     void selectAllItems() override     { selectAllNotes(); redraw(); }
     void deleteSelectedItems() override;
     bool hasSelection() const override { return !selection.empty(); }
+    void copySelection() override;
+    void pasteClipboard() override;
+    void setSelectionPopup(SelectionContextPopup* p) override { selectionPopup = p; }
     bool showing() const override      { return visible_r(); }
     bool ownsWindowPoint(int wx, int wy) const override
     { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }

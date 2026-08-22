@@ -8,7 +8,6 @@
 #include "gridPane.hpp"
 #include "songGrid.hpp"
 #include "patternInstanceContextPopup.hpp"
-#include "selectionContextPopup.hpp"
 #include "trackLabels.hpp"
 #include "noteContextPopup.hpp"
 #include "itransport.hpp"
@@ -66,7 +65,6 @@ public:
     ISelectionHost* selectionHost() { return &songGrid; }
 
     void setSongPopup(PatternInstanceContextPopup* p)         { songGrid.setSongPopup(p); }
-    void setSelectionPopup(SelectionContextPopup* p)          { songGrid.setSelectionPopup(p); }
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }
 
     void setTransport(ITransport* t, ObservableSong* tl);

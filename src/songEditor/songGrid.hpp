@@ -7,7 +7,6 @@
 #include "grid.hpp"
 #include "observableSong.hpp"
 #include "patternInstanceContextPopup.hpp"
-#include "selectionContextPopup.hpp"
 #include "paramDotPopup.hpp"
 #include "paramLaneTypes.hpp"
 #include <cmath>
@@ -21,7 +20,6 @@ class SongGrid : public Grid, public ITimelineObserver {
     bool isInstrHeaderVR(int vr) const;
     ObservableSong* timeline          = nullptr;
     PatternInstanceContextPopup*          songPopup         = nullptr;
-    SelectionContextPopup*                selectionPopup    = nullptr;
     ParamDotPopup*      paramDotPopup     = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;
@@ -35,38 +33,6 @@ class SongGrid : public Grid, public ITimelineObserver {
     ParamState                   paramState;
     std::unordered_set<int>      stackedNoteIds;
 
-    // ── Copy-and-place ───────────────────────────────────────────────────────
-    // "Copy selection" leaves a ghost of the copied instances following the
-    // cursor; the next click places the copy and ends the gesture, Escape
-    // cancels it, and either way the original selection is left as it was. A
-    // non-empty `stamp` IS the mode. It holds values rather than ids because
-    // the source instances may be edited or deleted while the ghost is up, and
-    // what gets placed should stay what was copied.
-    struct StampItem { int srcAbsRow; float startBar, length, startOffset; };
-    std::vector<StampItem> stamp;
-    int   stampOriginX  = 0, stampOriginY = 0;   // grid-relative cursor anchor
-    bool  stampAnchored = false;                 // re-anchor on the first move
-    float stampDBar     = 0.0f;
-    int   stampDRow     = 0;
-    // The delta the ghost held when it was last anchored. Re-anchoring (the
-    // cursor leaves and comes back, or the view scrolls under it) moves the
-    // origin to wherever the cursor now is and carries this forward, so the
-    // ghost stays put instead of springing back to the originals.
-    float stampBaseDBar = 0.0f;
-    int   stampBaseDRow = 0;
-    float stampMinDBar  = 0.0f, stampMaxDBar = 0.0f;
-    bool  stampBlocked  = false;
-
-    void beginStamp();
-    void endStamp();
-    void updateStamp();
-    // True when every copy would land on a row that holds blocks. The ghost
-    // refuses to move onto rows that fail this rather than drawing there.
-    bool stampRowsUsable(int dRow) const;
-    bool stampIsBlocked() const;
-    void commitStamp();
-    void drawStamp() const;
-    int  handleStampEvent(int event);
     // Destination lane for an absolute row, with the lane's own pattern. Both
     // are -1/0 when the row does not accept instances.
     void destLaneForAbsRow(int absRow, int& laneId, int& patternId) const;
@@ -137,6 +103,13 @@ protected:
     bool groupMoveBlocked(float dBeat, int dRow) const override;
     void onCommitGroupMove(float dBeat, int dRow) override;
 
+    ClipKind clipKind() const override { return ClipKind::SongInstances; }
+    std::vector<ClipItem> selectedForClipboard() const override;
+    bool  pasteAt(const std::vector<ClipItem>& items, int visualRow, float bar) override;
+    // Blocks snap to the beat of whatever time signature is in force where the
+    // cursor sits, exactly as dragging one does.
+    float pasteAnchorBeat() const override;
+
     // Automation dots share the selection with pattern instances here, because
     // they are rows of this same grid. Both are keyed by their model id, and
     // the id spaces never overlap (one nextId counter issues both).
@@ -156,12 +129,9 @@ public:
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
 
     void setSongPopup(PatternInstanceContextPopup* p)         { songPopup = p; }
-    void setSelectionPopup(SelectionContextPopup* p)          { selectionPopup = p; }
     void setParamDotPopup(ParamDotPopup* p) { paramDotPopup = p; }
 
     int handle(int event) override;
-
-    bool cancelPlacement() override;
 
     void setTimeline(ObservableSong* tl);
     void setTrackView(int trackFilter, bool beatResolution);

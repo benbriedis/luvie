@@ -171,6 +171,7 @@ void DrumGrid::draw()
 int DrumGrid::handle(int evt)
 {
     if (popup.visible()) return 0;
+    if (selectionPopup && selectionPopup->visible()) return 0;
 
     switch (evt) {
 
@@ -197,6 +198,15 @@ int DrumGrid::handle(int evt)
 
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (idx >= 0) {
+                // Right-clicking a member of a multi-selection is a different
+                // question from right-clicking one hit, so it gets its own menu.
+                if (selectionPopup && selection.contains(notes[idx].id)) {
+                    selectionPopup->open(this,
+                        [this]() { cutSelection(); redraw(); },
+                        [this]() { copySelection(); },
+                        [this]() { deleteSelectedItems(); redraw(); });
+                    return 1;
+                }
                 // Open context popup for this drum note
                 const auto& n = notes[idx];
                 int vr   = rowOffset + numRows - 1 - n.note;
@@ -411,6 +421,76 @@ void DrumGrid::deleteSelection()
     selection.clear();
     ObservableSong::Batch batch(pattern->song());
     for (int id : doomed) pattern->removeDrumNote(id);
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard
+//
+// A copy carries the visual row rather than the MIDI note, so the paste lands
+// under the cursor rather than back at the pitch it came from; `length` goes
+// unused, a drum hit having no duration.
+// ---------------------------------------------------------------------------
+
+void DrumGrid::copySelection()
+{
+    if (!pattern || patternId < 0 || selection.empty()) return;
+    std::vector<ClipItem> items;
+    for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId))
+        if (selection.contains(n.id))
+            items.push_back({rowOffset + numRows - 1 - n.note, n.beat, 0.0f, n.velocity, 0.0f});
+    clipboard().set(ClipKind::DrumNotes, std::move(items));
+}
+
+void DrumGrid::pasteClipboard()
+{
+    const Clipboard& cb = clipboard();
+    if (!cb.holds(ClipKind::DrumNotes) || !pasteAt(cb.items))
+        flashForbiddenCursor(window());
+}
+
+bool DrumGrid::pasteAt(const std::vector<ClipItem>& items)
+{
+    if (!pattern || patternId < 0 || items.empty()) return false;
+
+    const int baseRow = std::max(0, Fl::event_y() - y()) / rowHeight;
+    float     baseBeat = (float)(Fl::event_x() - x() - padX) / colWidth + colOffset;
+    if (snap > 0.0f) baseBeat = std::floor(baseBeat / snap) * snap;
+    baseBeat = std::max(0.0f, baseBeat);
+
+    struct Place { int note; float beat, velocity; };
+    std::vector<Place> places;
+    places.reserve(items.size());
+    for (const auto& it : items) {
+        int note = rowOffset + numRows - 1 - (baseRow + it.dRow);
+        if (note < 0 || note > 127) return false;
+        float beat = baseBeat + it.dBeat;
+        // Never on the closing line, which createNote() also refuses.
+        if (beat < 0.0f || beat >= (float)numCols) return false;
+        places.push_back({note, beat, it.velocity});
+    }
+
+    // Two hits on the same note at the same beat would be indistinguishable, so
+    // every hit the pattern already holds is in the way — the copied ones
+    // included, since nothing is vacating its place.
+    const float eps = 1e-4f;
+    auto all = pattern->buildDrumPatternNotes(patternId);
+    for (const auto& p : places)
+        for (const DrumNote& n : all)
+            if (n.note == p.note && std::abs(n.beat - p.beat) < eps) return false;
+
+    std::vector<int> pasted;
+    pasted.reserve(places.size());
+    {
+        ObservableSong::Batch batch(pattern->song());
+        for (const auto& p : places)
+            pasted.push_back(pattern->addDrumNote(patternId, p.note, p.beat, p.velocity));
+    }
+    // The copies take the selection over from the hits they were made from, once
+    // the batch has closed and they are in the model to be selected.
+    selection.clear();
+    for (int id : pasted) if (id > 0) selection.add(id);
+    redraw();
+    return true;
 }
 
 void DrumGrid::groupDragLimits(float& minDBeat, float& maxDBeat,

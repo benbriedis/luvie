@@ -50,6 +50,14 @@ public:
 	// whether it was the intended target from where the cursor happens to be.
 	std::function<void()> onSelectAll;
 
+	// Ctrl-C copies the selection of whichever editor is showing and ctrl-X cuts
+	// it; ctrl-V pastes into the editor the cursor is over, at the cursor.
+	// Window-level for the same reason as Escape and ctrl-A. A focused text input
+	// sees all three first and keeps its own clipboard behaviour.
+	std::function<void()> onCut;
+	std::function<void()> onCopy;
+	std::function<void()> onPaste;
+
 	// Delete/BackSpace with a multi-selection active, same reasoning again.
 	// Returns false when there was nothing selected, in which case the key is
 	// left to travel on: the grids also delete the single note under the cursor,

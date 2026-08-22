@@ -64,7 +64,7 @@ FUTURE FUNCTIONALITY
 - In standalone implement "Recent projects" menu.
 	Probably use FL_Preferences (part of FLTK) to make it cross-platform compatible.
 
-- Unit tests?
+- Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
 - Add a dark theme
 
@@ -155,9 +155,6 @@ Allow the window close to be clicked even if a popup of menu is showing.
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
 
-In the pattern editor reconsider the transport info 
-    (BPM, time signature etc - some is likely to be confusing or not needed
-
 Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
 
 Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
@@ -177,9 +174,6 @@ When I start up in standalone mode (with -v) and close the application (using th
 
 2. Add an 'expression' section at the bottom of BOTH the patterns and song editors
    that allow for rubber bands on a range of parameters.
-
-
-Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
 BUG: Not rewinding right to start (Ardour + Jack). See TRANSPORTS.txt.
 
@@ -305,9 +299,6 @@ Look at changing time signatures: auto changes are a bit annoying.
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
-
-
-
 BUG: looping to start of song causes a gap (plugin or standalone or both?)
 
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
@@ -357,21 +348,24 @@ TODO create a multi-select click and drag tool + copy for use in Song Editor.
 	 - Need zoom for this too...
 	 NB some tracks may be collapsed. Parameter dots need to be includable?
      
-Remove the automatic centering of the cursor on drag? OR have the cursor jump - not the pattern
-
 BUG: I suspect 'Loop mode' + current loops are not being saved.
 
 BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
 TODO move 'Add automation' to second last in the menu
 
+BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
+     messy flickery behaviour. Probably best to only resize one at a time.
 
 
 Document
- Ctrl-click  select/deselect
- Shift-click  slection area
- Ctrl-A      select all
- Ctrl-Z    undo
- Ctrl-Y    redo
+	Ctrl-click  select/deselect
+	Shift-click  slection area
+	Ctrl-A      select all
+	Ctrl-Z    undo
+	Ctrl-Y    redo
+	Ctrl-C   copy selection
+	Ctrl-X   cut selection
+	Ctrl-V   paste
  
  Maybe add an optional "Tools" toolbar?
  
@@ -383,18 +377,29 @@ TODO In pattern editors some notes may sit at divisions not currently supported.
      Should have a consistent policy for how to deal with dragging in this case.
      Seems a bit ad hoc at the moment.
 
+BUG: occassionally selecting multiple blocks in the song editor (elsewhere is unknown) does not select the 
+     top left block.
+
 Song Editor - wants a ZOOM, but where to put it? Options:
-	1. Create a dark horizontal settings bar at bottom and put the one control on it.
+	1. Hack it on to the transport bar.
+	   cf putting Zoom on the LHS for ALL pattern editors.
+	      Possibly with a multi-select enable?
+	2. Create a dark horizontal settings bar at bottom and put the one control on it.
+	   Maybe add a vertical zoom in time.
 	   Could add a selection mode button toggle to it.
-	2. Hack it on to the transport bar
 	3. Create a context menu over the entire grid (confusing - hides the different types of context menu)
 	4. Put into pattern instance context menus and possibly the label context menus
 	5. Use + and - or other shortcut keys exclusively. (or combine with 4.)
 	       (maybe a bit obscure to rely on it?)
     6. Context menu over bar ruler  (hard to find)
 
+Multi-select: probably prefer modifynig the colour of the blocks.
 
-Copy & paste: might be more standard for paste to require a right click or ctrl-V.	  
+Pasting selection - maybe show forbidden cursor even before pasting. Problem then is at what point
+   do we clear it? Maybe when selection is deselected. 
+   Maybe if we do something else, like click in the grid somewhere.
 
+Selection - deselecting on copy is probably the more standard behaviour.   
 
-BUG hover over dot and press delete. Nothing
+Manual: multi-select move, copy, delete descriptions
+

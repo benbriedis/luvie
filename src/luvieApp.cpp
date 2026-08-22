@@ -162,10 +162,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // Only one editor is visible at a time, so clearing all of them is both
     // correct and simpler than working out which one has the cursor.
     window->onEscape = [this]() {
-        // A copy waiting to be placed goes first: cancelling it leaves the items
-        // that were copied still selected, which is what the user is looking at.
-        for (ISelectionHost* h : selectionHosts())
-            if (h && h->cancelPlacement()) return true;
         bool cleared = false;
         for (ISelectionHost* h : selectionHosts())
             if (h && h->hasSelection()) { h->clearSelection(); cleared = true; }
@@ -186,15 +182,32 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         return false;
     };
 
+    // Ctrl-X acts on the selection wherever the cursor is, like Ctrl-C does.
+    window->onCut = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->hasSelection()) { h->cutSelection(); return; }
+    };
+
+    // Ctrl-C acts on the selection wherever the cursor is, like Delete does.
+    window->onCopy = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->hasSelection()) { h->copySelection(); return; }
+    };
+
+    // Ctrl-V, unlike the rest, does care where the cursor is: it is what chooses
+    // where the copy lands. Over anything but an editing grid it does nothing.
+    window->onPaste = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->ownsWindowPoint(Fl::event_x(), Fl::event_y()))
+                { h->pasteClipboard(); return; }
+    };
+
     // A click anywhere but the grid holding the selection dismisses it. Clicks
     // inside that grid are left alone: it has its own rules for them (band
     // sweeps, ctrl-toggles, dragging the selection).
     window->onClick = [this](int wx, int wy) {
         for (ISelectionHost* h : selectionHosts()) {
             if (!h || h->ownsWindowPoint(wx, wy)) continue;
-            // Clicking away is also how a copy waiting to be placed is
-            // abandoned — it can only be placed on the grid that owns it.
-            h->cancelPlacement();
             if (h->hasSelection()) h->clearSelection();
         }
     };
@@ -394,7 +407,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     og2->onPatternDoubleClick = openPatternTab;
     og2->onOpenPattern        = openPatternTab;
     og2->setSongPopup(sp);
-    og2->setSelectionPopup(selPop);
     og2->setParamDotPopup(pdPop);
     ctxPop->onOpenPattern     = openPatternTab;
     if (verbose) {
@@ -458,6 +470,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
+    // The selection menu is shared: only one editor is on screen at a time, so
+    // one instance can serve them all.
+    for (ISelectionHost* h : selectionHosts())
+        if (h) h->setSelectionPopup(selPop);
     harmonyEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);

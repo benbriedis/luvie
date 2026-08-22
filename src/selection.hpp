@@ -8,6 +8,8 @@
 #include <unordered_set>
 #include <vector>
 
+class SelectionContextPopup;
+
 // A set of selected item ids, plus the geometry of the rubber band being dragged
 // to build one. Held by each editing grid; the ids are model ids (Note::id,
 // DrumNote::id, PatternInstance::id, ParamPoint::id) rather than indices into a
@@ -93,15 +95,26 @@ class ISelectionHost {
 public:
     virtual ~ISelectionHost() = default;
     virtual void clearSelection()      = 0;
-    // A modal placement gesture in progress (the song editor's copy-and-stamp).
-    // Escape cancels that before it touches the selection, so a cancelled copy
-    // leaves the items that were copied still selected. Returns true when there
-    // was one to cancel.
-    virtual bool cancelPlacement()     { return false; }
     virtual void selectAllItems()      = 0;
     // Remove every selected item, in one batched edit.
     virtual void deleteSelectedItems() = 0;
     virtual bool hasSelection() const  = 0;
+    // Put the selection on the shared clipboard (ctrl-C, or the selection menu).
+    // Nothing selected copies nothing, leaving an earlier copy where it was.
+    virtual void copySelection()       = 0;
+    // Paste the clipboard where the mouse is (ctrl-V). Only called with the
+    // cursor over this host, so a copy that will not fit there is the host's own
+    // to report — see flashForbiddenCursor.
+    virtual void pasteClipboard()      = 0;
+    // Ctrl-X, and the selection menu's Cut. Copying and removing are both here
+    // already, so cut is the two in order — copy first, while the items still
+    // exist. Everything selected goes, including anything copySelection() chose
+    // not to take (the song editor's automation dots), exactly as Delete does.
+    void cutSelection() { copySelection(); deleteSelectedItems(); }
+    // The menu shown when a right-click lands on a member of the selection,
+    // instead of the menu for the single item under the cursor. One instance is
+    // shared by every host: only one editor is on screen at a time.
+    virtual void setSelectionPopup(SelectionContextPopup* p) = 0;
     // True when this host's widget is on screen. Only one editor shows at a time,
     // so it is what picks the grid a window-level command was meant for.
     virtual bool showing() const = 0;

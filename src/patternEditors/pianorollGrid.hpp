@@ -34,6 +34,10 @@ protected:
     bool groupMoveBlocked(float dBeat, int dRow) const override;
     void onCommitGroupMove(float dBeat, int dRow) override;
 
+    ClipKind clipKind() const override { return ClipKind::PianorollNotes; }
+    std::vector<ClipItem> selectedForClipboard() const override;
+    bool pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat) override;
+
 public:
     static constexpr int totalRows = 128;
 
