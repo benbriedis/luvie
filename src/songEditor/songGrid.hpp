@@ -66,6 +66,10 @@ protected:
     Fl_Color rowBgColor(int visualRow) const override;
     void moving(StateDragMove& s) override;
     void resizing(StateDragResize& s) override;
+    // A dot dragged along its lane follows the cursor off the edge too, and it
+    // runs outside Grid's drag states.
+    bool isItemDrag() const override;
+    void reapplyDrag() override;
     int  overlappingCell(int noteIdx) const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     void openContextMenu(int idx) override;

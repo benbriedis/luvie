@@ -160,18 +160,7 @@ void DrumGrid::draw()
     }
 
     // Rubber band, over the dots.
-    if (selection.active) {
-        const int bx = x() + selection.bandLeft(), bw = selection.bandRight()  - selection.bandLeft();
-        const int by = y() + selection.bandTop(),  bh = selection.bandBottom() - selection.bandTop();
-        if (bw > 0 || bh > 0) {
-            fl_color(fl_color_average(bandColor, bgColor, 0.18f));
-            fl_rectf(bx, by, bw, bh);
-            fl_color(bandColor);
-            fl_line_style(FL_DASH, 1);
-            fl_rect(bx, by, bw, bh);
-            fl_line_style(0);
-        }
-    }
+    drawSelectionBand(selection, x(), y());
 
     if (playhead)
         playhead->drawLine(x() + padX - colOffset * colWidth, y(), numRows * rowHeight);

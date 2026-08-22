@@ -381,10 +381,20 @@ Document
 cf copy/paste cloning of selection  
 
 Change tab when undoing/redoing when necessary (+ scroll? cf recenter? cf storing position when editing?) 
-Multi-select - selection box shouldn't be opaque
 
 TODO check undo and multi-select in LV2 mode
 TODO In pattern editors some notes may sit at divisions not currently supported.
      Should have a consistent policy for how to deal with dragging in this case.
      Seems a bit ad hoc at the moment.
+
+Song Editor - wants a ZOOM, but where to put it? Options:
+	1. Create a dark horizontal settings bar at bottom and put the one control on it.
+	2. Hack it on to the transport bar
+	3. Create a context menu over the entire grid (confusing - hides the different types of context menu)
+	4. Put into pattern instance context menus and possibly the label context menus
+	5. Use + and - or other shortcut keys exclusively. (or combine with 4.)
+	       (maybe a bit obscure to rely on it?)
+    6. Context menu over bar ruler  (hard to find)
+
+
 

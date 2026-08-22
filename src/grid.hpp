@@ -22,6 +22,16 @@ constexpr Fl_Color subdivLineColor = 0xDDDDDD00;
 // collide with the green/orange the tabs and playhead already use.
 constexpr Fl_Color bandColor      = 0xF59E0B00;
 constexpr Fl_Color selectionColor = 0xB4530900;
+// Opacity of the band's fill, 0-255. Enough to read as a swept-out region, faint
+// enough that the notes and grid lines under it stay legible.
+constexpr unsigned char bandFillAlpha = 56;
+
+class Selection;
+
+// Draw the rubber band of `selection`, whose coordinates are relative to
+// (originX, originY). Free-standing because DrumGrid is not a Grid but sweeps
+// the same band.
+void drawSelectionBand(const Selection& selection, int originX, int originY);
 
 enum class Side { Left, Right };
 struct Point { int row; float col; };
@@ -103,6 +113,31 @@ protected:
                std::holds_alternative<StateDragGroup>(state)  ||
                std::holds_alternative<StateBandSelect>(state);
     }
+
+    // ── Edge auto-scroll ─────────────────────────────────────────────────────
+    // A drag held past the left or right edge scrolls the view after it, so a
+    // selection can be dragged somewhere that isn't on screen when it starts.
+    // The band sweep is deliberately left out: its anchor is a widget pixel, so
+    // scrolling under it would slide the rectangle onto different bars.
+    virtual bool isItemDrag() const {
+        return std::holds_alternative<StateDragMove>(state)   ||
+               std::holds_alternative<StateDragResize>(state)  ||
+               std::holds_alternative<StateDragGroup>(state);
+    }
+    // Re-run the live drag against the current mouse position, after the view
+    // has scrolled under it.
+    virtual void reapplyDrag();
+    // Cursor x, relative to the grid, for positioning whatever a drag is moving.
+    // Once the view follows the drag out, a pointer past the edge means "keep
+    // going", not "put it over there": pinning the position to the edge keeps
+    // the dragged items on screen while the columns scroll under them. Grids
+    // whose editor cannot scroll them keep the raw position, so a note can still
+    // be dragged out to a column the view is not showing.
+    float dragX() const;
+    // Start, stop or reverse the scroll to match where the cursor now is. Call
+    // on every drag event of a drag that should follow the cursor out.
+    void updateEdgeScroll();
+    void stopEdgeScroll();
 
     void draw() override;
     int  handle(int event) override;
@@ -212,8 +247,19 @@ protected:
     virtual void toggleNote();
     virtual void drawNoteBlock(const Note& note, int x0, int y0, int width, int rh);
 
+private:
+    static void edgeScrollTick(void* self);
+    void edgeScrollStep();
+    int  edgeScrollDir = 0;   // -1 left, +1 right, 0 not scrolling
+
 public:
     Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
+    ~Grid() override;
+
+    // Scroll the view by `cols` columns, returning how many it actually managed
+    // (0 at either end). Set by the owning editor; a grid whose editor leaves it
+    // unset simply does not auto-scroll.
+    std::function<int(int cols)> onEdgeScroll;
 
     // ISelectionHost
     void clearSelection() override     { if (!selection.empty()) { selection.clear(); redraw(); } }

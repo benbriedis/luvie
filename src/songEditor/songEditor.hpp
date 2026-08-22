@@ -41,6 +41,9 @@ class SongEditor : public Editor, public ITimelineObserver {
     void setScrollPx(int px);
     void pushScroll(int availH);
     void setColOffset(int offset);
+    // Scroll by whole columns, reporting how far it actually got. The grid uses
+    // the answer to know when it has hit the end of the song and can stop.
+    int  scrollByCols(int cols);
     void drawRulerLabels() override;
     void layoutBody() override { updateScrollBounds(); }
     void onWheelX(int d) override { setColOffset(colOffset + d); }

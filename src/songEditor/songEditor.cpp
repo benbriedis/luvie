@@ -46,6 +46,9 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     trackLabels.position(x, y + rulerH);
     songGrid.position(x + labelW + controlsW, y + rulerH);
     songGrid.setPlayhead(&playhead);
+    // Dragging past either edge scrolls the grid along, so a selection can be
+    // moved somewhere that was off screen when the drag began.
+    songGrid.onEdgeScroll = [this](int cols) { return scrollByCols(cols); };
 
     // The scrolling body — grid, side panels and both scrollbars — lives in
     // gridPane; the editor sizes the pane to the content and leaves white space
@@ -265,6 +268,13 @@ void SongEditor::setColOffset(int offset)
     hScrollbar->value(colOffset, visibleCols, 0, songGrid.numCols);
     if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
     redraw();
+}
+
+int SongEditor::scrollByCols(int cols)
+{
+    int before = colOffset;
+    setColOffset(colOffset + cols);
+    return colOffset - before;
 }
 
 void SongEditor::followPlayhead()

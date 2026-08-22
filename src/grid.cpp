@@ -19,10 +19,19 @@
 
 using std::vector;
 
+// One column every 60 ms while a drag is held outside the grid: fast enough to
+// cross a song without waiting, slow enough to stop on the bar you meant.
+static constexpr double edgeScrollInterval = 0.06;
+
 Grid::Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup) :
     numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
     Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight, nullptr)
 {}
+
+Grid::~Grid()
+{
+    Fl::remove_timeout(edgeScrollTick, this);
+}
 
 void Grid::draw()
 {
@@ -249,9 +258,11 @@ int Grid::handle(int event)
                 selection.updateBand(Fl::event_x() - x(), Fl::event_y() - y());
                 redraw();
             }
+            updateEdgeScroll();
             return 1;
 
         case FL_RELEASE:
+            stopEdgeScroll();
             if (auto* s = std::get_if<StateBandSelect>(&state)) {
                 bool additive = s->additive;
                 state = StateIdle{};
@@ -304,6 +315,7 @@ int Grid::handle(int event)
             return 1;
 
         case FL_LEAVE:
+            stopEdgeScroll();
             state = StateIdle{};
             window()->cursor(FL_CURSOR_DEFAULT);
             return 0;
@@ -440,7 +452,7 @@ void Grid::movingGroup(StateDragGroup& s)
 {
     // The primary follows the cursor under the ordinary snapping rules; the
     // delta it lands on is what the rest of the selection inherits.
-    float ex   = Fl::event_x() - x();
+    float ex   = dragX();
     float beat = (ex - s.grabX) / (float)colWidth + colOffset;
     if (snap > 0.0f) beat = std::round(beat / snap) * snap;
     float dBeat = beat - s.original.col;
@@ -479,6 +491,69 @@ void Grid::movingGroup(StateDragGroup& s)
     redraw();
 }
 
+// ---------------------------------------------------------------------------
+// Edge auto-scroll
+// ---------------------------------------------------------------------------
+
+void Grid::reapplyDrag()
+{
+    if (auto* s = std::get_if<StateDragMove>  (&state)) moving(*s);
+    else if (auto* s = std::get_if<StateDragResize>(&state)) resizing(*s);
+    else if (auto* s = std::get_if<StateDragGroup> (&state)) movingGroup(*s);
+}
+
+float Grid::dragX() const
+{
+    float ex = (float)Fl::event_x();
+    if (onEdgeScroll) ex = std::clamp(ex, (float)x(), (float)(x() + w()));
+    return ex - (float)x();
+}
+
+void Grid::updateEdgeScroll()
+{
+    int dir = 0;
+    if (onEdgeScroll && isItemDrag()) {
+        if (Fl::event_x() < x())            dir = -1;
+        else if (Fl::event_x() >= x() + w()) dir = +1;
+    }
+    if (dir == edgeScrollDir) return;   // already scrolling that way, or already stopped
+
+    edgeScrollDir = dir;
+    Fl::remove_timeout(edgeScrollTick, this);
+    if (dir) Fl::add_timeout(edgeScrollInterval, edgeScrollTick, this);
+}
+
+void Grid::stopEdgeScroll()
+{
+    edgeScrollDir = 0;
+    Fl::remove_timeout(edgeScrollTick, this);
+}
+
+void Grid::edgeScrollTick(void* self)
+{
+    static_cast<Grid*>(self)->edgeScrollStep();
+}
+
+void Grid::edgeScrollStep()
+{
+    // Stop if the drag ended without this grid hearing about it: a window
+    // opening mid-drag (the project-settings dialog, say) takes the grab, and
+    // the release that would have stopped the scroll never arrives.
+    if (Fl::pushed() != this || !isItemDrag()) { edgeScrollDir = 0; return; }
+
+    // The view has moved under a stationary cursor, so the drag has to be run
+    // again for the items to follow it onto the newly revealed columns.
+    if (onEdgeScroll(edgeScrollDir) != 0) {
+        reapplyDrag();
+        Fl::repeat_timeout(edgeScrollInterval, edgeScrollTick, this);
+    }
+    else {
+        // Nothing left to scroll to on that side. Stop rather than keep a timer
+        // going; moving the cursor back in and out starts it again.
+        edgeScrollDir = 0;
+    }
+}
+
 void Grid::applyBand(bool additive)
 {
     if (!additive) selection.clear();
@@ -499,18 +574,37 @@ void Grid::applyBand(bool additive)
     redraw();
 }
 
-void Grid::drawBand() const
+void drawSelectionBand(const Selection& selection, int originX, int originY)
 {
     if (!selection.active) return;
-    const int bx = x() + selection.bandLeft(),  bw = selection.bandRight()  - selection.bandLeft();
-    const int by = y() + selection.bandTop(),   bh = selection.bandBottom() - selection.bandTop();
+    const int bx = originX + selection.bandLeft(), bw = selection.bandRight()  - selection.bandLeft();
+    const int by = originY + selection.bandTop(),  bh = selection.bandBottom() - selection.bandTop();
     if (bw <= 0 && bh <= 0) return;
-    fl_color(fl_color_average(bandColor, bgColor, 0.18f));
-    fl_rectf(bx, by, bw, bh);
+
+    // The fill is a wash rather than an opaque rectangle, so whatever the band
+    // sweeps over stays visible while it is being dragged. FLTK has no
+    // alpha-aware rectangle, so stretch a single translucent pixel: the driver
+    // pads it out, which costs nothing per frame and needs no pixel buffer.
+    if (bw > 0 && bh > 0) {
+        if (fl_can_do_alpha_blending()) {
+            static const uchar pixel[4] = {
+                uchar(bandColor >> 24), uchar(bandColor >> 16), uchar(bandColor >> 8), bandFillAlpha };
+            static Fl_RGB_Image wash(pixel, 1, 1, 4);
+            wash.scale(bw, bh, 0, 1);
+            wash.draw(bx, by);
+        }
+        else {
+            fl_color(fl_color_average(bandColor, bgColor, 0.18f));
+            fl_rectf(bx, by, bw, bh);
+        }
+    }
     fl_color(bandColor);
-    fl_line_style(FL_DASH, 1);
     fl_rect(bx, by, bw, bh);
-    fl_line_style(0);
+}
+
+void Grid::drawBand() const
+{
+    drawSelectionBand(selection, x(), y());
 }
 
 void Grid::drawSelectionOutline(int x0, int y0, int width, int rh) const
@@ -524,7 +618,7 @@ void Grid::drawSelectionOutline(int x0, int y0, int width, int rh) const
 void Grid::moving(StateDragMove& s)
 {
     Note* note = &notes[s.noteIdx];
-    float ex   = Fl::event_x() - x();
+    float ex   = dragX();
     note->beat  = (ex - s.grabX) / (float)colWidth + colOffset;
     if (snap > 0.0f) note->beat = std::round(note->beat / snap) * snap;
     // Clamp AFTER snapping so the note can't extend past the right edge. When
@@ -551,7 +645,7 @@ void Grid::resizing(StateDragResize& s)
 {
     float minLength = 10.0f / colWidth;
     Note* note      = &notes[s.noteIdx];
-    float ex        = Fl::event_x() - x();
+    float ex        = dragX();
     if (s.side == Side::Left) {
         float endCol  = note->beat + note->length;   // fixed (right) edge
         float newBeat = ex / (float)colWidth + colOffset;

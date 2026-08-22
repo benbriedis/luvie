@@ -842,7 +842,7 @@ int SongGrid::handleParamEvent(int event)
             return 1;
         }
         if (auto* d = std::get_if<ParamDragState>(&paramState)) {
-            int ex        = Fl::event_x() - x();
+            int ex        = (int)dragX();
             bool isAnchor = localParamLanes[d->laneIdx].points[d->ptIdx].anchor;
 
             float newBeat = (float)ex / colWidth + colOffset;
@@ -873,12 +873,14 @@ int SongGrid::handleParamEvent(int event)
             if (newBeat != pt.beat && canPlaceDot(d->laneIdx, newBeat, pt.id))
                 pt.beat = newBeat;
             pt.value = newValue;
+            updateEdgeScroll();
             redraw();
         }
         return 1;
     }
 
     case FL_RELEASE: {
+        stopEdgeScroll();
         if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
             auto& pt   = localParamLanes[d->laneIdx].points[d->predPtIdx];
             int  ptId  = pt.id;
@@ -1099,7 +1101,7 @@ void SongGrid::onBeginDrag(int noteIdx)
 void SongGrid::moving(StateDragMove& s)
 {
     if (timeline) {
-        float ex      = Fl::event_x() - x();
+        float ex      = dragX();
         float rawBeat = (ex - s.grabX) / (float)colWidth + colOffset;
         int   bpb, dummy;
         timeline->timeSigAt((int)std::max(0.0f, rawBeat), bpb, dummy);
@@ -1108,10 +1110,21 @@ void SongGrid::moving(StateDragMove& s)
     Grid::moving(s);
 }
 
+bool SongGrid::isItemDrag() const
+{
+    return Grid::isItemDrag() || std::holds_alternative<ParamDragState>(paramState);
+}
+
+void SongGrid::reapplyDrag()
+{
+    if (std::holds_alternative<ParamDragState>(paramState)) handleParamEvent(FL_DRAG);
+    else                                                    Grid::reapplyDrag();
+}
+
 void SongGrid::resizing(StateDragResize& s)
 {
     if (timeline) {
-        float ex      = Fl::event_x() - x();
+        float ex      = dragX();
         float rawBeat = ex / (float)colWidth + colOffset;
         int   bpb, dummy;
         timeline->timeSigAt((int)std::max(0.0f, rawBeat), bpb, dummy);
