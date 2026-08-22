@@ -108,7 +108,7 @@ protected:
     bool  pasteAt(const std::vector<ClipItem>& items, int visualRow, float bar) override;
     // Blocks snap to the beat of whatever time signature is in force where the
     // cursor sits, exactly as dragging one does.
-    float pasteAnchorBeat() const override;
+    float pasteAnchorBeat(int wx) const override;
 
     // Automation dots share the selection with pattern instances here, because
     // they are rows of this same grid. Both are keyed by their model id, and

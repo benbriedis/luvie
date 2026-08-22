@@ -9,6 +9,7 @@
 #include <vector>
 
 class SelectionContextPopup;
+class PasteContextPopup;
 
 // A set of selected item ids, plus the geometry of the rubber band being dragged
 // to build one. Held by each editing grid; the ids are model ids (Note::id,
@@ -102,10 +103,13 @@ public:
     // Put the selection on the shared clipboard (ctrl-C, or the selection menu).
     // Nothing selected copies nothing, leaving an earlier copy where it was.
     virtual void copySelection()       = 0;
-    // Paste the clipboard where the mouse is (ctrl-V). Only called with the
-    // cursor over this host, so a copy that will not fit there is the host's own
-    // to report — see flashForbiddenCursor.
-    virtual void pasteClipboard()      = 0;
+    // Paste the clipboard at (wx, wy), in window coordinates. The position is
+    // passed rather than read from the current event because the paste menu's
+    // item runs long after the right-click that chose the spot, by which time
+    // the event position is the click on the menu itself. Only called for a
+    // point inside this host, so a copy that will not fit there is the host's
+    // own to report — see flashForbiddenCursor.
+    virtual void pasteClipboard(int wx, int wy) = 0;
     // Ctrl-X, and the selection menu's Cut. Copying and removing are both here
     // already, so cut is the two in order — copy first, while the items still
     // exist. Everything selected goes, including anything copySelection() chose
@@ -115,6 +119,9 @@ public:
     // instead of the menu for the single item under the cursor. One instance is
     // shared by every host: only one editor is on screen at a time.
     virtual void setSelectionPopup(SelectionContextPopup* p) = 0;
+    // The menu offered by a right-click on empty grid when there is something on
+    // the clipboard to paste there. Shared for the same reason.
+    virtual void setPastePopup(PasteContextPopup* p) = 0;
     // True when this host's widget is on screen. Only one editor shows at a time,
     // so it is what picks the grid a window-level command was meant for.
     virtual bool showing() const = 0;

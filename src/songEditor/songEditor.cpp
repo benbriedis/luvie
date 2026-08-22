@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <iterator>
 
 SongEditor::SongEditor(int x, int y, int visibleW,
                        int numRows, int numCols, int rowHeight, int colWidth,
@@ -19,6 +20,7 @@ SongEditor::SongEditor(int x, int y, int visibleW,
       songGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     baseX        = x;
+    baseColWidth = colWidth;
     rulerOffsetX = labelW + controlsW;  // no scrollbar initially
 
     const int gridH = numRows * rowHeight;
@@ -74,8 +76,18 @@ void SongEditor::drawRulerLabels()
     int pixelBase    = x() + rulerOffsetX - hScrollPixel;
     int textBaseline = y() + rulerH / 2 + (fl_height() - fl_descent()) / 2;
 
+    // Zoomed out there is no room for a number on every bar, so label only every
+    // nth one — the first stride whose bars are far enough apart to read.
+    static constexpr int minLabelGap = 24;
+    static constexpr int strides[]   = { 1, 2, 5, 10, 20, 50 };
+    int stride = strides[std::size(strides) - 1];
+    for (int s : strides)
+        if (s * songGrid.colWidth >= minLabelGap) { stride = s; break; }
+
     int firstCol = songGrid.colWidth > 0 ? hScrollPixel / songGrid.colWidth : 0;
     for (int col = firstCol; col < songGrid.numCols; ++col) {
+        // Bars are numbered from 1, so it is that number the stride applies to.
+        if ((col + 1) % stride != 0) continue;
         int cx = pixelBase + col * songGrid.colWidth + songGrid.colWidth / 2;
         if (cx < gridLeft)  continue;
         if (cx >= gridRight) break;
@@ -129,6 +141,20 @@ void SongEditor::setTrackView(int trackIndex, bool beatResolution)
 
 void SongEditor::onTimelineChanged()
 {
+    updateScrollBounds();
+}
+
+void SongEditor::setZoom(float factor)
+{
+    int cw = std::max(1, (int)std::lround(baseColWidth * factor));
+    if (cw == songGrid.colWidth) return;
+    songGrid.colWidth = cw;
+    playhead.setColWidth(cw);
+    // The rulers stacked above measure bars in their own copy of the width, so
+    // they have to be told before updateScrollBounds() hands them a new offset.
+    if (onColWidthChanged) onColWidthChanged(cw);
+    // colOffset is counted in columns, so the leftmost bar stays where it is;
+    // updateScrollBounds re-derives the scrollbar and the ruler alignment.
     updateScrollBounds();
 }
 

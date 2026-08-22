@@ -172,6 +172,7 @@ int DrumGrid::handle(int evt)
 {
     if (popup.visible()) return 0;
     if (selectionPopup && selectionPopup->visible()) return 0;
+    if (pastePopup && pastePopup->visible()) return 0;
 
     switch (evt) {
 
@@ -216,6 +217,11 @@ int DrumGrid::handle(int evt)
                 popup.openForDot(dotX, dotY, this, rowHeight, n.velocity,
                     [this, id]() { if (pattern) pattern->removeDrumNote(id); },
                     [this, id](float v) { if (pattern) pattern->setDrumNoteVelocity(id, v); });
+            } else {
+                // No hit under the cursor to have a menu of its own, so the
+                // right-click offers the one thing that can happen on empty
+                // grid: dropping the clipboard here.
+                openPasteMenu();
             }
             return 1;
         }
@@ -441,19 +447,30 @@ void DrumGrid::copySelection()
     clipboard().set(ClipKind::DrumNotes, std::move(items));
 }
 
-void DrumGrid::pasteClipboard()
+void DrumGrid::pasteClipboard(int wx, int wy)
 {
     const Clipboard& cb = clipboard();
-    if (!cb.holds(ClipKind::DrumNotes) || !pasteAt(cb.items))
+    if (!cb.holds(ClipKind::DrumNotes) || !pasteAt(cb.items, wx, wy))
         flashForbiddenCursor(window());
 }
 
-bool DrumGrid::pasteAt(const std::vector<ClipItem>& items)
+bool DrumGrid::openPasteMenu()
+{
+    if (!pastePopup || !clipboard().holds(ClipKind::DrumNotes)) return false;
+    // Capture where the right-click landed: that is the spot the user picked,
+    // and by the time the menu item runs the event position is the click on the
+    // item itself.
+    const int wx = Fl::event_x(), wy = Fl::event_y();
+    pastePopup->open(this, [this, wx, wy]() { pasteClipboard(wx, wy); });
+    return true;
+}
+
+bool DrumGrid::pasteAt(const std::vector<ClipItem>& items, int wx, int wy)
 {
     if (!pattern || patternId < 0 || items.empty()) return false;
 
-    const int baseRow = std::max(0, Fl::event_y() - y()) / rowHeight;
-    float     baseBeat = (float)(Fl::event_x() - x() - padX) / colWidth + colOffset;
+    const int baseRow = std::max(0, wy - y()) / rowHeight;
+    float     baseBeat = (float)(wx - x() - padX) / colWidth + colOffset;
     if (snap > 0.0f) baseBeat = std::floor(baseBeat / snap) * snap;
     baseBeat = std::max(0.0f, baseBeat);
 

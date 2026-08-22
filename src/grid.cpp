@@ -139,14 +139,19 @@ int Grid::handle(int event)
         return 0;
     if (selectionPopup && selectionPopup->visible())
         return 0;
+    if (pastePopup && pastePopup->visible())
+        return 0;
 
     switch (event) {
         case FL_PUSH: {
             // Refresh the hovered note on a right-click: while a context popup
             // was open this grid got no FL_MOVE events, so its hover state may
             // be stale (pointing at the previously-clicked note). Left-clicks
-            // keep the existing state to preserve drag grab offsets.
-            if (Fl::event_button() == FL_RIGHT_MOUSE || std::holds_alternative<StateIdle>(state))
+            // keep the existing state to preserve drag grab offsets — except a
+            // resize hover held from before a selection appeared under a
+            // stationary cursor (ctrl-A, a paste), which is no longer on offer.
+            if (Fl::event_button() == FL_RIGHT_MOUSE || std::holds_alternative<StateIdle>(state) ||
+                (!selection.empty() && std::holds_alternative<StateHoverResize>(state)))
                 findNoteForCursor();
 
             const int mods = Fl::event_state();
@@ -178,8 +183,11 @@ int Grid::handle(int event)
                 int idx = -1;
                 if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
                 else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
-                if (idx >= 0)
-                    openContextMenu(idx);
+                if (idx >= 0) openContextMenu(idx);
+                // Nothing under the cursor to have a menu of its own, so the
+                // right-click offers the one thing that can happen on empty
+                // grid: dropping the clipboard here.
+                else          openPasteMenu();
             } else if (auto* h = std::get_if<StateHoverMove>(&state)) {
                 int   noteIdx = h->noteIdx;
                 float grabX   = h->grabX;
@@ -380,9 +388,9 @@ std::vector<ClipItem> Grid::selectedForClipboard() const
     return items;
 }
 
-float Grid::pasteAnchorBeat() const
+float Grid::pasteAnchorBeat(int wx) const
 {
-    float fcol = (float)(Fl::event_x() - x()) / (float)colWidth + colOffset;
+    float fcol = (float)(wx - x()) / (float)colWidth + colOffset;
     return newNoteStart(fcol);
 }
 
@@ -392,13 +400,13 @@ void Grid::copySelection()
     clipboard().set(clipKind(), selectedForClipboard());
 }
 
-void Grid::pasteClipboard()
+void Grid::pasteClipboard(int wx, int wy)
 {
     const Clipboard& cb = clipboard();
     // Nothing of this grid's kind to paste, or nowhere here it would fit: either
     // way nothing happens, and the cursor is what says so.
     if (!cb.holds(clipKind()) ||
-        !pasteAt(cb.items, rowAtPixelY(Fl::event_y() - y()), pasteAnchorBeat()))
+        !pasteAt(cb.items, rowAtPixelY(wy - y()), pasteAnchorBeat(wx)))
         flashForbiddenCursor(window());
 }
 
@@ -412,6 +420,17 @@ bool Grid::openSelectionMenu(int noteIdx)
         [this]() { cutSelection(); redraw(); },
         [this]() { copySelection(); },
         [this]() { deleteSelectedItems(); redraw(); });
+    return true;
+}
+
+bool Grid::openPasteMenu()
+{
+    if (!pastePopup || !clipboard().holds(clipKind())) return false;
+    // Capture where the right-click landed: that is the spot the user picked,
+    // and by the time the menu item runs the event position is the click on the
+    // item itself.
+    const int wx = Fl::event_x(), wy = Fl::event_y();
+    pastePopup->open(this, [this, wx, wy]() { pasteClipboard(wx, wy); });
     return true;
 }
 
@@ -744,15 +763,22 @@ void Grid::findNoteForCursor()
     int  resizeIdx  = -1;
     Side resizeSide = Side::Left;
 
+    // Resizing is off while a selection is live: what a selection is for is
+    // moving, copying and deleting, and an edge that resized one item would be
+    // an odd thing to offer when many are picked out. Dropping the resize zones
+    // also leaves the edges grabbable for dragging the group, which is what a
+    // press near the end of a selected block is far more likely to mean.
+    const bool resizable = selection.empty();
+
     for (int i = 0; i < (int)notes.size(); ++i) {
         const Note& n = notes[i];
         if ((int)n.row != row) continue;
         float leftEdge  = (n.beat - colOffset) * colWidth;
         float rightEdge = (n.beat + n.length - colOffset) * colWidth;
 
-        if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
+        if (resizable && leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Left;
-        } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
+        } else if (resizable && rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
             state = StateHoverMove{i, ex - leftEdge};

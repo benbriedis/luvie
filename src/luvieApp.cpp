@@ -14,6 +14,7 @@
 #include "harmonyEditor.hpp"
 #include "noteContextPopup.hpp"
 #include "patternInstanceContextPopup.hpp"
+#include "pasteContextPopup.hpp"
 #include "selectionContextPopup.hpp"
 #include "modernTabs.hpp"
 #include "settingsButton.hpp"
@@ -23,6 +24,7 @@
 #include "markerRuler.hpp"
 #include "loopRuler.hpp"
 #include "patternPanel.hpp"
+#include "songPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
 #include "loopRulerContextPopup.hpp"
@@ -199,7 +201,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->onPaste = [this]() {
         for (ISelectionHost* h : selectionHosts())
             if (h && h->showing() && h->ownsWindowPoint(Fl::event_x(), Fl::event_y()))
-                { h->pasteClipboard(); return; }
+                { h->pasteClipboard(Fl::event_x(), Fl::event_y()); return; }
     };
 
     // A click anywhere but the grid holding the selection dismisses it. Clicks
@@ -225,6 +227,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* p2      = new NoteContextPopup{};
     auto* sp      = new PatternInstanceContextPopup{};
     auto* selPop  = new SelectionContextPopup{};
+    auto* pastePop = new PasteContextPopup{};
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
@@ -285,10 +288,18 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     loopRuler->setContextPopup(loopRulerPop);
     tab1->add(loopRuler);
 
-    auto* og2 = new SongEditor(0, off + tabBarH + 3*markerRulerH, winW,
-                               10, 60, 45, 60, 0.25, *p2);
+    // The editor fills the tab bar-to-bar: everything under the three marker
+    // rulers except the control bar anchored at the bottom.
+    const int songBodyY = off + tabBarH + 3*markerRulerH;
+    const int songBodyH = (tabsH - tabBarH) - 3*markerRulerH - panelH;
+    auto* og2 = new SongEditor(0, songBodyY, winW, 10, 60, 45, 60, 0.25, *p2);
+    og2->size(winW, songBodyH);
     songEd = og2;
     tab1->add(og2);
+
+    songPanel = new SongPanel(0, songBodyY + songBodyH, winW, panelH);
+    tab1->add(songPanel);
+
     tab1->resizable(og2);
     tabs->add(*tab1);
 
@@ -358,6 +369,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         tempoRuler->setNumCols(n);
         loopRuler->setNumCols(n);
     };
+    // Horizontal zoom: the grid scales its bar width and the three rulers above
+    // it follow, so markers and the loop region stay over the bars they mark.
+    og2->onColWidthChanged = [timeSigRuler, tempoRuler, loopRuler](int cw) {
+        timeSigRuler->setColWidth(cw);
+        tempoRuler->setColWidth(cw);
+        loopRuler->setColWidth(cw);
+    };
+    songPanel->onZoomChanged = [og2](float factor) { og2->setZoom(factor); };
     og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);
     ctxPop->onShowInstruments = [this]() {
@@ -470,10 +489,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
-    // The selection menu is shared: only one editor is on screen at a time, so
-    // one instance can serve them all.
+    // The selection and paste menus are shared: only one editor is on screen at
+    // a time, so one instance of each can serve them all.
     for (ISelectionHost* h : selectionHosts())
-        if (h) h->setSelectionPopup(selPop);
+        if (h) { h->setSelectionPopup(selPop); h->setPastePopup(pastePop); }
     harmonyEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);
@@ -519,6 +538,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(p2);     window->registerPopup(p2);
     window->add(sp);     window->registerPopup(sp);
     window->add(selPop); window->registerPopup(selPop);
+    window->add(pastePop); window->registerPopup(pastePop);
     window->add(tPop);   window->registerPopup(tPop);
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);

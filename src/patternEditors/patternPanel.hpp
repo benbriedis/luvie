@@ -6,6 +6,7 @@
 
 #include "observablePattern.hpp"
 #include "inlineInput.hpp"
+#include "controlBar.hpp"
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Flex.H>
@@ -164,34 +165,7 @@ public:
 
 class ObservableInstrument;
 
-// ---------------------------------------------------------------------------
-// Control-bar layout description
-//
-// The bar is described as an ordered list of rows; each row packs some items
-// from its left edge and some against its right edge. Deciding how the controls
-// are distributed over the rows is buildLayout()'s job alone — placing them is
-// generic — so a different fold arrangement is a change to that one function.
-// ---------------------------------------------------------------------------
-
-// One control in the bar, with the width it wants.
-struct PanelItem {
-    Fl_Widget* widget;
-    int        width;
-    int        gapBefore = -1;   // space before this item; -1 = the standard gap
-};
-
-struct PanelRow {
-    std::vector<PanelItem> left;      // packed from the left edge
-    std::vector<PanelItem> right;     // packed against the right edge
-    int                    indent = 0;  // extra inset before the left run
-};
-
-class PatternPanel : public Fl_Group, public ITimelineObserver {
-
-    // Row geometry. One row is a strip of rowH; a folded bar stacks two of them.
-    static constexpr int rowH    = 28;
-    static constexpr int vMargin = 2;   // above the first row / below the last
-    static constexpr int rowGap  = 2;
+class PatternPanel : public ControlBar, public ITimelineObserver {
 
     ObservablePattern*   pattern = nullptr;
     ObservableInstrument* instr_ = nullptr;
@@ -216,11 +190,8 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     int   computeDivisions() const;
     int   computeZoomFactor() const;
 
-    std::vector<PanelRow> buildLayout(int availW);
-    static int  rowWidth(const PanelRow& row);
-    static int  rowsHeight(int rows) { return 2*vMargin + rows*rowH + (rows - 1)*rowGap; }
-    void        applyLayout(const std::vector<PanelRow>& rows);
-    void        relayout();
+    std::vector<PanelRow> buildLayout(int availW) override;
+    void                  afterLayout() override;
 
     void initControls();
     void initPatternName();
@@ -249,12 +220,9 @@ class PatternPanel : public Fl_Group, public ITimelineObserver {
     void commitHarmony();
     int  selectedPatternId() const;
 
-    void draw() override;
     int  handle(int event) override;
 
 public:
-    void resize(int x, int y, int w, int h) override;
-
     PatternPanel(int x, int y, int w, int h);
     ~PatternPanel();
 
@@ -264,12 +232,6 @@ public:
     std::function<void(int)>   onDivisionsChanged;
     std::function<void(int)>   onZoomChanged;
     std::function<void(bool)>  onRapidChanged;
-    // Fired when the bar folds or unfolds and so wants a different height; the
-    // owner re-fits whatever sits above the panel.
-    std::function<void(int)>   onHeightChanged;
-
-    // Height the bar needs at this width (one row, or two once it folds).
-    int heightForWidth(int width);
 
     void commitEdit();
 

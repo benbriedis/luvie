@@ -815,9 +815,9 @@ std::vector<ClipItem> SongGrid::selectedForClipboard() const
     return items;
 }
 
-float SongGrid::pasteAnchorBeat() const
+float SongGrid::pasteAnchorBeat(int wx) const
 {
-    float rawBar = (float)(Fl::event_x() - x()) / (float)colWidth + colOffset;
+    float rawBar = (float)(wx - x()) / (float)colWidth + colOffset;
     int   bpb = 4, dummy;
     if (timeline) timeline->timeSigAt((int)std::max(0.0f, rawBar), bpb, dummy);
     const float unit = 1.0f / (float)bpb;

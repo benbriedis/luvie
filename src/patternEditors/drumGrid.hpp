@@ -7,6 +7,7 @@
 #include "clipboard.hpp"
 #include "observablePattern.hpp"
 #include "noteContextPopup.hpp"
+#include "pasteContextPopup.hpp"
 #include "selection.hpp"
 #include "selectionContextPopup.hpp"
 #include <FL/Fl_Box.H>
@@ -63,6 +64,7 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
 
     NoteContextPopup&      popup;
     SelectionContextPopup* selectionPopup = nullptr;
+    PasteContextPopup*     pastePopup     = nullptr;
     DrumState  state;
     Selection  selection;
 
@@ -95,9 +97,13 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
     void movingGroup(DrumStateDragGroup& d);
     void applyBand(bool additive);
     int  dotRadius() const { return std::max(2, rowHeight / 3); }
-    // Place `items` with their top-left corner where the cursor is. All or
-    // nothing: false means one of them would not fit and none were placed.
-    bool pasteAt(const std::vector<ClipItem>& items);
+    // Place `items` with their top-left corner at (wx, wy), in window
+    // coordinates. All or nothing: false means one of them would not fit and
+    // none were placed.
+    bool pasteAt(const std::vector<ClipItem>& items, int wx, int wy);
+    // Opens the paste menu for a right-click on empty grid, if there is anything
+    // to paste there. Mirrors Grid::openPasteMenu.
+    bool openPasteMenu();
 
     bool isActiveDrag() const {
         return std::holds_alternative<DrumStateDrag>(state) ||
@@ -137,8 +143,9 @@ public:
     void deleteSelectedItems() override;
     bool hasSelection() const override { return !selection.empty(); }
     void copySelection() override;
-    void pasteClipboard() override;
+    void pasteClipboard(int wx, int wy) override;
     void setSelectionPopup(SelectionContextPopup* p) override { selectionPopup = p; }
+    void setPastePopup(PasteContextPopup* p) override         { pastePopup = p; }
     bool showing() const override      { return visible_r(); }
     bool ownsWindowPoint(int wx, int wy) const override
     { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }

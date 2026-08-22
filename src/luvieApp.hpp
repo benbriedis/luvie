@@ -29,6 +29,7 @@ class HarmonyEditor;
 class DrumPatternEditor;
 class PianorollEditor;
 class PatternPanel;
+class SongPanel;
 class LoopEditor;
 class Transport;
 class NoteContextPopup;
@@ -57,8 +58,10 @@ public:
     static constexpr int panelH          = 32;
     static constexpr int rowHeight       = 30;
 
+    // Sized so both tabs get their full body: ten 45px song rows (or the pattern
+    // editor's rows) above a one-row control bar.
     static int defaultWinH() {
-        return tabBarH + 3*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
+        return tabBarH + 3*markerRulerH + Editor::rulerH + 10*45 + 20 + panelH + bottomH;
     }
 
     // Options — set before calling build()
@@ -107,6 +110,7 @@ public:
     PianorollEditor*   pianorollEd  = nullptr;
     PatternPanel*      patternPanel = nullptr;
     SongEditor*        songEd       = nullptr;
+    SongPanel*         songPanel    = nullptr;
     LoopEditor*        loopEd       = nullptr;
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;

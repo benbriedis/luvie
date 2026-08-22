@@ -6,6 +6,7 @@
 
 #include "clipboard.hpp"
 #include "noteContextPopup.hpp"
+#include "pasteContextPopup.hpp"
 #include "selection.hpp"
 #include "selectionContextPopup.hpp"
 #include "timeline.hpp"
@@ -96,6 +97,7 @@ protected:
     float             snap;
     NoteContextPopup&            popup;
     SelectionContextPopup*       selectionPopup = nullptr;
+    PasteContextPopup*           pastePopup     = nullptr;
     std::vector<Note> notes;
 
     GridState state;
@@ -206,12 +208,17 @@ protected:
     // into place straight away, which is usually the next thing wanted.
     virtual bool pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat)
     { (void)items; (void)visualRow; (void)beat; return false; }
-    // The beat a paste anchors on: the grid line at or before the cursor.
-    virtual float pasteAnchorBeat() const;
+    // The beat a paste anchors on: the grid line at or before `wx` (a window
+    // x-coordinate).
+    virtual float pasteAnchorBeat(int wx) const;
 
     // Opens the selection menu if the right-click landed on a member of the
     // selection, in which case the caller must not open its own menu as well.
     bool openSelectionMenu(int noteIdx);
+    // Opens the paste menu for a right-click on empty grid, if there is anything
+    // this grid could paste there. False when there is not, and nothing opens:
+    // a menu whose only item does nothing is worse than no menu.
+    bool openPasteMenu();
 
     // Selected items are outlined rather than filled differently, so velocity
     // shading and the song editor's stacked-lane tinting stay readable under it.
@@ -313,8 +320,9 @@ public:
     void deleteSelectedItems() override;
     bool hasSelection() const override { return !selection.empty(); }
     void copySelection() override;
-    void pasteClipboard() override;
+    void pasteClipboard(int wx, int wy) override;
     void setSelectionPopup(SelectionContextPopup* p) override { selectionPopup = p; }
+    void setPastePopup(PasteContextPopup* p) override         { pastePopup = p; }
     bool showing() const override      { return visible_r(); }
     bool ownsWindowPoint(int wx, int wy) const override
     { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }

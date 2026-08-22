@@ -360,46 +360,31 @@ BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead mid
 Document
 	Ctrl-click  select/deselect
 	Shift-click  slection area
-	Ctrl-A      select all
-	Ctrl-Z    undo
-	Ctrl-Y    redo
+	Ctrl-A   select all
+	Ctrl-Z   undo
+	Ctrl-Y   redo
 	Ctrl-C   copy selection
 	Ctrl-X   cut selection
 	Ctrl-V   paste
  
- Maybe add an optional "Tools" toolbar?
- 
  
 Change tab when undoing/redoing when necessary (+ scroll? cf recenter? cf storing position when editing?) 
 
-TODO check undo and multi-select in LV2 mode
+TODO check undo, multi-select, etc in LV2 mode
+
 TODO In pattern editors some notes may sit at divisions not currently supported.
      Should have a consistent policy for how to deal with dragging in this case.
      Seems a bit ad hoc at the moment.
 
-BUG: occassionally selecting multiple blocks in the song editor (elsewhere is unknown) does not select the 
-     top left block.
+Multi-select: probably prefer modifying the colour of the blocks.
 
-Song Editor - wants a ZOOM, but where to put it? Options:
-	1. Hack it on to the transport bar.
-	   cf putting Zoom on the LHS for ALL pattern editors.
-	      Possibly with a multi-select enable?
-	2. Create a dark horizontal settings bar at bottom and put the one control on it.
-	   Maybe add a vertical zoom in time.
-	   Could add a selection mode button toggle to it.
-	3. Create a context menu over the entire grid (confusing - hides the different types of context menu)
-	4. Put into pattern instance context menus and possibly the label context menus
-	5. Use + and - or other shortcut keys exclusively. (or combine with 4.)
-	       (maybe a bit obscure to rely on it?)
-    6. Context menu over bar ruler  (hard to find)
+Manual: 
+   multi-select move, copy, delete descriptions.
+   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
 
-Multi-select: probably prefer modifynig the colour of the blocks.
+BUG: clicking a dragging two blocks in a collapsed track can be dragged into a single pattern lane.
+     Reality bites when clicking on one of the dragged blocks and one blocks jumps up.
 
-Pasting selection - maybe show forbidden cursor even before pasting. Problem then is at what point
-   do we clear it? Maybe when selection is deselected. 
-   Maybe if we do something else, like click in the grid somewhere.
 
-Selection - deselecting on copy is probably the more standard behaviour.   
 
-Manual: multi-select move, copy, delete descriptions
 

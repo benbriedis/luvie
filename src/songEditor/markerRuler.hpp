@@ -67,6 +67,7 @@ public:
 	void setOffsetX(int ox)   { offsetX  = ox; redraw(); }
 	void setClipLeft(int cl)  { clipLeft = cl; redraw(); }
 	void setNumCols(int n)    { numCols  = n;  redraw(); }
+	void setColWidth(int cw)  { colWidth = cw; redraw(); }
 };
 
 #endif

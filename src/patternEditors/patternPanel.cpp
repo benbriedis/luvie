@@ -13,10 +13,7 @@
 #include <algorithm>
 #include <cmath>
 
-static constexpr int pad           = 3;
-static constexpr int sg            = 3;
 static constexpr int groupGap      = 12;
-static constexpr int ctrlH         = 24;
 static constexpr int labelW        = 55;
 static constexpr int nameW         = 150;
 static constexpr int recentreBtnW  = 26;
@@ -203,7 +200,7 @@ int PatternPanel::computeZoomFactor() const
 }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
-    : Fl_Group(x, y, w, h),
+    : ControlBar(x, y, w, h),
       input          (0, 0, nameW,       ctrlH),
       recentreBtn    (0, 0, recentreBtnW,ctrlH),
       zoomChoice     (0, 0, zoomChoiceW, ctrlH),
@@ -231,8 +228,6 @@ void PatternPanel::initControls()
     // of the control it overlays (z-order).
     remove(&input);
     add(&input);
-
-    box(FL_NO_BOX);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,65 +274,11 @@ std::vector<PanelRow> PatternPanel::buildLayout(int availW)
     return { darkRow, colouredRow };
 }
 
-static int gapFor(const PanelItem& it)
+// The inline name editor overlays the name box, so it has to follow it.
+void PatternPanel::afterLayout()
 {
-    return it.gapBefore >= 0 ? it.gapBefore : sg;
-}
-
-// The width this row needs, hidden items excluded (they take no slot).
-int PatternPanel::rowWidth(const PanelRow& row)
-{
-    int total = 2 * pad + row.indent;
-    bool first = true;
-    for (const auto* run : { &row.left, &row.right })
-        for (const auto& it : *run) {
-            if (!it.widget->visible()) continue;
-            if (!first) total += gapFor(it);
-            total += it.width;
-            first  = false;
-        }
-    return total;
-}
-
-void PatternPanel::applyLayout(const std::vector<PanelRow>& rows)
-{
-    int ry = y() + vMargin;
-    for (const auto& row : rows) {
-        int lx    = x() + pad + row.indent;
-        bool first = true;
-        for (const auto& it : row.left) {
-            if (!it.widget->visible()) continue;
-            if (!first) lx += gapFor(it);
-            it.widget->resize(lx, ry, it.width, rowH);
-            lx   += it.width;
-            first = false;
-        }
-        int rx = x() + w() - pad;
-        for (auto it = row.right.rbegin(); it != row.right.rend(); ++it) {
-            if (!it->widget->visible()) continue;
-            rx -= it->width;
-            it->widget->resize(std::max(rx, lx + (first ? 0 : gapFor(*it))), ry, it->width, rowH);
-            rx -= gapFor(*it);
-        }
-        ry += rowH + rowGap;
-    }
-}
-
-int PatternPanel::heightForWidth(int width)
-{
-    return rowsHeight((int)buildLayout(width).size());
-}
-
-void PatternPanel::relayout()
-{
-    auto rows = buildLayout(w());
-    applyLayout(rows);
     if (editingPatId >= 0)
         input.resize(patternName.x(), patternName.y(), patternName.w(), patternName.h());
-
-    int wanted = rowsHeight((int)rows.size());
-    if (wanted != h() && onHeightChanged) onHeightChanged(wanted);
-    redraw();
 }
 
 void PatternPanel::initPatternName()
@@ -976,21 +917,6 @@ void PatternPanel::cancelEdit()
     InlineEditDispatch::uninstall();
     input.hide();
     redraw();
-}
-
-void PatternPanel::resize(int x, int y, int w, int h)
-{
-    Fl_Widget::resize(x, y, w, h);
-    relayout();
-}
-
-void PatternPanel::draw()
-{
-    fl_color(panelBorder);
-    fl_rectf(x(), y(), w(), 1);
-    fl_color(panelBg);
-    fl_rectf(x(), y() + 1, w(), h() - 1);
-    draw_children();
 }
 
 int PatternPanel::handle(int event)
