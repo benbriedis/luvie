@@ -123,6 +123,15 @@ bool AppWindow::wmResizeAvailable()
 #endif
 }
 
+bool AppWindow::inVisiblePopup(int ex, int ey) const
+{
+	for (auto* p : popups)
+		if (p->visible() && ex >= p->x() && ex < p->x() + p->w()
+		                 && ey >= p->y() && ey < p->y() + p->h())
+			return true;
+	return false;
+}
+
 int AppWindow::detectEdge() const
 {
     int ex = Fl::event_x(), ey = Fl::event_y();
@@ -324,8 +333,10 @@ int AppWindow::handle(int event)
     }
 
     // Past the popup handling, so the click that dismisses a popup is spent on
-    // that alone.
-    if (event == FL_PUSH && onClick)
+    // that alone. A click that lands ON a popup is not a click away from
+    // anything either — the menu item under it may well be about to act on the
+    // selection this would dismiss, and its callback has not run yet.
+    if (event == FL_PUSH && onClick && !inVisiblePopup(Fl::event_x(), Fl::event_y()))
         onClick(Fl::event_x(), Fl::event_y());
 
     return Fl_Double_Window::handle(event);

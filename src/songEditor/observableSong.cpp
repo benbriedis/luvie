@@ -1595,15 +1595,18 @@ void ObservableSong::setPatternStartOffset(int patternId, float startOffset)
                 if (p.id == patternId) { p.startOffset = startOffset; notify(); return; }
 }
 
-void ObservableSong::placePattern(int laneId, int patternId, float startBar, float length)
+int ObservableSong::placePattern(int laneId, int patternId, float startBar, float length,
+                                 float startOffset)
 {
     for (auto& t : data.tracks)
         for (auto& l : t.lanes)
             if (l.id == laneId) {
-                l.patterns.push_back({nextId++, patternId, startBar, length});
+                int id = nextId++;
+                l.patterns.push_back({id, patternId, startBar, length, startOffset});
                 notify();
-                return;
+                return id;
             }
+    return 0;
 }
 
 std::vector<Note> ObservableSong::buildNotes() const

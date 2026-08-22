@@ -14,6 +14,7 @@
 #include "harmonyEditor.hpp"
 #include "noteContextPopup.hpp"
 #include "patternInstanceContextPopup.hpp"
+#include "selectionContextPopup.hpp"
 #include "modernTabs.hpp"
 #include "settingsButton.hpp"
 #include "settingsMenuPopup.hpp"
@@ -161,6 +162,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // Only one editor is visible at a time, so clearing all of them is both
     // correct and simpler than working out which one has the cursor.
     window->onEscape = [this]() {
+        // A copy waiting to be placed goes first: cancelling it leaves the items
+        // that were copied still selected, which is what the user is looking at.
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->cancelPlacement()) return true;
         bool cleared = false;
         for (ISelectionHost* h : selectionHosts())
             if (h && h->hasSelection()) { h->clearSelection(); cleared = true; }
@@ -185,9 +190,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // inside that grid are left alone: it has its own rules for them (band
     // sweeps, ctrl-toggles, dragging the selection).
     window->onClick = [this](int wx, int wy) {
-        for (ISelectionHost* h : selectionHosts())
-            if (h && h->hasSelection() && !h->ownsWindowPoint(wx, wy))
-                h->clearSelection();
+        for (ISelectionHost* h : selectionHosts()) {
+            if (!h || h->ownsWindowPoint(wx, wy)) continue;
+            // Clicking away is also how a copy waiting to be placed is
+            // abandoned — it can only be placed on the grid that owns it.
+            h->cancelPlacement();
+            if (h->hasSelection()) h->clearSelection();
+        }
     };
 
     const int off        = 0;
@@ -202,6 +211,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* p1      = new NoteContextPopup{};
     auto* p2      = new NoteContextPopup{};
     auto* sp      = new PatternInstanceContextPopup{};
+    auto* selPop  = new SelectionContextPopup{};
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
@@ -384,6 +394,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     og2->onPatternDoubleClick = openPatternTab;
     og2->onOpenPattern        = openPatternTab;
     og2->setSongPopup(sp);
+    og2->setSelectionPopup(selPop);
     og2->setParamDotPopup(pdPop);
     ctxPop->onOpenPattern     = openPatternTab;
     if (verbose) {
@@ -491,6 +502,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(p1);     window->registerPopup(p1);
     window->add(p2);     window->registerPopup(p2);
     window->add(sp);     window->registerPopup(sp);
+    window->add(selPop); window->registerPopup(selPop);
     window->add(tPop);   window->registerPopup(tPop);
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);

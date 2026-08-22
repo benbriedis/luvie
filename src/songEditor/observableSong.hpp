@@ -172,7 +172,11 @@ public:
     void resizePattern(int instanceId, float newLength);
     void resizePatternLeft(int instanceId, float newStartBar, float newLength, float newStartOffset);
     void setPatternStartOffset(int instanceId, float startOffset);
-    void placePattern(int laneId, int patternId, float startBar, float length);
+    // Returns the new instance's id, or 0 if no such lane. startOffset is carried
+    // through so a copy of a left-resized instance keeps playing from the same
+    // beat of its pattern.
+    int  placePattern(int laneId, int patternId, float startBar, float length,
+                      float startOffset = 0.0f);
 
     // Song-level param lane management. Each lane belongs to one instrument and
     // routes only to that instrument's port; uniqueness is per (type, instrument).

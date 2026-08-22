@@ -165,13 +165,20 @@ protected:
     // screen could be dragged out of range.
     virtual void groupDragLimits(float& minDBeat, float& maxDBeat,
                                  int& minDRow, int& maxDRow) const;
+    // True if shifting the selection by this many rows would put a member on a
+    // row that cannot hold it at all — an automation lane or an instrument
+    // header in the song editor. Distinct from groupMoveBlocked: that reports a
+    // collision the user can see and drag out of, whereas these rows never
+    // accept the item, so the preview holds its last good row and steps over
+    // them rather than being drawn somewhere it could not land.
+    virtual bool groupRowsRejected(int dRow) const;
     // True if shifting the selection by this delta would collide with an item
     // that is NOT selected. Selected items keep their relative geometry, so they
     // can never newly collide with each other.
     virtual bool groupMoveBlocked(float dBeat, int dRow) const;
     // Apply the delta to every selected item, in one batched edit.
     virtual void onCommitGroupMove(float dBeat, int dRow);
-    // Some grids lock an axis — the song editor moves instances sideways only.
+    // Some grids lock an axis.
     virtual bool allowsVerticalDrag() const { return true; }
 
     // Selected items are outlined rather than filled differently, so velocity
@@ -193,7 +200,14 @@ protected:
     void beginGroupDrag(int noteIdx, float grabX, float grabY);
     // Same, for a primary that is not in `notes` — the caller passes its start
     // position and the grab offset within it.
-    void beginGroupDrag(Point original, float grabX, float grabY);
+    void beginGroupDrag(Point original, float grabX, float grabY,
+                        bool primaryInNotes = false);
+    // Which of the two the live drag was started by. groupDragLimits runs before
+    // the state exists, so it cannot work this out for itself, and a grid may
+    // want to lock an axis for one primary and not the other — the song editor
+    // will not change rows off an automation dot, whose vertical position is a
+    // value rather than a row.
+    bool groupPrimaryInNotes = false;
 
     // Virtual row geometry — override in subclasses for variable-height rows
     virtual int rowY(int r) const         { return r * rowHeight; }

@@ -376,8 +376,6 @@ Document
  Maybe add an optional "Tools" toolbar?
  
  
-cf copy/paste cloning of selection  
-
 Change tab when undoing/redoing when necessary (+ scroll? cf recenter? cf storing position when editing?) 
 
 TODO check undo and multi-select in LV2 mode
@@ -387,6 +385,7 @@ TODO In pattern editors some notes may sit at divisions not currently supported.
 
 Song Editor - wants a ZOOM, but where to put it? Options:
 	1. Create a dark horizontal settings bar at bottom and put the one control on it.
+	   Could add a selection mode button toggle to it.
 	2. Hack it on to the transport bar
 	3. Create a context menu over the entire grid (confusing - hides the different types of context menu)
 	4. Put into pattern instance context menus and possibly the label context menus
@@ -396,10 +395,11 @@ Song Editor - wants a ZOOM, but where to put it? Options:
 
 
 Multi-select: 
-   change context to remove Open pattern.
-   Delete to delete the whole selection
-   Add a copy option.  But how to paste?  ctrl-V?
    Allow dragging down a grid (useful if we've cloned a few patterns.) Parameters dots to ignore dragging down.
       cf allowing multiple lanes to be selected and cloned, deleted, moved.
 
+Copy & paste: might be more standard for paste to require a right click or ctrl-V.	  
 
+
+BUG hover over dot and press delete. Nothing
+BUG can drag onto automation row

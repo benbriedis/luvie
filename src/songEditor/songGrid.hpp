@@ -7,6 +7,7 @@
 #include "grid.hpp"
 #include "observableSong.hpp"
 #include "patternInstanceContextPopup.hpp"
+#include "selectionContextPopup.hpp"
 #include "paramDotPopup.hpp"
 #include "paramLaneTypes.hpp"
 #include <cmath>
@@ -20,6 +21,7 @@ class SongGrid : public Grid, public ITimelineObserver {
     bool isInstrHeaderVR(int vr) const;
     ObservableSong* timeline          = nullptr;
     PatternInstanceContextPopup*          songPopup         = nullptr;
+    SelectionContextPopup*                selectionPopup    = nullptr;
     ParamDotPopup*      paramDotPopup     = nullptr;
     int                 trackFilter       = -1;
     bool                beatResolution    = false;
@@ -32,6 +34,53 @@ class SongGrid : public Grid, public ITimelineObserver {
     std::vector<ParamLaneLocal>  localParamLanes;
     ParamState                   paramState;
     std::unordered_set<int>      stackedNoteIds;
+
+    // ── Copy-and-place ───────────────────────────────────────────────────────
+    // "Copy selection" leaves a ghost of the copied instances following the
+    // cursor; the next click places the copy and ends the gesture, Escape
+    // cancels it, and either way the original selection is left as it was. A
+    // non-empty `stamp` IS the mode. It holds values rather than ids because
+    // the source instances may be edited or deleted while the ghost is up, and
+    // what gets placed should stay what was copied.
+    struct StampItem { int srcAbsRow; float startBar, length, startOffset; };
+    std::vector<StampItem> stamp;
+    int   stampOriginX  = 0, stampOriginY = 0;   // grid-relative cursor anchor
+    bool  stampAnchored = false;                 // re-anchor on the first move
+    float stampDBar     = 0.0f;
+    int   stampDRow     = 0;
+    // The delta the ghost held when it was last anchored. Re-anchoring (the
+    // cursor leaves and comes back, or the view scrolls under it) moves the
+    // origin to wherever the cursor now is and carries this forward, so the
+    // ghost stays put instead of springing back to the originals.
+    float stampBaseDBar = 0.0f;
+    int   stampBaseDRow = 0;
+    float stampMinDBar  = 0.0f, stampMaxDBar = 0.0f;
+    bool  stampBlocked  = false;
+
+    void beginStamp();
+    void endStamp();
+    void updateStamp();
+    // True when every copy would land on a row that holds blocks. The ghost
+    // refuses to move onto rows that fail this rather than drawing there.
+    bool stampRowsUsable(int dRow) const;
+    bool stampIsBlocked() const;
+    void commitStamp();
+    void drawStamp() const;
+    int  handleStampEvent(int event);
+    // Destination lane for an absolute row, with the lane's own pattern. Both
+    // are -1/0 when the row does not accept instances.
+    void destLaneForAbsRow(int absRow, int& laneId, int& patternId) const;
+    // The rowOrder index the given lane is drawn on, or -1. Not simply the
+    // lane's own RowRef: a stacked track draws all of its lanes on its first
+    // lane's row, and only that lane has one.
+    int  absRowForLane(int laneId) const;
+
+    // Where a selected instance ends up when the selection moves by some delta.
+    struct Landing { int instId; int laneId; float startBar, length; };
+    // Fills `out` with one entry per selected instance. False when any of them
+    // lands on a row that cannot hold a block — an automation lane, an
+    // instrument header, or nothing at all.
+    bool collectLandings(float dBeat, int dRow, std::vector<Landing>& out) const;
 
     void rebuildNotes();
     void rebuildParamLanes();
@@ -79,14 +128,12 @@ protected:
     void onNoteDoubleClick(int noteIdx) override;
     void toggleNote() override;
 
-    // Instances move sideways only: a lane change is a different operation, and
-    // allowing it would make a collapsed track's lanes indistinguishable.
-    bool allowsVerticalDrag() const override { return false; }
     std::unordered_set<int> liveItemIds() const override;
     void selectAll() override;
     void deleteSelection() override;
     void groupDragLimits(float& minDBeat, float& maxDBeat,
                          int& minDRow, int& maxDRow) const override;
+    bool groupRowsRejected(int dRow) const override;
     bool groupMoveBlocked(float dBeat, int dRow) const override;
     void onCommitGroupMove(float dBeat, int dRow) override;
 
@@ -109,9 +156,12 @@ public:
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
 
     void setSongPopup(PatternInstanceContextPopup* p)         { songPopup = p; }
+    void setSelectionPopup(SelectionContextPopup* p)          { selectionPopup = p; }
     void setParamDotPopup(ParamDotPopup* p) { paramDotPopup = p; }
 
     int handle(int event) override;
+
+    bool cancelPlacement() override;
 
     void setTimeline(ObservableSong* tl);
     void setTrackView(int trackFilter, bool beatResolution);

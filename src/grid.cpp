@@ -401,6 +401,15 @@ void Grid::groupDragLimits(float& minDBeat, float& maxDBeat, int& minDRow, int& 
     }
 }
 
+bool Grid::groupRowsRejected(int dRow) const
+{
+    for (const auto& g : groupOrig) {
+        int row = g.row + dRow;
+        if (row < 0 || row >= numRows || isRowBlocked(row)) return true;
+    }
+    return false;
+}
+
 bool Grid::groupMoveBlocked(float dBeat, int dRow) const
 {
     for (const auto& g : groupOrig) {
@@ -422,11 +431,12 @@ void Grid::onCommitGroupMove(float, int) {}
 void Grid::beginGroupDrag(int noteIdx, float grabX, float grabY)
 {
     onBeginDrag(noteIdx);
-    beginGroupDrag(Point{(int)notes[noteIdx].row, notes[noteIdx].beat}, grabX, grabY);
+    beginGroupDrag(Point{(int)notes[noteIdx].row, notes[noteIdx].beat}, grabX, grabY, true);
 }
 
-void Grid::beginGroupDrag(Point original, float grabX, float grabY)
+void Grid::beginGroupDrag(Point original, float grabX, float grabY, bool primaryInNotes)
 {
+    groupPrimaryInNotes = primaryInNotes;
     // No pointer warp here. Snapping the cursor to one block's centre is a
     // helpful cue when that block is the only thing moving, and disorienting
     // when it is one of fifty.
@@ -469,6 +479,10 @@ void Grid::movingGroup(StateDragGroup& s)
     // limits were fixed when the drag began.
     dBeat = std::clamp(dBeat, s.minDBeat, s.maxDBeat);
     dRow  = std::clamp(dRow,  s.minDRow,  s.maxDRow);
+    // Rows the selection can never occupy are stepped over, not previewed on:
+    // hold the last row delta that worked. Zero always does — that is where the
+    // items already are — so there is always one to fall back to.
+    if (dRow != s.dRow && groupRowsRejected(dRow)) dRow = s.dRow;
     if (snap > 0.0f) {
         // Re-snap after clamping: the limit itself is rarely on a grid line.
         float snapped = std::round(dBeat / snap) * snap;

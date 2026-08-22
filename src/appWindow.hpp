@@ -16,6 +16,8 @@ class AppWindow : public Fl_Double_Window {
 
 	static constexpr int edgeZone = 6;      // px from window edge
 
+	// True when this window-relative point lies inside a popup that is showing.
+	bool      inVisiblePopup(int ex, int ey) const;
 	int       detectEdge()        const;
 	Fl_Cursor edgeCursor(int dir) const;
 	// Hands an interactive resize to the window manager. Returns false if this
@@ -57,7 +59,9 @@ public:
 	// Every left/right press that reaches the window, in window coordinates,
 	// before the widget under it sees it. Used to dismiss a multi-selection when
 	// the click lands anywhere but the grid that owns it — the grid itself never
-	// hears about clicks on its neighbours.
+	// hears about clicks on its neighbours. Presses that land on a popup are not
+	// reported: a menu item is usually acting on that very selection, and its
+	// callback has not run yet.
 	std::function<void(int, int)> onClick;
 
 	void openPopup(Fl_Window* p) {

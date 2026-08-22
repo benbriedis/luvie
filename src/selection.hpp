@@ -93,6 +93,11 @@ class ISelectionHost {
 public:
     virtual ~ISelectionHost() = default;
     virtual void clearSelection()      = 0;
+    // A modal placement gesture in progress (the song editor's copy-and-stamp).
+    // Escape cancels that before it touches the selection, so a cancelled copy
+    // leaves the items that were copied still selected. Returns true when there
+    // was one to cancel.
+    virtual bool cancelPlacement()     { return false; }
     virtual void selectAllItems()      = 0;
     // Remove every selected item, in one batched edit.
     virtual void deleteSelectedItems() = 0;

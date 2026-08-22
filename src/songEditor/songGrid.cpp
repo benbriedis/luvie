@@ -7,6 +7,7 @@
 #include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
+#include <FL/Fl_RGB_Image.H>
 #include <algorithm>
 #include <cmath>
 
@@ -20,6 +21,10 @@ static constexpr Fl_Color kInstrHeaderBg   = 0x64748B00;  // same slate-blue as 
 static constexpr Fl_Color kBlockFill       = 0x5555EE00;
 static constexpr Fl_Color kBlockBar        = 0x1111EE00;
 static constexpr float    kStackOpacity    = 0.6f;
+// The copy-and-stamp ghost: a wash faint enough to read the grid and any block
+// through, and a red outline for a landing spot that would collide.
+static constexpr unsigned char kStampFillAlpha = 72;
+static constexpr Fl_Color kStampBlocked    = 0xDC262600;
 
 SongGrid::SongGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Grid(numRows, numCols, rowHeight, colWidth, snap, popup)
@@ -310,6 +315,7 @@ void SongGrid::draw()
                                  rowH((int)note.row));
         }
     }
+    drawStamp();
     drawBand();
 
     fl_pop_clip();
@@ -322,6 +328,8 @@ SongGrid::~SongGrid()
 
 void SongGrid::setTimeline(ObservableSong* tl)
 {
+    // A ghost describes rows and lanes of the song being replaced.
+    endStamp();
     swapObserver(timeline, tl, this);
     rebuildNotes();
     rebuildParamLanes();
@@ -365,7 +373,14 @@ int SongGrid::laneIdxForAbsRow(int absRow) const
 
 bool SongGrid::isRowBlocked(int visualRow) const
 {
-    return isInstrHeaderVR(visualRow);
+    if (!timeline) return false;
+    int absRow = visualRow + rowOffset;
+    const auto& ro = timeline->get().rowOrder;
+    // Only lane rows hold pattern instances. An automation lane has no
+    // destination lane for movePattern to find, so a block dropped on one is
+    // discarded — and, with no notify() to trigger a rebuild, the preview stays
+    // stranded on the param row. Instrument header rows are not lanes either.
+    return absRow < 0 || absRow >= (int)ro.size() || ro[absRow].kind != RowKind::Lane;
 }
 
 Fl_Color SongGrid::rowBgColor(int visualRow) const
@@ -497,11 +512,59 @@ void SongGrid::deleteSelection()
     for (int id : points)    timeline->removeParamPoint(id);
 }
 
+int SongGrid::absRowForLane(int laneId) const
+{
+    if (!timeline) return -1;
+    const auto& tl = timeline->get();
+    // A stacked track draws every one of its lanes on its first lane's row, and
+    // that is the only one of them with a RowRef.
+    int rowLaneId = laneId;
+    for (const auto& t : tl.tracks) {
+        bool mine = false;
+        for (const auto& l : t.lanes)
+            if (l.id == laneId) { mine = true; break; }
+        if (!mine) continue;
+        if (t.stackedLanes && !t.lanes.empty()) rowLaneId = t.lanes[0].id;
+        break;
+    }
+    for (int i = 0; i < (int)tl.rowOrder.size(); i++)
+        if (tl.rowOrder[i].kind == RowKind::Lane && tl.rowOrder[i].id == rowLaneId) return i;
+    return -1;
+}
+
+bool SongGrid::collectLandings(float dBeat, int dRow, std::vector<Landing>& out) const
+{
+    out.clear();
+    if (!timeline) return false;
+    const auto& tl = timeline->get();
+    for (int ti = 0; ti < (int)tl.tracks.size(); ti++) {
+        const auto& t = tl.tracks[ti];
+        for (const auto& l : t.lanes) {
+            int srcRow = absRowForLane(l.id);
+            if (srcRow < 0) continue;
+            for (const auto& p : l.patterns) {
+                if (!selection.contains(p.id)) continue;
+                int laneId, patId;
+                destLaneForAbsRow(srcRow + dRow, laneId, patId);
+                if (laneId < 0) return false;
+                // Same rule a single block's drag follows: a move that stays
+                // inside a stacked track keeps its own lane, because all of
+                // that track's lanes share the one row and the row names only
+                // the first of them.
+                if (t.stackedLanes && timeline->trackIndexForLaneId(laneId) == ti)
+                    laneId = l.id;
+                out.push_back({p.id, laneId, p.startBar + dBeat, p.length});
+            }
+        }
+    }
+    return true;
+}
+
 void SongGrid::groupDragLimits(float& minDBeat, float& maxDBeat,
                                int& minDRow, int& maxDRow) const
 {
     minDBeat = maxDBeat = 0.0f;
-    minDRow  = maxDRow  = 0;   // vertical movement is disallowed here
+    minDRow  = maxDRow  = 0;
     if (!timeline) return;
 
     bool first = true;
@@ -536,44 +599,98 @@ void SongGrid::groupDragLimits(float& minDBeat, float& maxDBeat,
             span(lo, hi);
         }
     }
+
+    // Vertical. Only the instances have a row to travel along: a dot's vertical
+    // position is its value, not a row, so a selection that changes rows leaves
+    // its dots on the lanes they came from.
+    //
+    // A drag anchored on a dot stays horizontal altogether. The primary is what
+    // the row delta is measured from, and a dot moving up and down its lane
+    // would hand the blocks a number that means nothing.
+    if (!groupPrimaryInNotes) return;
+    bool firstRow = true;
+    for (const auto& t : timeline->get().tracks)
+        for (const auto& l : t.lanes) {
+            bool anySelected = false;
+            for (const auto& p : l.patterns)
+                if (selection.contains(p.id)) { anySelected = true; break; }
+            if (!anySelected) continue;
+            int srcRow = absRowForLane(l.id);
+            if (srcRow < 0) continue;
+            // Bounded by the rows on screen, as a single block's drag is: the
+            // view does not follow a drag vertically, so travel past the last
+            // visible row would only make the selection disappear. Which of the
+            // rows in between will actually take a block is left to
+            // groupRowsRejected, which steps over the ones that will not.
+            int vr = srcRow - rowOffset;
+            int rlo = -vr, rhi = numRows - 1 - vr;
+            if (firstRow) { minDRow = rlo; maxDRow = rhi; firstRow = false; }
+            else { minDRow = std::max(minDRow, rlo); maxDRow = std::min(maxDRow, rhi); }
+        }
 }
 
-bool SongGrid::groupMoveBlocked(float dBeat, int) const
+// The base version works off `notes`, which holds only the rows on screen. Here
+// the whole model is to hand, so a selection reaching past the viewport is
+// judged on all of it.
+bool SongGrid::groupRowsRejected(int dRow) const
+{
+    std::vector<Landing> landings;
+    return !collectLandings(0.0f, dRow, landings);
+}
+
+bool SongGrid::groupMoveBlocked(float dBeat, int dRow) const
 {
     if (!timeline) return false;
-    // An instance may only collide with instances in its OWN lane, so the test
-    // is per-lane rather than against every block on screen. Selected instances
-    // all shift by the same delta, so they cannot newly collide with each other.
-    for (const auto& t : timeline->get().tracks)
-        for (const auto& l : t.lanes)
-            for (const auto& p : l.patterns) {
-                if (!selection.contains(p.id)) continue;
-                float start = p.startBar + dBeat;
+
+    std::vector<Landing> landings;
+    // A row that cannot hold a block refuses the whole move — this is what stops
+    // a selection being dragged onto an automation lane or a header row.
+    if (!collectLandings(dBeat, dRow, landings)) return true;
+
+    // An instance may only collide with instances in the lane it LANDS in, so
+    // the test is per-lane rather than against every block on screen.
+    for (const auto& d : landings)
+        for (const auto& t : timeline->get().tracks)
+            for (const auto& l : t.lanes) {
+                if (l.id != d.laneId) continue;
                 for (const auto& q : l.patterns) {
-                    if (q.id == p.id || selection.contains(q.id)) continue;
-                    if (beatsOverlap(start, p.length, q.startBar, q.length)) return true;
+                    // A selected block sitting in this lane is leaving it by the
+                    // same delta, so it is not in the way. Two selected blocks
+                    // landing on each other is caught below.
+                    if (selection.contains(q.id)) continue;
+                    if (beatsOverlap(d.startBar, d.length, q.startBar, q.length)) return true;
                 }
             }
+
+    // Selected blocks keep their relative geometry and so cannot newly collide
+    // with each other — except across lanes, which a row change makes possible:
+    // a stacked track shows all of its lanes on one row, and two blocks from
+    // that row are aimed at the same destination lane.
+    for (size_t i = 0; i < landings.size(); i++)
+        for (size_t j = i + 1; j < landings.size(); j++)
+            if (landings[i].laneId == landings[j].laneId &&
+                beatsOverlap(landings[i].startBar, landings[i].length,
+                             landings[j].startBar, landings[j].length))
+                return true;
+
     // Dots crossing their neighbours is handled in groupDragLimits, which stops
     // the drag at the neighbour rather than letting it run on and then refusing
     // the whole move; moveParamPoint would clamp them into a heap otherwise.
     return false;
 }
 
-void SongGrid::onCommitGroupMove(float dBeat, int)
+void SongGrid::onCommitGroupMove(float dBeat, int dRow)
 {
-    if (!timeline || dBeat == 0.0f) return;
+    if (!timeline || (dBeat == 0.0f && dRow == 0)) return;
+
+    // Resolve every destination against the untouched model first: movePattern
+    // rewrites the lanes as it goes.
+    std::vector<Landing> landings;
+    if (!collectLandings(dBeat, dRow, landings)) return;
 
     struct PointMove { int id; float beat; int value; };
     std::vector<PointMove> pointMoves;
-    struct InstMove { int id; int laneId; float bar; };
-    std::vector<InstMove> instMoves;
-
-    for (const auto& t : timeline->get().tracks)
-        for (const auto& l : t.lanes)
-            for (const auto& p : l.patterns)
-                if (selection.contains(p.id))
-                    instMoves.push_back({p.id, l.id, p.startBar + dBeat});
+    // Dots travel along the beat axis only; the row delta is not theirs.
     for (const auto& lane : timeline->get().paramLanes)
         for (const auto& pt : lane.points)
             if (!pt.anchor && selection.contains(pt.id))
@@ -589,8 +706,9 @@ void SongGrid::onCommitGroupMove(float dBeat, int)
               });
 
     ObservableSong::Batch batch(timeline);
-    // Each instance keeps its own lane: this is a horizontal move.
-    for (const auto& m : instMoves) timeline->movePattern(m.id, m.laneId, m.bar);
+    // A block that changes lanes adopts that lane's pattern — movePattern's own
+    // rule, since a block plays the pattern of the lane it sits in.
+    for (const auto& d : landings)  timeline->movePattern(d.instId, d.laneId, d.startBar);
     for (const auto& m : pointMoves) timeline->moveParamPoint(m.id, m.beat, m.value);
 }
 
@@ -656,6 +774,324 @@ void SongGrid::drawParamSelection(int laneIdx, int rowYPx) const
         fl_line_style(FL_SOLID, 2);
         fl_arc(dotX - r, dotY - r, 2 * r, 2 * r, 0, 360);
         fl_line_style(0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Copy-and-place
+//
+// "Copy selection" does not paste anywhere by itself: it lifts the selected
+// instances into a ghost that follows the cursor, and the click that follows
+// drops the copy where the ghost stands. That keeps the destination an explicit
+// choice rather than a fixed offset. Escape cancels instead.
+//
+// Placing ends the gesture but leaves the original selection alone, so copying
+// the same blocks somewhere else again is just another right-click.
+//
+// The ghost is state of its own rather than a GridState variant: it is live
+// with no button held, which no drag state is.
+// ---------------------------------------------------------------------------
+
+void SongGrid::destLaneForAbsRow(int absRow, int& laneId, int& patternId) const
+{
+    laneId = -1; patternId = 0;
+    if (!timeline) return;
+    const auto& ro = timeline->get().rowOrder;
+    // Only lane rows take instances — the same rule isRowBlocked applies to a
+    // drag, which is what keeps copies out of automation lanes and instrument
+    // header rows.
+    if (absRow < 0 || absRow >= (int)ro.size() || ro[absRow].kind != RowKind::Lane) return;
+    laneId = ro[absRow].id;
+    for (const auto& t : timeline->get().tracks)
+        for (const auto& l : t.lanes)
+            if (l.id == laneId) { patternId = l.patternId; return; }
+}
+
+void SongGrid::beginStamp()
+{
+    stamp.clear();
+    stampDBar = stampBaseDBar = 0.0f;
+    stampDRow = stampBaseDRow = 0;
+    stampAnchored = false;
+    if (!timeline || selection.empty()) return;
+
+    bool  first = true;
+    float lo = 0.0f, hi = 0.0f;
+    for (const auto& t : timeline->get().tracks) {
+        for (const auto& l : t.lanes) {
+            int absRow = absRowForLane(l.id);
+            if (absRow < 0) continue;
+            for (const auto& p : l.patterns) {
+                if (!selection.contains(p.id)) continue;
+                stamp.push_back({absRow, p.startBar, p.length, p.startOffset});
+                // Same intersection of per-item ranges as groupDragLimits: the
+                // ghost stops when its first member would leave the grid, so
+                // the shape never gets squashed against the edge.
+                float ilo = -p.startBar, ihi = (float)numCols - (p.startBar + p.length);
+                if (first) { lo = ilo; hi = ihi; first = false; }
+                else       { lo = std::max(lo, ilo); hi = std::min(hi, ihi); }
+            }
+        }
+    }
+    // Selected automation dots are deliberately left out: a dot copied onto a
+    // different lane has no meaning, and the lane it came from already has one
+    // at that beat.
+    if (stamp.empty()) return;
+
+    includeZero(lo, hi);
+    stampMinDBar = lo;
+    stampMaxDBar = hi;
+    redraw();
+}
+
+// Drops the ghost, whether the copy was placed or abandoned. The selection is
+// deliberately untouched: the blocks that were copied stay selected either way.
+void SongGrid::endStamp()
+{
+    if (stamp.empty()) return;
+    stamp.clear();
+    stampAnchored = false;
+    if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+    redraw();
+}
+
+bool SongGrid::cancelPlacement()
+{
+    if (stamp.empty()) return false;
+    endStamp();
+    return true;
+}
+
+void SongGrid::updateStamp()
+{
+    if (stamp.empty()) return;
+    const int ex = Fl::event_x() - x();
+    const int ey = Fl::event_y() - y();
+
+    if (!stampAnchored) {
+        stampOriginX  = ex;
+        stampOriginY  = ey;
+        stampBaseDBar = stampDBar;
+        stampBaseDRow = stampDRow;
+        stampAnchored = true;
+    }
+
+    // Blocks snap to the beat of whatever time signature is in force where the
+    // ghost sits, exactly as dragging one does.
+    if (timeline) {
+        float rawBar = (float)ex / (float)colWidth + colOffset;
+        int   bpb, dummy;
+        timeline->timeSigAt((int)std::max(0.0f, rawBar), bpb, dummy);
+        snap = 1.0f / bpb;
+    }
+
+    float dBar = stampBaseDBar + (float)(ex - stampOriginX) / (float)colWidth;
+    if (snap > 0.0f) dBar = std::round(dBar / snap) * snap;
+    dBar = std::clamp(dBar, stampMinDBar, stampMaxDBar);
+    if (snap > 0.0f) {
+        // Re-snap after clamping: the limit itself is rarely on a grid line.
+        float snapped = std::round(dBar / snap) * snap;
+        if (snapped >= stampMinDBar && snapped <= stampMaxDBar) dBar = snapped;
+    }
+    stampDBar = dBar;
+
+    // Rows that cannot hold a block are stepped over rather than drawn on, so
+    // the ghost stays strictly in the pattern lanes: an automation lane or an
+    // instrument header under the cursor holds the last row delta that worked.
+    // Zero always works — that is where the blocks were copied from.
+    int dRow = stampBaseDRow + rowAtPixelY(ey) - rowAtPixelY(stampOriginY);
+    if (dRow != stampDRow && !stampRowsUsable(dRow)) dRow = stampDRow;
+    stampDRow = dRow;
+
+    stampBlocked = stampIsBlocked();
+    if (window()) {
+        if (stampBlocked) window()->cursor(forbiddenCursorImage(), 11, 11);
+        else              window()->cursor(FL_CURSOR_HAND);
+    }
+    redraw();
+}
+
+bool SongGrid::stampRowsUsable(int dRow) const
+{
+    if (!timeline) return false;
+    for (const auto& s : stamp) {
+        // On screen: the view does not follow the ghost vertically, so a row
+        // past the last visible one would only make the copy invisible.
+        int vr = s.srcAbsRow + dRow - rowOffset;
+        if (vr < 0 || vr >= numRows) return false;
+        int laneId, patId;
+        destLaneForAbsRow(s.srcAbsRow + dRow, laneId, patId);
+        if (laneId < 0 || patId <= 0) return false;
+    }
+    return true;
+}
+
+bool SongGrid::stampIsBlocked() const
+{
+    if (!timeline || stamp.empty()) return true;
+
+    struct Dest { int laneId; float startBar, length; };
+    std::vector<Dest> dests;
+    dests.reserve(stamp.size());
+    for (const auto& s : stamp) {
+        int laneId, patId;
+        destLaneForAbsRow(s.srcAbsRow + stampDRow, laneId, patId);
+        if (laneId < 0 || patId <= 0) return true;
+        float start = s.startBar + stampDBar;
+        if (start < 0.0f || start + s.length > (float)numCols) return true;
+        dests.push_back({laneId, start, s.length});
+    }
+
+    // Against what is already in the destination lane. Nothing is vacating —
+    // unlike a group move, the originals stay put — so every existing instance
+    // counts, including the selected ones.
+    for (const auto& d : dests)
+        for (const auto& t : timeline->get().tracks)
+            for (const auto& l : t.lanes) {
+                if (l.id != d.laneId) continue;
+                for (const auto& q : l.patterns)
+                    if (beatsOverlap(d.startBar, d.length, q.startBar, q.length)) return true;
+            }
+
+    // And against each other: a stacked track collapses several lanes onto one
+    // row, so two copies from that row are aimed at the same destination lane
+    // and can collide even though their sources did not.
+    for (size_t i = 0; i < dests.size(); i++)
+        for (size_t j = i + 1; j < dests.size(); j++)
+            if (dests[i].laneId == dests[j].laneId &&
+                beatsOverlap(dests[i].startBar, dests[i].length,
+                             dests[j].startBar, dests[j].length))
+                return true;
+
+    return false;
+}
+
+void SongGrid::commitStamp()
+{
+    if (!timeline || stamp.empty()) return;
+
+    struct Place { int laneId, patternId; float startBar, length, startOffset; };
+    std::vector<Place> places;
+    places.reserve(stamp.size());
+    for (const auto& s : stamp) {
+        int laneId, patId;
+        destLaneForAbsRow(s.srcAbsRow + stampDRow, laneId, patId);
+        if (laneId < 0 || patId <= 0) return;
+        // The copy takes the destination lane's pattern, because a block plays
+        // the pattern of the lane it sits in — the same rule movePattern uses.
+        places.push_back({laneId, patId, s.startBar + stampDBar, s.length, s.startOffset});
+    }
+
+    ObservableSong::Batch batch(timeline);   // one notification, one undo entry
+    for (const auto& p : places)
+        timeline->placePattern(p.laneId, p.patternId, p.startBar, p.length, p.startOffset);
+}
+
+void SongGrid::drawStamp() const
+{
+    if (stamp.empty()) return;
+    const int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
+    for (const auto& s : stamp) {
+        int vr = s.srcAbsRow + stampDRow - rowOffset;
+        if (vr < 0 || vr >= numRows) continue;
+        // Round both edges independently, as the block pass does, so a ghost
+        // lines up pixel-for-pixel with the block it will become.
+        int xLeft  = (int)std::lround((s.startBar + stampDBar - colOffset) * (double)colWidth);
+        int xRight = (int)std::lround((s.startBar + stampDBar + s.length - colOffset) * (double)colWidth);
+        int x0     = x() + xLeft;
+        int width  = xRight - xLeft;
+        if (width <= 0 || x0 + width < x() || x0 > x() + gridRight) continue;
+        int y0 = y() + rowY(vr);
+        int rh = rowH(vr);
+
+        // Ghostly rather than solid: a wash of the block colour leaves the grid
+        // and any block underneath readable, which is the whole point of
+        // showing where the copy would land before committing to it. Same
+        // stretched-single-pixel trick as the rubber band — FLTK has no
+        // alpha-aware rectangle.
+        if (fl_can_do_alpha_blending()) {
+            static const uchar pixel[4] = {
+                uchar(kBlockFill >> 24), uchar(kBlockFill >> 16),
+                uchar(kBlockFill >> 8),  kStampFillAlpha };
+            static Fl_RGB_Image wash(pixel, 1, 1, 4);
+            wash.scale(width, rh - 1, 0, 1);
+            wash.draw(x0, y0 + 1);
+        } else {
+            fl_rectf(x0, y0 + 1, width, rh - 1, fl_color_average(kBlockFill, bgColor, 0.25f));
+        }
+        fl_color(stampBlocked ? kStampBlocked : selectionColor);
+        fl_line_style(FL_SOLID, 2);
+        fl_rect(x0 + 1, y0 + 2, std::max(2, width - 2), rh - 3);
+        fl_line_style(0);
+    }
+}
+
+int SongGrid::handleStampEvent(int event)
+{
+    switch (event) {
+        case FL_ENTER:
+        case FL_MOVE:
+            updateStamp();
+            return 1;
+
+        case FL_PUSH:
+            if (Fl::event_button() == FL_LEFT_MOUSE) {
+                updateStamp();             // the click may be the first event we see
+                if (!stampBlocked) {
+                    commitStamp();
+                    // One click, one copy: the ghost goes away and the items it
+                    // was copied from stay selected, so the same selection can
+                    // simply be copied again.
+                    endStamp();
+                    // The matching FL_RELEASE now finds no ghost and reaches
+                    // Grid, whose idle release creates or removes a block. This
+                    // click has already been spent.
+                    creationForbidden = true;
+                }
+            } else {
+                endStamp();
+            }
+            return 1;
+
+        case FL_LEAVE:
+            // Keep the mode alive; re-anchor so the ghost picks up from where it
+            // stands when the cursor comes back rather than springing about.
+            stampAnchored = false;
+            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+            return 1;
+
+        case FL_HIDE:
+            // Switching to a pattern editor abandons the copy: leaving a ghost
+            // parked on a grid the user has walked away from would ambush them
+            // when they came back.
+            endStamp();
+            return Grid::handle(event);
+
+        case FL_MOUSEWHEEL:
+            // Let the view scroll, but the pixel anchor is meaningless once the
+            // rows have moved under it.
+            stampAnchored = false;
+            return Grid::handle(event);
+
+        case FL_KEYBOARD:
+        case FL_SHORTCUT: {
+            // Escape normally arrives via AppWindow (these grids never take
+            // focus); handled here too so the ghost still goes away if the key
+            // ever reaches the grid directly.
+            int key = Fl::event_key();
+            if (key == FL_Escape) { endStamp(); return 1; }
+            // No hover-delete under a ghost. Every other key is someone else's:
+            // this is a broadcast, so claiming it would steal it from them.
+            if (key == FL_Delete || key == FL_BackSpace) return 1;
+            return Grid::handle(event);
+        }
+
+        case FL_DRAG:
+        case FL_RELEASE:
+            return 1;   // nothing may be dragged, created or deleted underneath
+
+        default:
+            return Grid::handle(event);
     }
 }
 
@@ -1030,6 +1466,15 @@ std::function<void()> SongGrid::makeDeleteCallback(int noteIdx)
 
 void SongGrid::openContextMenu(int idx)
 {
+    // Right-clicking a member of a multi-selection is a different question from
+    // right-clicking one block, so it gets its own menu rather than a mode of
+    // the instance one. Right-clicking anything else falls through unchanged.
+    if (selectionPopup && !selection.empty() && selection.contains(notes[idx].id)) {
+        selectionPopup->open(this,
+            [this]() { beginStamp(); },
+            [this]() { deleteSelectedItems(); redraw(); });
+        return;
+    }
     if (!songPopup) { Grid::openContextMenu(idx); return; }
     int absRow   = (int)notes[idx].row + rowOffset;
     int trackIdx = -1;
@@ -1176,6 +1621,11 @@ void SongGrid::onCommitResize(const StateDragResize& s)
 int SongGrid::handle(int event)
 {
     if (songPopup && songPopup->visible()) return 0;
+    if (selectionPopup && selectionPopup->visible()) return 0;
+
+    // A ghost waiting to be placed owns the grid outright: no hovering,
+    // dragging or creating happens underneath it.
+    if (!stamp.empty()) return handleStampEvent(event);
 
     // Active param interaction takes priority over everything
     if (!std::holds_alternative<ParamIdle>(paramState))
