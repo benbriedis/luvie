@@ -23,5 +23,5 @@ public:
 
 private:
     NsmClient*  nsm;
-    std::string basePath;   // session path from onOpen; ".luv" appended on save
+    std::string basePath;   // session path from onOpen; ".luvie" appended on save
 };

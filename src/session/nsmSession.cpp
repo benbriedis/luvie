@@ -18,7 +18,7 @@ void NsmSession::markDirty()
 bool NsmSession::save()
 {
     if (basePath.empty()) return false;
-    bool ok = saveAppState(collect(), basePath + ".luv");
+    bool ok = saveAppState(collect(), basePath + ".luvie");
     if (ok) {
         clean = true;
         if (nsm) nsm->sendClean();

@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
                    "  -h, --help       Show this help message\n"
                    "  --version        Show version information\n\n"
                    "Arguments:\n"
-                   "  project-file     Path to a .luv project file to open on startup\n"
+                   "  project-file     Path to a .luvie project file to open on startup\n"
 #ifdef LUVIE_HAVE_NSM
                    "\nEnvironment:\n"
                    "  NSM_URL          Connect to a Non Session Manager at this OSC address\n"
@@ -481,7 +481,7 @@ int main(int argc, char **argv) {
     };
 
     // --- Session management ------------------------------------------------
-    // One SessionManager backs every save path; the mode (standalone .luv vs.
+    // One SessionManager backs every save path; the mode (standalone .luvie vs.
     // NSM-managed) is chosen once, below, and the rest of the code is mode-blind.
     static NsmClient nsm;
     std::unique_ptr<SessionManager> session;
@@ -523,7 +523,7 @@ int main(int argc, char **argv) {
     // NSM open: load the session file (if any) and remember the session path.
     nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
         AppState state;
-        if (loadAppState(path + ".luv", state)) {
+        if (loadAppState(path + ".luvie", state)) {
             newProject = false;
             dirtyTracker.setSuppressed(true);
             applyLoadedState(state);

@@ -148,10 +148,10 @@ void MarkerRuler::addMarker(Kind k, int bar)
 		timeline->timeSigAt(bar, top, bottom);
 		timeline->setTimeSig(bar, top, bottom, timeline->beatAt(bar));
 	}
-	openPopupFor(k, bar, /*showDelete=*/false);
+	openPopupFor(k, bar, /*creating=*/true);
 }
 
-void MarkerRuler::openPopupFor(Kind k, int bar, bool showDelete)
+void MarkerRuler::openPopupFor(Kind k, int bar, bool creating)
 {
 	MarkerPopup* popup = (k == TEMPO) ? tempoPopup : timeSigPopup;
 	Fl_Window* win = window();
@@ -171,7 +171,7 @@ void MarkerRuler::openPopupFor(Kind k, int bar, bool showDelete)
 
 		// A ramp starts from the tempo already in force, so the popup shows that
 		// rather than asking for it. Bar 0 has none: there it stays the user's.
-		popup->openTempo(pos.x, pos.y, isFixed(bar), showDelete, curve, bpm, endBpm,
+		popup->openTempo(pos.x, pos.y, isFixed(bar), creating, curve, bpm, endBpm,
 			timeline->inheritedBpmAt(bar),
 			[this, bar](timeSettings::TempoCurve c, double bpm, double endBpm) {
 				// A ramp keeps whatever length it already had; a marker becoming
@@ -187,7 +187,7 @@ void MarkerRuler::openPopupFor(Kind k, int bar, bool showDelete)
 		for (auto& m : timeline->get().timeSigs)
 			if (m.bar == bar) { top = m.top; bottom = m.bottom; beat = m.beat; break; }
 
-		popup->openTimeSig(pos.x, pos.y, isFixed(bar), showDelete, top, bottom, beat,
+		popup->openTimeSig(pos.x, pos.y, isFixed(bar), creating, top, bottom, beat,
 			[this, bar](int top, int bottom, timeSettings::BeatUnit beat) {
 				timeline->setTimeSig(bar, top, bottom, beat);
 			},
@@ -282,7 +282,7 @@ int MarkerRuler::handle(int event)
 		} else if (Fl::event_button() == FL_RIGHT_MOUSE) {
 			if (clickedBar >= 0) {
 				// Right click on an existing marker of this ruler: edit it.
-				openPopupFor(kind, clickedBar, /*showDelete=*/true);
+				openPopupFor(kind, clickedBar, /*creating=*/false);
 			} else {
 				// Right click on empty space: create a marker of this ruler's
 				// kind at this bar and open its settings popup.

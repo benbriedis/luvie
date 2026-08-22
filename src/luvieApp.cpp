@@ -105,7 +105,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     Fl_Native_File_Chooser fc;
     fc.title("Import Project");
     fc.type(Fl_Native_File_Chooser::BROWSE_FILE);
-    fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
+    fc.filter("Luvie Projects\t*.luvie\nAll Files\t*");
     if (!lastFileDir.empty()) fc.directory(lastFileDir.c_str());
     if (fc.show() != 0) return;
 
@@ -126,15 +126,15 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     Fl_Native_File_Chooser fc;
     fc.title("Export Project");
     fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
-    fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
+    fc.filter("Luvie Projects\t*.luvie\nAll Files\t*");
     fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
     if (!lastFileDir.empty()) fc.directory(lastFileDir.c_str());
     if (fc.show() != 0) return;
 
     std::string path = fc.filename();
     if (path.empty()) return;
-    if (path.size() < 4 || path.substr(path.size() - 4) != ".luv")
-        path += ".luv";
+    if (path.size() < 6 || path.substr(path.size() - 6) != ".luvie")
+        path += ".luvie";
     lastFileDir = std::filesystem::path(path).parent_path().string();
 
     AppState state;

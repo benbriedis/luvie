@@ -5,7 +5,7 @@
 #include <string>
 #include "sessionManager.hpp"
 
-// Standalone mode: Luvie owns the project file. Save writes the chosen .luv;
+// Standalone mode: Luvie owns the project file. Save writes the chosen .luvie;
 // Save As (or the first Save of an unnamed project) prompts for a path.
 //
 // markDirty() flips the clean flag and arms a debounced auto-save: once a project
@@ -33,5 +33,5 @@ private:
 
     static constexpr double autoSaveDelay = 10.0;   // seconds after the last edit
 
-    std::string projectPath;   // current .luv path; empty until first save
+    std::string projectPath;   // current .luvie path; empty until first save
 };

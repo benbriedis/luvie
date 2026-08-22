@@ -361,8 +361,6 @@ Remove the automatic centering of the cursor on drag? OR have the cursor jump - 
 
 BUG: I suspect 'Loop mode' + current loops are not being saved.
 
-TODO .luv ==> .luvie
-
 BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
 TODO move 'Add automation' to second last in the menu
 
@@ -396,5 +394,12 @@ Song Editor - wants a ZOOM, but where to put it? Options:
 	       (maybe a bit obscure to rely on it?)
     6. Context menu over bar ruler  (hard to find)
 
+
+Multi-select: 
+   change context to remove Open pattern.
+   Delete to delete the whole selection
+   Add a copy option.  But how to paste?  ctrl-V?
+   Allow dragging down a grid (useful if we've cloned a few patterns.) Parameters dots to ignore dragging down.
+      cf allowing multiple lanes to be selected and cloned, deleted, moved.
 
 
