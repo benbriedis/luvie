@@ -394,12 +394,7 @@ Song Editor - wants a ZOOM, but where to put it? Options:
     6. Context menu over bar ruler  (hard to find)
 
 
-Multi-select: 
-   Allow dragging down a grid (useful if we've cloned a few patterns.) Parameters dots to ignore dragging down.
-      cf allowing multiple lanes to be selected and cloned, deleted, moved.
-
 Copy & paste: might be more standard for paste to require a right click or ctrl-V.	  
 
 
 BUG hover over dot and press delete. Nothing
-BUG can drag onto automation row

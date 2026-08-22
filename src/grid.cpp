@@ -181,39 +181,21 @@ int Grid::handle(int event)
             } else if (auto* h = std::get_if<StateHoverMove>(&state)) {
                 int   noteIdx = h->noteIdx;
                 float grabX   = h->grabX;
-                float grabY   = h->grabY;
                 if (Fl::event_clicks() == 1) {
                     onNoteDoubleClick(noteIdx);
                     creationForbidden = true;  // prevent FL_RELEASE from calling toggleNote
                 } else if (selection.contains(notes[noteIdx].id)) {
                     // Grabbing a member of the selection drags the whole of it.
-                    beginGroupDrag(noteIdx, grabX, grabY);
+                    beginGroupDrag(noteIdx, grabX);
                 } else {
                     // Grabbing anything else drops the selection and moves that
                     // one item, exactly as before.
                     if (!selection.empty()) { selection.clear(); redraw(); }
                     Point orig = {(int)notes[noteIdx].row, notes[noteIdx].beat};
                     onBeginDrag(noteIdx);
-                    // Jump the cursor to the block's centre so it tracks the
-                    // middle of the note during the drag instead of wherever it
-                    // happened to be grabbed. Re-anchor grabX/grabY to the centre
-                    // to match the warped cursor (only when the warp actually
-                    // happened, so unwarped platforms keep the note in place
-                    // rather than making it jump). The centre x is clamped to the
-                    // visible area so a long note doesn't fling the cursor off
-                    // the grid; grabX is then taken from the clamped position.
-                    const Note& n  = notes[noteIdx];
-                    int   row      = (int)n.row;
-                    float centreY  = rowH(row) / 2.0f;
-                    float leftEdge = (n.beat - colOffset) * colWidth;
-                    float centreX  = std::clamp(leftEdge + n.length * colWidth / 2.0f,
-                                                0.0f, (float)w());
-                    if (warpPointerTo(window(), x() + (int)centreX,
-                                                y() + rowY(row) + (int)centreY)) {
-                        grabX = centreX - leftEdge;
-                        grabY = centreY;
-                    }
-                    state = StateDragMove{noteIdx, grabX, grabY, orig, orig, false};
+                    // The block stays where it was grabbed: no cursor warp, so
+                    // the drag never nudges the note before it has moved.
+                    state = StateDragMove{noteIdx, grabX, orig, orig, false};
                 }
             } else if (auto* h = std::get_if<StateHoverResize>(&state)) {
                 int  noteIdx = h->noteIdx;
@@ -428,13 +410,13 @@ bool Grid::groupMoveBlocked(float dBeat, int dRow) const
 
 void Grid::onCommitGroupMove(float, int) {}
 
-void Grid::beginGroupDrag(int noteIdx, float grabX, float grabY)
+void Grid::beginGroupDrag(int noteIdx, float grabX)
 {
     onBeginDrag(noteIdx);
-    beginGroupDrag(Point{(int)notes[noteIdx].row, notes[noteIdx].beat}, grabX, grabY, true);
+    beginGroupDrag(Point{(int)notes[noteIdx].row, notes[noteIdx].beat}, grabX, true);
 }
 
-void Grid::beginGroupDrag(Point original, float grabX, float grabY, bool primaryInNotes)
+void Grid::beginGroupDrag(Point original, float grabX, bool primaryInNotes)
 {
     groupPrimaryInNotes = primaryInNotes;
     // No pointer warp here. Snapping the cursor to one block's centre is a
@@ -454,7 +436,7 @@ void Grid::beginGroupDrag(Point original, float grabX, float grabY, bool primary
     includeZero(minDB, maxDB);
     includeZero(minDR, maxDR);
 
-    state = StateDragGroup{grabX, grabY, original, minDB, maxDB, minDR, maxDR,
+    state = StateDragGroup{grabX, original, minDB, maxDB, minDR, maxDR,
                            0.0f, 0, false};
 }
 
@@ -469,8 +451,9 @@ void Grid::movingGroup(StateDragGroup& s)
 
     int dRow = 0;
     if (allowsVerticalDrag()) {
-        float ey = Fl::event_y() - y();
-        int newRow = rowAtPixelY(std::max(0, (int)(ey - s.grabY)));
+        // The primary lands on whatever row the cursor is over — see moving().
+        int ey     = Fl::event_y() - y();
+        int newRow = rowAtPixelY(std::max(0, ey));
         dRow = newRow - s.original.row;
     }
 
@@ -643,8 +626,13 @@ void Grid::moving(StateDragMove& s)
         float maxBeat = numCols - note->length;
         note->beat = snap > 0.0f ? std::floor(maxBeat / snap) * snap : maxBeat;
     }
-    float ey   = Fl::event_y() - y();
-    int newRow = std::clamp(rowAtPixelY(std::max(0, (int)(ey - s.grabY))), 0, numRows - 1);
+    // The row is whichever one the cursor is currently over, not the one the
+    // block's grab point lands on. Anchoring to the grab offset lets the cursor
+    // drift outside the block it is dragging — a block grabbed near its bottom
+    // would flip rows only once the cursor was a row below it. This way the
+    // cursor always stays on the block, and rows change as it crosses a line.
+    int ey     = Fl::event_y() - y();
+    int newRow = std::clamp(rowAtPixelY(std::max(0, ey)), 0, numRows - 1);
     if (!isRowBlocked(newRow)) {
         note->row     = (float)newRow;
         s.overlapping = overlappingCell(s.noteIdx) >= 0;
@@ -714,7 +702,7 @@ void Grid::findNoteForCursor()
         } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
-            state = StateHoverMove{i, ex - leftEdge, (float)(ey - rowY((int)n.row))};
+            state = StateHoverMove{i, ex - leftEdge};
             window()->cursor(contextMenuCursorImage(), 0, 0);
             redraw();
             return;

@@ -20,8 +20,8 @@ struct DrumStateIdle {};
 struct DrumStateHover { int noteIdx; };
 struct DrumStateDrag {
     int   noteIdx;
-    int   grabX;        // pixel x where drag started
-    int   grabY;        // pixel y where drag started
+    int   grabX;        // pixel x where drag started; there is no vertical
+                        // counterpart — the row follows the cursor directly
     float origBeat;
     int   origNote;     // original MIDI note
     bool  moved = false;
@@ -32,7 +32,7 @@ struct DrumStateBand { bool additive; };
 // Dragging a whole selection. The grabbed note is the primary and follows the
 // cursor; the delta it lands on is applied to every other selected note.
 struct DrumStateDragGroup {
-    int   grabX, grabY;     // pixel position the drag was anchored at
+    int   grabX;            // pixel x the drag was anchored at
     float origBeat;
     int   origNote;
     // How far the selection may travel, resolved once when the drag begins.
@@ -88,7 +88,7 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
     void groupDragLimits(float& minDBeat, float& maxDBeat, int& minDNote, int& maxDNote) const;
     bool groupMoveBlocked(float dBeat, int dNote) const;
     void commitGroupMove(float dBeat, int dNote);
-    void beginGroupDrag(int idx, int grabX, int grabY);
+    void beginGroupDrag(int idx, int grabX);
     void movingGroup(DrumStateDragGroup& d);
     void applyBand(bool additive);
     int  dotRadius() const { return std::max(2, rowHeight / 3); }

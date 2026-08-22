@@ -215,27 +215,16 @@ int DrumGrid::handle(int evt)
             // Grabbing a member of the selection drags all of it. No pointer
             // warp: snapping the cursor to one dot is disorienting when many
             // are moving.
-            beginGroupDrag(idx, Fl::event_x(), Fl::event_y());
+            beginGroupDrag(idx, Fl::event_x());
             if (window()) window()->cursor(FL_CURSOR_HAND);
         } else if (idx >= 0) {
             if (!selection.empty()) { selection.clear(); redraw(); }
-            // Jump the cursor to the note's centre so it tracks the middle of
-            // the note during the drag. grabX/grabY hold the window position the
-            // drag is anchored to; use the warped centre when the warp actually
-            // happened, otherwise keep the grabbed position (unwarped platforms).
-            int vr         = rowOffset + numRows - 1 - notes[idx].note;
-            int centreWinX = x() + padX + (int)((notes[idx].beat - colOffset) * colWidth);
-            int centreWinY = y() + vr * rowHeight + rowHeight / 2;
-            int grabX      = Fl::event_x();
-            int grabY      = Fl::event_y();
-            if (warpPointerTo(window(), centreWinX, centreWinY)) {
-                grabX = centreWinX;
-                grabY = centreWinY;
-            }
-            // Start drag on this note
+            // grabX holds the window x the drag is anchored to. No cursor warp:
+            // the dot stays where it was grabbed rather than snapping under the
+            // pointer before the drag has moved anywhere.
             state = DrumStateDrag{
                 idx,
-                grabX, grabY,
+                Fl::event_x(),
                 notes[idx].beat, notes[idx].note,
                 false
             };
@@ -280,9 +269,10 @@ int DrumGrid::handle(int evt)
                 newBeat = snap > 0.0f ? (float)numCols - snap
                                       : std::nextafter((float)numCols, 0.0f);
 
-            // Vertical: update MIDI note
-            int rowDelta = (ey - (d->grabY - y())) / rowHeight;
-            int newMidi  = std::clamp(d->origNote - rowDelta, 0, 127);
+            // Vertical: the dot lands on the row the cursor is over, so the
+            // cursor never drifts off the dot it is dragging.
+            int vr      = std::max(0, ey) / rowHeight;
+            int newMidi = std::clamp(rowOffset + numRows - 1 - vr, 0, 127);
 
             notes[d->noteIdx].beat = newBeat;
             notes[d->noteIdx].note = newMidi;
@@ -482,7 +472,7 @@ void DrumGrid::commitGroupMove(float dBeat, int dNote)
         pattern->moveDrumNote(n.id, n.note - dNote, n.beat + dBeat);
 }
 
-void DrumGrid::beginGroupDrag(int idx, int grabX, int grabY)
+void DrumGrid::beginGroupDrag(int idx, int grabX)
 {
     groupOrig.clear();
     for (int i = 0; i < (int)notes.size(); ++i)
@@ -496,7 +486,7 @@ void DrumGrid::beginGroupDrag(int idx, int grabX, int grabY)
     includeZero(minDB, maxDB);
     includeZero(minDN, maxDN);
 
-    state = DrumStateDragGroup{grabX, grabY, notes[idx].beat, notes[idx].note,
+    state = DrumStateDragGroup{grabX, notes[idx].beat, notes[idx].note,
                                minDB, maxDB, minDN, maxDN, 0.0f, 0, false};
 }
 
@@ -509,8 +499,10 @@ void DrumGrid::movingGroup(DrumStateDragGroup& d)
     if (snap > 0.0f) beat = std::round(beat / snap) * snap;
     float dBeat = beat - d.origBeat;
 
-    int rowDelta = (ey - (d.grabY - y())) / rowHeight;
-    int dNote    = rowDelta;   // screen-down is a lower MIDI note; see header comment
+    // The primary lands on the row the cursor is over; screen-down is a lower
+    // MIDI note, so a downward move is a positive dNote (see header comment).
+    int vr    = std::max(0, ey) / rowHeight;
+    int dNote = d.origNote - (rowOffset + numRows - 1 - vr);
 
     // Limits were fixed when the drag began.
     dBeat = std::clamp(dBeat, d.minDBeat, d.maxDBeat);

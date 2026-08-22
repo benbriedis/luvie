@@ -1217,7 +1217,7 @@ int SongGrid::handleParamEvent(int event)
                 int dotX = (int)((pt.beat - colOffset) * colWidth);
                 int vr   = visualRowForLaneId(localParamLanes[laneIdx].id);
                 beginGroupDrag(Point{vr, pt.beat},
-                               (float)(Fl::event_x() - x() - dotX), 0.0f);
+                               (float)(Fl::event_x() - x() - dotX));
                 if (window()) window()->cursor(FL_CURSOR_HAND);
                 return 1;
             }

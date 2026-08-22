@@ -42,12 +42,15 @@ struct Point { int row; float col; };
 
 struct StateIdle {};
 
-struct StateHoverMove   { int noteIdx; float grabX, grabY; };
+// Only the horizontal grab offset is kept: an item's row is decided by which
+// row the cursor is over, not by where in the item it was grabbed, so the
+// cursor never floats outside the item it is dragging.
+struct StateHoverMove   { int noteIdx; float grabX; };
 struct StateHoverResize { int noteIdx; Side side; };
 
 struct StateDragMove {
     int   noteIdx;
-    float grabX, grabY;
+    float grabX;
     Point original;
     Point lastValid;
     bool  overlapping = false;
@@ -65,7 +68,7 @@ struct StateBandSelect { bool additive; };
 // named here: it may not be in `notes` at all (the song grid's automation dots),
 // and everything the drag needs is its start position.
 struct StateDragGroup {
-    float grabX, grabY;
+    float grabX;
     Point original;      // primary's start position, so the delta is absolute
     // How far the selection may travel, resolved once when the drag begins.
     // See beginGroupDrag for why it is not recomputed as the drag proceeds.
@@ -197,10 +200,10 @@ protected:
     // Recompute the preview positions of the dragged selection.
     void movingGroup(StateDragGroup& s);
     // Shared by FL_PUSH: begin a group drag anchored on `noteIdx`.
-    void beginGroupDrag(int noteIdx, float grabX, float grabY);
+    void beginGroupDrag(int noteIdx, float grabX);
     // Same, for a primary that is not in `notes` — the caller passes its start
-    // position and the grab offset within it.
-    void beginGroupDrag(Point original, float grabX, float grabY,
+    // position and the horizontal grab offset within it.
+    void beginGroupDrag(Point original, float grabX,
                         bool primaryInNotes = false);
     // Which of the two the live drag was started by. groupDragLimits runs before
     // the state exists, so it cannot work this out for itself, and a grid may
