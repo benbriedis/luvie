@@ -20,7 +20,7 @@ static constexpr int row2H   = 24;
 static constexpr int labelW  = 50;      // "Curve" / "Start" / "End" column
 
 // Row tops in the tempo popup. The End row is only present for a ramp; when it is
-// hidden the Delete button moves up to take its place (see layoutTempo).
+// hidden the discard button moves up to take its place (see layoutTempo).
 static constexpr int curveY  = row1Y;
 static constexpr int startY  = row1Y + row1H + rowGap;
 static constexpr int endY    = startY + row1H + rowGap;
@@ -94,7 +94,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		endBpmInput->step(1);
 		styleInput(endBpmInput);
 
-		deleteY = endY + row1H + pad;
+		discardY = endY + row1H + pad;
 	} else {
 		auto* lbl = new Fl_Box(pad, row1Y, 25, row1H, "Sig");
 		lbl->labelcolor(popupText);
@@ -120,23 +120,24 @@ MarkerPopup::MarkerPopup(Kind k)
 			static_cast<MarkerPopup*>(d)->snapBeat();
 		}, this);
 
-		deleteY = row2Y;
+		discardY = row2Y;
 	}
 
 	popupW = winW;
-	size(winW, deleteY + row2H + pad);
+	size(winW, discardY + row2H + pad);
 
-	// The button hugs its label rather than stretching across the popup.
+	// The button hugs its label rather than stretching across the popup, and keeps
+	// the one width for both labels so it does not resize as the popup is reused.
 	fl_font(FL_HELVETICA, FL_NORMAL_SIZE);
-	int deleteW = (int)fl_width("Delete") + 24;
-	deleteBtn = new ModernButton(pad, deleteY, deleteW, row2H, "Delete");
-	deleteBtn->color(FL_WHITE);
-	deleteBtn->labelcolor(popupText);
+	int btnW = (int)std::max(fl_width("Delete"), fl_width("Cancel")) + 24;
+	discardBtn = new ModernButton(pad, discardY, btnW, row2H, "Delete");
+	discardBtn->color(FL_WHITE);
+	discardBtn->labelcolor(popupText);
 
 	end();
 
-	deleteBtn->callback([](Fl_Widget*, void* d) {
-		static_cast<MarkerPopup*>(d)->doDelete();
+	discardBtn->callback([](Fl_Widget*, void* d) {
+		static_cast<MarkerPopup*>(d)->doDiscard();
 	}, this);
 }
 
@@ -155,9 +156,11 @@ void MarkerPopup::snapBeat()
 	denomChoice->redraw();
 }
 
-void MarkerPopup::doDelete()
+// Both labels do the same thing: drop the marker without committing the fields.
+// On a marker this right-click just created that reads as cancelling it.
+void MarkerPopup::doDiscard()
 {
-	if (onDeleteCb) onDeleteCb();
+	if (onRemoveCb) onRemoveCb();
 	commit();
 }
 
@@ -175,15 +178,15 @@ void MarkerPopup::doOk()
 int MarkerPopup::handle(int event)
 {
 	if (event == FL_KEYDOWN && Fl::event_key() == FL_Enter) {
-		if (Fl::focus() == deleteBtn) { doDelete(); return 1; }
+		if (Fl::focus() == discardBtn) { doDiscard(); return 1; }
 	}
 	return InputEditorPopup::handle(event);
 }
 
-void MarkerPopup::relayout(bool fixed, bool showDelete)
+void MarkerPopup::relayout(bool fixed, bool isCreating)
 {
-	showingDelete = showDelete;
-	deleteFixed   = fixed;
+	creating     = isCreating;
+	discardFixed = fixed;
 
 	// The last content row: the End row for a ramp, the BPM row otherwise, and
 	// row 1 for the time-signature popup, which has only the one.
@@ -191,20 +194,16 @@ void MarkerPopup::relayout(bool fixed, bool showDelete)
 	if (kind == TEMPO)
 		contentBottom = (curve() == timeSettings::TempoCurve::Linear ? endY : startY) + row1H;
 
-	deleteY = contentBottom + pad;
+	discardY = contentBottom + pad;
 
-	int popupH;
-	if (showDelete) {
-		// Children of an Fl_Window are placed in the window's own coordinates.
-		deleteBtn->position(pad, deleteY);
-		deleteBtn->show();
-		fixed ? deleteBtn->deactivate() : deleteBtn->activate();
-		popupH = deleteY + row2H + pad;
-	} else {
-		// Freshly created marker: no Delete row until it is re-opened to edit.
-		deleteBtn->hide();
-		popupH = deleteY;
-	}
+	// Children of an Fl_Window are placed in the window's own coordinates.
+	discardBtn->position(pad, discardY);
+	discardBtn->label(isCreating ? "Cancel" : "Delete");
+	// Bar 0's marker cannot be deleted, but a marker just created can always be
+	// cancelled — and bar 0 never is one, since markers are only added past it.
+	(fixed && !isCreating) ? discardBtn->deactivate() : discardBtn->activate();
+
+	int popupH = discardY + row2H + pad;
 	// popW/popH drive ContextMenuPopup::resize(), which otherwise pins the size.
 	popW = popupW;
 	popH = popupH;
@@ -233,7 +232,7 @@ void MarkerPopup::layoutTempo()
 
 	if (ramp) { endLabel->show(); endBpmInput->show(); }
 	else      { endLabel->hide(); endBpmInput->hide(); }
-	relayout(deleteFixed, showingDelete);
+	relayout(discardFixed, creating);
 }
 
 // A ramp's start is the tempo it inherits — the user only supplies one on the
@@ -262,34 +261,34 @@ double MarkerPopup::bpmOf(const Fl_Value_Input* inp) const
 	return std::clamp(inp->value(), timeSettings::bpmMin, timeSettings::bpmMax);
 }
 
-void MarkerPopup::openTempo(int wx, int wy, bool fixed, bool showDelete,
+void MarkerPopup::openTempo(int wx, int wy, bool fixed, bool isCreating,
                              timeSettings::TempoCurve c, double bpm, double endBpm,
                              double inherited,
                              std::function<void(timeSettings::TempoCurve, double, double)> onOk,
-                             std::function<void()> onDelete)
+                             std::function<void()> onRemove)
 {
 	inheritedBpm = inherited;
 	curveChoice->value(c == timeSettings::TempoCurve::Linear ? 1 : 0);
 	input1->value(bpm);
 	endBpmInput->value(endBpm > 0.0 ? endBpm : bpm);
-	showingDelete = showDelete;
-	deleteFixed   = fixed;
+	creating     = isCreating;
+	discardFixed = fixed;
 	layoutTempo();
 	onOkTempo  = std::move(onOk);
-	onDeleteCb = std::move(onDelete);
+	onRemoveCb = std::move(onRemove);
 	// Start is read-only on a ramp, so End is the field to land in.
 	openEditor(wx, wy, startIsInherited() ? (Fl_Widget*)endBpmInput : (Fl_Widget*)input1);
 }
 
-void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool showDelete,
+void MarkerPopup::openTimeSig(int wx, int wy, bool fixed, bool isCreating,
                                int num, int den, timeSettings::BeatUnit beat,
                                std::function<void(int, int, timeSettings::BeatUnit)> onOk,
-                               std::function<void()> onDelete)
+                               std::function<void()> onRemove)
 {
 	input1->value(num);
 	denomChoice->set(den, beat);
-	relayout(fixed, showDelete);
+	relayout(fixed, isCreating);
 	onOkTimeSig = std::move(onOk);
-	onDeleteCb  = std::move(onDelete);
+	onRemoveCb  = std::move(onRemove);
 	openEditor(wx, wy, input1);
 }

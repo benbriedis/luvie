@@ -58,13 +58,16 @@ private:
 	Hit  hitTest(int px)     const;  // px is absolute, as Fl::event_x() gives it
 	bool isFixed(int bar)    const   { return bar == 0; }
 	bool occupied(Kind k, int bar) const;
-	void openPopupFor(Kind k, int bar, bool showDelete);
+	// creating: the marker was just added by this right-click, so the popup offers
+	// Cancel (which removes it again) in place of Delete.
+	void openPopupFor(Kind k, int bar, bool creating);
 	void addMarker(Kind k, int bar);
 
 public:
 	void setOffsetX(int ox)   { offsetX  = ox; redraw(); }
 	void setClipLeft(int cl)  { clipLeft = cl; redraw(); }
 	void setNumCols(int n)    { numCols  = n;  redraw(); }
+	void setColWidth(int cw)  { colWidth = cw; redraw(); }
 };
 
 #endif

@@ -390,6 +390,24 @@ int PatternParamGrid::handle(int event)
     switch (event) {
     case FL_ENTER: return 1;
 
+    case FL_KEYBOARD:
+    case FL_SHORTCUT: {
+        // This grid never takes focus, so FLTK broadcasts the shortcut to every
+        // widget; the cursor decides which one it was meant for, exactly as it
+        // does for the note grids' hover-delete.
+        int key = Fl::event_key();
+        if (key != FL_Delete && key != FL_BackSpace) return 0;
+        if (!Fl::event_inside(this) || !overLane || !pattern) return 0;
+        if (!std::holds_alternative<ParamIdle>(paramState)) return 0;
+        int ptIdx = findParamPointAtCursor(laneIdx, y() + vr * kParamRowH);
+        if (ptIdx < 0) return 0;
+        const auto& pt = localLanes[laneIdx].points[ptIdx];
+        if (pt.anchor) return 0;   // anchors are pinned to beat 0 and cannot be removed
+        pattern->removeParamPoint(pt.id);
+        if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+        return 1;
+    }
+
     case FL_PUSH: {
         if (!overLane) return 1;
         int ex = Fl::event_x() - x();

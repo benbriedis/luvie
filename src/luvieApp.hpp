@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
+#include <array>
 #include <functional>
 #include <string>
+#include <vector>
 #include <FL/Fl_Group.H>
 #include "editor.hpp"
 #include "itransport.hpp"
@@ -18,6 +20,7 @@ class ObservablePattern;
 class ObservableInstrument;
 
 class AppWindow;
+class ISelectionHost;
 class ModernTabs;
 class SettingsButton;
 class SettingsMenuPopup;
@@ -27,6 +30,7 @@ class HarmonyEditor;
 class DrumPatternEditor;
 class PianorollEditor;
 class PatternPanel;
+class SongPanel;
 class LoopEditor;
 class Transport;
 class NoteContextPopup;
@@ -55,8 +59,10 @@ public:
     static constexpr int panelH          = 32;
     static constexpr int rowHeight       = 30;
 
+    // Sized so both tabs get their full body: ten 45px song rows (or the pattern
+    // editor's rows) above a one-row control bar.
     static int defaultWinH() {
-        return tabBarH + 3*markerRulerH + Editor::rulerH + 10*45 + 20 + bottomH;
+        return tabBarH + 3*markerRulerH + Editor::rulerH + 10*45 + 20 + panelH + bottomH;
     }
 
     // Options — set before calling build()
@@ -88,6 +94,21 @@ public:
     // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
     LoopManager loopMgr;
 
+    // Fires when the *persisted* part of the loop state changes: the Song/Loop mode,
+    // or which patterns are switched on while in Loop mode. Deliberately narrower
+    // than a LoopManager observer — sync() churns the active set several times a bar
+    // in Song mode and none of that is saved, so observing the manager directly
+    // would mark the project dirty (or re-send the whole session) continuously.
+    std::function<void()> onLoopStateChanged;
+
+    // The persisted loop state — see AppState::loopMode / activeLoopPatterns.
+    bool             isLoopMode() const;
+    std::vector<int> activeLoopPatterns() const;   // ascending; empty in Song mode
+
+    // Restore both from a loaded project. Not treated as an edit: the loaded values
+    // become the new baseline rather than firing onLoopStateChanged.
+    void applyLoopState(bool loopMode, const std::vector<int>& activePatterns);
+
     // Drives the Song/Loop mode toggle: freezes the song playhead in loop mode and
     // performs the bar-aligned hand-off back to song mode. Wired in build().
     LoopModeController modeController;
@@ -105,6 +126,7 @@ public:
     PianorollEditor*   pianorollEd  = nullptr;
     PatternPanel*      patternPanel = nullptr;
     SongEditor*        songEd       = nullptr;
+    SongPanel*         songPanel    = nullptr;
     LoopEditor*        loopEd       = nullptr;
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;
@@ -120,6 +142,22 @@ public:
     void layoutPatternTab();
 
 private:
+    // Every grid that can hold a multi-selection. Entries are null before build()
+    // has created that editor.
+    std::array<ISelectionHost*, 4> selectionHosts() const;
+
+    // Watches the LoopManager and the mode controller, and reports through
+    // onLoopStateChanged only when the saved values actually differ.
+    struct LoopStateWatch : ILoopObserver {
+        LuvieApp* app = nullptr;
+        void onLoopsChanged() override { app->checkLoopStateChanged(); }
+    };
+    LoopStateWatch   loopStateWatch;
+    bool             savedLoopMode = false;
+    std::vector<int> savedActiveLoopPatterns;
+    bool             applyingLoopState = false;   // suppresses reporting during a load
+    void checkLoopStateChanged();
+
     bool layingOutPatternTab = false;
 
     ObservableSong*      song_        = nullptr;

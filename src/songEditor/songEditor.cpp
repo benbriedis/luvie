@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <iterator>
 
 SongEditor::SongEditor(int x, int y, int visibleW,
                        int numRows, int numCols, int rowHeight, int colWidth,
@@ -19,6 +20,7 @@ SongEditor::SongEditor(int x, int y, int visibleW,
       songGrid(numRows, numCols, rowHeight, colWidth, snap, popup)
 {
     baseX        = x;
+    baseColWidth = colWidth;
     rulerOffsetX = labelW + controlsW;  // no scrollbar initially
 
     const int gridH = numRows * rowHeight;
@@ -46,6 +48,9 @@ SongEditor::SongEditor(int x, int y, int visibleW,
     trackLabels.position(x, y + rulerH);
     songGrid.position(x + labelW + controlsW, y + rulerH);
     songGrid.setPlayhead(&playhead);
+    // Dragging past either edge scrolls the grid along, so a selection can be
+    // moved somewhere that was off screen when the drag began.
+    songGrid.onEdgeScroll = [this](int cols) { return scrollByCols(cols); };
 
     // The scrolling body — grid, side panels and both scrollbars — lives in
     // gridPane; the editor sizes the pane to the content and leaves white space
@@ -71,8 +76,18 @@ void SongEditor::drawRulerLabels()
     int pixelBase    = x() + rulerOffsetX - hScrollPixel;
     int textBaseline = y() + rulerH / 2 + (fl_height() - fl_descent()) / 2;
 
+    // Zoomed out there is no room for a number on every bar, so label only every
+    // nth one — the first stride whose bars are far enough apart to read.
+    static constexpr int minLabelGap = 24;
+    static constexpr int strides[]   = { 1, 2, 5, 10, 20, 50 };
+    int stride = strides[std::size(strides) - 1];
+    for (int s : strides)
+        if (s * songGrid.colWidth >= minLabelGap) { stride = s; break; }
+
     int firstCol = songGrid.colWidth > 0 ? hScrollPixel / songGrid.colWidth : 0;
     for (int col = firstCol; col < songGrid.numCols; ++col) {
+        // Bars are numbered from 1, so it is that number the stride applies to.
+        if ((col + 1) % stride != 0) continue;
         int cx = pixelBase + col * songGrid.colWidth + songGrid.colWidth / 2;
         if (cx < gridLeft)  continue;
         if (cx >= gridRight) break;
@@ -129,6 +144,20 @@ void SongEditor::onTimelineChanged()
     updateScrollBounds();
 }
 
+void SongEditor::setZoom(float factor)
+{
+    int cw = std::max(1, (int)std::lround(baseColWidth * factor));
+    if (cw == songGrid.colWidth) return;
+    songGrid.colWidth = cw;
+    playhead.setColWidth(cw);
+    // The rulers stacked above measure bars in their own copy of the width, so
+    // they have to be told before updateScrollBounds() hands them a new offset.
+    if (onColWidthChanged) onColWidthChanged(cw);
+    // colOffset is counted in columns, so the leftmost bar stays where it is;
+    // updateScrollBounds re-derives the scrollbar and the ruler alignment.
+    updateScrollBounds();
+}
+
 int SongEditor::computeNumCols() const
 {
     static constexpr int minCols = 60;
@@ -144,6 +173,12 @@ int SongEditor::computeNumCols() const
         maxEnd = std::max(maxEnd, (float)m.rampEndBar());
     for (const auto& m : data.timeSigs)
         maxEnd = std::max(maxEnd, (float)m.bar);
+    // Automation dots count too. A dot past the last instance would otherwise
+    // sit outside the grid: invisible, unreachable, and — since the drag limits
+    // are measured against numCols — able to wreck a group drag it is part of.
+    for (const auto& lane : data.paramLanes)
+        for (const auto& pt : lane.points)
+            maxEnd = std::max(maxEnd, pt.beat);
     int rounded = (int)(std::ceil(maxEnd / step) * step);
     return std::max(minCols, rounded + step);
 }
@@ -154,6 +189,10 @@ void SongEditor::updateScrollBounds()
     int newNumCols = computeNumCols();
     if (newNumCols != songGrid.numCols) {
         songGrid.numCols = newNumCols;
+        // The playhead measures the end of the song against this too — it stops
+        // playback there and clamps seeks to it — so it has to grow with the grid,
+        // else a song longer than the initial column count stops mid-way.
+        playhead.setNumCols(newNumCols);
         if (onNumColsChanged) onNumColsChanged(newNumCols);
     }
     if (!timeline || !scrollbar) return;
@@ -259,6 +298,13 @@ void SongEditor::setColOffset(int offset)
     hScrollbar->value(colOffset, visibleCols, 0, songGrid.numCols);
     if (onRulerOffsetChanged) onRulerOffsetChanged(rulerOffsetX - hScrollPixel, rulerOffsetX);
     redraw();
+}
+
+int SongEditor::scrollByCols(int cols)
+{
+    int before = colOffset;
+    setColOffset(colOffset + cols);
+    return colOffset - before;
 }
 
 void SongEditor::followPlayhead()

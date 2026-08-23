@@ -27,6 +27,7 @@ ObservableSong::ObservableSong(float initBpm, int initTop, int initBottom)
 {
     data.bpms.push_back({0, initBpm});
     data.timeSigs.push_back({0, initTop, initBottom});
+    lastCommitted = data;
 }
 
 void ObservableSong::addObserver(ITimelineObserver* o)
@@ -39,13 +40,65 @@ void ObservableSong::removeObserver(ITimelineObserver* o)
     observers.erase(std::remove(observers.begin(), observers.end(), o), observers.end());
 }
 
-void ObservableSong::notify()
+void ObservableSong::fanout()
 {
     // Every mutation funnels through here, so this is the one place the cached
     // tempo map has to be invalidated.
     tempoMapDirty = true;
     auto copy = observers;
     for (auto* o : copy) o->onTimelineChanged();
+}
+
+void ObservableSong::notify()
+{
+    // Inside a Batch, hold the notification until the outermost guard leaves.
+    // lastCommitted deliberately does not advance here, so the snapshot the
+    // batch eventually records is the state from before its first mutation.
+    if (batchDepth > 0) { batchDirty = true; return; }
+
+    // Inside an UndoGroup only the first mutation records a snapshot, so the
+    // whole gesture collapses to one undo entry.
+    if (undoGroupDepth == 0 || !undoGroupSnapped) {
+        undoStack.push_back(lastCommitted);
+        if ((int)undoStack.size() > undoDepth) undoStack.pop_front();
+        redoStack.clear();
+        undoGroupSnapped = true;
+    }
+    lastCommitted = data;
+    fanout();
+}
+
+void ObservableSong::notifyViewState()
+{
+    lastCommitted = data;
+    fanout();
+}
+
+void ObservableSong::restoreSnapshot(const Timeline& tl)
+{
+    // nextId is deliberately untouched: it stays monotonic, so restoring an
+    // older timeline can never make a later edit reissue a live id.
+    data          = tl;
+    lastCommitted = tl;
+    fanout();
+}
+
+void ObservableSong::undo()
+{
+    if (undoStack.empty()) return;
+    redoStack.push_back(data);
+    Timeline prev = std::move(undoStack.back());
+    undoStack.pop_back();
+    restoreSnapshot(prev);
+}
+
+void ObservableSong::redo()
+{
+    if (redoStack.empty()) return;
+    undoStack.push_back(data);
+    Timeline next = std::move(redoStack.back());
+    redoStack.pop_back();
+    restoreSnapshot(next);
 }
 
 void ObservableSong::loadTimeline(const Timeline& tl)
@@ -111,7 +164,12 @@ void ObservableSong::loadTimeline(const Timeline& tl)
     rebuildInstrumentHeaders();
     reconcileLoopOrder();  // backfill loopOrder for old saves; prune stale IDs
     reconcileLoopLanes();  // backfill per-track loopLanes for old saves
-    notify();
+    // A load is not an edit: the history of the previous song must not survive
+    // into this one, or the first undo would jump to an unrelated state.
+    undoStack.clear();
+    redoStack.clear();
+    lastCommitted = data;
+    fanout();
 }
 
 void ObservableSong::rebuildInstrumentHeaders()
@@ -1037,14 +1095,14 @@ void ObservableSong::selectTrack(int index)
         data.selectedLaneId = data.tracks[index].lanes[0].id;
     else
         data.selectedLaneId = -1;
-    notify();
+    notifyViewState();
 }
 
 void ObservableSong::selectLane(int trackIndex, int laneId)
 {
     data.selectedTrackIndex = trackIndex;
     data.selectedLaneId     = laneId;
-    notify();
+    notifyViewState();
 }
 
 int ObservableSong::addLane(int trackId)
@@ -1537,15 +1595,18 @@ void ObservableSong::setPatternStartOffset(int patternId, float startOffset)
                 if (p.id == patternId) { p.startOffset = startOffset; notify(); return; }
 }
 
-void ObservableSong::placePattern(int laneId, int patternId, float startBar, float length)
+int ObservableSong::placePattern(int laneId, int patternId, float startBar, float length,
+                                 float startOffset)
 {
     for (auto& t : data.tracks)
         for (auto& l : t.lanes)
             if (l.id == laneId) {
-                l.patterns.push_back({nextId++, patternId, startBar, length});
+                int id = nextId++;
+                l.patterns.push_back({id, patternId, startBar, length, startOffset});
                 notify();
-                return;
+                return id;
             }
+    return 0;
 }
 
 std::vector<Note> ObservableSong::buildNotes() const

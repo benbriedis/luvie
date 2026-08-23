@@ -32,6 +32,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     int                scrollPx       = 0;   // absolute vertical scroll, in pixels
     int                colOffset      = 0;
     int                baseX          = 0;
+    int                baseColWidth   = 0;   // colWidth at zoom x1
     bool               wasPlaying     = false;
     bool               pendingScroll  = false;  // snap playhead into view on next tick
 
@@ -41,6 +42,9 @@ class SongEditor : public Editor, public ITimelineObserver {
     void setScrollPx(int px);
     void pushScroll(int availH);
     void setColOffset(int offset);
+    // Scroll by whole columns, reporting how far it actually got. The grid uses
+    // the answer to know when it has hit the end of the song and can stop.
+    int  scrollByCols(int cols);
     void drawRulerLabels() override;
     void layoutBody() override { updateScrollBounds(); }
     void onWheelX(int d) override { setColOffset(colOffset + d); }
@@ -58,6 +62,15 @@ public:
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
     std::function<void(int offsetX, int clipLeft)> onRulerOffsetChanged;
     std::function<void(int numCols)>               onNumColsChanged;
+    // Fired when zooming changes the pixel width of a bar, so the rulers stacked
+    // above the grid can be redrawn to the same scale.
+    std::function<void(int colWidth)>              onColWidthChanged;
+
+    // Horizontal zoom: `factor` scales the bar width from the width the grid was
+    // built at (1 = that width). The bar under the left edge stays put.
+    void setZoom(float factor);
+
+    ISelectionHost* selectionHost() { return &songGrid; }
 
     void setSongPopup(PatternInstanceContextPopup* p)         { songGrid.setSongPopup(p); }
     void setParamDotPopup(ParamDotPopup* p) { songGrid.setParamDotPopup(p); }

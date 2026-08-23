@@ -71,7 +71,7 @@ luvie
 ```
 or better yet
 ```
-luvie myproject.luv
+luvie myproject.luvie
 ```
 on the command line.
 

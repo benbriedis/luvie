@@ -17,19 +17,19 @@ StandaloneSession::~StandaloneSession()
     Fl::remove_timeout(autoSaveCb, this);   // cancel any pending auto-save
 }
 
-// Shows a Save As dialog and returns the chosen path (with a .luv extension),
+// Shows a Save As dialog and returns the chosen path (with a .luvie extension),
 // or an empty string if the user cancelled.
 std::string StandaloneSession::pickSavePath()
 {
     Fl_Native_File_Chooser fc;
     fc.title("Save Project As");
     fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
-    fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
+    fc.filter("Luvie Projects\t*.luvie\nAll Files\t*");
     fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
     if (!LuvieApp::lastFileDir.empty()) fc.directory(LuvieApp::lastFileDir.c_str());
     if (fc.show() != 0) return {};
     std::string p = fc.filename();
-    if (p.size() < 4 || p.substr(p.size() - 4) != ".luv") p += ".luv";
+    if (p.size() < 6 || p.substr(p.size() - 6) != ".luvie") p += ".luvie";
     LuvieApp::lastFileDir = std::filesystem::path(p).parent_path().string();
     return p;
 }

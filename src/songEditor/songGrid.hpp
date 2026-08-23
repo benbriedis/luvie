@@ -33,6 +33,21 @@ class SongGrid : public Grid, public ITimelineObserver {
     ParamState                   paramState;
     std::unordered_set<int>      stackedNoteIds;
 
+    // Destination lane for an absolute row, with the lane's own pattern. Both
+    // are -1/0 when the row does not accept instances.
+    void destLaneForAbsRow(int absRow, int& laneId, int& patternId) const;
+    // The rowOrder index the given lane is drawn on, or -1. Not simply the
+    // lane's own RowRef: a stacked track draws all of its lanes on its first
+    // lane's row, and only that lane has one.
+    int  absRowForLane(int laneId) const;
+
+    // Where a selected instance ends up when the selection moves by some delta.
+    struct Landing { int instId; int laneId; float startBar, length; };
+    // Fills `out` with one entry per selected instance. False when any of them
+    // lands on a row that cannot hold a block — an automation lane, an
+    // instrument header, or nothing at all.
+    bool collectLandings(float dBeat, int dRow, std::vector<Landing>& out) const;
+
     void rebuildNotes();
     void rebuildParamLanes();
     void drawParamRow(int laneIdx, int rowY, int gridRight);
@@ -66,6 +81,10 @@ protected:
     Fl_Color rowBgColor(int visualRow) const override;
     void moving(StateDragMove& s) override;
     void resizing(StateDragResize& s) override;
+    // A dot dragged along its lane follows the cursor off the edge too, and it
+    // runs outside Grid's drag states.
+    bool isItemDrag() const override;
+    void reapplyDrag() override;
     int  overlappingCell(int noteIdx) const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     void openContextMenu(int idx) override;
@@ -74,6 +93,29 @@ protected:
     void onCommitResize(const StateDragResize& s) override;
     void onNoteDoubleClick(int noteIdx) override;
     void toggleNote() override;
+
+    std::unordered_set<int> liveItemIds() const override;
+    void selectAll() override;
+    void deleteSelection() override;
+    void groupDragLimits(float& minDBeat, float& maxDBeat,
+                         int& minDRow, int& maxDRow) const override;
+    bool groupRowsRejected(int dRow) const override;
+    bool groupMoveBlocked(float dBeat, int dRow) const override;
+    void onCommitGroupMove(float dBeat, int dRow) override;
+
+    ClipKind clipKind() const override { return ClipKind::SongInstances; }
+    std::vector<ClipItem> selectedForClipboard() const override;
+    bool  pasteAt(const std::vector<ClipItem>& items, int visualRow, float bar) override;
+    // Blocks snap to the beat of whatever time signature is in force where the
+    // cursor sits, exactly as dragging one does.
+    float pasteAnchorBeat(int wx) const override;
+
+    // Automation dots share the selection with pattern instances here, because
+    // they are rows of this same grid. Both are keyed by their model id, and
+    // the id spaces never overlap (one nextId counter issues both).
+    void addBandHitExtras() override;
+    void previewGroupExtras(float dBeat) override;
+    void drawParamSelection(int laneIdx, int rowY) const;
     // Song blocks are placed one whole bar long, at the bar the click lands in;
     // beat subdivisions do not apply here.
     float newNoteLength() const override { return 1.0f; }

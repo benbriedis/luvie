@@ -9,11 +9,11 @@ TrackContextPopup::TrackContextPopup()
     : ContextMenuPopup(popW, 7*30+2)
 {
     openPatternBtn      = addItem(0, "Open pattern");
-    addParamBtn         = addItem(1, "Add automation \xe2\x96\xb6");
-    addLaneBtn          = addItem(2, "Add harmony pattern");
-    addPianorollLaneBtn = addItem(3, "Add pianoroll pattern");
-    cloneLaneBtn        = addItem(4, "Clone pattern");
-    removeLaneBtn       = addItem(5, "Remove pattern");
+    addLaneBtn          = addItem(1, "Add harmony pattern");
+    addPianorollLaneBtn = addItem(2, "Add pianoroll pattern");
+    cloneLaneBtn        = addItem(3, "Clone pattern");
+    removeLaneBtn       = addItem(4, "Remove pattern");
+    addParamBtn         = addItem(5, "Add automation \xe2\x96\xb6");
     showInstrumentsBtn  = addItem(6, "Show instruments");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
@@ -105,7 +105,7 @@ int TrackContextPopup::targetInstrumentId() const
 void TrackContextPopup::doShowParamSubmenu()
 {
     if (!paramSubmenu) return;
-    paramSubmenu->showFor(this, y() + 1 + 1*btnH, timeline->song(), targetInstrumentId());
+    paramSubmenu->showFor(this, y() + 1 + 5*btnH, timeline->song(), targetInstrumentId());
 }
 
 void TrackContextPopup::doAddLane()

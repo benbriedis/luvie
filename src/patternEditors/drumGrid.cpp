@@ -44,12 +44,19 @@ void DrumGrid::setPattern(ObservablePattern* tl, int patId)
 void DrumGrid::rebuildNotes()
 {
     notes.clear();
-    if (!pattern || patternId < 0) return;
+    if (!pattern || patternId < 0) { selection.clear(); return; }
     auto all = pattern->buildDrumPatternNotes(patternId);
     for (const auto& n : all) {
         int vr = rowOffset + numRows - 1 - n.note;
         if (vr >= 0 && vr < numRows)
             notes.push_back(n);
+    }
+    // Drop ids the pattern no longer has. Checked against the whole pattern,
+    // not the visible rows, so scrolling does not shrink the selection.
+    if (!selection.empty()) {
+        std::unordered_set<int> live;
+        for (const auto& n : all) live.insert(n.id);
+        selection.retain(live);
     }
 }
 
@@ -143,7 +150,17 @@ void DrumGrid::draw()
         fl_pie(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
         fl_color(velocityAccent(n.velocity));
         fl_arc(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
+        if (selection.contains(n.id)) {
+            const int r = dotR + 2;
+            fl_color(selectionColor);
+            fl_line_style(FL_SOLID, 2);
+            fl_arc(dotX - r, dotY - r, 2 * r, 2 * r, 0, 360);
+            fl_line_style(0);
+        }
     }
+
+    // Rubber band, over the dots.
+    drawSelectionBand(selection, x(), y());
 
     if (playhead)
         playhead->drawLine(x() + padX - colOffset * colWidth, y(), numRows * rowHeight);
@@ -154,14 +171,43 @@ void DrumGrid::draw()
 int DrumGrid::handle(int evt)
 {
     if (popup.visible()) return 0;
+    if (selectionPopup && selectionPopup->visible()) return 0;
+    if (pastePopup && pastePopup->visible()) return 0;
 
     switch (evt) {
 
     case FL_PUSH: {
         int idx = findNoteAtCursor();
 
+        const int mods = Fl::event_state();
+        if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_SHIFT)) {
+            selection.beginBand(Fl::event_x() - x(), Fl::event_y() - y());
+            state = DrumStateBand{(mods & FL_COMMAND) != 0};
+            creationForbidden = true;
+            redraw();
+            return 1;
+        }
+        if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_COMMAND)) {
+            if (idx >= 0) {
+                selection.toggle(notes[idx].id);
+                redraw();
+            }
+            state = DrumStateIdle{};
+            creationForbidden = true;   // never create on a ctrl-click
+            return 1;
+        }
+
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
             if (idx >= 0) {
+                // Right-clicking a member of a multi-selection is a different
+                // question from right-clicking one hit, so it gets its own menu.
+                if (selectionPopup && selection.contains(notes[idx].id)) {
+                    selectionPopup->open(this,
+                        [this]() { cutSelection(); redraw(); },
+                        [this]() { copySelection(); },
+                        [this]() { deleteSelectedItems(); redraw(); });
+                    return 1;
+                }
                 // Open context popup for this drum note
                 const auto& n = notes[idx];
                 int vr   = rowOffset + numRows - 1 - n.note;
@@ -171,40 +217,60 @@ int DrumGrid::handle(int evt)
                 popup.openForDot(dotX, dotY, this, rowHeight, n.velocity,
                     [this, id]() { if (pattern) pattern->removeDrumNote(id); },
                     [this, id](float v) { if (pattern) pattern->setDrumNoteVelocity(id, v); });
+            } else {
+                // No hit under the cursor to have a menu of its own, so the
+                // right-click offers the one thing that can happen on empty
+                // grid: dropping the clipboard here.
+                openPasteMenu();
             }
             return 1;
         }
 
         // Left mouse
-        if (idx >= 0) {
-            // Jump the cursor to the note's centre so it tracks the middle of
-            // the note during the drag. grabX/grabY hold the window position the
-            // drag is anchored to; use the warped centre when the warp actually
-            // happened, otherwise keep the grabbed position (unwarped platforms).
-            int vr         = rowOffset + numRows - 1 - notes[idx].note;
-            int centreWinX = x() + padX + (int)((notes[idx].beat - colOffset) * colWidth);
-            int centreWinY = y() + vr * rowHeight + rowHeight / 2;
-            int grabX      = Fl::event_x();
-            int grabY      = Fl::event_y();
-            if (warpPointerTo(window(), centreWinX, centreWinY)) {
-                grabX = centreWinX;
-                grabY = centreWinY;
-            }
-            // Start drag on this note
+        if (idx >= 0 && selection.contains(notes[idx].id)) {
+            // Grabbing a member of the selection drags all of it. No pointer
+            // warp: snapping the cursor to one dot is disorienting when many
+            // are moving.
+            beginGroupDrag(idx, Fl::event_x());
+            if (window()) window()->cursor(FL_CURSOR_HAND);
+        } else if (idx >= 0) {
+            if (!selection.empty()) { selection.clear(); redraw(); }
+            // grabX holds the window x the drag is anchored to. No cursor warp:
+            // the dot stays where it was grabbed rather than snapping under the
+            // pointer before the drag has moved anywhere.
             state = DrumStateDrag{
                 idx,
-                grabX, grabY,
+                Fl::event_x(),
                 notes[idx].beat, notes[idx].note,
                 false
             };
             if (window()) window()->cursor(FL_CURSOR_HAND);
+        } else if (!selection.empty()) {
+            // A plain click on empty space with a selection active clears it and
+            // creates nothing, so a selection can be dismissed without editing.
+            // The release still arrives, so it has to be told to stay its hand.
+            selection.clear();
+            state = DrumStateIdle{};
+            creationForbidden = true;
+            redraw();
+            return 1;
         } else {
             state = DrumStateIdle{};
+            creationForbidden = false;
         }
         return 1;
     }
 
     case FL_DRAG: {
+        if (std::holds_alternative<DrumStateBand>(state)) {
+            selection.updateBand(Fl::event_x() - x(), Fl::event_y() - y());
+            redraw();
+            return 1;
+        }
+        if (auto* g = std::get_if<DrumStateDragGroup>(&state)) {
+            movingGroup(*g);
+            return 1;
+        }
         if (auto* d = std::get_if<DrumStateDrag>(&state)) {
             int   ex       = Fl::event_x() - x();
             int   ey       = Fl::event_y() - y();
@@ -219,9 +285,10 @@ int DrumGrid::handle(int evt)
                 newBeat = snap > 0.0f ? (float)numCols - snap
                                       : std::nextafter((float)numCols, 0.0f);
 
-            // Vertical: update MIDI note
-            int rowDelta = (ey - (d->grabY - y())) / rowHeight;
-            int newMidi  = std::clamp(d->origNote - rowDelta, 0, 127);
+            // Vertical: the dot lands on the row the cursor is over, so the
+            // cursor never drifts off the dot it is dragging.
+            int vr      = std::max(0, ey) / rowHeight;
+            int newMidi = std::clamp(rowOffset + numRows - 1 - vr, 0, 127);
 
             notes[d->noteIdx].beat = newBeat;
             notes[d->noteIdx].note = newMidi;
@@ -235,16 +302,33 @@ int DrumGrid::handle(int evt)
     }
 
     case FL_RELEASE: {
+        if (auto* b = std::get_if<DrumStateBand>(&state)) {
+            bool additive = b->additive;
+            state = DrumStateIdle{};
+            applyBand(additive);
+            creationForbidden = false;
+            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+            return 1;
+        }
+        if (auto* g = std::get_if<DrumStateDragGroup>(&state)) {
+            DrumStateDragGroup drag = *g;
+            state = DrumStateIdle{};   // clear BEFORE the model ops so rebuild runs
+            if (!drag.blocked && (drag.dBeat != 0.0f || drag.dNote != 0))
+                commitGroupMove(drag.dBeat, drag.dNote);
+            else
+                redraw();
+            groupOrig.clear();
+            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+            return 1;
+        }
         if (auto* d = std::get_if<DrumStateDrag>(&state)) {
             if (d->moved && pattern) {
                 // Capture before clearing state
                 int   id       = notes[d->noteIdx].id;
                 float beat     = notes[d->noteIdx].beat;
                 int   midiNote = notes[d->noteIdx].note;
-                float vel      = notes[d->noteIdx].velocity;
                 state = DrumStateIdle{};  // clear BEFORE pattern ops so rebuild runs
-                pattern->removeDrumNote(id);
-                pattern->addDrumNote(patternId, midiNote, beat, vel);
+                pattern->moveDrumNote(id, midiNote, beat);
             } else if (!d->moved && pattern) {
                 // Pure click on existing note → remove it
                 int id = notes[d->noteIdx].id;
@@ -256,8 +340,9 @@ int DrumGrid::handle(int evt)
         } else {
             state = DrumStateIdle{};
             // Click on empty space → create note
-            if (Fl::event_button() == FL_LEFT_MOUSE)
+            if (Fl::event_button() == FL_LEFT_MOUSE && !creationForbidden)
                 createNote();
+            creationForbidden = false;
         }
         if (window()) window()->cursor(FL_CURSOR_DEFAULT);
         return 1;
@@ -286,6 +371,12 @@ int DrumGrid::handle(int evt)
     case FL_KEYBOARD:
     case FL_SHORTCUT: {
         int key = Fl::event_key();
+        // Unfocused widget: FLTK broadcasts the shortcut, so the cursor decides
+        // which grid it was meant for — the rule the hover-delete needs. The
+        // whole-grid commands (Ctrl-A, Delete with a selection) are window-level
+        // in AppWindow, so they don't care where the cursor is.
+        if (!Fl::event_inside(this))
+            return 0;
         if (key != FL_Delete && key != FL_BackSpace)
             return 0;
         auto* h = std::get_if<DrumStateHover>(&state);
@@ -301,6 +392,247 @@ int DrumGrid::handle(int evt)
     default:
         return 0;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-selection
+//
+// Drum notes are point events keyed by MIDI note rather than ranges on a row,
+// so none of Grid's range geometry carries over — hence the parallel
+// implementation. The grid is drawn highest note first, so moving DOWN the
+// screen by dNote rows SUBTRACTS dNote from the MIDI note.
+// ---------------------------------------------------------------------------
+
+void DrumGrid::selectAllNotes()
+{
+    selection.clear();
+    if (!pattern || patternId < 0) return;
+    for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId))
+        selection.add(n.id);
+}
+
+// Delete arrives from AppWindow, which knows nothing of hover, so the state has
+// to be dropped here: it may name a note that no longer exists.
+void DrumGrid::deleteSelectedItems()
+{
+    deleteSelection();
+    state = DrumStateIdle{};
+    if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+}
+
+void DrumGrid::deleteSelection()
+{
+    if (!pattern || selection.empty()) return;
+    std::vector<int> doomed(selection.ids().begin(), selection.ids().end());
+    selection.clear();
+    ObservableSong::Batch batch(pattern->song());
+    for (int id : doomed) pattern->removeDrumNote(id);
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard
+//
+// A copy carries the visual row rather than the MIDI note, so the paste lands
+// under the cursor rather than back at the pitch it came from; `length` goes
+// unused, a drum hit having no duration.
+// ---------------------------------------------------------------------------
+
+void DrumGrid::copySelection()
+{
+    if (!pattern || patternId < 0 || selection.empty()) return;
+    std::vector<ClipItem> items;
+    for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId))
+        if (selection.contains(n.id))
+            items.push_back({rowOffset + numRows - 1 - n.note, n.beat, 0.0f, n.velocity, 0.0f});
+    clipboard().set(ClipKind::DrumNotes, std::move(items));
+}
+
+void DrumGrid::pasteClipboard(int wx, int wy)
+{
+    const Clipboard& cb = clipboard();
+    if (!cb.holds(ClipKind::DrumNotes) || !pasteAt(cb.items, wx, wy))
+        flashForbiddenCursor(window());
+}
+
+bool DrumGrid::openPasteMenu()
+{
+    if (!pastePopup || !clipboard().holds(ClipKind::DrumNotes)) return false;
+    // Capture where the right-click landed: that is the spot the user picked,
+    // and by the time the menu item runs the event position is the click on the
+    // item itself.
+    const int wx = Fl::event_x(), wy = Fl::event_y();
+    pastePopup->open(this, [this, wx, wy]() { pasteClipboard(wx, wy); });
+    return true;
+}
+
+bool DrumGrid::pasteAt(const std::vector<ClipItem>& items, int wx, int wy)
+{
+    if (!pattern || patternId < 0 || items.empty()) return false;
+
+    const int baseRow = std::max(0, wy - y()) / rowHeight;
+    float     baseBeat = (float)(wx - x() - padX) / colWidth + colOffset;
+    if (snap > 0.0f) baseBeat = std::floor(baseBeat / snap) * snap;
+    baseBeat = std::max(0.0f, baseBeat);
+
+    struct Place { int note; float beat, velocity; };
+    std::vector<Place> places;
+    places.reserve(items.size());
+    for (const auto& it : items) {
+        int note = rowOffset + numRows - 1 - (baseRow + it.dRow);
+        if (note < 0 || note > 127) return false;
+        float beat = baseBeat + it.dBeat;
+        // Never on the closing line, which createNote() also refuses.
+        if (beat < 0.0f || beat >= (float)numCols) return false;
+        places.push_back({note, beat, it.velocity});
+    }
+
+    // Two hits on the same note at the same beat would be indistinguishable, so
+    // every hit the pattern already holds is in the way — the copied ones
+    // included, since nothing is vacating its place.
+    const float eps = 1e-4f;
+    auto all = pattern->buildDrumPatternNotes(patternId);
+    for (const auto& p : places)
+        for (const DrumNote& n : all)
+            if (n.note == p.note && std::abs(n.beat - p.beat) < eps) return false;
+
+    std::vector<int> pasted;
+    pasted.reserve(places.size());
+    {
+        ObservableSong::Batch batch(pattern->song());
+        for (const auto& p : places)
+            pasted.push_back(pattern->addDrumNote(patternId, p.note, p.beat, p.velocity));
+    }
+    // The copies take the selection over from the hits they were made from, once
+    // the batch has closed and they are in the model to be selected.
+    selection.clear();
+    for (int id : pasted) if (id > 0) selection.add(id);
+    redraw();
+    return true;
+}
+
+void DrumGrid::groupDragLimits(float& minDBeat, float& maxDBeat,
+                               int& minDNote, int& maxDNote) const
+{
+    minDBeat = maxDBeat = 0.0f;
+    minDNote = maxDNote = 0;
+    if (!pattern || patternId < 0) return;
+
+    bool first = true;
+    for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId)) {
+        if (!selection.contains(n.id)) continue;
+        // A drum note may sit anywhere in [0, numCols) — never on the closing
+        // line, which createNote() also refuses.
+        float bLo = -n.beat;
+        float bHi = (float)numCols - n.beat - (snap > 0.0f ? snap : 0.0f);
+        int   rLo = n.note - 127;
+        int   rHi = n.note;
+        if (first) { minDBeat = bLo; maxDBeat = bHi; minDNote = rLo; maxDNote = rHi; first = false; }
+        else {
+            minDBeat = std::max(minDBeat, bLo);
+            maxDBeat = std::min(maxDBeat, bHi);
+            minDNote = std::max(minDNote, rLo);
+            maxDNote = std::min(maxDNote, rHi);
+        }
+    }
+}
+
+// Two drum hits on the same note at the same beat would be indistinguishable,
+// so a move onto an unselected hit is refused. Selected hits all shift together
+// and so cannot newly collide with each other.
+bool DrumGrid::groupMoveBlocked(float dBeat, int dNote) const
+{
+    if (!pattern || patternId < 0) return false;
+    const float eps = 1e-4f;
+    auto all = pattern->buildDrumPatternNotes(patternId);
+    for (const DrumNote& n : all) {
+        if (!selection.contains(n.id)) continue;
+        float beat = n.beat + dBeat;
+        int   note = n.note - dNote;
+        for (const DrumNote& other : all) {
+            if (selection.contains(other.id)) continue;
+            if (other.note != note) continue;
+            if (std::abs(other.beat - beat) < eps) return true;
+        }
+    }
+    return false;
+}
+
+void DrumGrid::commitGroupMove(float dBeat, int dNote)
+{
+    if (!pattern || patternId < 0) return;
+    std::vector<DrumNote> sel;
+    for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId))
+        if (selection.contains(n.id)) sel.push_back(n);
+
+    ObservableSong::Batch batch(pattern->song());
+    for (const DrumNote& n : sel)
+        pattern->moveDrumNote(n.id, n.note - dNote, n.beat + dBeat);
+}
+
+void DrumGrid::beginGroupDrag(int idx, int grabX)
+{
+    groupOrig.clear();
+    for (int i = 0; i < (int)notes.size(); ++i)
+        if (selection.contains(notes[i].id))
+            groupOrig.push_back({i, notes[i].beat, notes[i].note});
+
+    // Resolve the travel limits now, from the untouched starting positions —
+    // the same reasoning as Grid::beginGroupDrag.
+    float minDB, maxDB; int minDN, maxDN;
+    groupDragLimits(minDB, maxDB, minDN, maxDN);
+    includeZero(minDB, maxDB);
+    includeZero(minDN, maxDN);
+
+    state = DrumStateDragGroup{grabX, notes[idx].beat, notes[idx].note,
+                               minDB, maxDB, minDN, maxDN, 0.0f, 0, false};
+}
+
+void DrumGrid::movingGroup(DrumStateDragGroup& d)
+{
+    int ex = Fl::event_x() - x();
+    int ey = Fl::event_y() - y();
+
+    float beat = d.origBeat + (float)(ex - (d.grabX - x())) / colWidth;
+    if (snap > 0.0f) beat = std::round(beat / snap) * snap;
+    float dBeat = beat - d.origBeat;
+
+    // The primary lands on the row the cursor is over; screen-down is a lower
+    // MIDI note, so a downward move is a positive dNote (see header comment).
+    int vr    = std::max(0, ey) / rowHeight;
+    int dNote = d.origNote - (rowOffset + numRows - 1 - vr);
+
+    // Limits were fixed when the drag began.
+    dBeat = std::clamp(dBeat, d.minDBeat, d.maxDBeat);
+    dNote = std::clamp(dNote, d.minDNote, d.maxDNote);
+
+    d.dBeat   = dBeat;
+    d.dNote   = dNote;
+    d.blocked = groupMoveBlocked(dBeat, dNote);
+
+    for (const auto& g : groupOrig) {
+        notes[g.idx].beat = g.beat + dBeat;
+        notes[g.idx].note = g.note - dNote;
+    }
+
+    if (window()) {
+        if (d.blocked) window()->cursor(forbiddenCursorImage(), 11, 11);
+        else           window()->cursor(FL_CURSOR_HAND);
+    }
+    redraw();
+}
+
+void DrumGrid::applyBand(bool additive)
+{
+    if (!additive) selection.clear();
+    for (const DrumNote& n : notes) {
+        int vr = rowOffset + numRows - 1 - n.note;
+        if (vr < 0 || vr >= numRows) continue;
+        int dotX = padX + (int)((n.beat - colOffset) * colWidth);
+        int dotY = vr * rowHeight + rowHeight / 2;
+        if (selection.bandContainsPoint(dotX, dotY)) selection.add(n.id);
+    }
+    selection.endBand();
+    redraw();
 }
 
 void DrumGrid::createNote()

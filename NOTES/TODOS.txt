@@ -55,7 +55,7 @@ FUTURE FUNCTIONALITY
 
 - Pianoroll and drum patterns - allow importing of patterns.
 
-- Pianoroll and drum patterns - should support recording of patterns..
+- Pianoroll and drum patterns - should support recording of patterns... (inc parameter changes)
 
 - cf Is pitch randomisation possible for drums?
 
@@ -64,7 +64,7 @@ FUTURE FUNCTIONALITY
 - In standalone implement "Recent projects" menu.
 	Probably use FL_Preferences (part of FLTK) to make it cross-platform compatible.
 
-- Unit tests?
+- Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
 - Add a dark theme
 
@@ -87,6 +87,7 @@ cf custom chord and scale builder
    - NB having 'chromatic' available means this isn't necessarily super required.
 
 MIDI 2:
+	Look at  https://midi2.dev/
 	Allows microtonal, including
    - Alpha, beta and gamma chords and scales 
    - More traditional / world scales
@@ -127,9 +128,6 @@ Do we get warning if deleting the plugin and notes have been added?
   In standalone probably want a warning too.
 
 
-cf being able to select a group of notes? cf picking the tool from the context menu?
-
-
 ------------------------------TODOs---------------------------
 
 1. Transport
@@ -158,9 +156,6 @@ Allow the window close to be clicked even if a popup of menu is showing.
 
 Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
 
-In the pattern editor reconsider the transport info 
-    (BPM, time signature etc - some is likely to be confusing or not needed
-
 Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
 
 Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
@@ -180,9 +175,6 @@ When I start up in standalone mode (with -v) and close the application (using th
 
 2. Add an 'expression' section at the bottom of BOTH the patterns and song editors
    that allow for rubber bands on a range of parameters.
-
-
-Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
 BUG: Not rewinding right to start (Ardour + Jack). See TRANSPORTS.txt.
 
@@ -278,9 +270,6 @@ Try Valgrind again
 
 Try Helvum
 
-Implement undo/redo (possible on an editor-by-editor basis? or current edit only?)
-    Only enable Save & Save As if a change has been made (and not undone).
-
 Create a shortcut mechanism and menu...  (cf dividing by editor type) 
    cf start/stop    - map to space
       open pattern  - eg map to <Enter>
@@ -311,9 +300,6 @@ Look at changing time signatures: auto changes are a bit annoying.
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
-
-
-
 BUG: looping to start of song causes a gap (plugin or standalone or both?)
 
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
@@ -336,9 +322,14 @@ BUG: all popups should be escapable using Esc
 TODO hover over an automation dot - should be able to press Delete
 
 
-
 ------------------------------------
 
+BUG running as 
+	$ build/src/luvie --tst
+	shows silly options:
+		 -bg2 color
+		 -bg color
+		 -di[splay] host:n.n
 
 Deb installer says 'Unknown license'.  Also, no screenshots
 Icon is missing in the system sidebar tray thingy.
@@ -351,5 +342,41 @@ Apply at signpath.org — one-off, takes days to weeks. Requirements Luvie alrea
 
 Can I add to Arch AUR myself?
 
+
+cf a tool option for multi-select?
+     
+BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
+
+BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
+     messy flickery behaviour. Probably best to only resize one at a time.
+
+
+Document
+	Ctrl-click  select/deselect
+	Shift-click  slection area
+	Ctrl-A   select all
+	Ctrl-Z   undo
+	Ctrl-Y   redo
+	Ctrl-C   copy selection
+	Ctrl-X   cut selection
+	Ctrl-V   paste
+Maybe list these shortcuts in a window even if they are not edittable.
+ 
+ 
+TODO change the tab being display when undoing/redoing as necessary 
+     (+ scroll? cf recenter? cf storing position when editing?) 
+
+TODO In pattern editors some notes may sit at divisions not currently supported.
+     Should have a consistent policy for how to deal with dragging in this case.
+     Seems a bit ad hoc at the moment.
+
+Multi-select: probably prefer modifying the colour of the blocks.
+
+Manual: 
+   multi-select move, copy, delete descriptions.
+   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
+
+BUG: clicking a dragging two blocks in a collapsed track can be dragged into a single pattern lane.
+     Reality bites when clicking on one of the dragged blocks and one blocks jumps up.
 
 

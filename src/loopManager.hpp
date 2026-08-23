@@ -30,6 +30,13 @@ public:
 	// Clear all state (called on mode switch). Notifies if non-empty.
 	void clear();
 
+	// Adopt a saved project's switched-on patterns: exactly `patterns` become
+	// active, all anchored at anchorBar, and every manual override is dropped.
+	// Unlike activate(), the restored patterns are NOT marked manual — a loaded
+	// project should not carry hidden overrides that outlive a switch back to
+	// Song mode. Notifies if anything changed.
+	void restore(const std::vector<int>& patterns, float anchorBar);
+
 	// Move every active pattern's anchor to anchorBar, so each one restarts from
 	// its first beat when the transport reaches that bar. Used by the rewind
 	// button in Loop mode: without it a pattern keeps the phase it was switched

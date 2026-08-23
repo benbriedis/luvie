@@ -7,6 +7,7 @@
 #include "itimelineobserver.hpp"
 #include "timeline.hpp"
 #include "patternNames.hpp"
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -171,7 +172,11 @@ public:
     void resizePattern(int instanceId, float newLength);
     void resizePatternLeft(int instanceId, float newStartBar, float newLength, float newStartOffset);
     void setPatternStartOffset(int instanceId, float startOffset);
-    void placePattern(int laneId, int patternId, float startBar, float length);
+    // Returns the new instance's id, or 0 if no such lane. startOffset is carried
+    // through so a copy of a left-resized instance keeps playing from the same
+    // beat of its pattern.
+    int  placePattern(int laneId, int patternId, float startBar, float length,
+                      float startOffset = 0.0f);
 
     // Song-level param lane management. Each lane belongs to one instrument and
     // routes only to that instrument's port; uniqueness is per (type, instrument).
@@ -188,6 +193,60 @@ public:
 
     // Replace the entire timeline at once and notify observers.
     void loadTimeline(const Timeline& tl);
+
+    // ── Undo/redo ────────────────────────────────────────────────────────────
+    // Whole-timeline snapshots: Timeline is a plain aggregate of vectors, so a
+    // copy is the whole story — no command objects, no inverse operations, and
+    // no mutation needs to know undo exists. The snapshot is taken in notify(),
+    // which every mutation already funnels through.
+    void undo();
+    void redo();
+    bool canUndo() const { return !undoStack.empty(); }
+    bool canRedo() const { return !redoStack.empty(); }
+
+    // Make the current state the baseline. Startup builds the default song
+    // through the ordinary mutators, so without this the user could undo their
+    // way back past an empty song before touching anything.
+    void clearHistory() { undoStack.clear(); redoStack.clear(); lastCommitted = data; }
+
+    // Coalesces a burst of mutations into one notification and one undo entry.
+    // Re-entrant: only the outermost guard notifies. Wrap any loop of single-item
+    // mutations in this — a notify() costs a full Sequencer snapshot rebuild and,
+    // in plugin mode, a complete timeline serialization to the DSP.
+    class Batch {
+        ObservableSong* song;
+    public:
+        explicit Batch(ObservableSong* s) : song(s) { song->batchDepth++; }
+        ~Batch() {
+            if (--song->batchDepth == 0 && song->batchDirty) {
+                song->batchDirty = false;
+                song->notify();
+            }
+        }
+        Batch(const Batch&)            = delete;
+        Batch& operator=(const Batch&) = delete;
+    };
+
+    // Folds a run of mutations into ONE undo entry while still notifying after
+    // each one. Batch cannot serve here: a drag-paint stroke has to redraw as
+    // it goes, so the notifications must flow, but the whole stroke should be a
+    // single ctrl-Z. Held open across a gesture, not a function call.
+    class UndoGroup {
+        ObservableSong* song;
+    public:
+        explicit UndoGroup(ObservableSong* s) : song(s) {
+            if (song->undoGroupDepth++ == 0) song->undoGroupSnapped = false;
+        }
+        ~UndoGroup() { --song->undoGroupDepth; }
+        UndoGroup(const UndoGroup&)            = delete;
+        UndoGroup& operator=(const UndoGroup&) = delete;
+    };
+
+    // Notify for a change that is UI state rather than song content — the
+    // selected track, a zoom level. Keeps the undo mirror in step so the NEXT
+    // real edit still snapshots correctly, but pushes no undo entry: undoing
+    // through a stack of "I clicked a different track" would be miserable.
+    void notifyViewState();
 
 private:
     void buildTempoMap() const;
@@ -214,6 +273,26 @@ private:
     bool patternStillReferenced(int patId) const;
 
     void notify();
+    // The observer fan-out on its own, with no undo bookkeeping. notify() and
+    // the undo machinery both go through it.
+    void fanout();
+    // Swap in a snapshot without recording one. Deliberately NOT loadTimeline():
+    // that re-runs file migration and recomputes nextId from the data, which
+    // would walk the counter backwards on every undo and let a later edit
+    // reissue an id a live view still holds.
+    void restoreSnapshot(const Timeline& tl);
+
+    std::deque<Timeline> undoStack, redoStack;
+    // The state as of the previous notify. Because it only advances when a
+    // notify actually fires, it is always the pre-change state — including
+    // across a Batch, which is what makes a batch one undo entry.
+    Timeline lastCommitted;
+    int      batchDepth = 0;
+    bool     batchDirty = false;
+    int      undoGroupDepth   = 0;
+    bool     undoGroupSnapped = false;
+    static constexpr int undoDepth = 100;
+
     // Drop stale track IDs from loopOrder and append any missing tracks.
     void reconcileLoopOrder();
     // Per track: drop stale lane IDs from loopLanes and append any missing lanes.

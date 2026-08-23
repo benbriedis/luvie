@@ -19,10 +19,19 @@
 
 using std::vector;
 
+// One column every 60 ms while a drag is held outside the grid: fast enough to
+// cross a song without waiting, slow enough to stop on the bar you meant.
+static constexpr double edgeScrollInterval = 0.06;
+
 Grid::Grid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup) :
     numRows(numRows), numCols(numCols), rowHeight(rowHeight), colWidth(colWidth), snap(snap), popup(popup),
     Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight, nullptr)
 {}
+
+Grid::~Grid()
+{
+    Fl::remove_timeout(edgeScrollTick, this);
+}
 
 void Grid::draw()
 {
@@ -112,7 +121,11 @@ void Grid::draw()
         int width  = xRight - xLeft;
         if (x0 + width < x() || x0 > x() + w()) continue;
         drawNoteBlock(note, x0, y0, width, rh);
+        if (selection.contains(note.id))
+            drawSelectionOutline(x0, y0, width, rh);
     }
+
+    drawBand();
 
     if (playhead)
         playhead->drawLine(x() - colOffset * colWidth, y(), rowY(numRows));
@@ -124,57 +137,88 @@ int Grid::handle(int event)
 {
     if (popup.visible())
         return 0;
+    if (selectionPopup && selectionPopup->visible())
+        return 0;
+    if (pastePopup && pastePopup->visible())
+        return 0;
 
     switch (event) {
-        case FL_PUSH:
+        case FL_PUSH: {
             // Refresh the hovered note on a right-click: while a context popup
             // was open this grid got no FL_MOVE events, so its hover state may
             // be stale (pointing at the previously-clicked note). Left-clicks
-            // keep the existing state to preserve drag grab offsets.
-            if (Fl::event_button() == FL_RIGHT_MOUSE || std::holds_alternative<StateIdle>(state))
+            // keep the existing state to preserve drag grab offsets — except a
+            // resize hover held from before a selection appeared under a
+            // stationary cursor (ctrl-A, a paste), which is no longer on offer.
+            if (Fl::event_button() == FL_RIGHT_MOUSE || std::holds_alternative<StateIdle>(state) ||
+                (!selection.empty() && std::holds_alternative<StateHoverResize>(state)))
                 findNoteForCursor();
+
+            const int mods = Fl::event_state();
+            if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_SHIFT)) {
+                // Shift-drag always sweeps a band, even when the press lands on
+                // a note — otherwise notes could not be band-selected from the
+                // middle of a dense pattern.
+                selection.beginBand(Fl::event_x() - x(), Fl::event_y() - y());
+                state = StateBandSelect{(mods & FL_COMMAND) != 0};
+                creationForbidden = true;
+                redraw();
+                return 1;
+            }
+            if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_COMMAND)) {
+                // Ctrl-click toggles one item in or out of the selection.
+                int idx = -1;
+                if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
+                else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
+                if (idx >= 0) {
+                    selection.toggle(notes[idx].id);
+                    state = StateIdle{};
+                    redraw();
+                }
+                creationForbidden = true;   // never create/delete on a ctrl-click
+                return 1;
+            }
+
             if (Fl::event_button() == FL_RIGHT_MOUSE) {
                 int idx = -1;
                 if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
                 else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
-                if (idx >= 0)
-                    openContextMenu(idx);
+                if (idx >= 0) openContextMenu(idx);
+                // Nothing under the cursor to have a menu of its own, so the
+                // right-click offers the one thing that can happen on empty
+                // grid: dropping the clipboard here.
+                else          openPasteMenu();
             } else if (auto* h = std::get_if<StateHoverMove>(&state)) {
                 int   noteIdx = h->noteIdx;
                 float grabX   = h->grabX;
-                float grabY   = h->grabY;
                 if (Fl::event_clicks() == 1) {
                     onNoteDoubleClick(noteIdx);
                     creationForbidden = true;  // prevent FL_RELEASE from calling toggleNote
+                } else if (selection.contains(notes[noteIdx].id)) {
+                    // Grabbing a member of the selection drags the whole of it.
+                    beginGroupDrag(noteIdx, grabX);
                 } else {
+                    // Grabbing anything else drops the selection and moves that
+                    // one item, exactly as before.
+                    if (!selection.empty()) { selection.clear(); redraw(); }
                     Point orig = {(int)notes[noteIdx].row, notes[noteIdx].beat};
                     onBeginDrag(noteIdx);
-                    // Jump the cursor to the block's centre so it tracks the
-                    // middle of the note during the drag instead of wherever it
-                    // happened to be grabbed. Re-anchor grabX/grabY to the centre
-                    // to match the warped cursor (only when the warp actually
-                    // happened, so unwarped platforms keep the note in place
-                    // rather than making it jump). The centre x is clamped to the
-                    // visible area so a long note doesn't fling the cursor off
-                    // the grid; grabX is then taken from the clamped position.
-                    const Note& n  = notes[noteIdx];
-                    int   row      = (int)n.row;
-                    float centreY  = rowH(row) / 2.0f;
-                    float leftEdge = (n.beat - colOffset) * colWidth;
-                    float centreX  = std::clamp(leftEdge + n.length * colWidth / 2.0f,
-                                                0.0f, (float)w());
-                    if (warpPointerTo(window(), x() + (int)centreX,
-                                                y() + rowY(row) + (int)centreY)) {
-                        grabX = centreX - leftEdge;
-                        grabY = centreY;
-                    }
-                    state = StateDragMove{noteIdx, grabX, grabY, orig, orig, false};
+                    // The block stays where it was grabbed: no cursor warp, so
+                    // the drag never nudges the note before it has moved.
+                    state = StateDragMove{noteIdx, grabX, orig, orig, false};
                 }
             } else if (auto* h = std::get_if<StateHoverResize>(&state)) {
                 int  noteIdx = h->noteIdx;
                 Side side    = h->side;
                 onBeginDrag(noteIdx);
                 state = StateDragResize{noteIdx, side};
+            } else if (!selection.empty()) {
+                // A plain click on empty space with a selection active just
+                // clears it. Creating as well would make it impossible to
+                // dismiss a selection without also editing something.
+                selection.clear();
+                creationForbidden = true;
+                redraw();
             } else {
                 // Idle — check whether note creation is allowed at click position
                 int   ex        = Fl::event_x() - x();
@@ -196,13 +240,43 @@ int Grid::handle(int event)
                 }
             }
             return 1;
+        }
 
         case FL_DRAG:
             if (auto* s = std::get_if<StateDragMove>  (&state)) moving(*s);
             else if (auto* s = std::get_if<StateDragResize>(&state)) resizing(*s);
+            else if (auto* s = std::get_if<StateDragGroup> (&state)) movingGroup(*s);
+            else if (std::holds_alternative<StateBandSelect>(state)) {
+                selection.updateBand(Fl::event_x() - x(), Fl::event_y() - y());
+                redraw();
+            }
+            updateEdgeScroll();
             return 1;
 
         case FL_RELEASE:
+            stopEdgeScroll();
+            if (auto* s = std::get_if<StateBandSelect>(&state)) {
+                bool additive = s->additive;
+                state = StateIdle{};
+                applyBand(additive);
+                creationForbidden = false;
+                window()->cursor(FL_CURSOR_DEFAULT);
+                return 1;
+            }
+            if (auto* s = std::get_if<StateDragGroup>(&state)) {
+                StateDragGroup drag = *s;
+                state = StateIdle{};   // clear BEFORE commit so isActiveDrag() is false
+                if (!drag.blocked && (drag.dBeat != 0.0f || drag.dRow != 0))
+                    onCommitGroupMove(drag.dBeat, drag.dRow);
+                else
+                    redraw();          // snap the preview back
+                // Whether the move committed or not, the model is now the truth
+                // for the items previewed outside `notes`.
+                previewGroupExtras(0.0f);
+                groupOrig.clear();
+                window()->cursor(FL_CURSOR_DEFAULT);
+                return 1;
+            }
             if (auto* s = std::get_if<StateDragMove>(&state)) {
                 // Capture before clearing state
                 bool  wasOverlapping = s->overlapping;
@@ -233,6 +307,7 @@ int Grid::handle(int event)
             return 1;
 
         case FL_LEAVE:
+            stopEdgeScroll();
             state = StateIdle{};
             window()->cursor(FL_CURSOR_DEFAULT);
             return 0;
@@ -244,6 +319,14 @@ int Grid::handle(int event)
         case FL_KEYBOARD:
         case FL_SHORTCUT: {
             int key = Fl::event_key();
+            // These are unfocused grids, so FLTK broadcasts the shortcut to all
+            // of them; the cursor decides which one it was meant for. Only the
+            // hover-delete below needs that rule, and it is all that is left
+            // here: the commands that act on the grid as a whole — Ctrl-A, and
+            // Delete with a selection — are handled by AppWindow, so the cursor
+            // can be anywhere in the window.
+            if (!Fl::event_inside(this))
+                return 0;
             if (key != FL_Delete && key != FL_BackSpace)
                 return 0;
             int idx = -1;
@@ -264,10 +347,347 @@ int Grid::handle(int event)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Multi-selection
+// ---------------------------------------------------------------------------
+
+// Default implementations work off the visible notes. The subclasses that can
+// see the whole model override them so a selection reaches past the viewport.
+std::unordered_set<int> Grid::liveItemIds() const
+{
+    std::unordered_set<int> ids;
+    for (const Note& n : notes) ids.insert(n.id);
+    return ids;
+}
+
+void Grid::selectAll()       { selection.clear(); for (const Note& n : notes) selection.add(n.id); }
+void Grid::deleteSelection() {}
+
+// Delete arrives from AppWindow, which knows nothing of hover, so the state has
+// to be dropped here: it may name a note that no longer exists.
+void Grid::deleteSelectedItems()
+{
+    deleteSelection();
+    state = StateIdle{};
+    if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard
+// ---------------------------------------------------------------------------
+
+// The base reads `notes`, which is right for a grid that shows all of its rows
+// at once. The scrolling grids override this and read their model instead, so a
+// selection reaching above or below the viewport is copied whole.
+std::vector<ClipItem> Grid::selectedForClipboard() const
+{
+    std::vector<ClipItem> items;
+    for (const Note& n : notes)
+        if (selection.contains(n.id))
+            items.push_back({(int)n.row, n.beat, n.length, n.velocity, 0.0f});
+    return items;
+}
+
+float Grid::pasteAnchorBeat(int wx) const
+{
+    float fcol = (float)(wx - x()) / (float)colWidth + colOffset;
+    return newNoteStart(fcol);
+}
+
+void Grid::copySelection()
+{
+    if (clipKind() == ClipKind::None || selection.empty()) return;
+    clipboard().set(clipKind(), selectedForClipboard());
+}
+
+void Grid::pasteClipboard(int wx, int wy)
+{
+    const Clipboard& cb = clipboard();
+    // Nothing of this grid's kind to paste, or nowhere here it would fit: either
+    // way nothing happens, and the cursor is what says so.
+    if (!cb.holds(clipKind()) ||
+        !pasteAt(cb.items, rowAtPixelY(wy - y()), pasteAnchorBeat(wx)))
+        flashForbiddenCursor(window());
+}
+
+bool Grid::openSelectionMenu(int noteIdx)
+{
+    // Right-clicking a member of a multi-selection is a different question from
+    // right-clicking one item, so it gets its own menu. Right-clicking anything
+    // else falls through to the caller's.
+    if (!selectionPopup || !selection.contains(notes[noteIdx].id)) return false;
+    selectionPopup->open(this,
+        [this]() { cutSelection(); redraw(); },
+        [this]() { copySelection(); },
+        [this]() { deleteSelectedItems(); redraw(); });
+    return true;
+}
+
+bool Grid::openPasteMenu()
+{
+    if (!pastePopup || !clipboard().holds(clipKind())) return false;
+    // Capture where the right-click landed: that is the spot the user picked,
+    // and by the time the menu item runs the event position is the click on the
+    // item itself.
+    const int wx = Fl::event_x(), wy = Fl::event_y();
+    pastePopup->open(this, [this, wx, wy]() { pasteClipboard(wx, wy); });
+    return true;
+}
+
+void Grid::groupDragLimits(float& minDBeat, float& maxDBeat, int& minDRow, int& maxDRow) const
+{
+    minDBeat = maxDBeat = 0.0f;
+    minDRow  = maxDRow  = 0;
+    bool first = true;
+    for (const Note& n : notes) {
+        if (!selection.contains(n.id)) continue;
+        float lo = -n.beat;                            // furthest left this note may go
+        float hi = (float)numCols - (n.beat + n.length);
+        int   rlo = -(int)n.row;
+        int   rhi = numRows - 1 - (int)n.row;
+        if (first) { minDBeat = lo; maxDBeat = hi; minDRow = rlo; maxDRow = rhi; first = false; }
+        else {
+            minDBeat = std::max(minDBeat, lo);
+            maxDBeat = std::min(maxDBeat, hi);
+            minDRow  = std::max(minDRow, rlo);
+            maxDRow  = std::min(maxDRow, rhi);
+        }
+    }
+}
+
+bool Grid::groupRowsRejected(int dRow) const
+{
+    for (const auto& g : groupOrig) {
+        int row = g.row + dRow;
+        if (row < 0 || row >= numRows || isRowBlocked(row)) return true;
+    }
+    return false;
+}
+
+bool Grid::groupMoveBlocked(float dBeat, int dRow) const
+{
+    for (const auto& g : groupOrig) {
+        const Note& n = notes[g.idx];
+        float beat = g.beat + dBeat;
+        int   row  = g.row  + dRow;
+        if (isRowBlocked(row)) return true;
+        for (const Note& other : notes) {
+            if (selection.contains(other.id)) continue;   // moves with us
+            if ((int)other.row != row) continue;
+            if (beatsOverlap(beat, n.length, other.beat, other.length)) return true;
+        }
+    }
+    return false;
+}
+
+void Grid::onCommitGroupMove(float, int) {}
+
+void Grid::beginGroupDrag(int noteIdx, float grabX)
+{
+    onBeginDrag(noteIdx);
+    beginGroupDrag(Point{(int)notes[noteIdx].row, notes[noteIdx].beat}, grabX, true);
+}
+
+void Grid::beginGroupDrag(Point original, float grabX, bool primaryInNotes)
+{
+    groupPrimaryInNotes = primaryInNotes;
+    // No pointer warp here. Snapping the cursor to one block's centre is a
+    // helpful cue when that block is the only thing moving, and disorienting
+    // when it is one of fifty.
+    groupOrig.clear();
+    for (int i = 0; i < (int)notes.size(); ++i)
+        if (selection.contains(notes[i].id))
+            groupOrig.push_back({i, notes[i].beat, (int)notes[i].row});
+
+    // Resolve the travel limits now, from the untouched starting positions.
+    // They must not be recomputed while the drag runs: some of the inputs are
+    // the preview positions themselves, so the bound would slide along with the
+    // selection instead of holding it.
+    float minDB, maxDB; int minDR, maxDR;
+    groupDragLimits(minDB, maxDB, minDR, maxDR);
+    includeZero(minDB, maxDB);
+    includeZero(minDR, maxDR);
+
+    state = StateDragGroup{grabX, original, minDB, maxDB, minDR, maxDR,
+                           0.0f, 0, false};
+}
+
+void Grid::movingGroup(StateDragGroup& s)
+{
+    // The primary follows the cursor under the ordinary snapping rules; the
+    // delta it lands on is what the rest of the selection inherits.
+    float ex   = dragX();
+    float beat = (ex - s.grabX) / (float)colWidth + colOffset;
+    if (snap > 0.0f) beat = std::round(beat / snap) * snap;
+    float dBeat = beat - s.original.col;
+
+    int dRow = 0;
+    if (allowsVerticalDrag()) {
+        // The primary lands on whatever row the cursor is over — see moving().
+        int ey     = Fl::event_y() - y();
+        int newRow = rowAtPixelY(std::max(0, ey));
+        dRow = newRow - s.original.row;
+    }
+
+    // Clamp the delta so no member of the selection leaves the grid, rather
+    // than clamping each note as it goes — that would squash the shape. The
+    // limits were fixed when the drag began.
+    dBeat = std::clamp(dBeat, s.minDBeat, s.maxDBeat);
+    dRow  = std::clamp(dRow,  s.minDRow,  s.maxDRow);
+    // Rows the selection can never occupy are stepped over, not previewed on:
+    // hold the last row delta that worked. Zero always does — that is where the
+    // items already are — so there is always one to fall back to.
+    if (dRow != s.dRow && groupRowsRejected(dRow)) dRow = s.dRow;
+    if (snap > 0.0f) {
+        // Re-snap after clamping: the limit itself is rarely on a grid line.
+        float snapped = std::round(dBeat / snap) * snap;
+        if (snapped >= s.minDBeat && snapped <= s.maxDBeat) dBeat = snapped;
+    }
+
+    s.dBeat   = dBeat;
+    s.dRow    = dRow;
+    s.blocked = groupMoveBlocked(dBeat, dRow);
+
+    // Preview from the originals, so repeated moves cannot drift.
+    for (const auto& g : groupOrig) {
+        notes[g.idx].beat = g.beat + dBeat;
+        notes[g.idx].row  = g.row  + dRow;
+    }
+    previewGroupExtras(dBeat);
+
+    if (s.blocked) window()->cursor(forbiddenCursorImage(), 11, 11);
+    else           window()->cursor(FL_CURSOR_HAND);
+    redraw();
+}
+
+// ---------------------------------------------------------------------------
+// Edge auto-scroll
+// ---------------------------------------------------------------------------
+
+void Grid::reapplyDrag()
+{
+    if (auto* s = std::get_if<StateDragMove>  (&state)) moving(*s);
+    else if (auto* s = std::get_if<StateDragResize>(&state)) resizing(*s);
+    else if (auto* s = std::get_if<StateDragGroup> (&state)) movingGroup(*s);
+}
+
+float Grid::dragX() const
+{
+    float ex = (float)Fl::event_x();
+    if (onEdgeScroll) ex = std::clamp(ex, (float)x(), (float)(x() + w()));
+    return ex - (float)x();
+}
+
+void Grid::updateEdgeScroll()
+{
+    int dir = 0;
+    if (onEdgeScroll && isItemDrag()) {
+        if (Fl::event_x() < x())            dir = -1;
+        else if (Fl::event_x() >= x() + w()) dir = +1;
+    }
+    if (dir == edgeScrollDir) return;   // already scrolling that way, or already stopped
+
+    edgeScrollDir = dir;
+    Fl::remove_timeout(edgeScrollTick, this);
+    if (dir) Fl::add_timeout(edgeScrollInterval, edgeScrollTick, this);
+}
+
+void Grid::stopEdgeScroll()
+{
+    edgeScrollDir = 0;
+    Fl::remove_timeout(edgeScrollTick, this);
+}
+
+void Grid::edgeScrollTick(void* self)
+{
+    static_cast<Grid*>(self)->edgeScrollStep();
+}
+
+void Grid::edgeScrollStep()
+{
+    // Stop if the drag ended without this grid hearing about it: a window
+    // opening mid-drag (the project-settings dialog, say) takes the grab, and
+    // the release that would have stopped the scroll never arrives.
+    if (Fl::pushed() != this || !isItemDrag()) { edgeScrollDir = 0; return; }
+
+    // The view has moved under a stationary cursor, so the drag has to be run
+    // again for the items to follow it onto the newly revealed columns.
+    if (onEdgeScroll(edgeScrollDir) != 0) {
+        reapplyDrag();
+        Fl::repeat_timeout(edgeScrollInterval, edgeScrollTick, this);
+    }
+    else {
+        // Nothing left to scroll to on that side. Stop rather than keep a timer
+        // going; moving the cursor back in and out starts it again.
+        edgeScrollDir = 0;
+    }
+}
+
+void Grid::applyBand(bool additive)
+{
+    if (!additive) selection.clear();
+
+    const int left = selection.bandLeft(), right = selection.bandRight();
+    for (const Note& n : notes) {
+        int row = (int)n.row;
+        if (row < 0 || row >= numRows) continue;
+        if (isRowBlocked(row)) continue;
+        if (!selection.bandCoversRow(rowY(row), rowH(row))) continue;
+        int nLeft  = (int)std::lround((n.beat - colOffset) * (double)colWidth);
+        int nRight = (int)std::lround((n.beat + n.length - colOffset) * (double)colWidth);
+        if (nRight < left || nLeft > right) continue;   // horizontal: any overlap
+        selection.add(n.id);
+    }
+    addBandHitExtras();
+    selection.endBand();
+    redraw();
+}
+
+void drawSelectionBand(const Selection& selection, int originX, int originY)
+{
+    if (!selection.active) return;
+    const int bx = originX + selection.bandLeft(), bw = selection.bandRight()  - selection.bandLeft();
+    const int by = originY + selection.bandTop(),  bh = selection.bandBottom() - selection.bandTop();
+    if (bw <= 0 && bh <= 0) return;
+
+    // The fill is a wash rather than an opaque rectangle, so whatever the band
+    // sweeps over stays visible while it is being dragged. FLTK has no
+    // alpha-aware rectangle, so stretch a single translucent pixel: the driver
+    // pads it out, which costs nothing per frame and needs no pixel buffer.
+    if (bw > 0 && bh > 0) {
+        if (fl_can_do_alpha_blending()) {
+            static const uchar pixel[4] = {
+                uchar(bandColor >> 24), uchar(bandColor >> 16), uchar(bandColor >> 8), bandFillAlpha };
+            static Fl_RGB_Image wash(pixel, 1, 1, 4);
+            wash.scale(bw, bh, 0, 1);
+            wash.draw(bx, by);
+        }
+        else {
+            fl_color(fl_color_average(bandColor, bgColor, 0.18f));
+            fl_rectf(bx, by, bw, bh);
+        }
+    }
+    fl_color(bandColor);
+    fl_rect(bx, by, bw, bh);
+}
+
+void Grid::drawBand() const
+{
+    drawSelectionBand(selection, x(), y());
+}
+
+void Grid::drawSelectionOutline(int x0, int y0, int width, int rh) const
+{
+    fl_color(selectionColor);
+    fl_line_style(FL_SOLID, 2);
+    fl_rect(x0 + 1, y0 + 2, std::max(2, width - 2), rh - 3);
+    fl_line_style(0);
+}
+
 void Grid::moving(StateDragMove& s)
 {
     Note* note = &notes[s.noteIdx];
-    float ex   = Fl::event_x() - x();
+    float ex   = dragX();
     note->beat  = (ex - s.grabX) / (float)colWidth + colOffset;
     if (snap > 0.0f) note->beat = std::round(note->beat / snap) * snap;
     // Clamp AFTER snapping so the note can't extend past the right edge. When
@@ -278,8 +698,13 @@ void Grid::moving(StateDragMove& s)
         float maxBeat = numCols - note->length;
         note->beat = snap > 0.0f ? std::floor(maxBeat / snap) * snap : maxBeat;
     }
-    float ey   = Fl::event_y() - y();
-    int newRow = std::clamp(rowAtPixelY(std::max(0, (int)(ey - s.grabY))), 0, numRows - 1);
+    // The row is whichever one the cursor is currently over, not the one the
+    // block's grab point lands on. Anchoring to the grab offset lets the cursor
+    // drift outside the block it is dragging — a block grabbed near its bottom
+    // would flip rows only once the cursor was a row below it. This way the
+    // cursor always stays on the block, and rows change as it crosses a line.
+    int ey     = Fl::event_y() - y();
+    int newRow = std::clamp(rowAtPixelY(std::max(0, ey)), 0, numRows - 1);
     if (!isRowBlocked(newRow)) {
         note->row     = (float)newRow;
         s.overlapping = overlappingCell(s.noteIdx) >= 0;
@@ -294,7 +719,7 @@ void Grid::resizing(StateDragResize& s)
 {
     float minLength = 10.0f / colWidth;
     Note* note      = &notes[s.noteIdx];
-    float ex        = Fl::event_x() - x();
+    float ex        = dragX();
     if (s.side == Side::Left) {
         float endCol  = note->beat + note->length;   // fixed (right) edge
         float newBeat = ex / (float)colWidth + colOffset;
@@ -338,18 +763,25 @@ void Grid::findNoteForCursor()
     int  resizeIdx  = -1;
     Side resizeSide = Side::Left;
 
+    // Resizing is off while a selection is live: what a selection is for is
+    // moving, copying and deleting, and an edge that resized one item would be
+    // an odd thing to offer when many are picked out. Dropping the resize zones
+    // also leaves the edges grabbable for dragging the group, which is what a
+    // press near the end of a selected block is far more likely to mean.
+    const bool resizable = selection.empty();
+
     for (int i = 0; i < (int)notes.size(); ++i) {
         const Note& n = notes[i];
         if ((int)n.row != row) continue;
         float leftEdge  = (n.beat - colOffset) * colWidth;
         float rightEdge = (n.beat + n.length - colOffset) * colWidth;
 
-        if (leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
+        if (resizable && leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Left;
-        } else if (rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
+        } else if (resizable && rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
             resizeIdx = i; resizeSide = Side::Right;
         } else if (ex >= leftEdge && ex <= rightEdge) {
-            state = StateHoverMove{i, ex - leftEdge, (float)(ey - rowY((int)n.row))};
+            state = StateHoverMove{i, ex - leftEdge};
             window()->cursor(contextMenuCursorImage(), 0, 0);
             redraw();
             return;
@@ -406,12 +838,18 @@ int Grid::overlappingCell(int noteIdx) const
 
 void Grid::openContextMenu(int idx)
 {
-    popup.open(idx, &notes, this, makeDeleteCallback(idx), makeVelocityCallback(idx),
-               makeTransposeCallback(idx));
+    if (openSelectionMenu(idx)) return;
+    popup.open(idx, &notes, this, makeDeleteCallback(idx), makeVelocityCallback(idx));
 }
 
 void Grid::clampSelection()
 {
+    // Drop ids the model has since lost. Checked against the model rather than
+    // `notes`, which holds only the visible rows — scrolling must not silently
+    // shrink the selection.
+    if (!selection.empty())
+        selection.retain(liveItemIds());
+
     int sz = (int)notes.size();
     auto oob = [sz](int i) { return i < 0 || i >= sz; };
     if      (auto* s = std::get_if<StateHoverMove>  (&state)) { if (oob(s->noteIdx)) state = StateIdle{}; }

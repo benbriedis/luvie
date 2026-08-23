@@ -3,43 +3,6 @@
 
 #include "cursors.hpp"
 #include <cmath>
-#include <FL/platform.H>   // fl_display (X11), fl_xid(), fl_win32_xid()
-
-#ifdef FLTK_USE_X11
-#include <X11/Xlib.h>
-#endif
-// <windows.h> arrives via FL/platform.H -> FL/win32.H.
-
-bool warpPointerTo(Fl_Window* win, int winX, int winY)
-{
-#ifdef FLTK_USE_X11
-    // On X11 `fl_display` is non-null (it's null under the Wayland backend).
-    if (fl_display && win) {
-        // Coordinates are relative to the destination window (fl_xid).
-        XWarpPointer(fl_display, None, fl_xid(win), 0, 0, 0, 0, winX, winY);
-        XFlush(fl_display);
-        return true;
-    }
-#endif
-
-#ifdef _WIN32
-    if (win) {
-        HWND hwnd = fl_win32_xid(win);
-        // SetCursorPos is in screen coordinates, so convert from the window's.
-        POINT p = { winX, winY };
-        if (hwnd && ClientToScreen(hwnd, &p) && SetCursorPos(p.x, p.y))
-            return true;
-    }
-#endif
-
-    (void)win; (void)winX; (void)winY;
-    // Wayland forbids pointer warping outright. macOS permits it (via
-    // CoreGraphics) but that needs a framework this build does not otherwise
-    // link, so it is left unimplemented rather than added untested. Both
-    // callers treat false as "keep the grab where the user put it", which is
-    // a slightly different feel, not a broken drag.
-    return false;
-}
 
 const Fl_RGB_Image* forbiddenCursorImage() {
 	static const int SIZE = 20;
@@ -112,6 +75,30 @@ const Fl_RGB_Image* forbiddenCursorImage() {
 
 	img = new Fl_RGB_Image(pix, SIZE, SIZE, 4);
 	return img;
+}
+
+// How long the forbidden cursor stays up. Long enough to be read as an answer to
+// the key that was just pressed, short enough not to leave the pointer looking
+// broken.
+static constexpr double forbiddenFlashSecs = 1.0;
+
+// The window the flash is running on, so a second flash replaces the first
+// rather than letting the older timeout clear the newer cursor.
+static Fl_Window* flashWindow = nullptr;
+
+static void endForbiddenFlash(void*)
+{
+	if (flashWindow) flashWindow->cursor(FL_CURSOR_DEFAULT);
+	flashWindow = nullptr;
+}
+
+void flashForbiddenCursor(Fl_Window* win)
+{
+	if (!win) return;
+	Fl::remove_timeout(endForbiddenFlash);
+	flashWindow = win;
+	win->cursor(forbiddenCursorImage(), 11, 11);
+	Fl::add_timeout(forbiddenFlashSecs, endForbiddenFlash);
 }
 
 const Fl_RGB_Image* contextMenuCursorImage() {

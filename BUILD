@@ -401,7 +401,7 @@ and, unsigned, could not be opened at all on current macOS.
 The Windows installer needs Inno Setup 6 (`choco install innosetup`); the script
 finds ISCC.exe on PATH or under Program Files. It installs per-user, without
 elevation, so there is no UAC prompt: luvie.exe under %LOCALAPPDATA%\Programs,
-the plugin in %APPDATA%\LV2, a Start menu entry, a .luv file association and an
+the plugin in %APPDATA%\LV2, a Start menu entry, a .luvie file association and an
 uninstaller. The script drives packaging/windows/luvie.iss, which is where all of
 that is declared. CPack does have an INNOSETUP generator, but only from CMake
 3.30, and this project requires 3.28.

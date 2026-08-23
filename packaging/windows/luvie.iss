@@ -13,7 +13,7 @@
 ; (dropped after v0.0.6, see cmake/Packaging.cmake). One artifact is what makes signing
 ; meaningful: an unsigned second download beside a signed one is the one people would
 ; reach for when the signed one gives them any trouble. It also earns its place on its
-; own, by putting luvie.lv2 where hosts look, adding a Start menu entry, registering .luv,
+; own, by putting luvie.lv2 where hosts look, adding a Start menu entry, registering .luvie,
 ; and being able to uninstall itself.
 
 #ifndef AppVersion
@@ -46,7 +46,7 @@ AppUpdatesURL=https://github.com/benbriedis/luvie/releases
 ; Install per-user, without elevation. This is the point of the whole file: with
 ; PrivilegesRequired=lowest there is no UAC prompt, and so no "Unknown publisher" shield
 ; on an unsigned build -- only SmartScreen, which no installer design can avoid. It also
-; means the LV2 bundle and the .luv association land in the per-user locations that need no
+; means the LV2 bundle and the .luvie association land in the per-user locations that need no
 ; administrator, matching where a developer build would have put them.
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\Luvie
@@ -85,7 +85,7 @@ Name: "plugin";     Description: "LV2 plug-in (for Reaper, Ardour, Carla, ...)";
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Components: standalone; Flags: unchecked
-Name: "associate";   Description: "Open .luv project files with Luvie"; Components: standalone
+Name: "associate";   Description: "Open .luvie project files with Luvie"; Components: standalone
 
 [Files]
 Source: "{#StageDir}\bin\luvie.exe"; DestDir: "{app}"; Components: standalone; Flags: ignoreversion
@@ -108,7 +108,7 @@ Name: "{autodesktop}\Luvie";     Filename: "{app}\luvie.exe"; Components: standa
 ; Under HKCU, not HKCR: this installer never elevates, and a per-user association is all
 ; that is wanted anyway. luvie.exe already takes a project path as its first argument
 ; (see src/main.cpp), so the association needs nothing on the application side.
-Root: HKCU; Subkey: "Software\Classes\.luv"; ValueType: string; ValueName: ""; ValueData: "Luvie.Project"; Flags: uninsdeletevalue; Tasks: associate
+Root: HKCU; Subkey: "Software\Classes\.luvie"; ValueType: string; ValueName: ""; ValueData: "Luvie.Project"; Flags: uninsdeletevalue; Tasks: associate
 Root: HKCU; Subkey: "Software\Classes\Luvie.Project"; ValueType: string; ValueName: ""; ValueData: "Luvie Project"; Flags: uninsdeletekey; Tasks: associate
 Root: HKCU; Subkey: "Software\Classes\Luvie.Project\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\luvie.exe,0"; Tasks: associate
 Root: HKCU; Subkey: "Software\Classes\Luvie.Project\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\luvie.exe"" ""%1"""; Tasks: associate

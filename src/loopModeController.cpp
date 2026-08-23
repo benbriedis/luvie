@@ -44,17 +44,37 @@ void LoopModeController::requestMode(bool loop)
     }
 }
 
+// Settling into a mode: the transport flag, the editors, the frozen song playhead
+// and the button visual. Every path that changes mode ends here, so none of them
+// can leave one of the four out of step.
+void LoopModeController::applyMode(bool loop)
+{
+    transport->setLoopMode(loop);
+    // In loop mode this gates sync() off → the active loop set freezes as-is.
+    setEditorsLoopMode(loop);
+    songEditor->setPlayheadFrozen(loop, frozenSongBar);
+    songEditor->setSeekingEnabled(!loop);
+
+    state = loop ? State::Loop : State::Song;
+    tabs->setModeVisual(loop ? ModernTabs::ModeVisual::Loop : ModernTabs::ModeVisual::Song);
+    if (onModeSettled) onModeSettled();
+}
+
 void LoopModeController::enterLoop()
 {
     // Remember where the song playhead was; freeze it there (greyed, non-interactive).
     frozenSongBar = transport->position();
-    transport->setLoopMode(true);
-    setEditorsLoopMode(true);   // gates sync() off → the active loop set freezes as-is
-    songEditor->setPlayheadFrozen(true, frozenSongBar);
-    songEditor->setSeekingEnabled(false);
+    applyMode(true);
+}
 
-    state = State::Loop;
-    tabs->setModeVisual(ModernTabs::ModeVisual::Loop);
+void LoopModeController::setMode(bool loop)
+{
+    stopPoll();
+    if (loop) {
+        if (state != State::Loop) enterLoop();
+    } else if (state != State::Song) {
+        applyMode(false);
+    }
 }
 
 void LoopModeController::beginTransition()
@@ -75,13 +95,7 @@ void LoopModeController::finishToSong()
     stopPoll();
     // Whole-bar seek back to the frozen position keeps bar-length loops phase-aligned.
     transport->seek(frozenSongBar);
-    transport->setLoopMode(false);
-    setEditorsLoopMode(false);   // re-enables sync() from the frozen bar onward
-    songEditor->setPlayheadFrozen(false);
-    songEditor->setSeekingEnabled(true);
-
-    state = State::Song;
-    tabs->setModeVisual(ModernTabs::ModeVisual::Song);
+    applyMode(false);   // re-enables sync() from the frozen bar onward
 }
 
 void LoopModeController::poll()

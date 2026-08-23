@@ -123,6 +123,15 @@ bool AppWindow::wmResizeAvailable()
 #endif
 }
 
+bool AppWindow::inVisiblePopup(int ex, int ey) const
+{
+	for (auto* p : popups)
+		if (p->visible() && ex >= p->x() && ex < p->x() + p->w()
+		                 && ey >= p->y() && ey < p->y() + p->h())
+			return true;
+	return false;
+}
+
 int AppWindow::detectEdge() const
 {
     int ex = Fl::event_x(), ey = Fl::event_y();
@@ -247,8 +256,38 @@ int AppWindow::handle(int event)
         }
     }
 
-    if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape)
+    // FL_COMMAND is ctrl everywhere but macOS, where it is the Command key.
+    // Accept both cases of the key: whether shift folds it is platform-dependent.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) && (Fl::event_state() & FL_COMMAND) &&
+        !(Fl::event_state() & FL_SHIFT)) {
+        const int key = Fl::event_key();
+        if (key == 'z' || key == 'Z') { if (onUndo) onUndo(); return 1; }
+        if (key == 'y' || key == 'Y') { if (onRedo) onRedo(); return 1; }
+        if (key == 'x' || key == 'X') { if (onCut)   onCut();   return 1; }
+        if (key == 'c' || key == 'C') { if (onCopy)  onCopy();  return 1; }
+        if (key == 'v' || key == 'V') { if (onPaste) onPaste(); return 1; }
+    }
+
+    // Same key routing as undo: a focused text input sees it first and keeps its
+    // own select-all.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) && (Fl::event_state() & FL_COMMAND) &&
+        (Fl::event_key() == 'a' || Fl::event_key() == 'A')) {
+        if (onSelectAll) onSelectAll();
         return 1;
+    }
+
+    // Not consumed when nothing is selected: falling through lets FLTK carry on
+    // to the shortcut broadcast, which is how the hovered grid gets its chance
+    // to delete the note under the cursor.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
+        (Fl::event_key() == FL_Delete || Fl::event_key() == FL_BackSpace)) {
+        if (onDeleteSelection && onDeleteSelection()) return 1;
+    }
+
+    if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape) {
+        if (onEscape) onEscape();
+        return 1;
+    }
 
     switch (event) {
     case FL_PUSH:
@@ -295,5 +334,13 @@ int AppWindow::handle(int event)
     default:
         break;
     }
+
+    // Past the popup handling, so the click that dismisses a popup is spent on
+    // that alone. A click that lands ON a popup is not a click away from
+    // anything either — the menu item under it may well be about to act on the
+    // selection this would dismiss, and its callback has not run yet.
+    if (event == FL_PUSH && onClick && !inVisiblePopup(Fl::event_x(), Fl::event_y()))
+        onClick(Fl::event_x(), Fl::event_y());
+
     return Fl_Double_Window::handle(event);
 }

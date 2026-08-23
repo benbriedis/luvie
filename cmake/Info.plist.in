@@ -39,7 +39,7 @@
          requires a reason string, or the app is denied access silently. -->
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Luvie uses Bluetooth to reach wireless MIDI devices.</string>
-    <!-- .luv project files, so Finder shows them as Luvie documents and can open them. -->
+    <!-- .luvie project files, so Finder shows them as Luvie documents and can open them. -->
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>
@@ -51,7 +51,7 @@
             <string>Owner</string>
             <key>CFBundleTypeExtensions</key>
             <array>
-                <string>luv</string>
+                <string>luvie</string>
             </array>
         </dict>
     </array>

@@ -8,12 +8,15 @@
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
 #include "observableInstrument.hpp"
+#include <algorithm>
 #include <filesystem>
 #include "appWindow.hpp"
 #include "songEditor.hpp"
 #include "harmonyEditor.hpp"
 #include "noteContextPopup.hpp"
 #include "patternInstanceContextPopup.hpp"
+#include "pasteContextPopup.hpp"
+#include "selectionContextPopup.hpp"
 #include "modernTabs.hpp"
 #include "settingsButton.hpp"
 #include "settingsMenuPopup.hpp"
@@ -22,6 +25,7 @@
 #include "markerRuler.hpp"
 #include "loopRuler.hpp"
 #include "patternPanel.hpp"
+#include "songPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
 #include "loopRulerContextPopup.hpp"
@@ -34,7 +38,6 @@
 #include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
-#include "transposePopup.hpp"
 #include "patternParamGrid.hpp"
 
 // The pattern tab's control panel is bottom-anchored and can change height (it
@@ -106,7 +109,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     Fl_Native_File_Chooser fc;
     fc.title("Import Project");
     fc.type(Fl_Native_File_Chooser::BROWSE_FILE);
-    fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
+    fc.filter("Luvie Projects\t*.luvie\nAll Files\t*");
     if (!lastFileDir.empty()) fc.directory(lastFileDir.c_str());
     if (fc.show() != 0) return;
 
@@ -119,6 +122,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
 
     app->song_->loadTimeline(state.timeline);
     if (app->onApplyOutputs) app->onApplyOutputs(state);
+    app->applyLoopState(state.loopMode, state.activeLoopPatterns);
 }
 
 void LuvieApp::exportCb(Fl_Widget*, void* data) {
@@ -127,21 +131,30 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     Fl_Native_File_Chooser fc;
     fc.title("Export Project");
     fc.type(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
-    fc.filter("Luvie Projects\t*.luv\nAll Files\t*");
+    fc.filter("Luvie Projects\t*.luvie\nAll Files\t*");
     fc.options(Fl_Native_File_Chooser::SAVEAS_CONFIRM);
     if (!lastFileDir.empty()) fc.directory(lastFileDir.c_str());
     if (fc.show() != 0) return;
 
     std::string path = fc.filename();
     if (path.empty()) return;
-    if (path.size() < 4 || path.substr(path.size() - 4) != ".luv")
-        path += ".luv";
+    if (path.size() < 6 || path.substr(path.size() - 6) != ".luvie")
+        path += ".luvie";
     lastFileDir = std::filesystem::path(path).parent_path().string();
 
     AppState state;
     state.timeline = app->song_->get();
     if (app->onCollectOutputs) app->onCollectOutputs(state);
+    state.loopMode           = app->isLoopMode();
+    state.activeLoopPatterns = app->activeLoopPatterns();
     saveAppState(state, path);
+}
+
+std::array<ISelectionHost*, 4> LuvieApp::selectionHosts() const {
+    return { songEd      ? songEd->selectionHost()      : nullptr,
+             harmonyEd   ? harmonyEd->selectionHost()   : nullptr,
+             pianorollEd ? pianorollEd->selectionHost() : nullptr,
+             drumEd      ? drumEd->selectionHost()      : nullptr };
 }
 
 void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
@@ -149,6 +162,61 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     song_         = song;
     pattern_      = pattern;
     instruments_  = instruments;
+
+    window->onUndo = [song]() { song->undo(); };
+    window->onRedo = [song]() { song->redo(); };
+    // Only one editor is visible at a time, so clearing all of them is both
+    // correct and simpler than working out which one has the cursor.
+    window->onEscape = [this]() {
+        bool cleared = false;
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->hasSelection()) { h->clearSelection(); cleared = true; }
+        return cleared;
+    };
+
+    // Ctrl-A goes to whichever editor is on screen, wherever the cursor sits.
+    window->onSelectAll = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing()) h->selectAllItems();
+    };
+
+    // Delete acts on the selection wherever the cursor is; with nothing selected
+    // it says so, and the grid under the cursor deletes the note it is hovering.
+    window->onDeleteSelection = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->hasSelection()) { h->deleteSelectedItems(); return true; }
+        return false;
+    };
+
+    // Ctrl-X acts on the selection wherever the cursor is, like Ctrl-C does.
+    window->onCut = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->hasSelection()) { h->cutSelection(); return; }
+    };
+
+    // Ctrl-C acts on the selection wherever the cursor is, like Delete does.
+    window->onCopy = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->hasSelection()) { h->copySelection(); return; }
+    };
+
+    // Ctrl-V, unlike the rest, does care where the cursor is: it is what chooses
+    // where the copy lands. Over anything but an editing grid it does nothing.
+    window->onPaste = [this]() {
+        for (ISelectionHost* h : selectionHosts())
+            if (h && h->showing() && h->ownsWindowPoint(Fl::event_x(), Fl::event_y()))
+                { h->pasteClipboard(Fl::event_x(), Fl::event_y()); return; }
+    };
+
+    // A click anywhere but the grid holding the selection dismisses it. Clicks
+    // inside that grid are left alone: it has its own rules for them (band
+    // sweeps, ctrl-toggles, dragging the selection).
+    window->onClick = [this](int wx, int wy) {
+        for (ISelectionHost* h : selectionHosts()) {
+            if (!h || h->ownsWindowPoint(wx, wy)) continue;
+            if (h->hasSelection()) h->clearSelection();
+        }
+    };
 
     const int off        = 0;
     const int tabsH      = defaultWinH() - bottomH;
@@ -162,6 +230,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* p1      = new NoteContextPopup{};
     auto* p2      = new NoteContextPopup{};
     auto* sp      = new PatternInstanceContextPopup{};
+    auto* selPop  = new SelectionContextPopup{};
+    auto* pastePop = new PasteContextPopup{};
     auto* tPop    = new MarkerPopup(MarkerPopup::TEMPO);
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
@@ -171,8 +241,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* pdPop      = new ParamDotPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
     auto* settingsPop = new SettingsMenuPopup;
-    auto* patTransposePop   = new TransposePopup("Rows:");
-    auto* pianoTransposePop = new TransposePopup("Semitones:");
 
     // ---- Tabs ----
     static constexpr Fl_Color songColor = 0x22C55E00;
@@ -224,10 +292,18 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     loopRuler->setContextPopup(loopRulerPop);
     tab1->add(loopRuler);
 
-    auto* og2 = new SongEditor(0, off + tabBarH + 3*markerRulerH, winW,
-                               10, 60, 45, 60, 0.25, *p2);
+    // The editor fills the tab bar-to-bar: everything under the three marker
+    // rulers except the control bar anchored at the bottom.
+    const int songBodyY = off + tabBarH + 3*markerRulerH;
+    const int songBodyH = (tabsH - tabBarH) - 3*markerRulerH - panelH;
+    auto* og2 = new SongEditor(0, songBodyY, winW, 10, 60, 45, 60, 0.25, *p2);
+    og2->size(winW, songBodyH);
     songEd = og2;
     tab1->add(og2);
+
+    songPanel = new SongPanel(0, songBodyY + songBodyH, winW, panelH);
+    tab1->add(songPanel);
+
     tab1->resizable(og2);
     tabs->add(*tab1);
 
@@ -297,6 +373,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         tempoRuler->setNumCols(n);
         loopRuler->setNumCols(n);
     };
+    // Horizontal zoom: the grid scales its bar width and the three rulers above
+    // it follow, so markers and the loop region stay over the bars they mark.
+    og2->onColWidthChanged = [timeSigRuler, tempoRuler, loopRuler](int cw) {
+        timeSigRuler->setColWidth(cw);
+        tempoRuler->setColWidth(cw);
+        loopRuler->setColWidth(cw);
+    };
+    songPanel->onZoomChanged = [og2](float factor) { og2->setZoom(factor); };
     og2->setPattern(pattern);
     og2->setContextPopup(ctxPop);
     ctxPop->onShowInstruments = [this]() {
@@ -389,6 +473,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         drumEd->setPlayheadLoopMode(loop);
         pianorollEd->setPlayheadLoopMode(loop);
     });
+    // Both halves of the saved loop state report through one hook: the mode when it
+    // settles (which for Loop -> Song is the end of the hand-off, not the click),
+    // and the switched-on set whenever the LoopManager changes.
+    modeController.onModeSettled = [this]() { checkLoopStateChanged(); };
+    loopStateWatch.app = this;
+    loopMgr.addObserver(&loopStateWatch);
     tabs->onModeChanged = [this](bool isLoop) {
         modeController.requestMode(isLoop);
         // The transport loop toggle only applies in Song mode; grey it (but keep it
@@ -409,8 +499,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
-    harmonyEd->setTransposePopup(patTransposePop);
-    pianorollEd->setTransposePopup(pianoTransposePop);
+    // The selection and paste menus are shared: only one editor is on screen at
+    // a time, so one instance of each can serve them all.
+    for (ISelectionHost* h : selectionHosts())
+        if (h) { h->setSelectionPopup(selPop); h->setPastePopup(pastePop); }
     harmonyEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);
@@ -455,6 +547,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(p1);     window->registerPopup(p1);
     window->add(p2);     window->registerPopup(p2);
     window->add(sp);     window->registerPopup(sp);
+    window->add(selPop); window->registerPopup(selPop);
+    window->add(pastePop); window->registerPopup(pastePop);
     window->add(tPop);   window->registerPopup(tPop);
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
@@ -467,8 +561,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
     window->add(settingsPop); window->registerPopup(settingsPop);
-    window->add(patTransposePop);   window->registerPopup(patTransposePop);
-    window->add(pianoTransposePop); window->registerPopup(pianoTransposePop);
     // Hover popup: a positioned sub-window, but NOT registered — registering
     // would route mouse-moves through AppWindow's click-away logic and break the
     // indicator's enter/leave tracking.
@@ -627,4 +719,48 @@ LuvieApp::~LuvieApp() {
         song_->removeObserver(&editorSwitcher_);
         song_->removeObserver(&changeNotifier_);
     }
+    loopMgr.removeObserver(&loopStateWatch);
+}
+
+// ---- Persisted loop state ------------------------------------------------
+
+bool LuvieApp::isLoopMode() const {
+    return modeController.isLoopMode();
+}
+
+std::vector<int> LuvieApp::activeLoopPatterns() const {
+    // Only Loop mode's set is ours to save; in Song mode the active patterns are
+    // derived from the timeline by sync() and would be stale by the next bar.
+    if (!isLoopMode()) return {};
+    std::vector<int> ids;
+    ids.reserve(loopMgr.patterns().size());
+    for (const auto& [patId, anchor] : loopMgr.patterns()) ids.push_back(patId);
+    // The manager keys off an unordered_map, so sort: an arbitrary order would
+    // churn the saved JSON (and the plugin's state atom) with no real change.
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+void LuvieApp::checkLoopStateChanged() {
+    if (applyingLoopState) return;
+    bool             mode    = isLoopMode();
+    std::vector<int> actives = activeLoopPatterns();
+    if (mode == savedLoopMode && actives == savedActiveLoopPatterns) return;
+    savedLoopMode           = mode;
+    savedActiveLoopPatterns = std::move(actives);
+    if (onLoopStateChanged) onLoopStateChanged();
+}
+
+void LuvieApp::applyLoopState(bool loopMode, const std::vector<int>& activePatterns) {
+    applyingLoopState = true;
+    // Mode first: it gates sync() off, so a Song-mode sync() can't overwrite the
+    // set we are about to restore.
+    modeController.setMode(loopMode);
+    loopMgr.restore(loopMode ? activePatterns : std::vector<int>{}, 0.0f);
+    if (bottomPane) bottomPane->setLoopVisualDisabled(loopMode);
+    applyingLoopState = false;
+
+    // A load is not an edit — adopt the loaded values as the baseline.
+    savedLoopMode           = isLoopMode();
+    savedActiveLoopPatterns = activeLoopPatterns();
 }

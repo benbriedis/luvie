@@ -107,6 +107,21 @@ void LoopManager::clear()
 	if (hadContent) notify();
 }
 
+void LoopManager::restore(const std::vector<int>& patterns, float anchorBar)
+{
+	std::unordered_map<int, float> next;
+	for (int patId : patterns) next[patId] = anchorBar;
+
+	bool changed = next != activePats || !manualActive.empty() || !manuallyDisabled.empty();
+	activePats = std::move(next);
+	manualActive.clear();
+	manuallyDisabled.clear();
+	// Left empty so the first sync() after a switch back to Song mode treats every
+	// timeline placement as a new instance rather than a continuing one.
+	songOriginated.clear();
+	if (changed) notify();
+}
+
 void LoopManager::reanchorAll(float anchorBar)
 {
 	bool changed = false;

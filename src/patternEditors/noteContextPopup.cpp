@@ -48,7 +48,9 @@ public:
 	}
 };
 
-NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 3 * btnH)
+// Two rows: the velocity slider and Delete. (A third, Transpose, used to sit
+// below them and size the menu dynamically; vertical drag replaced it.)
+NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 2 * btnH)
 {
 	velRow = new VelocityRow(1, 1, popW - 2, btnH);
 	velRow->begin();
@@ -77,7 +79,6 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 3 * btnH
 	velRow->end();
 
 	ModernButton *deleteItem = addItem(1, "Delete");
-	transposeItem            = addItem(2, "Transpose");
 	end();
 	hide();
 
@@ -89,15 +90,6 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 3 * btnH
 			self->notes->erase(self->notes->begin() + self->selected);
 		self->hide();
 		if (auto* win = self->window()) win->redraw();
-	}, this);
-
-	transposeItem->callback([](Fl_Widget*, void* me) {
-		NoteContextPopup* self = (NoteContextPopup*)me;
-		// Hand the transpose popup this menu's position so it opens in place.
-		auto fn = self->onTransposeFn;
-		int  px = self->x(), py = self->y();
-		self->hide();
-		if (fn) fn(px, py);
 	}, this);
 }
 
@@ -123,26 +115,14 @@ void NoteContextPopup::onVelocityChanged()
 		onVelocityFn((float)velSlider->value());
 }
 
-// The Transpose item only applies to the note editors, so the menu grows and
-// shrinks by one row depending on whether the opener supplied a handler.
-void NoteContextPopup::showTranspose(bool on)
-{
-	on ? transposeItem->show() : transposeItem->hide();
-	popH = 2 + (on ? 3 : 2) * btnH;
-	size(popW, popH);
-}
-
 void NoteContextPopup::open(int mySelected, std::vector<Note>* myNotes, Grid* myGrid,
-                 std::function<void()> onDelete, std::function<void(float)> onVelocity,
-                 std::function<void(int,int)> onTranspose)
+                 std::function<void()> onDelete, std::function<void(float)> onVelocity)
 {
 	selected      = mySelected;
 	notes         = myNotes;
 	grid          = myGrid;
 	onDeleteFn    = std::move(onDelete);
 	onVelocityFn  = std::move(onVelocity);
-	onTransposeFn = std::move(onTranspose);
-	showTranspose((bool)onTransposeFn);
 
 	const Note& cell = (*notes)[mySelected];
 	velSlider->value(cell.velocity);
@@ -160,8 +140,6 @@ void NoteContextPopup::openForDot(int dotX, int dotY, Fl_Widget* w, int rowH, fl
 {
 	onDeleteFn    = std::move(onDelete);
 	onVelocityFn  = std::move(onVelocity);
-	onTransposeFn = nullptr;
-	showTranspose(false);
 	notes = nullptr;
 	grid  = nullptr;
 	velSlider->value(velocity);

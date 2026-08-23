@@ -30,9 +30,14 @@ class HarmonyGrid : public Grid, public ITimelineObserver {
     std::set<std::pair<int,int>> rapidCells;
     std::optional<RapidCell>     rapidLast;
     std::optional<RapidCell>     rapidPending;
+    // Open for the duration of a paint stroke so the whole stroke is one undo
+    // entry. Not a Batch: the notifications have to keep flowing or the painted
+    // notes would not appear until the mouse came up.
+    std::optional<ObservableSong::UndoGroup> rapidUndo;
 
     void rebuildNotes();
-    void addNoteAt(int virtualPos, float col, float length);
+    // Returns the new note's id, or 0 if it could not be created.
+    int  addNoteAt(int virtualPos, float col, float length, float velocity = 0.8f);
     bool screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const;
     void rapidTryCreate(int visualRow, int absCol);
     void processRapidCell(RapidCell cur);
@@ -50,8 +55,6 @@ class HarmonyGrid : public Grid, public ITimelineObserver {
     // and the note-slot a virtual row stands for — inverses of each other.
     int virtualPosOf(const Note& n) const;
     ObservablePattern::NoteRowSlot slotForVirtualPos(int noteId, int virtualPos) const;
-    std::pair<int,int> virtualPosExtent() const;
-    void transposeRows(int rows);
 
 protected:
     Fl_Color columnColor(int col) const override;
@@ -59,10 +62,24 @@ protected:
     Fl_Color rowBgColor(int row)  const override;
     std::function<void()> makeDeleteCallback(int noteIdx) override;
     std::function<void(float)> makeVelocityCallback(int noteIdx) override;
-    std::function<void(int,int)> makeTransposeCallback(int noteIdx) override;
     void onCommitMove(const StateDragMove& s) override;
     void onCommitResize(const StateDragResize& s) override;
     void toggleNote() override;
+
+    // Dragging a selection up or down is what replaced the Transpose dialog:
+    // the delta is in GUI rows, so notes cross into and out of bonus rows the
+    // same way a single dragged note does.
+    std::unordered_set<int> liveItemIds() const override;
+    void selectAll() override;
+    void deleteSelection() override;
+    void groupDragLimits(float& minDBeat, float& maxDBeat,
+                         int& minDRow, int& maxDRow) const override;
+    bool groupMoveBlocked(float dBeat, int dRow) const override;
+    void onCommitGroupMove(float dBeat, int dRow) override;
+
+    ClipKind clipKind() const override { return ClipKind::HarmonyNotes; }
+    std::vector<ClipItem> selectedForClipboard() const override;
+    bool pasteAt(const std::vector<ClipItem>& items, int visualRow, float beat) override;
 
     int handle(int event) override;
 

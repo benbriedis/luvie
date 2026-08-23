@@ -41,29 +41,33 @@ void ObservablePattern::onTimelineChanged()
 // ---------------------------------------------------------------------------
 // Note CRUD
 
-void ObservablePattern::addNote(int patternId, float start, int pitch, float length, float velocity)
+int ObservablePattern::addNote(int patternId, float start, int pitch, float length, float velocity)
 {
     for (auto& pat : song_->data.patterns) {
         if (pat.id == patternId) {
-            pat.notes.push_back({song_->nextId++, pitch, start, length, velocity});
+            int id = song_->nextId++;
+            pat.notes.push_back({id, pitch, start, length, velocity});
             song_->notify();
-            return;
+            return id;
         }
     }
+    return 0;
 }
 
-void ObservablePattern::addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
-                                     float length, float velocity)
+int ObservablePattern::addBonusNote(int patternId, float start, int pitchGroup, int bonusDegree,
+                                    float length, float velocity)
 {
-    if (bonusDegree < 0) return;
+    if (bonusDegree < 0) return 0;
     for (auto& pat : song_->data.patterns) {
         if (pat.id == patternId) {
-            pat.notes.push_back({song_->nextId++, pitchGroup, start, length, velocity,
+            int id = song_->nextId++;
+            pat.notes.push_back({id, pitchGroup, start, length, velocity,
                                  true, bonusDegree});
             song_->notify();
-            return;
+            return id;
         }
     }
+    return 0;
 }
 
 void ObservablePattern::removeNote(int noteId)
@@ -133,72 +137,9 @@ void ObservablePattern::setNoteVelocity(int noteId, float velocity)
     }
 }
 
-std::pair<int,int> ObservablePattern::patternPitchExtent(int patternId) const
-{
-    for (const auto& pat : song_->data.patterns) {
-        if (pat.id != patternId) continue;
-        if (pat.notes.empty()) break;
-
-        int lo = 127, hi = 0;
-        for (const auto& n : pat.notes) {
-            lo = std::min(lo, n.row);
-            hi = std::max(hi, n.row);
-        }
-        return {lo, hi};
-    }
-    return {-1, -1};
-}
-
-// Shift every note of a pianoroll pattern (row = MIDI pitch) by `semitones`.
-// Callers offer only shifts that keep the pattern in range (patternPitchExtent);
-// the clamp here is the backstop that keeps that invariant in one place.
-// One notify() covers everything downstream: the editors redraw and the
-// sequencer snapshot (JACK/native) or the plugin's state atom is rebuilt.
-void ObservablePattern::transposePattern(int patternId, int semitones)
-{
-    if (semitones == 0) return;
-    auto [lo, hi] = patternPitchExtent(patternId);
-    if (lo < 0) return;
-
-    int shift = std::clamp(semitones, -lo, 127 - hi);
-    if (shift == 0) return;
-
-    for (auto& pat : song_->data.patterns) {
-        if (pat.id != patternId) continue;
-        for (auto& n : pat.notes) n.row += shift;
-        song_->notify();
-        return;
-    }
-}
-
-// Bulk row assignment, used by the harmony editor's transpose. Which row a note
-// belongs on is a question about the chord layout, so the caller works that out;
-// applying the whole set in one pass keeps it atomic and costs a single notify()
-// (one snapshot rebuild for the RT thread) however many notes moved.
-void ObservablePattern::setNoteRows(int patternId, const std::vector<NoteRowSlot>& slots)
-{
-    if (slots.empty()) return;
-    for (auto& pat : song_->data.patterns) {
-        if (pat.id != patternId) continue;
-        bool changed = false;
-        for (auto& n : pat.notes) {
-            for (const auto& s : slots) {
-                if (s.noteId != n.id) continue;
-                n.row         = s.row;
-                n.bonus       = s.bonus;
-                n.bonusDegree = s.bonusDegree;
-                changed = true;
-                break;
-            }
-        }
-        if (changed) song_->notify();
-        return;
-    }
-}
-
-// A drag in the harmony editor changes the beat and the row together, and the row
-// may switch a note between ordinary and bonus — so it goes through one call, and
-// one notify(), rather than a moveNote() plus a setNoteRows().
+// A drag in the harmony editor changes the beat and the row together, and the
+// row may switch a note between ordinary and bonus — so it goes through one
+// call, and one notify(), rather than a moveNote() plus a row assignment.
 void ObservablePattern::moveNoteToSlot(float newStart, const NoteRowSlot& slot)
 {
     for (auto& pat : song_->data.patterns) {
@@ -256,15 +197,17 @@ void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
 // ---------------------------------------------------------------------------
 // Drum note CRUD
 
-void ObservablePattern::addDrumNote(int patternId, int note, float beat, float velocity)
+int ObservablePattern::addDrumNote(int patternId, int note, float beat, float velocity)
 {
     for (auto& pat : song_->data.patterns) {
         if (pat.id == patternId) {
-            pat.drumNotes.push_back({song_->nextId++, note, beat, velocity});
+            int id = song_->nextId++;
+            pat.drumNotes.push_back({id, note, beat, velocity});
             song_->notify();
-            return;
+            return id;
         }
     }
+    return 0;
 }
 
 void ObservablePattern::removeDrumNote(int drumNoteId)
@@ -276,6 +219,24 @@ void ObservablePattern::removeDrumNote(int drumNoteId)
             pat.drumNotes.erase(it);
             song_->notify();
             return;
+        }
+    }
+}
+
+// Move in both axes, keeping the note's id. The drum grid used to commit a drag
+// as removeDrumNote + addDrumNote, which issued a NEW id — two notifications for
+// one gesture, two undo steps, and no stable identity for a selection to hold on
+// to across the drag.
+void ObservablePattern::moveDrumNote(int drumNoteId, int note, float beat)
+{
+    for (auto& pat : song_->data.patterns) {
+        for (auto& n : pat.drumNotes) {
+            if (n.id == drumNoteId) {
+                n.note = std::clamp(note, 0, 127);
+                n.beat = beat;
+                song_->notify();
+                return;
+            }
         }
     }
 }
@@ -477,7 +438,7 @@ void ObservablePattern::setPatternDivisions(int patId, int divisions)
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
             p.divisions = divisions;
-            song_->notify();
+            song_->notifyViewState();
             return;
         }
     }
@@ -488,7 +449,7 @@ void ObservablePattern::setPatternSnapEnabled(int patId, bool enabled)
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
             p.snapEnabled = enabled;
-            song_->notify();
+            song_->notifyViewState();
             return;
         }
     }
@@ -499,7 +460,7 @@ void ObservablePattern::setPatternZoom(int patId, int zoom)
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
             p.zoom = zoom;
-            song_->notify();
+            song_->notifyViewState();
             return;
         }
     }

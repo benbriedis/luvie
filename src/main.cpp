@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
                    "  -h, --help       Show this help message\n"
                    "  --version        Show version information\n\n"
                    "Arguments:\n"
-                   "  project-file     Path to a .luv project file to open on startup\n"
+                   "  project-file     Path to a .luvie project file to open on startup\n"
 #ifdef LUVIE_HAVE_NSM
                    "\nEnvironment:\n"
                    "  NSM_URL          Connect to a Non Session Manager at this OSC address\n"
@@ -334,6 +334,8 @@ int main(int argc, char **argv) {
         state.timeline = songTimeline.get();
         if (app.transportOverlay) state.transport = app.transportOverlay->selection();
         collectOutputs(state);
+        state.loopMode           = app.isLoopMode();
+        state.activeLoopPatterns = app.activeLoopPatterns();
         return state;
     };
 
@@ -345,6 +347,9 @@ int main(int argc, char **argv) {
         applyLoadedOutputs(state);
         if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
             app.transportOverlay->setSelection(state.transport);
+        // After the timeline: restoring the mode gates sync() off, and loadTimeline
+        // above fires the sync that would otherwise repopulate the active set.
+        app.applyLoopState(state.loopMode, state.activeLoopPatterns);
     };
 
     // --- Transport selection ----------------------------------------------
@@ -481,7 +486,7 @@ int main(int argc, char **argv) {
     };
 
     // --- Session management ------------------------------------------------
-    // One SessionManager backs every save path; the mode (standalone .luv vs.
+    // One SessionManager backs every save path; the mode (standalone .luvie vs.
     // NSM-managed) is chosen once, below, and the rest of the code is mode-blind.
     static NsmClient nsm;
     std::unique_ptr<SessionManager> session;
@@ -520,10 +525,15 @@ int main(int argc, char **argv) {
     DirtyTracker dirtyTracker(session.get());
     songTimeline.addObserver(&dirtyTracker);
 
+    // The Song/Loop mode and the Loop Editor's switches live outside the timeline,
+    // so the tracker above never sees them — but they are saved now, so a change to
+    // either has to dirty the project the same way an edit does.
+    app.onLoopStateChanged = [&]() { session->markDirty(); };
+
     // NSM open: load the session file (if any) and remember the session path.
     nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
         AppState state;
-        if (loadAppState(path + ".luv", state)) {
+        if (loadAppState(path + ".luvie", state)) {
             newProject = false;
             dirtyTracker.setSuppressed(true);
             applyLoadedState(state);
@@ -648,6 +658,12 @@ int main(int argc, char **argv) {
             while (Fl_Window* w = Fl::first_window()) w->hide();
         });
     }
+
+    // Everything above built the song through the ordinary mutators — the
+    // default tracks, a loaded project, the instrument reconciliation. None of
+    // it is an edit the user made, so it must not be sitting on the undo stack
+    // when they press ctrl-Z for the first time.
+    songTimeline.clearHistory();
 
     // Under NSM the GUI is optional: hiding it must not end the program (the
     // session manager keeps us running and terminates us with SIGTERM).

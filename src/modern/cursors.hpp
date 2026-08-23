@@ -12,12 +12,13 @@
 const Fl_RGB_Image* forbiddenCursorImage();
 const Fl_RGB_Image* contextMenuCursorImage();
 
-// Warp the mouse pointer to the window-relative position (winX, winY). Used at
-// drag start so the cursor jumps to the centre of the block being moved.
-// Returns true if the pointer was actually moved; false when the platform
-// doesn't support warping (e.g. Wayland), so callers can skip re-anchoring
-// their grab offset and keep the pre-warp behaviour.
-bool warpPointerTo(Fl_Window* win, int winX, int winY);
+// Put the forbidden cursor up for a moment, then hand the window back to the
+// default one. It is how a command that acts where the cursor is says it could
+// not be done there — a paste that would not fit, say: there is no item to
+// outline and nothing was placed, so the cursor is the only thing left to say it
+// with. Any mouse movement in the meantime lets the widget under it set its own
+// cursor again, which is fine: the user has moved on.
+void flashForbiddenCursor(Fl_Window* win);
 
 // General hover-cursor helper. Call at the top of a widget's handle().
 // Returns >= 0 when the event is consumed by cursor logic (caller should return that value).

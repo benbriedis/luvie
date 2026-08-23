@@ -51,6 +51,10 @@
 #include "observableSong.hpp"
 #include "timelineIO.hpp"
 #include "pluginPorts.hpp"
+/* luvieDebug(): LUVIE_DEBUG=1 traces state application and per-second
+   transport/MIDI activity on stderr. The UI half of a hosted session reads
+   the same variable, so one setting covers both processes. */
+#include "luvieDebug.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -65,17 +69,6 @@
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
 #define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
-
-/* Opt-in diagnostics: run the host with LUVIE_DEBUG=1 to trace state application
-   and per-second transport/MIDI activity on stderr. */
-static bool luvieDebug()
-{
-    static const bool on = [] {
-        const char* e = getenv("LUVIE_DEBUG");
-        return e && *e && strcmp(e, "0") != 0;
-    }();
-    return on;
-}
 
 /* -----------------------------------------------------------------------
    Lv2Engine — Sequencer whose emit() forges MIDI into the LV2 MIDI output ports.
@@ -274,7 +267,11 @@ struct Plugin {
    State application (worker thread, or the host thread during dsp_restore)
    ----------------------------------------------------------------------- */
 
-static void applyState(Plugin* p, const std::string& json)
+/* restoreLoopState is true only for dsp_restore (project load). The UI re-sends the
+   whole project on every edit, and those sends must NOT touch the loop state: the
+   live anchors live in the luvie_loop atom, and re-applying the saved set would drop
+   every running loop back to bar 0 — an audible phase jump on an unrelated edit. */
+static void applyState(Plugin* p, const std::string& json, bool restoreLoopState = false)
 {
     AppState st;
     if (!appStateFromJsonString(json, st))
@@ -313,6 +310,18 @@ static void applyState(Plugin* p, const std::string& json)
     /* Timeline last: each setter rebuilds the RT snapshot, so loading the timeline
        after the routing/params are in place gives a final snapshot with them. */
     p->song->loadTimeline(st.timeline);
+
+    /* A project can be loaded with no editor open — the DSP is then the only thing
+       that knows the session was left in Loop Mode, so it has to come up that way
+       rather than playing the song arrangement. Anchor at bar 0: anchors are not
+       saved (see AppState). Mode before the set, matching the atom path. */
+    if (restoreLoopState) {
+        p->engine->setLoopMode(st.loopMode);
+        std::unordered_map<int, float> actives;
+        if (st.loopMode)
+            for (int patId : st.activeLoopPatterns) actives[patId] = 0.0f;
+        p->loopMgr.mirror(actives, {}, {});
+    }
 
     {
         std::lock_guard<std::mutex> lk(p->stateMutex);
@@ -742,7 +751,7 @@ static LV2_State_Status dsp_restore(
 
     /* Restore runs on the host thread at load time with no concurrent worker, so
        apply directly (applyState also stores stateJson for a later dsp_save). */
-    applyState(p, std::string((const char*)data, jsonLen));
+    applyState(p, std::string((const char*)data, jsonLen), /*restoreLoopState=*/true);
 
     /* Also write the JSON to the state file so the UI repaints this project when its
        editor is next opened. A plain write is fine: no concurrent writer at load. */

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "playhead.hpp"
+#include "luvieDebug.hpp"
 #include "port.hpp"
 #include "portRegistry.hpp"
 #include "chords.hpp"
@@ -132,6 +133,13 @@ void Playhead::tick()
 						allSoftNotesOff();   // seeked backward
 					}
 					if (curPos >= (float)numCols) {
+						// Hosted, this is a global jack_transport_stop(), so when
+						// playback dies unexpectedly it matters whether WE did it.
+						// LUVIE_DEBUG=1 says so on stderr; see luvie_dsp.cpp.
+						if (luvieDebug())
+							fprintf(stderr, "[luvie] playhead: song end reached at bar "
+							        "%.2f (grid is %d bars) - stopping transport\n",
+							        curPos, numCols);
 						transport->pause();
 						if (onEndReached) onEndReached();
 					}
