@@ -87,6 +87,7 @@ cf custom chord and scale builder
    - NB having 'chromatic' available means this isn't necessarily super required.
 
 MIDI 2:
+	Look at  https://midi2.dev/
 	Allows microtonal, including
    - Alpha, beta and gamma chords and scales 
    - More traditional / world scales
@@ -348,8 +349,6 @@ TODO create a multi-select click and drag tool + copy for use in Song Editor.
 	 - Need zoom for this too...
 	 NB some tracks may be collapsed. Parameter dots need to be includable?
      
-BUG: I suspect 'Loop mode' + current loops are not being saved.
-
 BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
 TODO move 'Add automation' to second last in the menu
 
@@ -370,8 +369,6 @@ Document
  
 Change tab when undoing/redoing when necessary (+ scroll? cf recenter? cf storing position when editing?) 
 
-TODO check undo, multi-select, etc in LV2 mode
-
 TODO In pattern editors some notes may sit at divisions not currently supported.
      Should have a consistent policy for how to deal with dragging in this case.
      Seems a bit ad hoc at the moment.
@@ -384,7 +381,5 @@ Manual:
 
 BUG: clicking a dragging two blocks in a collapsed track can be dragged into a single pattern lane.
      Reality bites when clicking on one of the dragged blocks and one blocks jumps up.
-
-
 
 

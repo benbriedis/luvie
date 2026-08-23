@@ -189,6 +189,10 @@ void SongEditor::updateScrollBounds()
     int newNumCols = computeNumCols();
     if (newNumCols != songGrid.numCols) {
         songGrid.numCols = newNumCols;
+        // The playhead measures the end of the song against this too — it stops
+        // playback there and clamps seeks to it — so it has to grow with the grid,
+        // else a song longer than the initial column count stops mid-way.
+        playhead.setNumCols(newNumCols);
         if (onNumColsChanged) onNumColsChanged(newNumCols);
     }
     if (!timeline || !scrollbar) return;

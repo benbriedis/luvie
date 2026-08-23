@@ -336,6 +336,8 @@ std::string appStateToJsonString(const AppState& state) {
         {"timeline",        timelineToJson(state.timeline)},
         {"jackOutputs",     jconns},
         {"jackInstruments", jinstrs},
+        {"loopMode",           state.loopMode},
+        {"activeLoopPatterns", state.activeLoopPatterns},
     };
     return j.dump(2);
 }
@@ -349,6 +351,11 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     }
     state.transport = j.value("transport", -1);
     state.defaultPortBackend = backendFromString(j.value("defaultPortBackend", "jack"));
+    // Absent in projects saved before loop state was persisted: they load as Song
+    // mode with no loops running, which is what those sessions started as anyway.
+    state.loopMode = j.value("loopMode", false);
+    for (const auto& jp : j.value("activeLoopPatterns", json::array()))
+        state.activeLoopPatterns.push_back(jp.get<int>());
     if (j.contains("timeline"))
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackOutputs", json::array()))

@@ -8,6 +8,7 @@
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
 #include "observableInstrument.hpp"
+#include <algorithm>
 #include <filesystem>
 #include "appWindow.hpp"
 #include "songEditor.hpp"
@@ -121,6 +122,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
 
     app->song_->loadTimeline(state.timeline);
     if (app->onApplyOutputs) app->onApplyOutputs(state);
+    app->applyLoopState(state.loopMode, state.activeLoopPatterns);
 }
 
 void LuvieApp::exportCb(Fl_Widget*, void* data) {
@@ -143,6 +145,8 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     AppState state;
     state.timeline = app->song_->get();
     if (app->onCollectOutputs) app->onCollectOutputs(state);
+    state.loopMode           = app->isLoopMode();
+    state.activeLoopPatterns = app->activeLoopPatterns();
     saveAppState(state, path);
 }
 
@@ -469,6 +473,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         drumEd->setPlayheadLoopMode(loop);
         pianorollEd->setPlayheadLoopMode(loop);
     });
+    // Both halves of the saved loop state report through one hook: the mode when it
+    // settles (which for Loop -> Song is the end of the hand-off, not the click),
+    // and the switched-on set whenever the LoopManager changes.
+    modeController.onModeSettled = [this]() { checkLoopStateChanged(); };
+    loopStateWatch.app = this;
+    loopMgr.addObserver(&loopStateWatch);
     tabs->onModeChanged = [this](bool isLoop) {
         modeController.requestMode(isLoop);
         // The transport loop toggle only applies in Song mode; grey it (but keep it
@@ -709,4 +719,48 @@ LuvieApp::~LuvieApp() {
         song_->removeObserver(&editorSwitcher_);
         song_->removeObserver(&changeNotifier_);
     }
+    loopMgr.removeObserver(&loopStateWatch);
+}
+
+// ---- Persisted loop state ------------------------------------------------
+
+bool LuvieApp::isLoopMode() const {
+    return modeController.isLoopMode();
+}
+
+std::vector<int> LuvieApp::activeLoopPatterns() const {
+    // Only Loop mode's set is ours to save; in Song mode the active patterns are
+    // derived from the timeline by sync() and would be stale by the next bar.
+    if (!isLoopMode()) return {};
+    std::vector<int> ids;
+    ids.reserve(loopMgr.patterns().size());
+    for (const auto& [patId, anchor] : loopMgr.patterns()) ids.push_back(patId);
+    // The manager keys off an unordered_map, so sort: an arbitrary order would
+    // churn the saved JSON (and the plugin's state atom) with no real change.
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+void LuvieApp::checkLoopStateChanged() {
+    if (applyingLoopState) return;
+    bool             mode    = isLoopMode();
+    std::vector<int> actives = activeLoopPatterns();
+    if (mode == savedLoopMode && actives == savedActiveLoopPatterns) return;
+    savedLoopMode           = mode;
+    savedActiveLoopPatterns = std::move(actives);
+    if (onLoopStateChanged) onLoopStateChanged();
+}
+
+void LuvieApp::applyLoopState(bool loopMode, const std::vector<int>& activePatterns) {
+    applyingLoopState = true;
+    // Mode first: it gates sync() off, so a Song-mode sync() can't overwrite the
+    // set we are about to restore.
+    modeController.setMode(loopMode);
+    loopMgr.restore(loopMode ? activePatterns : std::vector<int>{}, 0.0f);
+    if (bottomPane) bottomPane->setLoopVisualDisabled(loopMode);
+    applyingLoopState = false;
+
+    // A load is not an edit — adopt the loaded values as the baseline.
+    savedLoopMode           = isLoopMode();
+    savedActiveLoopPatterns = activeLoopPatterns();
 }

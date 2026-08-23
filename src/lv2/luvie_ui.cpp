@@ -225,6 +225,13 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
         return false;
     state.timeline  = ui->song->get();
     collectOverlayOutputs(ui, state);
+    /* Loop state travels in the project blob as well as in the luvie_loop atom.
+       The atom is the live channel (it carries anchors and reaches the engine
+       immediately); this copy is what dsp_save persists and what the next editor
+       window reads back, so closing and reopening comes up in the same mode with
+       the same patterns switched on. */
+    state.loopMode           = ui->app.isLoopMode();
+    state.activeLoopPatterns = ui->app.activeLoopPatterns();
     return true;
 }
 
@@ -304,6 +311,11 @@ static void sendLoopState(LuvieUI* ui)
 {
     if (!ui || !ui->writeFunc || !ui->luvie_loop_urid || !ui->atom_eventTransfer)
         return;
+    /* Mid-restore the UI's LoopManager is still being rebuilt, and loadTimeline()
+       fires a Song-mode sync() before the saved mode has been applied. Sending that
+       would knock a restored DSP out of Loop Mode for a moment; the restore sends
+       one authoritative message when it is finished instead. */
+    if (ui->restoringState) return;
 
     const LoopManager& lm      = ui->app.loopMgr;
     const bool         loopMode = ui->loopMode;
@@ -412,7 +424,17 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->restoringState = true;
     ui->song->loadTimeline(state.timeline);
     applyOverlayOutputs(ui, state);
+    /* After the timeline: applyLoopState() gates sync() off for Loop Mode, and
+       loadTimeline() above has just fired the sync that would otherwise refill the
+       active set from the song. */
+    ui->app.applyLoopState(state.loopMode, state.activeLoopPatterns);
+    ui->loopMode = state.loopMode;
     ui->restoringState = false;
+    /* One loop-state message now that the mode and the active set agree. This the
+       DSP does need even though dsp_restore applied the same values: the editor can
+       be opened long after the restore, and this is also the path that re-syncs the
+       engine when a window is closed and reopened mid-session. */
+    sendLoopState(ui);
     /* No sendState() here: this is called from the restore path, where the DSP
        already applied exactly this content in dsp_restore. Re-sending it would only
        schedule a redundant worker parse. */
@@ -567,6 +589,14 @@ static LV2UI_Handle instantiate(
         ui->loopMode = m;
         sendLoopState(ui);
     });
+    /* The atom above is the live channel and is not persisted by the host. Mode and
+       switch changes are part of the project now, so re-send the full state too —
+       that is what dsp_save stores and what a reopened editor reads back. Narrow by
+       design: this fires only when the saved values change, never on the several
+       sync() churns a bar that Song Mode produces. */
+    ui->app.onLoopStateChanged = [ui]() {
+        if (!ui->restoringState) sendState(ui);
+    };
 
     /* Emit auditioned notes (and their note-offs) to the DSP as raw MIDI. */
     ui->app.auditioner.setMidiSink(

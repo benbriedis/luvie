@@ -34,6 +34,15 @@ struct AppState {
     MidiBackend defaultPortBackend = MidiBackend::Jack;  // type assigned to newly added ports
     std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;
+
+    // Song/Loop mode, and in Loop mode which patterns the Loop Editor has switched
+    // on. The LoopManager is otherwise runtime-only state, but these two survive so
+    // a project reopens in the mode it was left in with the same loops running.
+    // Anchors are deliberately not saved: on load every loop starts at bar 0.
+    // activeLoopPatterns is meaningless (and left empty) in Song mode, where the
+    // active set is derived from the timeline by LoopManager::sync().
+    bool             loopMode = false;
+    std::vector<int> activeLoopPatterns;   // pattern IDs, ascending
 };
 
 // Serialize/deserialize AppState to/from a JSON string.

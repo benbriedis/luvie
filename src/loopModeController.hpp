@@ -37,12 +37,26 @@ public:
     // Wire to ModernTabs::onModeChanged. `loop` is the requested mode.
     void requestMode(bool loop);
 
+    // Adopt a mode from a loaded project. Settles immediately in both directions:
+    // a project load has no in-flight loop phase to hand off, so the Loop → Song
+    // alignment wait (and its seek-back to the frozen bar) would be meaningless.
+    void setMode(bool loop);
+
+    // Fired whenever the mode settles — the user's toggle, the end of a Loop →
+    // Song hand-off, or setMode(). Lets the owner notice a mode change without
+    // having to poll or duplicate the transition rules.
+    std::function<void()> onModeSettled;
+
     // True while settled in Song mode (not Loop, not mid-transition-to-Song).
     bool isSongMode() const { return state == State::Song; }
+    // True in Loop mode, including while handing back to Song: the loops are still
+    // the thing playing until the hand-off completes.
+    bool isLoopMode() const { return state != State::Song; }
 
 private:
     enum class State { Song, Loop, TransitionToSong };
 
+    void applyMode(bool loop);  // the settle itself: transport, editors, visuals
     void enterLoop();        // Song → Loop
     void beginTransition();  // Loop → Song (starts the poll, or finishes if paused)
     void finishToSong();     // commit the seek-back + flip to song mode

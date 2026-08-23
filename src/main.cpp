@@ -334,6 +334,8 @@ int main(int argc, char **argv) {
         state.timeline = songTimeline.get();
         if (app.transportOverlay) state.transport = app.transportOverlay->selection();
         collectOutputs(state);
+        state.loopMode           = app.isLoopMode();
+        state.activeLoopPatterns = app.activeLoopPatterns();
         return state;
     };
 
@@ -345,6 +347,9 @@ int main(int argc, char **argv) {
         applyLoadedOutputs(state);
         if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)
             app.transportOverlay->setSelection(state.transport);
+        // After the timeline: restoring the mode gates sync() off, and loadTimeline
+        // above fires the sync that would otherwise repopulate the active set.
+        app.applyLoopState(state.loopMode, state.activeLoopPatterns);
     };
 
     // --- Transport selection ----------------------------------------------
@@ -519,6 +524,11 @@ int main(int argc, char **argv) {
     // it). Loads also fire onTimelineChanged(), so they suppress the tracker.
     DirtyTracker dirtyTracker(session.get());
     songTimeline.addObserver(&dirtyTracker);
+
+    // The Song/Loop mode and the Loop Editor's switches live outside the timeline,
+    // so the tracker above never sees them — but they are saved now, so a change to
+    // either has to dirty the project the same way an edit does.
+    app.onLoopStateChanged = [&]() { session->markDirty(); };
 
     // NSM open: load the session file (if any) and remember the session path.
     nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {
