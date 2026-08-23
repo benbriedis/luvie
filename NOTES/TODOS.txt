@@ -55,7 +55,7 @@ FUTURE FUNCTIONALITY
 
 - Pianoroll and drum patterns - allow importing of patterns.
 
-- Pianoroll and drum patterns - should support recording of patterns..
+- Pianoroll and drum patterns - should support recording of patterns... (inc parameter changes)
 
 - cf Is pitch randomisation possible for drums?
 
@@ -343,14 +343,9 @@ Apply at signpath.org — one-off, takes days to weeks. Requirements Luvie alrea
 Can I add to Arch AUR myself?
 
 
-TODO create a multi-select click and drag tool + copy for use in Song Editor.
-     + probably pattern editors
-     - May be able to remove the transposition option then too...
-	 - Need zoom for this too...
-	 NB some tracks may be collapsed. Parameter dots need to be includable?
+cf a tool option for multi-select?
      
 BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
-TODO move 'Add automation' to second last in the menu
 
 BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
      messy flickery behaviour. Probably best to only resize one at a time.
@@ -365,9 +360,11 @@ Document
 	Ctrl-C   copy selection
 	Ctrl-X   cut selection
 	Ctrl-V   paste
+Maybe list these shortcuts in a window even if they are not edittable.
  
  
-Change tab when undoing/redoing when necessary (+ scroll? cf recenter? cf storing position when editing?) 
+TODO change the tab being display when undoing/redoing as necessary 
+     (+ scroll? cf recenter? cf storing position when editing?) 
 
 TODO In pattern editors some notes may sit at divisions not currently supported.
      Should have a consistent policy for how to deal with dragging in this case.
