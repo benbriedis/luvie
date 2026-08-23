@@ -2,42 +2,71 @@
 
 [← Loops](08-loop-editor.md) · [Contents](README.md) · [The pianoroll editor →](10-pianoroll-editor.md)
 
-A harmony pattern does not store fixed pitches. It stores positions within a
-chord or scale, and the pitches come out of how that is currently interpreted.
-Change the interpretation and the same pattern plays different notes.
+This editor is arguably the meat and potatoes of this sequencer.
+
+A harmony pattern does not store fixed pitches. 
+Instead it stores the positions within an initial chord or scale (ie 1, 2, 3, ...), and calculates the pitches 
+to output by dynamically looking up these positions within the currently selected chord or scale, set relative to the currently 
+selected base/root note. The user can quickly change the currently selected chord or scale and base note.
+This makes it easy for the user to create repeating patterns that move through shifting harmonic landscapes. 
 
 <img src="images/harmonyEditor.png" alt="The Luvie harmony editor" width="800">
 
 ## Pitch interpretation
 
-The purple control panel holds the current interpretation of the pattern's
-pitches. Changing it does not modify the pattern — it changes the pitches that
-are output.
+The purple control panel determines which chord or scale to play and what its
+base note should be. Changing these settings does not modify the pattern — 
+it changes the pitches that are output.
 
-Contrast this with the Transpose option on the note context menu, which changes
-the pattern itself.
+From left to right the purple control panel contains:
+- A sharp/flat toggle that determines whether flats or sharps are to be used in the scales or chords.
+- The base, or root, note to use for the current chord of scale.
+- A chord/scale toggle button. This will change what is shown in the next dropdown.
+- A chord or scale dropdown that lists a large number of available chords and
+  scales. These are divided into categories.
+  Currently only scales and chords belonging to the 12-tone well-tempered scale
+  are included. 
+  I would like to extend to microtonal scales soon (NB this requires good MIDI 2.0 support).
 
-TODO: enumerate the controls on the panel and what each one does.
+In addition it should be noted that the user is free to shift pitches manually
+by selecting multiple notes, clicking and dragging.
 
-## Pitch groups
+## The mapping algorithm
 
-A pitch group is a set of rows covering one chord or scale. Above it sits the
-next group, a real octave higher.
+So when we swap between different types of scales and chords how do we map the notes?
+Different approaches could be taken, but we use a fairly simple one...<br>
+the first note of the old scale or chord becomes the first note of the new scale or chord,<br>
+the second note of the old scale or chord becomes the second note of the new scale or chord,<br>
+the third note of the old scale or chord becomes the third note of the new scale or chord,<br>
+and so on.
 
-TODO: chords, scales and multiple octaves — how many rows each produces.
+Now most chords have a 1st, a 3rd (or a 3rd substitute), a 5th, then a 7th or 6th if it extends that far, and then some extra notes if it continues further.
+So for the most part the simple approach yields decent results moving between different chord types,
+with 1 -> 1, a 3rd -> a 3rd, a 5th -> a 5th, a 7th -> a 7th
 
-Because a group steps up by a full octave rather than by the span of the chord,
-extended chords can overlap into the group above. Pitches are therefore not
-always strictly increasing as you move up the rows. This is deliberate: it keeps
-the root of each group octave-stable as you change chord or scale.
+One nice property of this approach is that its possible to change the chord or scale, and then on
+coming back to the original chord or scale the original notes are reinstated.
 
-## Bonus notes
+Moving between different scales mostly works pretty well too as most scales have
+a 1st, 2nd, 3rd, etc and notes are mapped like-for-like. Changes are likely to be less 
+dramatic when changing between different scales (or chords) containing the same number 
+of notes as one another.
 
-Bonus notes sit in bonus rows, outside the ordinary pitch groups.
+Now some chords and scales extend over more than one octave. To help describe how we deal with this let's 
+define the term *pitch group*. A pitch group is a set of rows covering one chord or scale and can be larger
+than one octave. The harmony editor splits the grid vertically into multiple pitch groups.
 
-TODO: how a bonus note is created.
+The root note of one pitch group always sits one octave above and one octave below the root notes
+of its neighbouring pitch groups. In cases where a pitch group extends beyond one octave
+pitches will *not* strictly ascend as you go up the rows. Instead the pitch will drop down a bit
+when you cross over from one pitch group to the next.
 
-TODO: describe how bonus notes get stretched up additional octaves when using
-smaller pitch groups.
+What happens when you change the type of chord or scale and the number of notes in 
+the pitch group decreases? Ie, what happens to the extra notes at the top of the old
+pitch group? Well these are kept and converted into "bonus notes". The rows these notes sit in are 
+coloured grey, and are mapped onto notes in the pitch group above.  
+If the user removes all the bonus notes in a row then the grey row disappears.
 
-A bonus row disappears when every note in it, across all octaves, is removed.
+
+(The pink control panel is shared with the other editors) - cf putting in the next chapter.
+
