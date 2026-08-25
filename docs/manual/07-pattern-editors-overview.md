@@ -1,4 +1,4 @@
-# The pattern editors
+# The pattern editors - overview
 
 [← The song editor](05-song-editor.md) · [Contents](README.md) · [Tempo, beats and bars →](07-tempo-and-beats.md)
 
@@ -38,3 +38,4 @@ TODO: adding a lane, adding and dragging points, and what the pitch lane does.
 
 TODO: the same lanes exist at song level and at pattern level; explain when to
 use which.
+
