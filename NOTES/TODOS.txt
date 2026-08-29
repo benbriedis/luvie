@@ -13,6 +13,8 @@ Suggestions for Carla (install newest first)
 
 1. 'Recent projects' would be useful.  Otherwise is it assumed we have to use RaySession?
 
+1. Auto-save changes and/or warn if trying to close and changes have been made.
+
 1. Canvas - simplify somehow.
    Possible algorithm - reduce its size by creating a binding box around current items and 
    adding 200px to each sides.
@@ -36,8 +38,6 @@ Suggestions for LV2
 
 FUTURE FUNCTIONALITY
 ====================
-
-- Add a better-looking flat symbol, and maybe sharp, using SVG.  
 
 - Allow the Luvie DSP to send BPM and time signature changes to Jack (ie be a time master).
   Require the DSP to have its own Jack client connection.
@@ -270,29 +270,14 @@ Try Valgrind again
 
 Try Helvum
 
-Create a shortcut mechanism and menu...  (cf dividing by editor type) 
-   cf start/stop    - map to space
-      open pattern  - eg map to <Enter>
-      open context? - eg context button  (currently not working)
-      solo? mute?
-	  Rewind could be '<' and/or ','
-   Generally prefer to have 1 good set of bindings though...
-      
 TODO review the format of the JSON file cf a Zod-like description? cf a version number?
 
 
-BUG (seen twice): After changing scale/chord centering button doesn't (always?) work
-
 Add more hover over notes for controls
-
-DISPLAY BUG: saw all the controls in the plain pattern editor disappear (in Song Mode, looping, LV2 plugin).
 
 
 SOMETIMES there's a row of extra space under the pattern grids. Inconsistent.
 
-
-
-TO CHECK MORE: Not totally sure about how bonus notes are transformed when moving to more complicated chords.
 
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
@@ -320,13 +305,6 @@ TODO hover over an automation dot - should be able to press Delete
 
 ------------------------------------
 
-BUG running as 
-	$ build/src/luvie --tst
-	shows silly options:
-		 -bg2 color
-		 -bg color
-		 -di[splay] host:n.n
-
 Deb installer says 'Unknown license'.  Also, no screenshots
 Icon is missing in the system sidebar tray thingy.
 TEST: cleanup deb install
@@ -346,7 +324,6 @@ BUG: clicking on 'Add automation' (and anything similar) - moving the cursor awa
 BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
      messy flickery behaviour. Probably best to only resize one at a time.
 
-
 Document
 	Ctrl-click  select/deselect
 	Shift-click  slection area
@@ -359,6 +336,14 @@ Document
 Maybe list these shortcuts in a window even if they are not edittable.
 
     cf P or space over song editor to move playhead
+	Create a shortcut mechanism and menu...  (cf dividing by editor type) 
+	   cf start/stop    - map to space
+		  open pattern  - eg map to <Enter>
+		  open context? - eg context button  (currently not working)
+		  solo? mute?
+		  Rewind could be '<' and/or ','
+	   Generally prefer to have 1 good set of bindings though...
+      
  
  
 TODO change the tab being display when undoing/redoing as necessary 

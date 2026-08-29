@@ -48,7 +48,7 @@ static constexpr int kZoomDefault      = 1;  // x2
 KeySection::KeySection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       baseLabel   (0, 0, kLabelW,  h, "Base"),
-      sharpFlatBtn(0, 0, kBtnW,    h, "#", "b"),
+      sharpFlatBtn(0, 0, kBtnW,    h),
       rootChoice  (0, 0, kChoiceW, h)
 {
     gap(kGap);
@@ -306,6 +306,7 @@ void PatternPanel::initHarmonyControls()
     ks.sharpFlatBtn.labelcolor(panelText);
     ks.sharpFlatBtn.setBorderWidth(1);
     ks.sharpFlatBtn.setBorderColor(panelCtrlBorder);
+    ks.sharpFlatBtn.tooltip("Spell notes with sharps or flats");
     ks.sharpFlatBtn.onToggle = [this](bool sharp) {
         int idx  = harmonyControls.keySec.rootChoice.value();
         useSharp = sharp;
@@ -586,6 +587,7 @@ void PatternPanel::populateChordChoice()
                                          : chordDefs[i].name;
         cc.add(path.c_str(), 0, nullptr, (void*)(intptr_t)i);
     }
+    cc.styleItems();
     cc.value(firstChordItem(cc));
     cc.redraw();
 }
@@ -773,6 +775,7 @@ void PatternPanel::updateRootChoiceLabels(int idx)
     else
         for (const char* n : {"A","Bb","B","C","Db","D","Eb","E","F","Gb","G","Ab"})
             rc.add(n);
+    rc.styleItems();
     rc.value(idx);
     rc.redraw();
 }

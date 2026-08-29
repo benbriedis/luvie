@@ -41,6 +41,25 @@
 #include "luvieVersion.hpp"
 #include <memory>
 
+static void printUsage(FILE* out) {
+    fprintf(out,
+            "Usage: luvie [options] [project-file]\n\n"
+            "Options:\n"
+            "  --verbose        Print notes and parameter changes during playback\n"
+            "  --test           Use internal transport and debug MIDI output;\n"
+            "                   skip JACK (implies --verbose; no project file allowed)\n"
+            "  --exit-after N   Close the window and quit after N seconds (testing)\n"
+            "  -h, --help       Show this help message\n"
+            "  --version        Show version information\n\n"
+            "Arguments:\n"
+            "  project-file     Path to a .luvie project file to open on startup\n"
+#ifdef LUVIE_HAVE_NSM
+            "\nEnvironment:\n"
+            "  NSM_URL          Connect to a Non Session Manager at this OSC address\n"
+#endif
+            );
+}
+
 int main(int argc, char **argv) {
 #ifdef __linux__
     /* Force FLTK to use X11 (not native Wayland). FLTK 1.5's Wayland backend
@@ -65,26 +84,11 @@ int main(int argc, char **argv) {
        would show up. Negative means "run until the user closes the window". */
     float exitAfter = -1.0f;
     std::string projectPath;   // optional CLI project file (standalone only)
-    int  fltk_argc = 1;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg == "--help" || arg == "-h") {
-            printf("Usage: luvie [options] [project-file]\n\n"
-                   "Options:\n"
-                   "  --verbose        Print notes and parameter changes during playback\n"
-                   "  --test           Use internal transport and debug MIDI output;\n"
-                   "                   skip JACK (implies --verbose; no project file allowed)\n"
-                   "  --exit-after N   Close the window and quit after N seconds (testing)\n"
-                   "  -h, --help       Show this help message\n"
-                   "  --version        Show version information\n\n"
-                   "Arguments:\n"
-                   "  project-file     Path to a .luvie project file to open on startup\n"
-#ifdef LUVIE_HAVE_NSM
-                   "\nEnvironment:\n"
-                   "  NSM_URL          Connect to a Non Session Manager at this OSC address\n"
-#endif
-                   );
+            printUsage(stdout);
             return 0;
         } else if (arg == "--version") {
             printf("luvie %s\n", LUVIE_VERSION);
@@ -105,12 +109,20 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        else if (!arg.empty() && arg[0] != '-' && projectPath.empty())
+        else if (!arg.empty() && arg[0] != '-') {
+            if (!projectPath.empty()) {
+                fprintf(stderr, "luvie: unexpected extra argument \"%s\"\n\n", argv[i]);
+                printUsage(stderr);
+                return 1;
+            }
             projectPath = arg;   // first non-flag arg treated as project file
-        else
-            argv[fltk_argc++] = argv[i];
+        }
+        else {
+            fprintf(stderr, "luvie: unrecognised option \"%s\"\n\n", argv[i]);
+            printUsage(stderr);
+            return 1;
+        }
     }
-    argc = fltk_argc;
 
     // --test runs a self-contained internal session; pairing it with a named
     // project file on the command line is contradictory, so reject it.
@@ -645,7 +657,11 @@ int main(int argc, char **argv) {
     // the main thread.
     Fl::lock();
 
-    window.show(argc, argv);
+    /* Only argv[0] (used for the window class) is handed to FLTK: Luvie's options
+       are all parsed above, and FLTK's own switches are deliberately not exposed
+       on the command line. Passing more would let FLTK parse — and complain about
+       — arguments we have already dealt with. */
+    window.show(1, argv);
 
     // The window starts visible; tell NSM so the "eye" toggle starts in sync.
     if (nsm.isActive()) nsm.setGuiVisible(true);

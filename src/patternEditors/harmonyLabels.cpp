@@ -4,6 +4,7 @@
 #include "harmonyLabels.hpp"
 #include "chords.hpp"
 #include "cursors.hpp"
+#include "modern/accidentalText.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 #include <algorithm>
@@ -121,15 +122,17 @@ int HarmonyLabels::midiForRow(int r) const {
 }
 
 void HarmonyLabels::draw() {
-    static constexpr Fl_Color bgCol     = 0x1F293700;
-    static constexpr Fl_Color borderCol = 0x37415100;
+    static constexpr Fl_Color    bgCol     = 0x1F293700;
+    static constexpr Fl_Color    borderCol = 0x37415100;
+    static constexpr Fl_Font     font      = FL_HELVETICA;
+    static constexpr Fl_Fontsize fontSize  = 10;
 
     fl_color(bgCol);
     fl_rectf(x(), y(), w(), h());
     fl_color(borderCol);
     fl_rectf(x() + w() - 1, y(), 1, h());
 
-    fl_font(FL_HELVETICA, 10);
+    fl_font(font, fontSize);
     fl_color(FL_WHITE);
 
     for (int r = 0; r < numRows; r++) {
@@ -147,10 +150,14 @@ void HarmonyLabels::draw() {
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }
 
+        // Drawn with accidentalText, not fl_draw, so that the "#" and "b" in a
+        // note name come out as the signs themselves. It has no clipping of its
+        // own, so a name too wide for the strip is clipped here.
         std::string label = noteForRow(virtualPos);
-        fl_color(FL_WHITE);
-        fl_draw(label.c_str(), x(), ry, w() - 3, rowHeight,
-                FL_ALIGN_RIGHT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+        fl_push_clip(x(), ry, w() - 3, rowHeight);
+        accidentalText::draw(label.c_str(), x(), ry, w() - 3, rowHeight,
+                             FL_ALIGN_RIGHT, FL_WHITE, font, fontSize);
+        fl_pop_clip();
     }
 
 }

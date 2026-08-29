@@ -17,7 +17,9 @@
 #include "modernButton.hpp"
 #include "toggleButton.hpp"
 #include "modernChoice.hpp"
+#include "modern/accidentalChoice.hpp"
 #include "modern/denomBeatChoice.hpp"
+#include "modern/sharpFlatButton.hpp"
 #include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
 #include "chords.hpp"
@@ -39,9 +41,9 @@ struct KeySection : Fl_Flex {
     static constexpr int kBtnW    = 26;
     static constexpr int kChoiceW = 52;
     static constexpr int kWidth   = kLabelW + kGap + kBtnW + kGap + kChoiceW;
-    Fl_Box       baseLabel;
-    ToggleButton sharpFlatBtn;
-    ModernChoice rootChoice;
+    Fl_Box           baseLabel;
+    SharpFlatButton  sharpFlatBtn;
+    AccidentalChoice rootChoice;
     KeySection(int x, int y, int h);
 };
 
@@ -50,8 +52,8 @@ struct ChordSection : Fl_Flex {
     static constexpr int kLabelW  = 55;
     static constexpr int kChoiceW = 98;
     static constexpr int kWidth   = kLabelW + kGap + kChoiceW;
-    ToggleButton chordScaleBtn;   // toggles the choice between chords and scales
-    ModernChoice chordChoice;
+    ToggleButton     chordScaleBtn;   // toggles the choice between chords and scales
+    AccidentalChoice chordChoice;     // names carry accidentals: "7(b9)", "maj7(#11)"
     ChordSection(int x, int y, int h);
 };
 

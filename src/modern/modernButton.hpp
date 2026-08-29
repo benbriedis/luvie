@@ -39,11 +39,7 @@ private:
             fl_line_style(0);
         }
 
-        if (label()) {
-            fl_font(labelfont(), labelsize());
-            fl_color(active() ? labelcolor() : fl_color_average(labelcolor(), bg, 0.4f));
-            fl_draw(label(), x() + 4, y(), w() - 8, h(), align());
-        }
+        drawContent(x() + 4, y(), w() - 8, h(), bg);
     }
 
     int handle(int event) override {
@@ -55,6 +51,17 @@ private:
             if (k == FL_Enter || k == FL_KP_Enter) { do_callback(); return 1; }
         }
         return Fl_Button::handle(event);
+    }
+
+protected:
+    // Renders the button's face inside the box the border leaves. Subclasses whose
+    // face is a picture rather than words (see SharpFlatButton) override this. bg
+    // is the colour already painted behind it, which an inactive label fades into.
+    virtual void drawContent(int X, int Y, int W, int H, Fl_Color bg) {
+        if (!label()) return;
+        fl_font(labelfont(), labelsize());
+        fl_color(active() ? labelcolor() : fl_color_average(labelcolor(), bg, 0.4f));
+        fl_draw(label(), X, Y, W, H, align());
     }
 
 public:
