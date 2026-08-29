@@ -11,6 +11,9 @@ The main things that make this sequencer special in the world of Linux audio are
 1. It has decent support for driving drumkits.
 1. It has been redesigned and rebuild ground-up, so hopefully it is a bit easier to understand and use than some earlier efforts.
 
+# Manual
+For details please consult the [Luvie manual](docs/manual/README.md) 
+
 # Screenshots
 
 ### Song Editor
@@ -44,9 +47,6 @@ Launch and stop patterns live without touching the song arrangement.
 Define MIDI output ports and map instruments and drumkits onto them.
 
 <img src="screenshots/settings.png" alt="Luvie instruments and outputs settings" width="700">
-
-# Manual
-For details please consult the [Luvie manual](docs/manual/README.md) 
 
 # Dependencies
 JACK is optional, but desirable.
