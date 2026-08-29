@@ -118,6 +118,10 @@ static constexpr Fl_Color btnBorder      = 0xCBD5E100;
 static constexpr Fl_Color headerBg       = 0x1E293B00;
 static constexpr Fl_Color headerText     = 0xCBD5E100;
 
+// Line heights of the pattern name and the kind tag stacked beneath it in a cell.
+static constexpr int nameLineH = 17;
+static constexpr int kindLineH = 11;
+
 // ======================================================
 // LoopEditor
 // ======================================================
@@ -753,14 +757,24 @@ void LoopEditor::draw()
                 fl_rect(bx, by, bw, bh);
                 fl_line_style(0);
 
-                // Pattern name
+                // Pattern name, with the pattern's kind tagged faintly underneath
+                // it (as the song editor's track labels do). The two are stacked
+                // and the pair centred as a block, so the tag reads as belonging
+                // to the name rather than floating at the cell's foot.
                 const char* patName = nullptr;
+                const char* patKind = nullptr;
                 for (const auto& p : tl.patterns)
-                    if (p.id == patId) { patName = p.name.c_str(); break; }
+                    if (p.id == patId) { patName = p.name.c_str(); patKind = patternKindLabel(p.type); break; }
                 if (patName) {
+                    int blockY = by + (bh - (nameLineH + kindLineH)) / 2;
                     fl_color(FL_WHITE);
-                    fl_draw(patName, bx + 4, by, bw - 8, bh,
+                    fl_draw(patName, bx + 4, blockY, bw - 8, nameLineH,
                             FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+                    fl_font(FL_HELVETICA, 8);
+                    fl_color(fl_color_average(FL_WHITE, bg, 0.45f));
+                    fl_draw(patKind, bx + 4, blockY + nameLineH, bw - 8, kindLineH,
+                            FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+                    fl_font(FL_HELVETICA_BOLD, 13);   // restore for the next cell's name
                 }
 
                 // Playhead line — always running, regardless of toggle state

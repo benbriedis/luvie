@@ -17,6 +17,17 @@
 
 enum class PatternType { HARMONY = 0, DRUM = 1, PIANOROLL = 2 };
 
+// Short tag naming a pattern's kind, drawn faintly under the pattern name in the
+// song editor's track labels and in the loop editor's pattern blocks.
+inline const char* patternKindLabel(PatternType type)
+{
+	switch (type) {
+		case PatternType::PIANOROLL: return "pianoroll";
+		case PatternType::DRUM:      return "drums";
+		default:                     return "harmony";
+	}
+}
+
 struct DrumNote {
 	int   id;
 	int   note;        // MIDI note number (0–127)

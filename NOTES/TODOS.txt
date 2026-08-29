@@ -300,8 +300,6 @@ Look at changing time signatures: auto changes are a bit annoying.
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
-'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
-
 BUG 'Add automation' is missing its right-pointing triangle icon (installed via .deb)
   - if there's a problem maybe provide my own svgs?
 

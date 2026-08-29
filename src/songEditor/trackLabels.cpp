@@ -329,12 +329,8 @@ void TrackLabels::draw()
 
     // Short kind tag shown under the pattern name.
     auto patKind = [&](int patId) -> const char* {
-        for (const auto& p : tl.patterns) {
-            if (p.id != patId) continue;
-            if (p.type == PatternType::PIANOROLL) return "pianoroll";
-            if (p.type == PatternType::DRUM)      return "drums";
-            return "harmony";
-        }
+        for (const auto& p : tl.patterns)
+            if (p.id == patId) return patternKindLabel(p.type);
         return nullptr;
     };
 
