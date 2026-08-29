@@ -10,31 +10,41 @@
 #include <FL/fl_draw.H>
 
 // Note and chord names are written with "#" and "b" in the source -- they have to
-// be, they are C strings -- but drawn with the real accidental signs, since we
-// cannot count on a font that carries them. The artwork is src/icons/sharp.svg
-// and flat.svg, minimised here the way svgGlyph wants it. Each viewBox hugs its
-// ink, so the two signs scale to a common height and take up only the width they
-// need, which is what lets them sit inside a run of text.
+// be, they are C strings -- but drawn with the real accidental signs. The artwork
+// is src/icons/sharp.svg and flat.svg, minimised here the way svgGlyph wants it
+// (sharp.svg's second path, a sliver a fraction of a unit across, is dropped
+// along with the editor cruft). Each viewBox hugs its ink, so the two signs
+// scale to a common height and take up only the width they need, which is what
+// lets them sit inside a run of text. Re-minimise after editing the artwork:
+// these constants are the copy that gets compiled in, not the files.
+//
+// The signs could instead be had as text: U+266F and U+266D are ordinary
+// characters in Miscellaneous Symbols, which DejaVu carries, so unlike the
+// Musical Symbols block the dotted notes would need (see denomBeatChoice), a
+// font can be expected to draw them. The two were compared side by side and the
+// artwork won -- and it draws the same everywhere, where the characters lean on
+// whatever the installed fonts happen to fall back to.
 inline const char* kSharpSvg =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="83.16 17.87 345.69 494.13"><path d="M418.562,173.34c5.999-1.291,10.281-6.582,10.281-12.724V103.86c0-3.927-1.775-7.649-4.834-10.124c-3.058-2.466-7.07-3.425-10.912-2.6l-51.621,11.093V30.884c0-3.856-1.713-7.515-4.672-9.99c-2.964-2.475-6.869-3.507-10.662-2.816l-38.686,7.013c-6.192,1.121-10.694,6.51-10.694,12.805v78.242l-80.658,17.333V64.117c0-3.856-1.713-7.514-4.672-9.99c-2.958-2.475-6.864-3.506-10.662-2.816l-38.69,7.004c-6.192,1.12-10.693,6.511-10.693,12.806v76.25l-57.948,12.456c-5.999,1.282-10.281,6.59-10.281,12.724v56.756c0,3.927,1.776,7.649,4.834,10.124c3.062,2.466,7.07,3.426,10.917,2.601l52.478-11.281v108.39l-57.948,12.456c-5.999,1.282-10.281,6.582-10.281,12.715v56.737c0,3.928,1.776,7.649,4.834,10.125c3.062,2.466,7.07,3.425,10.917,2.6l52.478-11.281v76.492c0,3.856,1.712,7.515,4.672,9.99c2.959,2.476,6.864,3.507,10.662,2.816l38.686-6.995c6.192-1.12,10.698-6.51,10.698-12.805v-83.397l80.658-17.334v74.502c0,3.865,1.712,7.524,4.672,9.99c2.96,2.475,6.865,3.506,10.662,2.815l38.686-7.004c6.192-1.121,10.694-6.51,10.694-12.805V377.35l57.087-12.267c5.999-1.291,10.281-6.582,10.281-12.724v-56.729c0-3.927-1.775-7.649-4.834-10.124c-3.058-2.466-7.07-3.426-10.912-2.6l-51.621,11.093v-108.39L418.562,173.34z M296.761,307.906l-80.658,17.326V216.85l80.658-17.334V307.906z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="83.16 18.75 345.69 490.94"><path d="m 418.562,162.53752 c 5.999,-1.291 10.281,-6.582 10.281,-12.724 v -43.25787 c 0,-3.927 -1.775,-7.648998 -4.834,-10.123998 -3.058,-2.466 -7.07,-3.425 -10.912,-2.6 L 356.10954,105.80912 V 31.768472 c 0,-3.856 -1.713,-7.515 -4.672,-9.99 -2.964,-2.475 -6.869,-3.507 -10.662,-2.816 l -26.32327,4.409273 c -6.192,1.121 -10.694,6.51 -10.694,12.805 V 117.1144 L 210.2804,138.25609 V 66.206441 c 0,-3.856 -1.713,-7.514 -4.672,-9.99 -2.958,-2.475 -6.864,-3.506 -10.662,-2.816 l -27.78317,2.601516 c -6.192,1.12 -10.693,6.511 -10.693,12.806 V 147.75361 L 93.439,162.52265 c -5.999,1.282 -10.281,6.59 -10.281,12.724 v 43.25787 c 0,3.927 1.776,7.649 4.834,10.124 3.062,2.466 7.07,3.426 10.917,2.601 l 57.56123,-13.59405 V 344.94224 L 93.439,352.47402 c -5.999,1.282 -10.281,6.582 -10.281,12.715 v 48.62271 c 0,3.928 1.776,7.649 4.834,10.125 3.062,2.466 7.07,3.425 10.917,2.6 l 57.56123,-13.59404 0,83.72927 c 0,3.856 1.712,7.515 4.672,9.99 2.959,2.476 6.864,3.507 10.662,2.816 l 27.77917,-2.59252 c 6.192,-1.12 10.698,-6.51 10.698,-12.805 l 0,-90.63427 93.47787,-21.14269 0,81.73927 c 0,3.865 1.712,7.524 4.672,9.99 2.96,2.475 6.865,3.506 10.662,2.815 l 26.32327,-4.40028 c 6.192,-1.121 10.694,-6.51 10.694,-12.805 l 0,-88.64527 62.45346,-13.15147 c 5.999,-1.291 10.281,-6.582 10.281,-12.724 l 0,-41.37744 c 0,-3.927 -1.775,-7.649 -4.834,-10.124 -3.058,-2.466 -7.07,-3.426 -10.912,-2.6 l -56.98746,11.97747 V 175.69099 Z M 303.75727,314.30103 210.2794,335.43573 V 208.13696 l 93.47787,-21.1427 z"/></svg>)SVG";
 
 inline const char* kFlatSvg =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="129.26 0 253.48 512"><path d="M200.438,214.712V0h-71.18v512c0,0,170.389-50.606,236.182-162.99C424.052,248.893,324.927,139.024,200.438,214.712z M300.508,302.609c-6.37,82.823-100.117,126.984-100.117,126.984v-156.27C239.449,239.14,305.394,239.14,300.508,302.609z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="133.82 0 248.45 512"><path d="M 195.896,214.712 V 0 l -62.08016,0 v 512 c 0,0 165.83116,-50.606 231.62416,-162.99 C 424.052,248.893 320.385,139.024 195.896,214.712 Z m 115.95907,83.28527 C 305.48507,380.82027 195.849,429.593 195.849,429.593 v -156.27 c 39.058,-34.183 120.89207,-38.79473 116.00607,24.67427 z"/></svg>)SVG";
 
 // Text in which "#" and "b" are drawn as accidental signs.
 namespace accidentalText {
 
-// A sign is drawn a little taller than the capitals it sits beside -- about
-// seven eighths of the point size, against a cap height of some three quarters
-// -- which is the proportion an engraved accidental keeps against its note.
-inline int glyphHeight(Fl_Fontsize size) { return (size * 7 + 4) / 8; }
+// A sign is drawn taller than the capitals it sits beside -- all but the point
+// size itself, against a cap height of some three quarters of it -- which is
+// about the proportion an engraved accidental keeps against its note.
+inline int glyphHeight(Fl_Fontsize size) { return (size * 19 + 10) / 20; }
 
-// How far below the baseline a sign reaches. The flat's bulb rests on it, like a
-// letter; the sharp is symmetric about its middle, so it drops a little and
-// straddles the line instead.
-inline int signDrop(const char* svg, Fl_Fontsize size)
+// How far a sign is lifted off the text's baseline. The flat's bulb would rest
+// on it like a letter, but reads better standing a shade clear; the sharp is
+// symmetric about its middle, so for the two to look level it has to hang the
+// lower of them, and sits on the baseline itself.
+inline int signLift(const char* svg, Fl_Fontsize size)
 {
-	return (svg == kFlatSvg) ? 0 : size / 8;
+	return (svg == kFlatSvg) ? (size + 5) / 10 : 0;
 }
 
 // Air either side of a sign: its viewBox hugs the ink, so it brings no side
@@ -91,7 +101,7 @@ inline int width(const char* s, Fl_Font font, Fl_Fontsize size)
 }
 
 // Draw s in the X,Y,W,H box, aligned left, right or (by default) centred, with
-// the signs standing on the text's own baseline.
+// the signs riding just clear of the text's own baseline.
 inline void draw(const char* s, int X, int Y, int W, int H, Fl_Align align,
                  Fl_Color col, Fl_Font font, Fl_Fontsize size)
 {
@@ -115,7 +125,7 @@ inline void draw(const char* s, int X, int Y, int W, int H, Fl_Align align,
 		},
 		[&](const char* svg) {
 			int gw     = svgGlyph::width(svg, gh);
-			int bottom = baseline + signDrop(svg, size);
+			int bottom = baseline - signLift(svg, size);
 			svgGlyph::draw(svg, x + kBearing + gw / 2, bottom - gh / 2, col, gh);
 			x += gw + 2 * kBearing;
 		});
