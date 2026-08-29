@@ -150,6 +150,13 @@ struct LuvieUI {
     /* Loop-mode flag as last set from the UI, and the observer that re-sends the
        loop state whenever the LoopManager changes. */
     bool loopMode = false;
+
+    /* Song-loop region (the song editor's Start/End markers + toggle), as last set
+       from the UI. Travels in the same luvie_loop atom; the DSP wraps song playback
+       on it. */
+    bool  songLoopEnabled  = false;
+    float songLoopStartBar = 0.0f;
+    float songLoopEndBar   = 0.0f;
     struct LoopBridge : ILoopObserver {
         LuvieUI* ui = nullptr;
         void onLoopsChanged() override { sendLoopState(ui); }
@@ -232,6 +239,7 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
        the same patterns switched on. */
     state.loopMode           = ui->app.isLoopMode();
     state.activeLoopPatterns = ui->app.activeLoopPatterns();
+    ui->app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
     return true;
 }
 
@@ -361,7 +369,9 @@ static void sendLoopState(LuvieUI* ui)
     std::memcpy(p, &chunkHdr, sizeof(chunkHdr));
     p += sizeof(chunkHdr);
 
-    LuvieLoopState hdr{ loopMode ? 1u : 0u, static_cast<uint32_t>(entries.size()) };
+    LuvieLoopState hdr{ loopMode ? 1u : 0u, static_cast<uint32_t>(entries.size()),
+                        ui->songLoopEnabled ? 1u : 0u,
+                        ui->songLoopStartBar, ui->songLoopEndBar };
     std::memcpy(p, &hdr, sizeof(hdr));
     p += sizeof(hdr);
 
@@ -429,6 +439,12 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
        active set from the song. */
     ui->app.applyLoopState(state.loopMode, state.activeLoopPatterns);
     ui->loopMode = state.loopMode;
+    /* Song-loop region: applySongLoop() sets the ruler + toggle and pushes through
+       onSongLoopChanged, which updates ui->songLoop* below. Done while
+       restoringState is still true so the push's sendLoopState() is deferred to the
+       one authoritative send just after. */
+    ui->app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol,
+                          state.songLoopEndCol);
     ui->restoringState = false;
     /* One loop-state message now that the mode and the active set agree. This the
        DSP does need even though dsp_restore applied the same values: the editor can
@@ -598,6 +614,17 @@ static LV2UI_Handle instantiate(
         if (!ui->restoringState) sendState(ui);
     };
 
+    /* Song-loop (Start/End markers + toggle) lives only in the live luvie_loop atom
+       (like loop mode). Ship it whenever it changes so the DSP wraps song playback
+       at the seam itself — the host frame keeps rolling linearly past the End
+       marker. */
+    ui->app.onSongLoopChanged = [ui](bool en, float start, float end) {
+        ui->songLoopEnabled  = en;
+        ui->songLoopStartBar = start;
+        ui->songLoopEndBar   = end;
+        sendLoopState(ui);
+    };
+
     /* Emit auditioned notes (and their note-offs) to the DSP as raw MIDI. */
     ui->app.auditioner.setMidiSink(
         [ui](const std::string& portName, int ch, int midi, int vel, bool on) {
@@ -689,6 +716,7 @@ static LV2UI_Handle instantiate(
        whether restored or freshly seeded defaults. */
     ui->restoringState = false;
     sendState(ui);
+    ui->app.pushSongLoopState();   // seed the DSP with the current song-loop region
 
     /* Return the widget pointer as the LV2UI handle */
     *widget = &ui->widget;

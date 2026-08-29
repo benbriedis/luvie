@@ -5,6 +5,7 @@
 #define LOOP_RULER_HPP
 
 #include <FL/Fl_Widget.H>
+#include <functional>
 
 class LoopRulerContextPopup;
 
@@ -27,6 +28,10 @@ public:
 	void setEndColumn(int bar);
 
 	void setContextPopup(LoopRulerContextPopup* p) { contextPopup = p; }
+
+	// Fired whenever a marker moves (drag, context menu, or a numCols clamp), so
+	// the RT sequencer(s) can be handed the new loop region.
+	std::function<void()> onChanged;
 
 private:
 	int numCols;

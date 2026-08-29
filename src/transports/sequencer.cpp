@@ -62,6 +62,16 @@ void Sequencer::setLoopMode(bool mode)
     rebuildSnapshot();
 }
 
+void Sequencer::setSongLoop(bool enabled, float startBar, float endBar)
+{
+    // Store the region before flipping the flag on so the RT thread never sees a
+    // stale region with a fresh "enabled". A rare one-cycle mismatch the other way
+    // (region updated while enabled stays true) is self-correcting.
+    songLoopStart.store(startBar, std::memory_order_relaxed);
+    songLoopEnd.store(endBar,     std::memory_order_relaxed);
+    songLoopOn.store(enabled,     std::memory_order_relaxed);
+}
+
 // ── Snapshot building (owner thread) ──────────────────────────────────────────
 
 void Sequencer::rebuildSnapshot()
@@ -304,17 +314,119 @@ float Sequencer::snapSecondsToBar(double secs) const
 
 // ── Cycle rendering (RT thread) ───────────────────────────────────────────────
 
-bool Sequencer::renderWindow(bool nowPlaying, bool jumped,
-                             float prevBars, float curBars)
+// Seconds from the current cycle's first frame to musical position `bar`, in the
+// active sub-segment's time base. A plain snapBarToSeconds(bar) - cycleStart would
+// be wrong for a segment rendered after a loop wrap (its bars map to an *earlier*
+// wall-clock than the cycle start); segCycleStartSecs / segMusicalStart carry the
+// per-segment offset so the arithmetic stays correct across the seam.
+long Sequencer::segFrameOffset(float bar) const
 {
-    // Hold the snapshot for the whole cycle: emit() reads snap.segs (via
-    // snapBarToSeconds) for every message, so the lock must cover note-offs too.
-    // try_lock keeps the RT thread from blocking on the owner thread's rebuild; on
-    // failure we bail and the caller leaves wasPlaying untouched so the missed
-    // stop/jump is retried next cycle.
+    double secs = segCycleStartSecs
+                + snapBarToSeconds(bar             - (float)emitBarOffset)
+                - snapBarToSeconds(segMusicalStart - (float)emitBarOffset);
+    return (long)std::llround(secs * sampleRateHz);
+}
+
+bool Sequencer::renderCycle(bool nowPlaying, bool jumped, uint32_t nframes,
+                            double cycleStartSecs, double barOffset)
+{
+    // Hold the snapshot for the whole cycle — including every snapBarToSeconds()
+    // call below and in emit(). try_lock keeps the RT thread from blocking on the
+    // owner thread's rebuild; on failure the caller leaves wasPlaying untouched so
+    // the missed stop/jump is retried next cycle.
     if (!snapMutex.try_lock())
         return false;
 
+    emitBarOffset = barOffset;
+
+    const float linPrev = (float)(snapSecondsToBar(cycleStartSecs) + barOffset);
+    const float linCur  = (float)(snapSecondsToBar(cycleStartSecs
+                                  + (double)nframes / sampleRateHz) + barOffset);
+
+    const float ls         = songLoopStart.load(std::memory_order_relaxed);
+    const float le         = songLoopEnd.load(std::memory_order_relaxed);
+    const bool  haveRegion = songLoopOn.load(std::memory_order_relaxed)
+                             && (le - ls) > 1.0e-4f;
+
+    if (!haveRegion || !nowPlaying) {
+        // Straight through. Keep the wrapped-position publisher sensible even when
+        // the toggle is on but playback has not yet crossed the loop end.
+        segCycleStartSecs = 0.0;
+        segMusicalStart   = linPrev;
+        renderWindowLocked(nowPlaying, jumped, linPrev, linCur);
+        loopCursorValid = false;
+        float pub = nowPlaying ? linCur : linPrev;
+        if (haveRegion && pub >= le)
+            pub = ls + std::fmod(pub - ls, le - ls);
+        loopedBar.store(pub, std::memory_order_relaxed);
+        snapMutex.unlock();
+        return true;
+    }
+
+    // Sync the musical cursor to the linear clock on the first looped cycle and
+    // after any jump (seek / host relocate). fmod folds a position that already
+    // ran past the loop end back into the region.
+    if (!loopCursorValid || jumped) {
+        float p = linPrev;
+        if (p >= le) p = ls + std::fmod(p - ls, le - ls);
+        musicalPos      = p;
+        loopCursorValid = true;
+    }
+
+    // Musical bars to advance this cycle, evaluated at the *musical* position so a
+    // tempo change inside the loop region is honoured (rather than reusing the
+    // linear delta, which is sampled at a different point on the tempo map).
+    const double dtSecs = (double)nframes / sampleRateHz;
+    const double s0     = snapBarToSeconds(musicalPos - (float)barOffset);
+    double remaining    = snapSecondsToBar(s0 + dtSecs) - snapSecondsToBar(s0);
+    if (remaining < 0.0) remaining = 0.0;
+
+    double segOff   = 0.0;          // seconds from the cycle's first frame to segStart
+    float  segStart = musicalPos;
+    bool   segJump  = jumped;
+
+    for (int guard = 0; guard < 128 && remaining > 1.0e-9; ++guard) {
+        const double barsToEnd = (double)le - (double)segStart;
+        const double take      = barsToEnd < remaining ? barsToEnd : remaining;
+        const float  segEnd    = (float)((double)segStart + take);
+
+        segCycleStartSecs = segOff;
+        segMusicalStart   = segStart;
+        renderWindowLocked(true, segJump, segStart, segEnd);
+
+        remaining -= take;
+        segOff += snapBarToSeconds(segEnd   - (float)barOffset)
+                - snapBarToSeconds(segStart - (float)barOffset);
+
+        if ((double)le - (double)segEnd <= 1.0e-4) {
+            // Reached the loop end: wrap. The next renderWindowLocked() runs with
+            // jumped=true, which releases any note still held across the seam (a
+            // note-off one frame before the seam) and resets controllers, before
+            // the post-seam window's note-ons.
+            segStart = ls;
+            segJump  = true;
+            if (remaining <= 1.0e-9) {
+                // Cycle ends exactly on the seam: still flush held notes now with a
+                // zero-width jumped window, so nothing rings into the next cycle.
+                segCycleStartSecs = segOff;
+                segMusicalStart   = ls;
+                renderWindowLocked(true, true, ls, ls);
+            }
+        } else {
+            segStart = segEnd;
+            segJump  = false;
+        }
+    }
+
+    musicalPos = segStart;
+    loopedBar.store(musicalPos, std::memory_order_relaxed);
+    snapMutex.unlock();
+    return true;
+}
+
+bool Sequencer::renderWindowLocked(bool nowPlaying, bool jumped,
+                                   float prevBars, float curBars)
+{
     // On stop or jump: silence active notes, then reset all controllers on
     // instrument channels. Emitted at the cycle start (prevBars -> frame 0).
     if ((!nowPlaying && wasPlaying) || jumped) {
@@ -366,7 +478,6 @@ bool Sequencer::renderWindow(bool nowPlaying, bool jumped,
         fireParamEvents(prevBars, curBars);
     }
 
-    snapMutex.unlock();
     return true;
 }
 

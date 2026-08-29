@@ -291,6 +291,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         60, 60);
     loopRuler->setContextPopup(loopRulerPop);
     tab1->add(loopRuler);
+    this->loopRuler = loopRuler;
 
     // The editor fills the tab bar-to-bar: everything under the three marker
     // rulers except the control bar anchored at the bottom.
@@ -368,10 +369,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         loopRuler->setOffsetX(off);
         loopRuler->setClipLeft(clipLeft);
     };
-    og2->onNumColsChanged = [timeSigRuler, tempoRuler, loopRuler](int n) {
+    og2->onNumColsChanged = [this, timeSigRuler, tempoRuler, loopRuler](int n) {
         timeSigRuler->setNumCols(n);
         tempoRuler->setNumCols(n);
         loopRuler->setNumCols(n);
+        pushSongLoopState();   // the End marker may have been clamped in
     };
     // Horizontal zoom: the grid scales its bar width and the three rulers above
     // it follow, so markers and the loop region stay over the bars they mark.
@@ -401,6 +403,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         end   = (float)loopRuler->endColumn() + 1.0f;
         return true;
     });
+    // Push the same region to the RT sequencer(s), which own the sample-accurate
+    // loop wrap. The playhead closure above is only for the UI (visual + soft
+    // ports); the toggle and marker drags feed this.
+    bottomPane->onLoopToggled = [this](bool) { pushSongLoopState(); };
+    loopRuler->onChanged      = [this]()     { pushSongLoopState(); };
     // In Song mode the rewind button jumps to the loop-ruler Start marker rather
     // than to bar 0 (in Loop mode the song playhead is frozen, so fall back).
     bottomPane->rewindTarget = [this, loopRuler](float& bar) -> bool {
@@ -739,6 +746,31 @@ std::vector<int> LuvieApp::activeLoopPatterns() const {
     // churn the saved JSON (and the plugin's state atom) with no real change.
     std::sort(ids.begin(), ids.end());
     return ids;
+}
+
+void LuvieApp::pushSongLoopState() {
+    if (!onSongLoopChanged || !bottomPane || !loopRuler) return;
+    // End marker is right-aligned to its column, so the loop end (exclusive) is the
+    // column after it — matching the playhead closure in build().
+    onSongLoopChanged(bottomPane->loopEnabled(),
+                      (float)loopRuler->startColumn(),
+                      (float)loopRuler->endColumn() + 1.0f);
+}
+
+void LuvieApp::songLoopState(bool& enabled, int& startCol, int& endCol) const {
+    enabled  = bottomPane ? bottomPane->loopEnabled() : false;
+    startCol = loopRuler ? loopRuler->startColumn() : 0;
+    endCol   = loopRuler ? loopRuler->endColumn()   : -1;
+}
+
+void LuvieApp::applySongLoop(bool enabled, int startCol, int endCol) {
+    if (loopRuler && endCol >= 0) {
+        loopRuler->setStartColumn(startCol);
+        loopRuler->setEndColumn(endCol);
+    }
+    if (bottomPane)
+        bottomPane->setLoopEnabled(enabled);
+    pushSongLoopState();
 }
 
 void LuvieApp::checkLoopStateChanged() {

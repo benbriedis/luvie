@@ -336,6 +336,7 @@ int main(int argc, char **argv) {
         collectOutputs(state);
         state.loopMode           = app.isLoopMode();
         state.activeLoopPatterns = app.activeLoopPatterns();
+        app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         return state;
     };
 
@@ -350,6 +351,7 @@ int main(int argc, char **argv) {
         // After the timeline: restoring the mode gates sync() off, and loadTimeline
         // above fires the sync that would otherwise repopulate the active set.
         app.applyLoopState(state.loopMode, state.activeLoopPatterns);
+        app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
     };
 
     // --- Transport selection ----------------------------------------------
@@ -359,6 +361,7 @@ int main(int argc, char **argv) {
         jackUp = true;
         jackTransport.setTimeline(&songTimeline);
         jackTransport.setLoopManager(&app.loopMgr);
+        app.pushSongLoopState();   // re-sync the loop region onto the fresh client
         jackTransport.onTransportEvent = [&]() {
             Fl::awake([](void* data) {
                 static_cast<Transport*>(data)->syncPlayState();
@@ -529,6 +532,14 @@ int main(int argc, char **argv) {
     // so the tracker above never sees them — but they are saved now, so a change to
     // either has to dirty the project the same way an edit does.
     app.onLoopStateChanged = [&]() { session->markDirty(); };
+
+    // Song-loop (Start/End markers + toggle) → the RT sequencer, which wraps song
+    // playback at the loop seam sample-accurately. setSongLoop is just atomic
+    // stores, so it is safe to call before JACK is up.
+    app.onSongLoopChanged = [&](bool en, float start, float end) {
+        jackTransport.setSongLoop(en, start, end);
+    };
+    app.pushSongLoopState();
 
     // NSM open: load the session file (if any) and remember the session path.
     nsm.onOpen = [&](const std::string& path, const std::string& /*displayName*/) -> bool {

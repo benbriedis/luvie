@@ -8,6 +8,7 @@
 #include "observableSong.hpp"
 #include "loopManager.hpp"
 #include "timeline.hpp"
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <mutex>
@@ -39,10 +40,11 @@ inline bool isNoteOff(const uint8_t* data, int len)
  *   - All setters (setTimeline/setInstruments/...) run on the owner thread that is
  *     the single writer of the snapshot (UI thread standalone; LV2 worker thread in
  *     the plugin).
- *   - renderWindow() runs on the real-time thread. It try_locks snapMutex; on
- *     failure it does nothing and returns false so the caller leaves wasPlaying
- *     untouched (the missed stop/jump is handled next cycle).
- *   - emit() is called only from renderWindow() (RT thread) and must not allocate.
+ *   - renderCycle() runs on the real-time thread. It try_locks snapMutex once for
+ *     the whole cycle; on failure it does nothing and returns false so the caller
+ *     leaves wasPlaying untouched (the missed stop/jump is handled next cycle). It
+ *     also owns the song-loop wrap, splitting the cycle at the loop seam.
+ *   - emit() is called only from renderCycle() (RT thread) and must not allocate.
  */
 class Sequencer : public ITimelineObserver, public ILoopObserver {
 public:
@@ -63,6 +65,14 @@ public:
     void setLoopManager(LoopManager* loopMgr);
     void setInstruments(const std::vector<InstrumentRouting>& routings);
     void setLoopMode(bool loopMode);
+
+    // Song-loop region (the song editor's Start/End markers), in absolute song
+    // bars with endBar exclusive. When enabled and playing, renderCycle() wraps
+    // musical playback from endBar back to startBar *within the RT cycle* — the
+    // window that straddles the seam is split and rendered in two, notes still
+    // held across the boundary are released at the seam frame, and no transport
+    // relocate is involved. Owner thread; read lock-free on the RT thread.
+    void setSongLoop(bool enabled, float startBar, float endBar);
 
     // ITimelineObserver / ILoopObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
@@ -114,18 +124,35 @@ protected:
     // position/seek conversions). Owned by the caller.
     ObservableSong* timeline = nullptr;
 
+    void   setSampleRate(double sr) { sampleRateHz = sr; }
+    bool   songLoopActive() const { return songLoopOn.load(std::memory_order_relaxed); }
+    // The (possibly wrapped) musical bar playback is currently at — for the UI
+    // playhead. Published by renderCycle() every cycle; lock-free.
+    float  loopedPosition() const { return loopedBar.load(std::memory_order_relaxed); }
+
     void   rebuildSnapshot();
-    double snapBarToSeconds(float bar)   const;   // RT-safe; reads snap.segs
+    double snapBarToSeconds(float bar)   const;   // reads snap.segs; hold snapMutex
     float  snapSecondsToBar(double secs) const;
 
     // ── RT firing ─────────────────────────────────────────────────────────────
-    // Generate all MIDI for one cycle's bar window. nowPlaying/jumped are computed
-    // by the backend from its clock. Returns true if it ran (snapMutex acquired);
-    // false means the caller should leave wasPlaying unchanged. Calls emit() for
-    // every message produced. wasPlaying is read here but updated by the caller.
-    bool renderWindow(bool nowPlaying, bool jumped, float prevBars, float curBars);
+    // Render one RT cycle. cycleStartSecs is the backend clock's position on
+    // Luvie's timeline (frame / sample-rate); barOffset is any backend frame->bar
+    // shift (JACK's tempo re-anchor; 0 elsewhere). Acquires snapMutex once for the
+    // whole cycle, converts the clock window to a musical window, and — when the
+    // song loop is armed and playing — splits it at the loop seam so playback
+    // wraps seamlessly. Returns true if the snapshot was readable and at least one
+    // sub-window rendered; false means the caller should leave wasPlaying
+    // unchanged (missed stop/jump retried next cycle). Calls emit() for every
+    // message produced.
+    bool renderCycle(bool nowPlaying, bool jumped, uint32_t nframes,
+                     double cycleStartSecs, double barOffset);
 
-    bool wasPlaying = false;   // owner: updated by the backend after renderWindow
+    // Frame offset within the current cycle for an emitted musical `bar`, honouring
+    // the active sub-segment's time base (so events past a loop wrap land at the
+    // right frame). Call from emit(); result is not clamped to [0, nframes).
+    long segFrameOffset(float bar) const;
+
+    bool wasPlaying = false;   // owner: updated by the backend after renderCycle
 
     // Backend output hook: emit one 1-3 byte MIDI message for `port` at bar
     // position `bar` within the current cycle. Called on the RT thread; must not
@@ -134,10 +161,32 @@ protected:
                       const uint8_t* data, int len) = 0;
 
 private:
+    // Generate all MIDI for one musical bar window [prevBars, curBars). The caller
+    // (renderCycle) must already hold snapMutex. nowPlaying/jumped drive the
+    // stop/jump reset; on a wrap the next sub-window is passed jumped=true so notes
+    // held across the seam are released. Always returns true.
+    bool renderWindowLocked(bool nowPlaying, bool jumped, float prevBars, float curBars);
+
     // ── Owner-thread state ────────────────────────────────────────────────────
     LoopManager*                loopMgr       = nullptr;
     bool                             loopMode  = false;
     std::map<int, InstrumentRouting> instrumentMap_;
+
+    double sampleRateHz = 48000.0;
+
+    // Song-loop region + published wrapped position (see setSongLoop / renderCycle).
+    std::atomic<bool>  songLoopOn{false};
+    std::atomic<float> songLoopStart{0.0f};
+    std::atomic<float> songLoopEnd{0.0f};
+    std::atomic<float> loopedBar{0.0f};
+
+    // RT-thread-only sub-segment time base, set by renderCycle() before each
+    // renderWindowLocked() call and read by segFrameOffset() via emit().
+    double segCycleStartSecs = 0.0;   // seconds from the cycle's first frame to segment start
+    float  segMusicalStart   = 0.0f;  // musical bar at that instant
+    double emitBarOffset     = 0.0;   // backend frame->bar shift for this cycle
+    float  musicalPos        = 0.0f;  // current wrapped musical position
+    bool   loopCursorValid   = false; // musicalPos synced to the clock?
 
     // ── RT-thread-only state ──────────────────────────────────────────────────
     struct ActiveNote {

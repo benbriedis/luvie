@@ -32,6 +32,7 @@ class PianorollEditor;
 class PatternPanel;
 class SongPanel;
 class LoopEditor;
+class LoopRuler;
 class Transport;
 class NoteContextPopup;
 class MarkerPopup;
@@ -101,6 +102,26 @@ public:
     // would mark the project dirty (or re-send the whole session) continuously.
     std::function<void()> onLoopStateChanged;
 
+    // Fires when the song-loop toggle or the Start/End markers change:
+    // (enabled, startBar, endBar) in song-bar units with endBar exclusive. Wire to
+    // the RT sequencer(s) (JackTransport::setSongLoop / the plugin loop atom) so the
+    // loop wrap is applied sample-accurately rather than by a UI-timer seek.
+    std::function<void(bool enabled, float startBar, float endBar)> onSongLoopChanged;
+
+    // Re-send the current song-loop region through onSongLoopChanged. Call once
+    // after wiring the callback, and whenever it must be re-synced (e.g. JACK
+    // reconnect). No-op until build() has run.
+    void pushSongLoopState();
+
+    // The current song-loop toggle + Start/End marker columns (0-based, End
+    // inclusive), for persisting to AppState. No-op until build() has run.
+    void songLoopState(bool& enabled, int& startCol, int& endCol) const;
+
+    // Restore the song-loop toggle + markers from a loaded project, then push the
+    // region to the RT sequencer(s). endCol < 0 leaves the markers untouched (a
+    // project saved before the region was persisted).
+    void applySongLoop(bool enabled, int startCol, int endCol);
+
     // The persisted loop state — see AppState::loopMode / activeLoopPatterns.
     bool             isLoopMode() const;
     std::vector<int> activeLoopPatterns() const;   // ascending; empty in Song mode
@@ -128,6 +149,7 @@ public:
     SongEditor*        songEd       = nullptr;
     SongPanel*         songPanel    = nullptr;
     LoopEditor*        loopEd       = nullptr;
+    LoopRuler*         loopRuler    = nullptr;
     Transport*         bottomPane   = nullptr;
     OutputsOverlay*    outputsOverlay = nullptr;
     TransportOverlay*  transportOverlay = nullptr;

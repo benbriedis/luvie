@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
         if (c == 1 && loopPattern >= 0) {
             // LuvieStateChunk header with msgId 0 marks a loop message, not JSON.
             LuvieStateChunk mark{ 0, (uint32_t)(sizeof(LuvieLoopState) + sizeof(LuvieLoopEntry)), 0, 0 };
-            LuvieLoopState  ls{ 1, 1 };
+            LuvieLoopState  ls{ 1, 1, 0, 0.0f, 0.0f };
             LuvieLoopEntry  le{ loopPattern, 0.0f, LUVIE_LOOP_ACTIVE | LUVIE_LOOP_MANUAL };
             lv2_atom_forge_frame_time(&forge, 0);
             lv2_atom_forge_atom(&forge, (uint32_t)(sizeof(mark) + sizeof(ls) + sizeof(le)), uLoop);

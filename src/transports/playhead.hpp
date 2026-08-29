@@ -70,14 +70,21 @@ class Playhead : public ITimelineObserver {
 	Fl_Color  currentHeadColor()      const;
 	int       displayedPatternId()    const;  // pattern the editor shows for patternTrack
 
+	// Song mode: fold a raw transport position into the active song-loop region
+	// (via songLoopRange). No-op when not looping or before the loop end.
+	float     songLoopFold(float raw) const;
+	// Transport position with the song-loop fold applied (song mode only).
+	float     livePosition()          const;
+
 public:
 	std::function<void()>        onEndReached;
 	std::function<void()>        onTick;
 	std::function<std::string(int)> pitchName;   // optional: pitch index → "E4" etc.
 
 	// Song-loop query (song mode only): fills [startBar, endBar) in transport-bar
-	// units and returns true when the transport loop toggle is on. When set and
-	// active, reaching endBar wraps playback back to startBar instead of stopping.
+	// units and returns true when the transport loop toggle is on. The RT sequencer
+	// owns the actual playback wrap; the playhead uses this only to fold its own
+	// displayed position and its soft-port sequencing back into the loop region.
 	std::function<bool(float& startBar, float& endBar)> songLoopRange;
 
 	Playhead(int numCols, int colWidth);

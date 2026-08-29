@@ -52,14 +52,18 @@ void Playhead::onTimelineChanged()
 	if (transport) {
 		float bars    = transport->position();
 		float clamped = std::clamp(bars, 0.0f, (float)numCols);
+		float ls, le;
+		bool  songLooping = songLoopRange && songLoopRange(ls, le);
 		// Only clamp playback to the song grid in song mode. In loop mode the
 		// transport free-runs (position grows unbounded, the display wraps via
 		// fmod), so seeking it back would shift the loop phase — e.g. committing
-		// a note edit after looping past the last bar would jump playback.
-		if (patternTrack < 0 && !loopActive && clamped != bars)
+		// a note edit after looping past the last bar would jump playback. Same
+		// reasoning for the song loop: the RT sequencer wraps playback itself and
+		// the raw transport position may sit past the grid end.
+		if (patternTrack < 0 && !loopActive && !songLooping && clamped != bars)
 			transport->seek(clamped);
 		if (loopMgr && obsTl && patternTrack < 0 && !loopActive)
-			loopMgr->sync(*obsTl, bars);
+			loopMgr->sync(*obsTl, songLoopFold(bars));
 	}
 	if (owner && owner->visible_r()) owner->redraw();
 }
@@ -101,7 +105,10 @@ void Playhead::tick()
 		const bool playing   = transport->isPlaying();
 		const bool runChecks = verbose || anySoftPort || (!jackClock && anyJackPort);
 		if (playing) {
-			float curPos = transport->position();
+			// Position folded into the song-loop region (song mode): the RT
+			// sequencer wraps playback at the seam, and this keeps the drawn
+			// playhead and the soft-port sequencing below in step with it.
+			float curPos = livePosition();
 			// Release expiring notes BEFORE emitting this window's note-ons, so a
 			// flush same-pitch note (note1 off == note2 on) gets off-then-on and
 			// re-attacks instead of being cancelled by the stale off.
@@ -113,42 +120,34 @@ void Playhead::tick()
 					allSoftNotesOff();   // loop wrapped — silence anything still on
 				}
 			} else {
-				// Song-loop: when the transport loop toggle is on and playback
-				// reaches the End marker, jump back to Start and keep playing.
-				float loopStart, loopEnd;
-				if (songLoopRange && songLoopRange(loopStart, loopEnd) &&
-				    curPos >= loopEnd) {
-					allSoftNotesOff();
-					transport->seek(loopStart);
-					curPos = loopStart;
+				if (loopMgr && obsTl) loopMgr->sync(*obsTl, curPos);
+				if (curPos >= lastPosition) {
+					flushSoftNoteOffs(curPos);
+					if (runChecks && obsTl) {
+						checkVerboseNotes(lastPosition, curPos);
+						checkVerboseSongParams(lastPosition, curPos);
+					}
 				} else {
-					if (loopMgr && obsTl) loopMgr->sync(*obsTl, curPos);
-					if (curPos >= lastPosition) {
-						flushSoftNoteOffs(curPos);
-						if (runChecks && obsTl) {
-							checkVerboseNotes(lastPosition, curPos);
-							checkVerboseSongParams(lastPosition, curPos);
-						}
-					} else {
-						allSoftNotesOff();   // seeked backward
-					}
-					if (curPos >= (float)numCols) {
-						// Hosted, this is a global jack_transport_stop(), so when
-						// playback dies unexpectedly it matters whether WE did it.
-						// LUVIE_DEBUG=1 says so on stderr; see luvie_dsp.cpp.
-						if (luvieDebug())
-							fprintf(stderr, "[luvie] playhead: song end reached at bar "
-							        "%.2f (grid is %d bars) - stopping transport\n",
-							        curPos, numCols);
-						transport->pause();
-						if (onEndReached) onEndReached();
-					}
+					allSoftNotesOff();   // seeked backward, or the song loop wrapped
+				}
+				// curPos is folded into the loop region when looping, so it never
+				// reaches numCols and this stop path stays disarmed mid-loop.
+				if (curPos >= (float)numCols) {
+					// Hosted, this is a global jack_transport_stop(), so when
+					// playback dies unexpectedly it matters whether WE did it.
+					// LUVIE_DEBUG=1 says so on stderr; see luvie_dsp.cpp.
+					if (luvieDebug())
+						fprintf(stderr, "[luvie] playhead: song end reached at bar "
+						        "%.2f (grid is %d bars) - stopping transport\n",
+						        curPos, numCols);
+					transport->pause();
+					if (onEndReached) onEndReached();
 				}
 			}
 			lastPosition = curPos;
 		} else {
 			if (wasPlaying) allSoftNotesOff();   // stopped — release held notes
-			float curPos = transport->position();
+			float curPos = livePosition();
 			if (loopMgr && obsTl && !loopActive) loopMgr->sync(*obsTl, curPos);
 			lastPosition = curPos;
 		}
@@ -336,11 +335,27 @@ Fl_Color Playhead::currentHeadColor() const
 	return headColor;
 }
 
+// Fold a raw song-mode position into the active loop region. songLoopRange returns
+// false (leaving raw untouched) when the toggle is off or there is no region; the
+// fold only bites once playback has run past the loop end.
+float Playhead::songLoopFold(float raw) const
+{
+	if (patternTrack >= 0 || !songLoopRange) return raw;
+	float ls, le;
+	if (!songLoopRange(ls, le) || le - ls <= 1.0e-4f || raw < le) return raw;
+	return ls + std::fmod(raw - ls, le - ls);
+}
+
+float Playhead::livePosition() const
+{
+	return songLoopFold(transport ? transport->position() : 0.0f);
+}
+
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
 	if (!transport) return;
 	if (patternTrack < 0 && loopActive && !frozen) return;  // loop mode, no frozen bar: hide
-	float bars = (frozen && patternTrack < 0) ? frozenBar : transport->position();
+	float bars = (frozen && patternTrack < 0) ? frozenBar : livePosition();
 	if (!isInPattern(bars)) return;
 	int px  = rulerX + barsToPixel(bars);
 	int tw  = 11;
@@ -354,7 +369,7 @@ void Playhead::drawLine(int gridX, int gridY, int gridH)
 {
 	if (!transport) return;
 	if (patternTrack < 0 && loopActive && !frozen) return;  // loop mode, no frozen bar: hide
-	float bars = (frozen && patternTrack < 0) ? frozenBar : transport->position();
+	float bars = (frozen && patternTrack < 0) ? frozenBar : livePosition();
 	if (!isInPattern(bars)) return;
 	int px = gridX + barsToPixel(bars);
 	fl_color(currentHeadColor());
@@ -363,12 +378,12 @@ void Playhead::drawLine(int gridX, int gridY, int gridH)
 
 int Playhead::xOffset() const
 {
-	return transport ? barsToPixel(transport->position()) : 0;
+	return transport ? barsToPixel(livePosition()) : 0;
 }
 
 float Playhead::currentBar() const
 {
-	return transport ? transport->position() : 0.0f;
+	return livePosition();
 }
 
 void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)

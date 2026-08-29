@@ -87,6 +87,9 @@ public:
 
 	// Song-loop toggle (the circular button before rewind).
 	bool loopEnabled() const;
+	// Set the toggle programmatically (project load). Updates the button glyph but
+	// does NOT fire onLoopToggled — the caller drives the downstream sync.
+	void setLoopEnabled(bool on);
 	// Grey the loop toggle (Loop mode) without disabling it — it stays clickable.
 	void setLoopVisualDisabled(bool d);
 	std::function<void(bool loopOn)> onLoopToggled;

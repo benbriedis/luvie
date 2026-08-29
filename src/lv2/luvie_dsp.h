@@ -69,10 +69,17 @@ typedef struct {
    pattern count, so it is always one atom — no chunking.
 
    Atom body: a LuvieStateChunk header with msgId 0 (the marker that says "loop
-   message, not JSON"), then this header, then `count` LuvieLoopEntry records. */
+   message, not JSON"), then this header, then `count` LuvieLoopEntry records.
+
+   songLoop* mirror the song editor's Start/End markers + loop toggle. They are
+   runtime-only like the rest of this message, and the DSP wraps song playback on
+   them internally (the host frame keeps rolling past the End marker). */
 typedef struct {
-    uint32_t loopMode;   /* 1 while the UI is in Loop Mode, 0 in Song Mode */
-    uint32_t count;      /* number of LuvieLoopEntry records that follow */
+    uint32_t loopMode;         /* 1 while the UI is in Loop Mode, 0 in Song Mode */
+    uint32_t count;            /* number of LuvieLoopEntry records that follow */
+    uint32_t songLoop;         /* 1 if the Start/End song loop is armed */
+    float    songLoopStartBar; /* loop start bar (inclusive) */
+    float    songLoopEndBar;   /* loop end bar (exclusive) */
 } LuvieLoopState;
 
 /* One pattern's loop state. A pattern appears here if it is active, manual, or

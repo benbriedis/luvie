@@ -53,6 +53,7 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
         return false;
 
     sampleRate = jack_get_sample_rate(client);
+    setSampleRate((double)sampleRate);
 
     jack_set_process_callback(client, processCallback, this);
 
@@ -181,6 +182,11 @@ void JackTransport::reanchor(float bars)
 float JackTransport::position() const
 {
     if (!timeline) return 0.0f;
+    // While the song loop is armed the RT thread wraps playback internally (the
+    // JACK timeline keeps rolling linearly), so the honest playhead position is the
+    // wrapped musical bar it publishes each cycle, not the raw frame->bar mapping.
+    if (songLoopActive())
+        return loopedPosition();
     double secs = static_cast<double>(posFrames.load()) / sampleRate;
     return static_cast<float>(timeline->secondsToBar(secs) + barOffset.load());
 }
@@ -220,7 +226,6 @@ int JackTransport::process(jack_nframes_t nframes)
     }
 
     outEvents.clear();
-    curBlockStart = pos.frame;
     curNframes    = nframes;
     // Snapshot the tempo re-anchor offset once so process() and emit() agree for
     // the whole cycle even if the UI thread updates it mid-cycle.
@@ -242,15 +247,12 @@ int JackTransport::process(jack_nframes_t nframes)
 
     bool jumped = !firstCall && wasPlaying && (pos.frame != lastFrame + nframes);
 
-    // Fire events for exactly this buffer: [pos.frame, pos.frame + nframes). JACK
-    // advances pos.frame contiguously by nframes when rolling, so each cycle's
-    // window abuts the previous one. emit() (below) converts each bar to a frame
-    // offset relative to curBlockStart. curBarOffset shifts frame->bar so a tempo
+    // Render this buffer's window. renderCycle() converts [pos.frame, +nframes) to
+    // a musical window, splits it at the song-loop seam when looping, and calls
+    // emit() (below) for each message; curBarOffset shifts frame<->bar so a tempo
     // re-anchor keeps the same bar without a reposition (see reanchor()).
-    float prevBars = snapSecondsToBar(static_cast<double>(pos.frame) / sampleRate) + curBarOffset;
-    float curBars  = snapSecondsToBar(static_cast<double>(pos.frame + nframes) / sampleRate) + curBarOffset;
-
-    bool ran = renderWindow(nowPlaying, jumped, prevBars, curBars);
+    bool ran = renderCycle(nowPlaying, jumped, nframes,
+                           static_cast<double>(pos.frame) / sampleRate, curBarOffset);
 
     // Flush the cycle's events in non-decreasing frame order per buffer. JACK
     // drops any event written out of frame order, so this single ordered pass
@@ -291,10 +293,10 @@ void JackTransport::emit(const std::string& port, float bar,
     void* buf = findBuf(namedBufs, port.c_str());
     if (!buf) return;
 
-    // Invert the frame->bar offset applied in process() so the bar lands on the
-    // right frame under the re-anchored mapping.
-    long frameAbs = static_cast<long>(snapBarToSeconds(bar - curBarOffset) * sampleRate);
-    long off      = frameAbs - static_cast<long>(curBlockStart);
+    // Frame offset within this cycle for `bar`, honouring the current sub-segment's
+    // time base (so events after a loop wrap land past the seam, not at frame 0) and
+    // the tempo re-anchor offset.
+    long off = segFrameOffset(bar);
     if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
     if (off < 0) off = 0;
     if (curNframes > 0 && off > static_cast<long>(curNframes) - 1)

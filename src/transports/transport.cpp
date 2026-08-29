@@ -306,6 +306,14 @@ bool Transport::loopEnabled() const
 	return loopOn;
 }
 
+void Transport::setLoopEnabled(bool on)
+{
+	if (loopOn == on) return;
+	loopOn = on;
+	loopBtn->setAlt(on);
+	loopBtn->redraw();
+}
+
 void Transport::setLoopVisualDisabled(bool d)
 {
 	loopBtn->setVisualDisabled(d);

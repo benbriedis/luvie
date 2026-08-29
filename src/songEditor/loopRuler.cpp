@@ -24,9 +24,11 @@ void LoopRuler::setNumCols(int n)
 	numCols = std::max(1, n);
 	// Keep both markers inside the ruler; End stays at the last column if it was
 	// already there (grew with the content), otherwise just clamp.
+	int oldStart = startBar, oldEnd = endBar;
 	endBar   = std::clamp(endBar,   0, numCols - 1);
 	startBar = std::clamp(startBar, 0, endBar);
 	redraw();
+	if ((startBar != oldStart || endBar != oldEnd) && onChanged) onChanged();
 }
 
 void LoopRuler::draw()
@@ -69,13 +71,13 @@ void LoopRuler::draw()
 void LoopRuler::setStartColumn(int bar)
 {
 	int nb = std::clamp(bar, 0, endBar);
-	if (nb != startBar) { startBar = nb; redraw(); }
+	if (nb != startBar) { startBar = nb; redraw(); if (onChanged) onChanged(); }
 }
 
 void LoopRuler::setEndColumn(int bar)
 {
 	int nb = std::clamp(bar, startBar, numCols - 1);
-	if (nb != endBar) { endBar = nb; redraw(); }
+	if (nb != endBar) { endBar = nb; redraw(); if (onChanged) onChanged(); }
 }
 
 int LoopRuler::pixelToBar(int px) const
@@ -134,10 +136,10 @@ int LoopRuler::handle(int event)
 	case FL_DRAG: {
 		if (dragging == START) {
 			int nb = std::clamp(pixelToBar(Fl::event_x()), 0, endBar);
-			if (nb != startBar) { startBar = nb; redraw(); }
+			if (nb != startBar) { startBar = nb; redraw(); if (onChanged) onChanged(); }
 		} else if (dragging == END) {
 			int nb = std::clamp(pixelToBar(Fl::event_x()), startBar, numCols - 1);
-			if (nb != endBar) { endBar = nb; redraw(); }
+			if (nb != endBar) { endBar = nb; redraw(); if (onChanged) onChanged(); }
 		}
 		return 1;
 	}

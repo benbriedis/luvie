@@ -338,6 +338,9 @@ std::string appStateToJsonString(const AppState& state) {
         {"jackInstruments", jinstrs},
         {"loopMode",           state.loopMode},
         {"activeLoopPatterns", state.activeLoopPatterns},
+        {"songLoopEnabled",    state.songLoopEnabled},
+        {"songLoopStartCol",   state.songLoopStartCol},
+        {"songLoopEndCol",     state.songLoopEndCol},
     };
     return j.dump(2);
 }
@@ -356,6 +359,9 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     state.loopMode = j.value("loopMode", false);
     for (const auto& jp : j.value("activeLoopPatterns", json::array()))
         state.activeLoopPatterns.push_back(jp.get<int>());
+    state.songLoopEnabled  = j.value("songLoopEnabled",  false);
+    state.songLoopStartCol = j.value("songLoopStartCol", 0);
+    state.songLoopEndCol   = j.value("songLoopEndCol",   -1);
     if (j.contains("timeline"))
         state.timeline = timelineFromJson(j.at("timeline"));
     for (const auto& jc : j.value("jackOutputs", json::array()))

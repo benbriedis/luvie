@@ -88,9 +88,13 @@ static_assert(kMaxPluginOutputs == LUVIE_NUM_MIDI_OUTS,
 
 class Lv2Engine : public Sequencer {
 public:
-    explicit Lv2Engine(double sr) : sampleRate(sr) { evs.reserve(4096); }
+    explicit Lv2Engine(double sr) : sampleRate(sr)
+    {
+        Sequencer::setSampleRate(sr);
+        evs.reserve(4096);
+    }
 
-    void   setSampleRate(double sr) { sampleRate = sr; }
+    void   setSampleRate(double sr) { sampleRate = sr; Sequencer::setSampleRate(sr); }
     double sampleRateHz() const     { return sampleRate; }
 
     /* Port name -> LV2 output index, resolved off the audio thread. Called on the
@@ -114,14 +118,12 @@ public:
        each output port has its own sequence to forge into. */
     void render(double startSecs, uint32_t nf, bool nowPlaying, bool jumped)
     {
-        cycleStartSecs = startSecs;
         nframes = nf;
         evs.clear();
 
-        float prevBars = snapSecondsToBar(startSecs);
-        float curBars  = snapSecondsToBar(startSecs + (double)nf / sampleRate);
-
-        bool ran = renderWindow(nowPlaying, jumped, prevBars, curBars);
+        // renderCycle() maps startSecs -> Luvie bars, splits the window at the
+        // song-loop seam when looping, and calls emit() for each message.
+        bool ran = renderCycle(nowPlaying, jumped, nf, startSecs, 0.0);
 
         std::sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) {
             if (a.frame != b.frame) return a.frame < b.frame;
@@ -155,6 +157,11 @@ public:
     {
         if (!snapMutex.try_lock())
             return false;
+        // While the song loop is armed, report the wrapped musical position the RT
+        // thread publishes (the host frame keeps rolling linearly past the End
+        // marker) so the UI playhead follows the loop.
+        if (songLoopActive())
+            secs = snapBarToSeconds(loopedPosition());
         float beatsPerBar = 4.0f;
         float barsTotal   = 0.0f;
         if (const TimeSegment* seg = timeSettings::segmentAtSeconds(snap.segs, secs)) {
@@ -173,7 +180,9 @@ protected:
     void emit(const std::string& port, float bar,
               const uint8_t* data, int len) override
     {
-        long off = static_cast<long>((snapBarToSeconds(bar) - cycleStartSecs) * sampleRate);
+        // Frame offset within this cycle, honouring the current sub-segment's time
+        // base so events after a song-loop wrap land past the seam, not at frame 0.
+        long off = segFrameOffset(bar);
         if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
         if (off < 0) off = 0;
         if (nframes > 0 && off > static_cast<long>(nframes) - 1)
@@ -186,7 +195,7 @@ protected:
     }
 
 private:
-    /* RT thread, snapMutex held (renderWindow holds it for the whole cycle).
+    /* RT thread, snapMutex held (renderCycle holds it for the whole cycle).
        Unmapped names go to output 0 — see pluginPorts.hpp for why. */
     int portIndex(const char* name) const
     {
@@ -196,7 +205,6 @@ private:
     }
 
     double          sampleRate     = 48000.0;
-    double          cycleStartSecs = 0.0;
     uint32_t        nframes        = 0;
     int             lastEmitted    = 0;
 
@@ -321,6 +329,15 @@ static void applyState(Plugin* p, const std::string& json, bool restoreLoopState
         if (st.loopMode)
             for (int patId : st.activeLoopPatterns) actives[patId] = 0.0f;
         p->loopMgr.mirror(actives, {}, {});
+
+        /* Song-loop region: End column is inclusive, the sequencer wants an
+           exclusive end bar. endCol < 0 means the project predates this field. */
+        if (st.songLoopEndCol >= 0)
+            p->engine->setSongLoop(st.songLoopEnabled,
+                                   (float)st.songLoopStartCol,
+                                   (float)st.songLoopEndCol + 1.0f);
+        else
+            p->engine->setSongLoop(false, 0.0f, 0.0f);
     }
 
     {
@@ -357,10 +374,13 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
     }
 
     if (luvieDebug())
-        fprintf(stderr, "[luvie] applyLoopState: loopMode=%u, %u entries (%zu active)\n",
-                hdr.loopMode, count, actives.size());
+        fprintf(stderr, "[luvie] applyLoopState: loopMode=%u, %u entries (%zu active), "
+                "songLoop=%u [%.2f,%.2f)\n",
+                hdr.loopMode, count, actives.size(), hdr.songLoop,
+                hdr.songLoopStartBar, hdr.songLoopEndBar);
 
     p->engine->setLoopMode(hdr.loopMode != 0);
+    p->engine->setSongLoop(hdr.songLoop != 0, hdr.songLoopStartBar, hdr.songLoopEndBar);
     p->loopMgr.mirror(actives, manual, disabled);
 }
 

@@ -300,8 +300,6 @@ Look at changing time signatures: auto changes are a bit annoying.
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
-BUG: looping to start of song causes a gap (plugin or standalone or both?)
-
 'pianoroll' & 'drums' labels not shown in Loop Editor (Ideally would be attached to P1, P2, etc)
 
 BUG 'Add automation' is missing its right-pointing triangle icon (installed via .deb)
@@ -361,6 +359,8 @@ Document
 	Ctrl-X   cut selection
 	Ctrl-V   paste
 Maybe list these shortcuts in a window even if they are not edittable.
+
+    cf P or space over song editor to move playhead
  
  
 TODO change the tab being display when undoing/redoing as necessary 

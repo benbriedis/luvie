@@ -25,7 +25,7 @@
  *
  * Thread model:
  *   - Public ITransport methods and the inherited Sequencer setters run on the UI thread.
- *   - processCallback() runs on the JACK real-time thread and calls renderWindow().
+ *   - processCallback() runs on the JACK real-time thread and calls renderCycle().
  */
 class JackTransport : public Sequencer, public ITransport {
 public:
@@ -112,10 +112,9 @@ private:
     // the UI thread updates barOffset mid-cycle.
     double         curBarOffset = 0.0;
 
-    // Per-cycle context for emit(): the buffers, this cycle's start frame and length.
+    // Per-cycle context for emit(): the port buffers and this cycle's length.
     using NamedBuf = std::pair<const std::string*, void*>;
     std::vector<NamedBuf> namedBufs;
-    jack_nframes_t        curBlockStart = 0;
     jack_nframes_t        curNframes    = 0;
 
     // All MIDI output for a cycle is collected here, then sorted by frame per

@@ -43,6 +43,15 @@ struct AppState {
     // active set is derived from the timeline by LoopManager::sync().
     bool             loopMode = false;
     std::vector<int> activeLoopPatterns;   // pattern IDs, ascending
+
+    // Song-mode loop: the song editor's Start/End markers + the loop toggle. Like
+    // the fields above these are otherwise runtime-only, but persisting them lets a
+    // project reopen with the same loop region armed. Columns are 0-based; End is
+    // the last looped column (inclusive), matching LoopRuler. songLoopEndCol < 0
+    // means "not saved" — leave the ruler at its default.
+    bool             songLoopEnabled  = false;
+    int              songLoopStartCol = 0;
+    int              songLoopEndCol   = -1;
 };
 
 // Serialize/deserialize AppState to/from a JSON string.
