@@ -40,7 +40,7 @@ Q: do Ardour and Carla need their plugin lists refreshed before Luvie is visible
 If you prefer to run Luvie as a standalone application then note that it supports NSM (New/Non Session Manager) 
 for saving projects that use multiple applications.  You will need a program such as RaySession to manage 
 the project in this case.  Alternatively if you are hardcore you can choose to manage a project yourself 
-(or with an AI) using scripts.
+(or with an AI) using scripts. [Here](startBristol.sh) is example script for starting Luvie in standalone mode.
 
 
 ## MIDI Ports
