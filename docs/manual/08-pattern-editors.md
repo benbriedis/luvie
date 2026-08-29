@@ -37,12 +37,23 @@ TODO screenshot
 
 NOTE: the other pattern editors behaviour similarly
 
+## Automation
 
-automation
+MIDI parameters such as pitch bend, modulation, etc can be automated using rubberbands in dedicated automation lanes. 
+See the screenshot above for an example. Note that this automation applies at a pattern level, but the song editor has its own automation lanes
 
-dark panel settings
+To create a lane right-click on the track in the left hand column and choose 'Add automation'.
 
-timing panel
+TODO screenshot
+
+You can add dots on the rubberbands by clicking on it. You can click and drag them around, and you can delete them
+either by hovering over them and pressing delete or by right-clicking on them and using the menu option.
+
+## Main settings panel/row
+
+TODO instrument name etc  NB changing name
+
+## Timing panel 
 - Why the odd divisions? NB snap
 
 
