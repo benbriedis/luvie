@@ -363,3 +363,23 @@ BUG: clicking a dragging two blocks in a collapsed track can be dragged into a s
      Reality bites when clicking on one of the dragged blocks and one blocks jumps up.
 
 
+
+----------------------
+sudo apt install jackd2
+
+
+TO Kill stale jack:
+killall -9 jackdbus
+rm -f /dev/shm/jack_* /dev/shm/jack-1000/* 2>/dev/null
+
+
+RaySession by adding them as "Ray-Hack" clients or using external proxy tools, as RaySession natively handles non-compatible programs through its own internal proxy/hack implementation rather than requiring a separate nsm-proxy daemon.
+
+Executable
+ - deselect NSM Protocol
+ - startBristol -jack -midi seq -mini
+
+Document: nsm-proxy
+
+
+TODO document standalone2.luvie
