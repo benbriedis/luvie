@@ -1,26 +1,25 @@
-# Getting started
+# The Basics
 
 [← Configuration](01-configuration.md) · [Contents](README.md) · [MIDI output and instruments →](03-outputs.md)
 
-TODO: screenshot of the whole window with the main areas labelled, referred to
-by the names used throughout the rest of the manual.
+<img src="images/songEditor.png" alt="Luvie song editor" width="1000">
 
 ## Songs, Loops and Patterns
 
 Luvie can play in one of two modes: Song Mode and Loop Mode.
+The Song/Loop mode toggle button is found on the top left of the window.
 
 When in Song Mode a "song" is played from start to end. 
-It's likely to contain many bars and run for some minutes, but don't let me limit you.
 A song consists of multiple patterns that are turned on and off at strategic moments
-so as to produce auditory bliss, or otherwise.
+so as to produce auditory bliss, or other.
 
-Loop Mode accesses the same pool of patterns as Song Mode but in this case the patterns
+Loop Mode has access to the same pool of patterns as Song Mode but in this case the patterns
 are manually enabled and disabled by the user.
 
-Loop Mode is more of a "live" experience whereas "Song Mode" is more pre-baked.
+Loop Mode is more of a "live" experience whereas "Song Mode" is more composed or pre-baked.
 
-The Song/Loop mode toggle button is found on the top left.
-The Song Editor displays what is to be played when in Song Mode and
+Near the top of the window there are three tabs: Song Editor, Loop Editor and Pattern Editor.
+The Song Editor displays what is played when in Song Mode and
 the Loop Editor displays what is playing when in Loop Mode.
 
 ## The Pattern Editors
@@ -28,16 +27,26 @@ the Loop Editor displays what is playing when in Loop Mode.
 There are three different types of pattern editor: the harmony editor,
 the pianoroll editor and the drum editor. 
 
-There is only one Pattern Editor tab - which type of pattern editor shown
+There is only one Pattern Editor tab. The type of pattern editor shown
 depends on which pattern is selected when you open the Pattern Editor.
-Alternatively it's possible to open the Pattern Editor by right clicking on the
-etc...
-
-
+Alternatively it's possible to open the desired Pattern Editor by right clicking on a
+pattern name or pattern block when in the Song Editor, or right clicking on a
+pattern block when in the Loop Editor.
 
 ## Context Popups
 
-## The Settings Nav
+Luvie make extensive use of context menus to organise its operations.
+You display these popup menus by right-clicking on appropriate items.
+Luvie indicates that a popup menu by displaying a special cursor when you
+hover the cursor over a section of the window that has a context menu available.
+When in doubt about how to do something try right clicking on it.
+
+TODO include image of the cursor
+
+## The Settings Menu
+
+Project-wide settings are to be found in the Settings Menu. To display it click on the
+gear icon at the top right of the window.
 
 ## Instruments and Outputs
 
@@ -72,7 +81,8 @@ When swapping from Loop mode to Song mode the currently playing bar will finish 
 and then the Song editor will take over. Note that if you have enabled any patterns when 
 in Loop editor they will keep on playing until either you or the Song Editor turns them off again.
 
-
+## The transport setting
+TODO
 
 ## Where to go next
 
