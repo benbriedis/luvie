@@ -50,10 +50,11 @@ When in doubt about how to do something try right clicking on it.
 
 TODO include image of the special cursor
 
+## The playhead
+
+TODO
+
 ## The Transport 
-
-TODO describe the playhead
-
 
 The transport controls sit along the bottom of the window. They consist of a
 loop/don't loop toggle button, a play/pause button, and a rewind button.
