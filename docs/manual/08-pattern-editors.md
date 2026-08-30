@@ -77,7 +77,6 @@ the pattern blocks.
 The time signature denominator has three different '8' options, same as the Song Editor. 
 These different versions determine how the beat is defined. See [Tempo and Beats](11-tempo-and-beats.md) for details.
 
-TODO: check this
 
 The next control determines the number of bars in the pattern.
 
