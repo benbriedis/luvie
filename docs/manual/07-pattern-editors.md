@@ -1,4 +1,4 @@
-# The pattern editors
+# The pattern editors & the pianoroll editor
 
 [← Loops](06-loop-editor.md) · [Contents](README.md) · [Harmony patterns →](08-harmony-editor.md)
 
