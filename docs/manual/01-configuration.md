@@ -122,3 +122,13 @@ TODO check 'Strict I/O' setting
 1. add some notes to both patterns
 1. (Transport seems to be happily using Jack)
 
+## The transport setting
+
+TODO: how to access. Where to place this?
+
+There's a transport window with a transport setting in it. This setting describes where the transport
+implementation comes from. When Luvie is run as a plugin it will fixed to "host". Otherwise you have a 
+choice between "Internal" and "Jack". When the Jack server is available you will usually want to go with 
+that - see [Configuration](configuration.md)
+
+
