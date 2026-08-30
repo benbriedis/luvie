@@ -22,6 +22,13 @@ Near the top of the window there are three tabs: Song Editor, Loop Editor and Pa
 The Song Editor displays what is played when in Song Mode and
 the Loop Editor displays what is playing when in Loop Mode.
 
+It is possible to switch between the two modes in a fairly graceful fashion.
+When swapping from Song mode to Loop mode the last playing patterns keep on playing.
+
+When swapping from Loop mode to Song mode the currently playing bar will finish playing
+and then the Song editor will take over. Note that if you have enabled any patterns when 
+in Loop editor they will keep on playing until either you or the Song Editor turns them off again.
+
 ## The Pattern Editors
 
 There are three different types of pattern editor: the harmony editor,
@@ -41,48 +48,38 @@ Luvie indicates that a popup menu by displaying a special cursor when you
 hover the cursor over a section of the window that has a context menu available.
 When in doubt about how to do something try right clicking on it.
 
-TODO include image of the cursor
+TODO include image of the special cursor
+
+## The Transport 
+
+TODO describe the playhead
+
+
+The transport controls sit along the bottom of the window. They consist of a
+loop/don't loop toggle button, a play/pause button, and a rewind button.
+
+When in song mode rewind takes the playhead to the "start" marker and play 
+ends at the end marker.
+FIX THIS
+If looping is enabled then the playhead loops been the "start" and "end" markers.
+
+## Alerts
+
+To the right of the transport controls there is an "alerts" icon. Hover over it to 
+view any current alerts. The most common alerts relate to the Jack server not being present.
 
 ## The Settings Menu
 
 Project-wide settings are to be found in the Settings Menu. To display it click on the
 gear icon at the top right of the window.
 
-## Instruments and Outputs
+## Export and import
 
+So you started a project in Carla and now decide you want to move over to Ardour? Or maybe as a standalone?
+This is what export and import is about. You can access these though the 'settings' menu - just click the
+gear icon at the top right of the window.
 
-## The Song Editor 
-
-## The Control Bar
-
-## The Transport Bar
-
-TODO: pattern editor tab, song editor tab, the transport bar along the bottom.
-TODO: play/stop, etc
-
-
-## Song mode vs Loop mode
-
-There's a button on the top left that says 'Song'. 
-Try clicking it....
-It says 'Loop', it says 'Song', it says 'Loop', it says 'Song'.
-Green, blue, green, blue, green, ...
-You get the picture - there are two modes: 'Loop' and 'Song'.
-
-The Song Editor shows what happens when in Song mode and
-the Loop Editor shows what happen when in Loop mode.
-
-[MOVE TO 'loop' chapter?]
-
-It is possible to switch between the two modes in a fairly graceful fashion.
-When swapping from Song mode to Loop mode the last playing patterns keep on playing.
-
-When swapping from Loop mode to Song mode the currently playing bar will finish playing
-and then the Song editor will take over. Note that if you have enabled any patterns when 
-in Loop editor they will keep on playing until either you or the Song Editor turns them off again.
-
-## The transport setting
-TODO
+You can also export projects to give you save multiple versions, save backups, etc, in some circumstances.
 
 ## Where to go next
 
