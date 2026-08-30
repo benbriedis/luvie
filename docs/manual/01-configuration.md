@@ -122,10 +122,3 @@ TODO check 'Strict I/O' setting
 1. add some notes to both patterns
 1. (Transport seems to be happily using Jack)
 
-## Export and import
-
-So you started a project in Carla and now decide you want to move over to Ardour? Or maybe as a standalone?
-This is what export and import is about. You can access these though the 'settings' menu - just click the
-gear icon at the top right of the window.
-
-You can also export projects to give you save multiple versions, save backups, etc, in some circumstances.
