@@ -63,7 +63,7 @@ You can add or modify instruments by clicking the gear icon at the top right of 
 
 ## Timing controls 
 
-To the right of the main controls, with a purple background, are the timing controls.
+To the right of the main controls, with a dark pink background, are the timing controls.
 
 <img src="images/patternEditorControls.png" alt="The shared pattern editor controls" width="800">
 
