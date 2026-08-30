@@ -269,7 +269,7 @@ protected:
     }
 
     // Tolerance (in beats) for treating two note ranges as overlapping. Snapping
-    // to non-power-of-two subdivisions (1/3, 1/5, 1/7) can't be represented
+    // to non-power-of-two subdivisions (1/3, 1/5, 1/6, 1/7) can't be represented
     // exactly in float, so an abutting note's start and its neighbour's end
     // differ by ~1e-7 beats; a strict comparison then reports a phantom overlap
     // and forbids the placement. This epsilon is far below any real subdivision

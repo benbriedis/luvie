@@ -35,8 +35,9 @@ static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
 static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 
 // Divisions split one beat (a time-signature denominator unit) into this many
-// parts; the choice labels are "1/1" (1), "1/2", "1/3", "1/5" and "1/7".
-static constexpr int kDivisors[]       = { 1, 2, 3, 5, 7 };
+// parts; the choice labels are "1/1" (1), "1/2", "1/3", "1/4", "1/5", "1/6" and
+// "1/7".
+static constexpr int kDivisors[]       = { 1, 2, 3, 4, 5, 6, 7 };
 static constexpr int kDivisionsDefault = 0;  // None
 static constexpr int kZoomFactors[]    = { 1, 2, 4 };
 static constexpr int kZoomDefault      = 1;  // x2
@@ -469,7 +470,7 @@ void PatternPanel::initTimeControls()
     ds.divLabel.labelcolor(panelText);
     ds.divLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    for (const char* v : {"1\\/1", "1\\/2", "1\\/3", "1\\/5", "1\\/7"})
+    for (const char* v : {"1\\/1", "1\\/2", "1\\/3", "1\\/4", "1\\/5", "1\\/6", "1\\/7"})
         ds.divChoice.add(v);
     ds.divChoice.value(kDivisionsDefault);
     ds.divChoice.color(TimeControls::kBg);

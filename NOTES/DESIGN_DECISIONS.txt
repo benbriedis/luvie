@@ -124,4 +124,11 @@ Similarly the most common scales have 7 notes with equivalent notes.
 Also its reasonable to support conversions between like scales (eg pentantics) or chords,
    but matching up very different ones is probably not a reasonable thing to expect.
 
+Loop mode and Jack time master
+==============================
+More of a note really... a Jack time master supplies the BPM and the time signature.
+The loop mode doesn't have a time signature to supply. 
+Less obviously there can be multiple CPM (ie crotchets per minute) happening too...
+the BPM in tab is meant to represent the true BPM, not Jack's CPM/BPM.
+As a result the loop mode isn't a great time master.
 
