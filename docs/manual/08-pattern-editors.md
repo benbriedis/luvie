@@ -1,6 +1,6 @@
 # The pattern editors
 
-[← Harmony patterns](09-harmony-editor.md) · [Contents](README.md) · [The drumkit editor →](11-drumkit-editor.md)
+[← The pattern editors — overview](07-pattern-editors-overview.md) · [Contents](README.md) · [Harmony patterns →](09-harmony-editor.md)
 
 ## The pianoroll editor
 
@@ -75,7 +75,7 @@ both in song mode and edit mode. In the Song Editor the beginning of patterns ar
 the pattern blocks.
 
 The time signature denominator has three different '8' options, same as the Song Editor. 
-These different versions determine how the beat is defined. See [Tempo and Beats](11-tempo-and-beats.md) for details.
+These different versions determine how the beat is defined. See [BPM and time signatures](11-beats-and-times.md) for details.
 
 
 The next control determines the number of bars in the pattern.

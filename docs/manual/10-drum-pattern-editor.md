@@ -1,6 +1,6 @@
 # The drum pattern editor
 
-[← The pianoroll editor](10-pianoroll-editor.md) · [Contents](README.md) · [Sessions and saving →](12-sessions.md)
+[← Harmony patterns](09-harmony-editor.md) · [Contents](README.md) · [BPM and time signatures →](11-beats-and-times.md)
 
 <img src="images/drumsEditor.png" alt="The Luvie drum pattern editor" width="800">
 

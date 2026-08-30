@@ -1,6 +1,6 @@
 # The harmony pattern editor
 
-[← Loops](08-loop-editor.md) · [Contents](README.md) · [The pianoroll editor →](10-pianoroll-editor.md)
+[← The pattern editors](08-pattern-editors.md) · [Contents](README.md) · [The drum pattern editor →](10-drum-pattern-editor.md)
 
 This editor is arguably the meat and potatoes of this sequencer.
 

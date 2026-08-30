@@ -1,6 +1,6 @@
 # Sessions and saving
 
-[← The drumkit editor](11-drumkit-editor.md) · [Contents](README.md)
+[← BPM and time signatures](11-beats-and-times.md) · [Contents](README.md)
 
 ## Export and import
 

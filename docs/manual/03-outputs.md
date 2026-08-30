@@ -75,4 +75,4 @@ instance — and for those, none of this needs touching.
 ## Drum kits
 
 TODO: naming drum instruments and reusing a kit across patterns.
-Cross-reference [The drumkit editor](11-drumkit-editor.md).
+Cross-reference [The drum pattern editor](10-drum-pattern-editor.md).

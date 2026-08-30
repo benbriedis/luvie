@@ -1,6 +1,6 @@
 # The song editor
 
-[← A simple walk through](04-walkthrough.md) · [Contents](README.md) · [The pattern editors →](06-intro-pattern-editors.md)
+[← A simple walk through](04-walkthrough.md) · [Contents](README.md) · [Loops →](06-loop-editor.md)
 
 <img src="images/songEditor.png" alt="Luvie song editor" width="1000">
 
