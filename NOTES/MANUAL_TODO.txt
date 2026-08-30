@@ -37,7 +37,7 @@ writing music with it -- that is when the awkward parts are obvious.
 Facts to verify before publishing
 ---------------------------------
 
-docs/manual/11-beats-and-times.md: whether the song editor's first beat
+docs/manual/10-beats-and-times.md: whether the song editor's first beat
 definition and time signature really do serve as the defaults for new patterns.
 The original note was unsure.
 

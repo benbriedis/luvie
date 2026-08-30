@@ -1,6 +1,6 @@
 # The pattern editors
 
-[← The pattern editors — overview](07-pattern-editors-overview.md) · [Contents](README.md) · [Harmony patterns →](09-harmony-editor.md)
+[← Loops](06-loop-editor.md) · [Contents](README.md) · [Harmony patterns →](08-harmony-editor.md)
 
 A pattern is a short piece of music that the song editor places on a timeline.
 Luvie has three different types of pattern: pianoroll, harmony, and drum.
@@ -77,7 +77,7 @@ both in song mode and edit mode. In the Song Editor the beginning of patterns ar
 the pattern blocks.
 
 The time signature denominator has three different '8' options, same as the Song Editor. 
-These different versions determine how the beat is defined. See [BPM and time signatures](11-beats-and-times.md) for details.
+These different versions determine how the beat is defined. See [BPM and time signatures](10-beats-and-times.md) for details.
 
 
 The next control determines the number of bars in the pattern.

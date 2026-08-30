@@ -1,6 +1,6 @@
 # Loops
 
-[← The song editor](05-song-editor.md) · [Contents](README.md) · [The pattern editors — overview →](07-pattern-editors-overview.md)
+[← The song editor](05-song-editor.md) · [Contents](README.md) · [The pattern editors →](07-pattern-editors.md)
 
 <img src="images/loopEditor.png" alt="The Luvie loop editor" width="800">
 
@@ -24,4 +24,4 @@ TODO: creating, naming and deleting loops; the loop ruler; the context menu.
 
 TODO: the loop panel is BPM-only — it has no time signature of its own, because
 each pattern brings its own. Cross-reference
-[BPM and time signatures](11-beats-and-times.md).
+[BPM and time signatures](10-beats-and-times.md).

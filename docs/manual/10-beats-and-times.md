@@ -1,6 +1,6 @@
 # BPM and time signatures
 
-[← The drum pattern editor](10-drum-pattern-editor.md) · [Contents](README.md) · [Sessions and saving →](12-sessions.md)
+[← The drum pattern editor](09-drum-pattern-editor.md) · [Contents](README.md) · [Sessions and saving →](11-sessions.md)
 
 ## BPM has two meanings
 
