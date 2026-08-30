@@ -11,8 +11,6 @@ to demonstrate the features common to all of the pattern editors.
 Each row represents one semitone, labelled with its note name. A parameter lane (Modulation, above) can be shown
 beneath the grid.
 
-<img src="images/pianorollEditor.png" alt="The Luvie pianoroll editor" width="800">
-
 ## Adding and removing notes
 
 To add a note simply click somewhere on the grid. To remove it you can hover over the
@@ -49,11 +47,40 @@ TODO screenshot
 You can add dots on the rubberbands by clicking on it. You can click and drag them around, and you can delete them
 either by hovering over them and pressing delete or by right-clicking on them and using the menu option.
 
-## Main settings panel/row
+## Control row
 
-TODO instrument name etc  NB changing name
+The main controls of the pattern editors are found at the bottom of the UI.
 
-## Timing panel 
-- Why the odd divisions? NB snap
+<img src="images/patternEditorControls.png" alt="The shared pattern editor controls" width="800">
+
+The first control scrolls the grid to show the notes, and the second zooms the grid out horizontally.
+
+Next comes the pattern name. Double click to edit.
+
+The next control is a dropdown containing the instrument name. This maps to the MIDI output and MIDI channel used.
+You can add or modify instruments by clicking the gear icon at the top right of the screen.
 
 
+## Timing controls 
+
+To the right of the main controls, with a purple background, are the timing controls.
+
+<img src="images/patternEditorControls.png" alt="The shared pattern editor controls" width="800">
+
+The first two controls define the time signature.
+
+Patterns have their own time signatures, and these are independent of those shown in the Song Editor. 
+As a result it is possible to play patterns with different time signatures against one another, 
+both in song mode and edit mode. In the Song Editor the beginning of patterns are marked with ticks in 
+the pattern blocks.
+
+The time signature denominator has three different '8' options, same as the Song Editor. 
+These different versions determine how the beat is defined. See [Tempo and Beats](11-tempo-and-beats.md) for details.
+
+TODO: check this
+
+The next control determines the number of bars in the pattern.
+
+The next control declares how many parts to divide each beat into. This determines the granularity to to use when 
+adding and resizing notes. It is possible to go free-form by deselecting the 'Snap' control.
+  
