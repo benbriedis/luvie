@@ -1,6 +1,6 @@
 # MIDI output and instruments
 
-[← Getting started](02-basics.md) · [Contents](README.md) · [A simple walk through →](04-walkthrough.md)
+[← Getting started](02-basics.md) · [Contents](README.md) · [The song editor →](04-song-editor.md)
 
 The gear icon at the top right of the window opens the **Instruments & Outputs**
 dialog, where everything in this chapter is set up:
@@ -75,4 +75,4 @@ instance — and for those, none of this needs touching.
 ## Drum kits
 
 TODO: naming drum instruments and reusing a kit across patterns.
-Cross-reference [The drum pattern editor](09-drum-pattern-editor.md).
+Cross-reference [The drum pattern editor](08-drum-pattern-editor.md).

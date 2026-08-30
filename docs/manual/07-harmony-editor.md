@@ -1,6 +1,6 @@
 # The harmony pattern editor
 
-[← The pattern editors](07-pattern-editors.md) · [Contents](README.md) · [The drum pattern editor →](09-drum-pattern-editor.md)
+[← The pattern editors](06-pattern-editors.md) · [Contents](README.md) · [The drum pattern editor →](08-drum-pattern-editor.md)
 
 This editor is arguably the meat and potatoes of this sequencer.
 

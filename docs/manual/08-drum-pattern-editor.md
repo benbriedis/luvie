@@ -1,6 +1,6 @@
 # The drum pattern editor
 
-[← Harmony patterns](08-harmony-editor.md) · [Contents](README.md) · [BPM and time signatures →](10-beats-and-times.md)
+[← Harmony patterns](07-harmony-editor.md) · [Contents](README.md) · [BPM and time signatures →](09-beats-and-times.md)
 
 <img src="images/drumsEditor.png" alt="The Luvie drum pattern editor" width="800">
 

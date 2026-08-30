@@ -76,6 +76,6 @@ in Loop editor they will keep on playing until either you or the Song Editor tur
 
 ## Where to go next
 
-- [The song editor](05-song-editor.md) — arranging patterns into a song
-- [The pattern editors](07-pattern-editors.md) — writing the patterns themselves
+- [The song editor](04-song-editor.md) — arranging patterns into a song
+- [The pattern editors](06-pattern-editors.md) — writing the patterns themselves
 - [MIDI output and instruments](03-outputs.md) — getting sound out of Luvie
