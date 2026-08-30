@@ -113,17 +113,20 @@ public:
         }
     }
 
-    /* Generate this cycle's MIDI. startSecs is the cycle's start position on
-       Luvie's timeline (frame/sr). Writing is a separate step (forgePort) because
-       each output port has its own sequence to forge into. */
-    void render(double startSecs, uint32_t nf, bool nowPlaying, bool jumped)
+    /* Generate this cycle's MIDI for host frames [startFrame, startFrame + nf).
+       Writing is a separate step (forgePort) because each output port has its own
+       sequence to forge into. */
+    void render(int64_t startFrame, uint32_t nf, bool nowPlaying, bool jumped)
     {
         nframes = nf;
         evs.clear();
 
-        // renderCycle() maps startSecs -> Luvie bars, splits the window at the
-        // song-loop seam when looping, and calls emit() for each message.
-        bool ran = renderCycle(nowPlaying, jumped, nf, startSecs, 0.0);
+        // renderCycle() maps the frame window -> Luvie bars, splits it at the
+        // song-loop seam when looping, and calls emit() for each message. Both ends
+        // come from the integer frame counter so consecutive cycles abut exactly.
+        bool ran = renderCycle(nowPlaying, jumped,
+                               (double)startFrame        / sampleRate,
+                               (double)(startFrame + nf) / sampleRate);
 
         std::sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) {
             if (a.frame != b.frame) return a.frame < b.frame;
@@ -157,17 +160,18 @@ public:
     {
         if (!snapMutex.try_lock())
             return false;
-        // While the song loop is armed, report the wrapped musical position the RT
-        // thread publishes (the host frame keeps rolling linearly past the End
-        // marker) so the UI playhead follows the loop.
-        if (songLoopActive())
-            secs = snapBarToSeconds(loopedPosition());
+        // The honest playhead position is the sequencer's musical one, not the raw
+        // host frame: a Loop -> Song hand-off shifts it by a bar offset, and the song
+        // loop wraps it inside the RT cycle. In both cases the host frame keeps
+        // rolling linearly and would misreport the bar.
+        float barsTotal = (float)(timeSettings::mapSecondsToBar(snap.segs, secs)
+                                  + barOffsetBars());
+        if (songLoopActive() && !snap.loopMode)
+            barsTotal = loopedPosition();
         float beatsPerBar = 4.0f;
-        float barsTotal   = 0.0f;
-        if (const TimeSegment* seg = timeSettings::segmentAtSeconds(snap.segs, secs)) {
-            barsTotal   = (float)timeSettings::mapSecondsToBar(snap.segs, secs);
+        if (const TimeSegment* seg =
+                timeSettings::segmentAtSeconds(snap.segs, snapBarToSeconds(barsTotal)))
             beatsPerBar = (float)seg->beatsPerBar;
-        }
         snapMutex.unlock();
         if (barsTotal < 0.0f) barsTotal = 0.0f;
         bar     = (int64_t)barsTotal;
@@ -177,7 +181,7 @@ public:
     }
 
 protected:
-    void emit(const std::string& port, float bar,
+    void emit(const std::string& port, double bar,
               const uint8_t* data, int len) override
     {
         // Frame offset within this cycle, honouring the current sub-segment's time
@@ -375,12 +379,27 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
 
     if (luvieDebug())
         fprintf(stderr, "[luvie] applyLoopState: loopMode=%u, %u entries (%zu active), "
-                "songLoop=%u [%.2f,%.2f)\n",
+                "songLoop=%u [%.2f,%.2f), handoff=%u@%.2f\n",
                 hdr.loopMode, count, actives.size(), hdr.songLoop,
-                hdr.songLoopStartBar, hdr.songLoopEndBar);
+                hdr.songLoopStartBar, hdr.songLoopEndBar,
+                hdr.songHandoff, hdr.songHandoffBar);
+
+    p->engine->setSongLoop(hdr.songLoop != 0, hdr.songLoopStartBar, hdr.songLoopEndBar);
+
+    if (hdr.songHandoff) {
+        /* Loop -> Song hand-off. Hold the rebuilds so the mode flip and the mirrored
+           active set do not each publish a snapshot — an intermediate song snapshot
+           would play at the loop position for a cycle. endLoopMode() then makes the
+           one commit that carries the content and the resume position together. */
+        p->engine->suspendRebuilds(true);
+        p->engine->setLoopMode(false);
+        p->loopMgr.mirror(actives, manual, disabled);
+        p->engine->suspendRebuilds(false);
+        p->engine->endLoopMode(hdr.songHandoffBar);
+        return;
+    }
 
     p->engine->setLoopMode(hdr.loopMode != 0);
-    p->engine->setSongLoop(hdr.songLoop != 0, hdr.songLoopStartBar, hdr.songLoopEndBar);
     p->loopMgr.mirror(actives, manual, disabled);
 }
 
@@ -611,9 +630,9 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
     /* ── Generate this cycle's MIDI once, then hand each output port its share.
        Rendering must happen before the forge loop because a port's events are only
-       known after renderWindow() has run. ─────────────────────────────────────── */
+       known after renderCycle() has run. ─────────────────────────────────────── */
     double startSecs = (double)p->curFrame / (double)p->engine->sampleRateHz();
-    p->engine->render(startSecs, sample_count, p->playing, jumped);
+    p->engine->render(p->curFrame, sample_count, p->playing, jumped);
 
     /* Position/StateChanged are authored on output 0 only — they exist for the UI
        and the host, not for the instrument, and duplicating them on eight ports

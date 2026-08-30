@@ -14,7 +14,7 @@
 
 Sequencer::Sequencer()
 {
-    // Pre-reserve every RT-thread scratch buffer so renderWindow() never allocates,
+    // Pre-reserve every RT-thread scratch buffer so renderCycle() never allocates,
     // not even on its first call. The bounds match the worst dense window a JACK
     // cycle (up to ~90 ms at 4096 frames @ 44.1 kHz) can produce; param-ramp
     // densification is capped per segment. Exceeding a bound would reallocate (an
@@ -58,8 +58,41 @@ void Sequencer::setInstruments(const std::vector<InstrumentRouting>& routings)
 
 void Sequencer::setLoopMode(bool mode)
 {
+    // Entering a mode supersedes a hand-off out of one that has not landed yet — the
+    // user clicked back into Loop Mode mid-transition.
+    cancelHandoff();
     loopMode = mode;
     rebuildSnapshot();
+}
+
+void Sequencer::endLoopMode(float resumeBar)
+{
+    loopMode = false;
+    Snapshot newSnap;
+    if (!buildSnapshot(newSnap)) return;
+
+    // Park the song content next to the live one and arm the switch. `snap` is left
+    // alone: the loops must keep playing until the RT thread reaches the seam, and it
+    // is the one that decides where that is (see the header). Both halves go under the
+    // same lock, so no cycle can see one without the other.
+    std::lock_guard<std::mutex> lock(snapMutex);
+    pendingSnap      = std::move(newSnap);
+    pendingHandoff   = true;
+    pendingResumeBar = resumeBar;
+}
+
+void Sequencer::cancelHandoff()
+{
+    std::lock_guard<std::mutex> lock(snapMutex);
+    pendingHandoff = false;
+}
+
+void Sequencer::swapSnapshots()
+{
+    snap.segs.swap      (pendingSnap.segs);
+    snap.tracks.swap    (pendingSnap.tracks);
+    snap.paramInsts.swap(pendingSnap.paramInsts);
+    std::swap(snap.loopMode, pendingSnap.loopMode);
 }
 
 void Sequencer::setSongLoop(bool enabled, float startBar, float endBar)
@@ -76,10 +109,24 @@ void Sequencer::setSongLoop(bool enabled, float startBar, float endBar)
 
 void Sequencer::rebuildSnapshot()
 {
-    if (!timeline) return;
+    if (rebuildsSuspended) return;
+    Snapshot newSnap;
+    if (!buildSnapshot(newSnap)) return;
+    std::lock_guard<std::mutex> lock(snapMutex);
+    // While a hand-off is armed the loops are still the thing playing, so an edit
+    // arriving in the meantime belongs to the snapshot the switch will land on.
+    if (pendingHandoff) pendingSnap = std::move(newSnap);
+    else                snap        = std::move(newSnap);
+}
+
+// Returns false if there is nothing to publish, in which case the caller must leave
+// the live snapshot alone rather than commit an empty one.
+bool Sequencer::buildSnapshot(Snapshot& newSnap)
+{
+    if (!timeline) return false;
 
     const Timeline& tl = timeline->get();
-    Snapshot newSnap;
+    newSnap.loopMode = loopMode;
 
     // The tempo table is built by the data model, so the RT thread and the UI
     // cannot disagree about where a bar falls in time.
@@ -180,7 +227,7 @@ void Sequencer::rebuildSnapshot()
     };
 
     if (loopMode) {
-        if (!loopMgr) return;
+        if (!loopMgr) return false;
         const auto& actives = loopMgr->patterns();
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
@@ -294,22 +341,19 @@ void Sequencer::rebuildSnapshot()
         }
     }
 
-    {
-        std::lock_guard<std::mutex> lock(snapMutex);
-        snap = std::move(newSnap);
-    }
+    return true;
 }
 
 // ── RT-safe bar/seconds conversion ────────────────────────────────────────────
 
-double Sequencer::snapBarToSeconds(float bar) const
+double Sequencer::snapBarToSeconds(double bar) const
 {
     return timeSettings::mapBarToSeconds(snap.segs, bar);
 }
 
-float Sequencer::snapSecondsToBar(double secs) const
+double Sequencer::snapSecondsToBar(double secs) const
 {
-    return (float)timeSettings::mapSecondsToBar(snap.segs, secs);
+    return timeSettings::mapSecondsToBar(snap.segs, secs);
 }
 
 // ── Cycle rendering (RT thread) ───────────────────────────────────────────────
@@ -319,46 +363,123 @@ float Sequencer::snapSecondsToBar(double secs) const
 // be wrong for a segment rendered after a loop wrap (its bars map to an *earlier*
 // wall-clock than the cycle start); segCycleStartSecs / segMusicalStart carry the
 // per-segment offset so the arithmetic stays correct across the seam.
-long Sequencer::segFrameOffset(float bar) const
+long Sequencer::segFrameOffset(double bar) const
 {
     double secs = segCycleStartSecs
-                + snapBarToSeconds(bar             - (float)emitBarOffset)
-                - snapBarToSeconds(segMusicalStart - (float)emitBarOffset);
+                + snapBarToSeconds(bar             - emitBarOffset)
+                - snapBarToSeconds(segMusicalStart - emitBarOffset);
     return (long)std::llround(secs * sampleRateHz);
 }
 
-bool Sequencer::renderCycle(bool nowPlaying, bool jumped, uint32_t nframes,
-                            double cycleStartSecs, double barOffset)
+bool Sequencer::handoffPoint(double prevBars, double curBars, double& at) const
+{
+    // Bars are a uniform domain (1.0 == one bar whatever the time signature), so the
+    // crossing is just the next position with the resume bar's fractional part.
+    const double ph   = (double)pendingResumeBar - std::floor((double)pendingResumeBar);
+    double       cand = std::floor(prevBars) + ph;
+    if (cand < prevBars) cand += 1.0;
+    if (cand >= curBars) return false;
+    at = cand;
+    return true;
+}
+
+bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
+                            double cycleStartSecs, double cycleEndSecs)
 {
     // Hold the snapshot for the whole cycle — including every snapBarToSeconds()
     // call below and in emit(). try_lock keeps the RT thread from blocking on the
     // owner thread's rebuild; on failure the caller leaves wasPlaying untouched so
     // the missed stop/jump is retried next cycle.
-    if (!snapMutex.try_lock())
+    if (!snapMutex.try_lock()) {
+        // The musical cursor did not advance this cycle, so it now trails the clock.
+        // Drop it and let the next readable cycle re-sync from the clock, otherwise
+        // the lost window would become a permanent lag rather than one skipped one.
+        loopCursorValid = false;
         return false;
+    }
 
-    emitBarOffset = barOffset;
+    const double dtSecs = cycleEndSecs - cycleStartSecs;
 
-    const float linPrev = (float)(snapSecondsToBar(cycleStartSecs) + barOffset);
-    const float linCur  = (float)(snapSecondsToBar(cycleStartSecs
-                                  + (double)nframes / sampleRateHz) + barOffset);
+    double curBarOffset = barOffset.load(std::memory_order_relaxed);
+    emitBarOffset = curBarOffset;
+
+    double linPrev = snapSecondsToBar(cycleStartSecs) + curBarOffset;
+    double linCur  = snapSecondsToBar(cycleEndSecs)   + curBarOffset;
+
+    // A transport break resets controllers; a purely musical one (the hand-off below,
+    // and the loop seam) only releases what is still held.
+    Reset cycleReset = (jumped || (!nowPlaying && wasPlaying)) ? Reset::Hard
+                                                              : Reset::None;
+
+    // Seconds from this cycle's first frame to where the window rendered below starts.
+    // Non-zero only when a hand-off has already consumed the head of the cycle.
+    double baseSegOff = 0.0;
+
+    // ── Loop -> Song hand-off ─────────────────────────────────────────────────
+    // Armed by endLoopMode(); this is where it lands. Waiting for the matching bar
+    // phase here rather than applying it on arrival is what keeps the switch on the
+    // beat however long the message took to reach us.
+    if (pendingHandoff) {
+        double at = 0.0;
+        // Stopped or already jumping: there is no phase to align to, so take it now.
+        const bool immediate = !nowPlaying || jumped;
+        if (immediate) at = linPrev;
+
+        if (immediate || handoffPoint(linPrev, linCur, at)) {
+            if (!immediate) {
+                // Play the loops out to the seam first, from the live snapshot.
+                segCycleStartSecs = 0.0;
+                segMusicalStart   = linPrev;
+                renderWindowLocked(true, cycleReset, linPrev, at);
+                cycleReset = Reset::None;          // consumed by the pre-seam window
+                baseSegOff = snapBarToSeconds(at      - curBarOffset)
+                           - snapBarToSeconds(linPrev - curBarOffset);
+                if (baseSegOff < 0.0) baseSegOff = 0.0;
+            }
+
+            // Release what the loops still hold, exactly at the seam. A musical break,
+            // so notes off and nothing else — unless the transport broke too.
+            const Reset seamReset = cycleReset == Reset::Hard ? Reset::Hard : Reset::Soft;
+            segCycleStartSecs = baseSegOff;
+            segMusicalStart   = at;
+            renderWindowLocked(nowPlaying, seamReset, at, at);
+            cycleReset = Reset::None;
+
+            // Adopt the song content and the re-anchored bar mapping together. The
+            // offset moves by a whole number of bars (that is what handoffPoint
+            // guarantees), so the beat lands exactly where the loops left it.
+            swapSnapshots();
+            pendingHandoff  = false;
+            curBarOffset   += (double)pendingResumeBar - at;
+            barOffset.store(curBarOffset, std::memory_order_relaxed);
+            emitBarOffset   = curBarOffset;
+            loopCursorValid = false;
+
+            linPrev = pendingResumeBar;
+            linCur  = snapSecondsToBar(cycleEndSecs) + curBarOffset;
+        }
+    }
 
     const float ls         = songLoopStart.load(std::memory_order_relaxed);
     const float le         = songLoopEnd.load(std::memory_order_relaxed);
+    // The region belongs to the song timeline: in Loop mode the patterns free-run
+    // against a linear clock, so wrapping there would restart their phase. snap
+    // carries the mode so the gate flips in step with the content.
     const bool  haveRegion = songLoopOn.load(std::memory_order_relaxed)
+                             && !snap.loopMode
                              && (le - ls) > 1.0e-4f;
 
     if (!haveRegion || !nowPlaying) {
         // Straight through. Keep the wrapped-position publisher sensible even when
         // the toggle is on but playback has not yet crossed the loop end.
-        segCycleStartSecs = 0.0;
+        segCycleStartSecs = baseSegOff;
         segMusicalStart   = linPrev;
-        renderWindowLocked(nowPlaying, jumped, linPrev, linCur);
+        renderWindowLocked(nowPlaying, cycleReset, linPrev, linCur);
         loopCursorValid = false;
-        float pub = nowPlaying ? linCur : linPrev;
+        double pub = nowPlaying ? linCur : linPrev;
         if (haveRegion && pub >= le)
-            pub = ls + std::fmod(pub - ls, le - ls);
-        loopedBar.store(pub, std::memory_order_relaxed);
+            pub = ls + std::fmod(pub - ls, (double)le - ls);
+        loopedBar.store((float)pub, std::memory_order_relaxed);
         snapMutex.unlock();
         return true;
     }
@@ -367,8 +488,8 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped, uint32_t nframes,
     // after any jump (seek / host relocate). fmod folds a position that already
     // ran past the loop end back into the region.
     if (!loopCursorValid || jumped) {
-        float p = linPrev;
-        if (p >= le) p = ls + std::fmod(p - ls, le - ls);
+        double p = linPrev;
+        if (p >= le) p = ls + std::fmod(p - ls, (double)le - ls);
         musicalPos      = p;
         loopCursorValid = true;
     }
@@ -376,60 +497,62 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped, uint32_t nframes,
     // Musical bars to advance this cycle, evaluated at the *musical* position so a
     // tempo change inside the loop region is honoured (rather than reusing the
     // linear delta, which is sampled at a different point on the tempo map).
-    const double dtSecs = (double)nframes / sampleRateHz;
-    const double s0     = snapBarToSeconds(musicalPos - (float)barOffset);
-    double remaining    = snapSecondsToBar(s0 + dtSecs) - snapSecondsToBar(s0);
+    const double remainSecs = dtSecs - baseSegOff;
+    const double s0         = snapBarToSeconds(musicalPos - curBarOffset);
+    double remaining        = snapSecondsToBar(s0 + remainSecs) - snapSecondsToBar(s0);
     if (remaining < 0.0) remaining = 0.0;
 
-    double segOff   = 0.0;          // seconds from the cycle's first frame to segStart
-    float  segStart = musicalPos;
-    bool   segJump  = jumped;
+    double segOff   = baseSegOff;   // seconds from the cycle's first frame to segStart
+    double segStart = musicalPos;
+    Reset  segReset = cycleReset;
 
     for (int guard = 0; guard < 128 && remaining > 1.0e-9; ++guard) {
-        const double barsToEnd = (double)le - (double)segStart;
+        const double barsToEnd = (double)le - segStart;
         const double take      = barsToEnd < remaining ? barsToEnd : remaining;
-        const float  segEnd    = (float)((double)segStart + take);
+        const double segEnd    = segStart + take;
 
         segCycleStartSecs = segOff;
         segMusicalStart   = segStart;
-        renderWindowLocked(true, segJump, segStart, segEnd);
+        renderWindowLocked(true, segReset, segStart, segEnd);
 
         remaining -= take;
-        segOff += snapBarToSeconds(segEnd   - (float)barOffset)
-                - snapBarToSeconds(segStart - (float)barOffset);
+        segOff += snapBarToSeconds(segEnd   - curBarOffset)
+                - snapBarToSeconds(segStart - curBarOffset);
 
-        if ((double)le - (double)segEnd <= 1.0e-4) {
-            // Reached the loop end: wrap. The next renderWindowLocked() runs with
-            // jumped=true, which releases any note still held across the seam (a
-            // note-off one frame before the seam) and resets controllers, before
-            // the post-seam window's note-ons.
+        if ((double)le - segEnd <= 1.0e-4) {
+            // Reached the loop end: wrap. The next renderWindowLocked() gets a soft
+            // reset, which releases any note still held across the seam (a note-off
+            // one frame before the seam) before the post-seam window's note-ons. The
+            // seam is a musical move, not a transport one, so controller state — CC
+            // automation, pitch bend — carries across it untouched.
             segStart = ls;
-            segJump  = true;
+            segReset = Reset::Soft;
             if (remaining <= 1.0e-9) {
                 // Cycle ends exactly on the seam: still flush held notes now with a
-                // zero-width jumped window, so nothing rings into the next cycle.
+                // zero-width window, so nothing rings into the next cycle.
                 segCycleStartSecs = segOff;
                 segMusicalStart   = ls;
-                renderWindowLocked(true, true, ls, ls);
+                renderWindowLocked(true, Reset::Soft, ls, ls);
             }
         } else {
             segStart = segEnd;
-            segJump  = false;
+            segReset = Reset::None;
         }
     }
 
     musicalPos = segStart;
-    loopedBar.store(musicalPos, std::memory_order_relaxed);
+    loopedBar.store((float)musicalPos, std::memory_order_relaxed);
     snapMutex.unlock();
     return true;
 }
 
-bool Sequencer::renderWindowLocked(bool nowPlaying, bool jumped,
-                                   float prevBars, float curBars)
+bool Sequencer::renderWindowLocked(bool nowPlaying, Reset reset,
+                                   double prevBars, double curBars)
 {
-    // On stop or jump: silence active notes, then reset all controllers on
-    // instrument channels. Emitted at the cycle start (prevBars -> frame 0).
-    if ((!nowPlaying && wasPlaying) || jumped) {
+    // Release notes still sounding, at the window start (prevBars -> frame 0). A hard
+    // reset additionally resets controllers on every instrument channel; a soft one
+    // must not, since the transport itself has not moved.
+    if (reset != Reset::None) {
         for (auto& an : activeNotes) {
             uint8_t msg[3] = {
                 static_cast<uint8_t>(0x80 | (an.channel & 0x0F)),
@@ -438,7 +561,9 @@ bool Sequencer::renderWindowLocked(bool nowPlaying, bool jumped,
             emit(an.portName, prevBars, msg, 3);
         }
         activeNotes.clear();
+    }
 
+    if (reset == Reset::Hard) {
         // Dedup (port, channel) without a std::set: instance counts are tiny, so a
         // linear scan over the reused resetScratch vector allocates nothing.
         resetScratch.clear();
@@ -483,7 +608,7 @@ bool Sequencer::renderWindowLocked(bool nowPlaying, bool jumped,
 
 // ── Note event generation (RT thread, snapMutex held) ─────────────────────────
 
-void Sequencer::fireNoteEvents(float prevBars, float curBars)
+void Sequencer::fireNoteEvents(double prevBars, double curBars)
 {
     for (const TrackSnap& track : snap.tracks) {
         for (const InstanceSnap& inst : track.instances) {
@@ -496,17 +621,17 @@ void Sequencer::fireNoteEvents(float prevBars, float curBars)
                 if (inst.startBar >= curBars)                continue;
             }
 
-            float windowStart = inst.loop ? prevBars : std::max(prevBars, inst.startBar);
-            float windowEnd   = inst.loop ? curBars  : std::min(curBars,  inst.startBar + inst.length);
+            double windowStart = inst.loop ? prevBars : std::max(prevBars, (double)inst.startBar);
+            double windowEnd   = inst.loop ? curBars  : std::min(curBars,  (double)inst.startBar + inst.length);
             if (windowEnd <= windowStart) continue;
-            float beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
-            float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
+            double beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
+            double beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
 
             for (const NoteSnap& note : inst.notes) {
                 forEachFiring(note.beat, inst.patternBeats, beatStart, beatEnd,
-                              [&](float firstFire) {
-                    float onBar = inst.startBar
-                                + (firstFire - inst.startOffset) / inst.beatsPerBar;
+                              [&](double firstFire) {
+                    double onBar = inst.startBar
+                                 + (firstFire - inst.startOffset) / inst.beatsPerBar;
                     uint8_t vel = static_cast<uint8_t>(
                         std::clamp(static_cast<int>(note.velocity * 127), 1, 127));
                     uint8_t onMsg[3] = {
@@ -515,8 +640,8 @@ void Sequencer::fireNoteEvents(float prevBars, float curBars)
                     };
                     emit(inst.portName, onBar, onMsg, 3);
 
-                    float offBar = inst.startBar
-                                 + (firstFire + note.length - inst.startOffset) / inst.beatsPerBar;
+                    double offBar = inst.startBar
+                                  + (firstFire + note.length - inst.startOffset) / inst.beatsPerBar;
                     ActiveNote an{note.midiPitch, inst.midiChannel, offBar, {}};
                     std::strncpy(an.portName, inst.portName.c_str(), sizeof(an.portName) - 1);
                     activeNotes.push_back(an);
@@ -528,7 +653,7 @@ void Sequencer::fireNoteEvents(float prevBars, float curBars)
 
 // ── Param event generation (RT thread, snapMutex held) ────────────────────────
 
-void Sequencer::fireParamEvents(float prevBars, float curBars)
+void Sequencer::fireParamEvents(double prevBars, double curBars)
 {
     paramScratch.clear();
 
@@ -549,16 +674,16 @@ void Sequencer::fireParamEvents(float prevBars, float curBars)
                 if (inst.startBar >= curBars)                continue;
             }
 
-            float windowStart = inst.loop ? prevBars : std::max(prevBars, inst.startBar);
-            float windowEnd   = inst.loop ? curBars  : std::min(curBars,  inst.startBar + inst.length);
+            double windowStart = inst.loop ? prevBars : std::max(prevBars, (double)inst.startBar);
+            double windowEnd   = inst.loop ? curBars  : std::min(curBars,  (double)inst.startBar + inst.length);
             if (windowEnd <= windowStart) continue;
-            float beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
-            float beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
+            double beatStart   = inst.startOffset + (windowStart - inst.startBar) * inst.beatsPerBar;
+            double beatEnd     = inst.startOffset + (windowEnd   - inst.startBar) * inst.beatsPerBar;
 
             for (const ParamEventSnap& evt : inst.events) {
                 forEachFiring(evt.beat, inst.patternBeats, beatStart, beatEnd,
-                              [&](float firstFire) {
-                    float onBar = inst.startBar + (firstFire - inst.startOffset) / inst.beatsPerBar;
+                              [&](double firstFire) {
+                    double onBar = inst.startBar + (firstFire - inst.startOffset) / inst.beatsPerBar;
                     paramScratch.push_back({onBar, &inst.portName, inst.midiChannel,
                                             inst.ccNumber, evt.value, inst.priority});
                 });

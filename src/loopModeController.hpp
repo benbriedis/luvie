@@ -19,12 +19,23 @@ class Editor;
 //                  active set is NOT cleared, so whatever was sounding keeps
 //                  looping (sync() is gated off while the playhead is loop-active).
 //   Loop → Song  : the looper keeps running (button yellow, "Loop") until the
-//                  transport's position within the bar lines up with the frozen
-//                  song bar, then it seeks back a whole number of bars and resumes
-//                  song playback from exactly where the playhead was frozen.
+//                  transport's position within the bar lines up with the frozen song
+//                  bar, then playback resumes from exactly where the playhead was
+//                  frozen.
 //
-// UI-thread only; the transition is polled on an FLTK timeout, and both backends
-// (Internal + JACK) are driven purely through ITransport::seek()/setLoopMode().
+// The hand-off is *armed* on the click and landed by the engine, not by this class.
+// Two reasons. A seek would relocate the clock — dipping JACK through
+// JackTransportStarting (and the host, in plugin mode), silencing notes and resetting
+// controllers. And the moment matters as much as the manner: in plugin mode the switch
+// travels UI → host → LV2 worker, which takes tens of milliseconds, so applying it on
+// arrival snapped playback backwards by that latency however carefully this class had
+// aligned the phase first. ITransport::endLoopMode() therefore hands the engine the
+// resume bar and lets its RT thread pick the frame — the next one whose intra-bar phase
+// matches — which is beat-exact whenever the message happens to arrive.
+//
+// UI-thread only. The FLTK timeout below no longer decides any timing; it only watches
+// for the switch (the position jumping back to the frozen bar) so the editors and the
+// button visual follow it.
 class LoopModeController {
 public:
     ~LoopModeController();
@@ -56,11 +67,14 @@ public:
 private:
     enum class State { Song, Loop, TransitionToSong };
 
-    void applyMode(bool loop);  // the settle itself: transport, editors, visuals
+    // The settle itself: transport, editors, visuals. tellTransport is false only on
+    // the Loop → Song path, where beginTransition() already armed the engine and this
+    // is just the visuals catching up with a switch that has happened.
+    void applyMode(bool loop, bool tellTransport);
     void enterLoop();        // Song → Loop
-    void beginTransition();  // Loop → Song (starts the poll, or finishes if paused)
-    void finishToSong();     // commit the seek-back + flip to song mode
-    void poll();             // transition tick: watch for intra-bar phase alignment
+    void beginTransition();  // Loop → Song: arm the hand-off, then watch for it
+    void finishToSong();     // the switch has landed (or cannot): settle the visuals
+    void poll();             // transition tick: watch for the engine's switch
     void startPoll();
     void stopPoll();
     static void pollCb(void* self);
@@ -72,7 +86,8 @@ private:
 
     State state         = State::Song;
     float frozenSongBar = 0.0f;
-    float pollPrevPhase = -1.0f;   // last intra-bar phase seen; -1 = not yet sampled
+    float pollPrevPos   = 0.0f;    // last transport position seen by poll()
+    int   pollTicksLeft = 0;       // safety-net countdown; see poll()
     bool  pollActive    = false;
 };
 

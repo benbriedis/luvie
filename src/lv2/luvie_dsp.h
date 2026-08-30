@@ -73,13 +73,20 @@ typedef struct {
 
    songLoop* mirror the song editor's Start/End markers + loop toggle. They are
    runtime-only like the rest of this message, and the DSP wraps song playback on
-   them internally (the host frame keeps rolling past the End marker). */
+   them internally (the host frame keeps rolling past the End marker).
+
+   songHandoff marks the Loop -> Song hand-off. The UI must not ask the host to
+   relocate for it — that dips the transport and silences notes — so it ships the
+   resume bar here and the DSP moves its own musical position instead. One-shot:
+   set on the message that ends Loop Mode, clear on every other. */
 typedef struct {
     uint32_t loopMode;         /* 1 while the UI is in Loop Mode, 0 in Song Mode */
     uint32_t count;            /* number of LuvieLoopEntry records that follow */
     uint32_t songLoop;         /* 1 if the Start/End song loop is armed */
     float    songLoopStartBar; /* loop start bar (inclusive) */
     float    songLoopEndBar;   /* loop end bar (exclusive) */
+    uint32_t songHandoff;      /* 1 = resume song playback at songHandoffBar */
+    float    songHandoffBar;   /* bar the frozen song playhead is handed back to */
 } LuvieLoopState;
 
 /* One pattern's loop state. A pattern appears here if it is active, manual, or

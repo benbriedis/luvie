@@ -398,6 +398,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // loop toggle is on and, if so, for the loop region. Start is the left edge of
     // its column; End is right-aligned, so the loop ends at that column's right edge.
     og2->setPlayheadSongLoop([this, loopRuler](float& start, float& end) -> bool {
+        // Song mode only: in Loop mode the patterns free-run against a linear clock
+        // and the song playhead is frozen, so folding a position into the region
+        // would misreport it. The RT sequencer gates the wrap the same way.
+        if (!modeController.isSongMode()) return false;
         if (!bottomPane->loopEnabled()) return false;
         start = (float)loopRuler->startColumn();
         end   = (float)loopRuler->endColumn() + 1.0f;

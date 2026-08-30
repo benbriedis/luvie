@@ -18,13 +18,18 @@
 // pattern-relative beat space as windowStart / eventBeat.
 //
 // Header-only and allocation-free, so it is safe to call on the JACK RT thread.
+//
+// Double, not float: windowStart/windowEnd are derived from an absolute song
+// position, so late in a long song (or a long loop region) a float's ~1e-7 relative
+// step is already worth a sample or more, and the per-cycle window is a *difference*
+// of two such values — precisely where that error bites.
 template <typename Sink>
-inline void forEachFiring(float eventBeat, float patternLen,
-                          float windowStart, float windowEnd, Sink&& sink)
+inline void forEachFiring(double eventBeat, double patternLen,
+                          double windowStart, double windowEnd, Sink&& sink)
 {
-    if (patternLen <= 0.0f) return;
-    float cycles    = std::floor((windowStart - eventBeat) / patternLen);
-    float firstFire = eventBeat + cycles * patternLen;
+    if (patternLen <= 0.0) return;
+    double cycles    = std::floor((windowStart - eventBeat) / patternLen);
+    double firstFire = eventBeat + cycles * patternLen;
     if (firstFire < windowStart) firstFire += patternLen;
     while (firstFire < windowEnd) {
         sink(firstFire);

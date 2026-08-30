@@ -27,6 +27,14 @@ public:
 
 	// Loop mode: when active, generate MIDI only for enabled patterns, looping indefinitely.
 	virtual void setLoopMode(bool /*loopMode*/) {}
+
+	// Loop -> Song hand-off: leave loop mode and resume song playback at `bars` as a
+	// *continuous* move. Backends must not relocate the host clock and must not reset
+	// controllers — the loops' held notes are released, nothing more — and must apply
+	// the position and the mode together, so no cycle renders one without the other.
+	// The default (seek then flip) is right for clocks whose seek is already
+	// glitch-free; JackTransport and the plugin override it.
+	virtual void endLoopMode(float bars) { seek(bars); setLoopMode(false); }
 };
 
 #endif

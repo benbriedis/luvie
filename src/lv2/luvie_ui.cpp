@@ -65,6 +65,11 @@ public:
        transport is not enough in plugin mode — the engine that acts on it lives in
        the DSP process. onLoopMode ships it there. */
     void setOnLoopMode(std::function<void(bool)> f) { onLoopMode = std::move(f); }
+    /* Loop -> Song hand-off. Deliberately does NOT seek: asking the host to relocate
+       would dip its transport, silencing notes and resetting controllers — the very
+       hiccup this path exists to avoid. The resume bar travels to the DSP in the loop
+       atom instead, and the DSP moves its own musical position. */
+    void setOnEndLoopMode(std::function<void(float)> f) { onEndLoopMode = std::move(f); }
 
     void  play()           override { if (command) command->play(); }
     void  pause()          override { if (command) command->pause(); }
@@ -76,11 +81,17 @@ public:
         if (command) command->setLoopMode(m);
         if (onLoopMode) onLoopMode(m);
     }
+    void  endLoopMode(float bars) override {
+        if (command) command->setLoopMode(false);   // mode only — never a host seek
+        if (onEndLoopMode) onEndLoopMode(bars);
+        else if (onLoopMode) onLoopMode(false);
+    }
 
 private:
     ITransport* display = nullptr;
     ITransport* command = nullptr;
-    std::function<void(bool)> onLoopMode;
+    std::function<void(bool)>  onLoopMode;
+    std::function<void(float)> onEndLoopMode;
 };
 
 /* -----------------------------------------------------------------------
@@ -157,6 +168,12 @@ struct LuvieUI {
     bool  songLoopEnabled  = false;
     float songLoopStartBar = 0.0f;
     float songLoopEndBar   = 0.0f;
+
+    /* Loop -> Song hand-off, pending until the next loop atom carries it. One-shot:
+       cleared once the message is actually written, so a later loop-state change
+       does not re-arm the hand-off. */
+    bool  songHandoff    = false;
+    float songHandoffBar = 0.0f;
     struct LoopBridge : ILoopObserver {
         LuvieUI* ui = nullptr;
         void onLoopsChanged() override { sendLoopState(ui); }
@@ -371,7 +388,8 @@ static void sendLoopState(LuvieUI* ui)
 
     LuvieLoopState hdr{ loopMode ? 1u : 0u, static_cast<uint32_t>(entries.size()),
                         ui->songLoopEnabled ? 1u : 0u,
-                        ui->songLoopStartBar, ui->songLoopEndBar };
+                        ui->songLoopStartBar, ui->songLoopEndBar,
+                        ui->songHandoff ? 1u : 0u, ui->songHandoffBar };
     std::memcpy(p, &hdr, sizeof(hdr));
     p += sizeof(hdr);
 
@@ -382,6 +400,7 @@ static void sendLoopState(LuvieUI* ui)
 
     if (buf == ui->lastLoopMsg) return;   // nothing the DSP would act on has changed
     ui->lastLoopMsg = buf;
+    ui->songHandoff = false;              // one-shot: consumed by this message
 
     ui->writeFunc(ui->controller, PORT_CONTROL_IN,
                   static_cast<uint32_t>(buf.size()),
@@ -613,6 +632,15 @@ static LV2UI_Handle instantiate(
     ui->app.onLoopStateChanged = [ui]() {
         if (!ui->restoringState) sendState(ui);
     };
+
+    /* Loop -> Song: record the resume bar and flip the mode in one atom, so the DSP
+       hands the position and the song content over on a single RT cycle. */
+    ui->hostTransport->setOnEndLoopMode([ui](float bars) {
+        ui->songHandoff    = true;
+        ui->songHandoffBar = bars;
+        ui->loopMode       = false;
+        sendLoopState(ui);
+    });
 
     /* Song-loop (Start/End markers + toggle) lives only in the live luvie_loop atom
        (like loop mode). Ship it whenever it changes so the DSP wraps song playback

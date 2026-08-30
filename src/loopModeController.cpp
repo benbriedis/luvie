@@ -9,7 +9,10 @@
 #include <FL/Fl.H>
 #include <cmath>
 
-static constexpr double kPollInterval = 0.02;  // 20 ms — sub-frame alignment resolution
+// The poll no longer times the hand-off — the engine does — so this is just how
+// often the visuals check whether the switch has landed.
+static constexpr double kPollInterval      = 0.02;   // 20 ms
+static constexpr int    kMaxTransitionTicks = 250;   // 5 s; see the note in poll()
 
 LoopModeController::~LoopModeController()
 {
@@ -28,8 +31,11 @@ void LoopModeController::init(ITransport* t, ModernTabs* tb, Editor* se,
 void LoopModeController::requestMode(bool loop)
 {
     // A click during the hand-off cancels it: stay looping (back to a settled Loop).
+    // The engine has an armed hand-off waiting for its bar phase, so it has to be told
+    // — setLoopMode() drops any pending one.
     if (state == State::TransitionToSong) {
         stopPoll();
+        transport->setLoopMode(true);
         state = State::Loop;
         tabs->setModeVisual(ModernTabs::ModeVisual::Loop);
         return;
@@ -47,9 +53,9 @@ void LoopModeController::requestMode(bool loop)
 // Settling into a mode: the transport flag, the editors, the frozen song playhead
 // and the button visual. Every path that changes mode ends here, so none of them
 // can leave one of the four out of step.
-void LoopModeController::applyMode(bool loop)
+void LoopModeController::applyMode(bool loop, bool tellTransport)
 {
-    transport->setLoopMode(loop);
+    if (tellTransport) transport->setLoopMode(loop);
     // In loop mode this gates sync() off → the active loop set freezes as-is.
     setEditorsLoopMode(loop);
     songEditor->setPlayheadFrozen(loop, frozenSongBar);
@@ -64,7 +70,7 @@ void LoopModeController::enterLoop()
 {
     // Remember where the song playhead was; freeze it there (greyed, non-interactive).
     frozenSongBar = transport->position();
-    applyMode(true);
+    applyMode(true, true);
 }
 
 void LoopModeController::setMode(bool loop)
@@ -73,29 +79,38 @@ void LoopModeController::setMode(bool loop)
     if (loop) {
         if (state != State::Loop) enterLoop();
     } else if (state != State::Song) {
-        applyMode(false);
+        applyMode(false, true);
     }
 }
 
 void LoopModeController::beginTransition()
 {
-    // With no clock advancing there is nothing to align to — resume immediately.
+    // Arm the hand-off straight away. The engine holds it until the next frame whose
+    // intra-bar phase matches frozenSongBar's and switches there, so the wait happens
+    // on the RT thread where it can be sample-accurate — rather than here, where the
+    // message's travel time to the engine would shift it off the beat.
+    transport->endLoopMode(frozenSongBar);
+
+    // With no clock advancing there is no phase to wait for: the engine takes the
+    // hand-off on its next cycle, so settle the visuals now.
     if (!transport->isPlaying()) {
         finishToSong();
         return;
     }
     state = State::TransitionToSong;
     tabs->setModeVisual(ModernTabs::ModeVisual::Transitioning);   // yellow, still "Loop"
-    pollPrevPhase = -1.0f;
+    pollPrevPos  = transport->position();
+    pollTicksLeft = kMaxTransitionTicks;
     startPoll();
 }
 
 void LoopModeController::finishToSong()
 {
     stopPoll();
-    // Whole-bar seek back to the frozen position keeps bar-length loops phase-aligned.
-    transport->seek(frozenSongBar);
-    applyMode(false);   // re-enables sync() from the frozen bar onward
+    // The engine has already switched (or, when stopped, will on its next cycle). This
+    // only brings the editors, the frozen playhead and the button visual across — and
+    // re-enables sync() from the frozen bar onward.
+    applyMode(false, false);
 }
 
 void LoopModeController::poll()
@@ -103,20 +118,23 @@ void LoopModeController::poll()
     if (state != State::TransitionToSong) return;
     if (!transport->isPlaying()) { finishToSong(); return; }
 
-    const float target = frozenSongBar - std::floor(frozenSongBar);   // intra-bar phase
-    const float pos    = transport->position();
-    const float phase  = pos - std::floor(pos);
-
-    if (pollPrevPhase >= 0.0f) {
-        // Did the advancing transport just cross the frozen bar's intra-bar phase?
-        bool crossed;
-        if (phase >= pollPrevPhase)
-            crossed = (pollPrevPhase <= target && target <= phase);       // same bar
-        else
-            crossed = (target >= pollPrevPhase || target <= phase);       // wrapped a bar
-        if (crossed) { finishToSong(); return; }
+    // Watch for the engine's switch rather than timing one. In Loop mode the clock
+    // free-runs forward, so the only thing that moves the position backwards is the
+    // hand-off landing — and it lands on frozenSongBar, which the second test pins
+    // down (a rewind mid-transition also jumps back, but to bar 0).
+    const float pos = transport->position();
+    if (pos < pollPrevPos &&
+        pos >= frozenSongBar - 0.01f && pos < frozenSongBar + 0.25f) {
+        finishToSong();
+        return;
     }
-    pollPrevPhase = phase;
+    pollPrevPos = pos;
+
+    // Safety net, not a timing mechanism. The engine takes at most one bar to reach
+    // the phase, so this only fires if the switch never happened (nothing armed
+    // because there was no timeline to build from) or was missed — either way, a
+    // permanently yellow button that will not go back to Song is the worse outcome.
+    if (--pollTicksLeft <= 0) finishToSong();
 }
 
 void LoopModeController::pollCb(void* self)

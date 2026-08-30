@@ -150,7 +150,8 @@ void JackTransport::play()  { if (client && jackAlive.load()) jack_transport_sta
 void JackTransport::pause() { if (client && jackAlive.load()) jack_transport_stop(client); }
 void JackTransport::rewind(){
     if (!client || !jackAlive.load()) return;
-    barOffset.store(0.0);
+    setBarOffset(0.0);
+    cancelHandoff();
     jack_transport_locate(client, 0);
 }
 
@@ -159,7 +160,8 @@ void JackTransport::seek(float bars)
     if (!client || !jackAlive.load() || !timeline) return;
     // An explicit seek re-establishes the identity frame<->bar mapping: drop any
     // accumulated tempo re-anchor offset and locate straight to the target bar.
-    barOffset.store(0.0);
+    setBarOffset(0.0);
+    cancelHandoff();
     double secs  = timeline->barToSeconds(std::max(0.0f, bars));
     auto   frame = static_cast<jack_nframes_t>(secs * sampleRate);
     jack_transport_locate(client, frame);
@@ -176,7 +178,7 @@ void JackTransport::reanchor(float bars)
     // by the caller). Future frames then advance at the new tempo. No reposition,
     // so the RT thread sees a contiguous window and keeps its notes sounding.
     double secs = static_cast<double>(posFrames.load()) / sampleRate;
-    barOffset.store(bars - timeline->secondsToBar(secs));
+    setBarOffset(bars - timeline->secondsToBar(secs));
 }
 
 float JackTransport::position() const
@@ -188,7 +190,7 @@ float JackTransport::position() const
     if (songLoopActive())
         return loopedPosition();
     double secs = static_cast<double>(posFrames.load()) / sampleRate;
-    return static_cast<float>(timeline->secondsToBar(secs) + barOffset.load());
+    return static_cast<float>(timeline->secondsToBar(secs) + barOffsetBars());
 }
 
 // ── JACK process callback (RT thread) ────────────────────────────────────────
@@ -227,9 +229,6 @@ int JackTransport::process(jack_nframes_t nframes)
 
     outEvents.clear();
     curNframes    = nframes;
-    // Snapshot the tempo re-anchor offset once so process() and emit() agree for
-    // the whole cycle even if the UI thread updates it mid-cycle.
-    curBarOffset  = barOffset.load();
 
     // Raw pending messages (program changes etc.) at frame 0.
     if (!namedBufs.empty() && pendingMutex_.try_lock()) {
@@ -249,10 +248,14 @@ int JackTransport::process(jack_nframes_t nframes)
 
     // Render this buffer's window. renderCycle() converts [pos.frame, +nframes) to
     // a musical window, splits it at the song-loop seam when looping, and calls
-    // emit() (below) for each message; curBarOffset shifts frame<->bar so a tempo
-    // re-anchor keeps the same bar without a reposition (see reanchor()).
-    bool ran = renderCycle(nowPlaying, jumped, nframes,
-                           static_cast<double>(pos.frame) / sampleRate, curBarOffset);
+    // emit() (below) for each message; the Sequencer's bar offset shifts frame<->bar
+    // so a tempo re-anchor or a Loop -> Song hand-off keeps playback rolling without
+    // a reposition (see reanchor() / endLoopMode()).
+    // Both ends from the integer frame counter, so this cycle's end is bit-identical
+    // to the next cycle's start and no event falls between two buffers.
+    bool ran = renderCycle(nowPlaying, jumped,
+                           static_cast<double>(pos.frame)           / sampleRate,
+                           static_cast<double>(pos.frame + nframes) / sampleRate);
 
     // Flush the cycle's events in non-decreasing frame order per buffer. JACK
     // drops any event written out of frame order, so this single ordered pass
@@ -271,7 +274,7 @@ int JackTransport::process(jack_nframes_t nframes)
     posFrames.store(pos.frame + nframes);
     playing_.store(nowPlaying);
 
-    // Only commit wasPlaying when renderWindow actually ran (it skips on a failed
+    // Only commit wasPlaying when renderCycle actually ran (it skips on a failed
     // snapMutex try_lock); leaving it stale lets the missed stop/jump retry next cycle.
     if (ran) {
         if ((nowPlaying != wasPlaying || jumped) && onTransportEvent)
@@ -285,9 +288,9 @@ int JackTransport::process(jack_nframes_t nframes)
     return 0;
 }
 
-// ── Sequencer output hook (RT thread, snapMutex held by renderWindow) ─────────
+// ── Sequencer output hook (RT thread, snapMutex held by renderCycle) ─────────
 
-void JackTransport::emit(const std::string& port, float bar,
+void JackTransport::emit(const std::string& port, double bar,
                           const uint8_t* data, int len)
 {
     void* buf = findBuf(namedBufs, port.c_str());

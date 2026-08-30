@@ -72,6 +72,9 @@ public:
     float position()  const override;
     bool  isPlaying() const override { return playing_.load(); }
     void  setLoopMode(bool loopMode) override { Sequencer::setLoopMode(loopMode); }
+    // No jack_transport_locate: the Sequencer shifts its bar offset and swaps to the
+    // song snapshot on the same RT cycle, leaving the JACK timeline rolling.
+    void  endLoopMode(float bars)    override { Sequencer::endLoopMode(bars); }
 
     // True once a JACK client is open and live (so port registration / MIDI work).
     bool  isOpen() const { return client != nullptr && jackAlive.load(); }
@@ -79,7 +82,7 @@ public:
 protected:
     // Sequencer output hook (RT thread): resolve the port's cycle buffer and queue
     // the message at the bar's frame offset for the ordered end-of-cycle flush.
-    void emit(const std::string& port, float bar,
+    void emit(const std::string& port, double bar,
               const uint8_t* data, int len) override;
 
 private:
@@ -99,18 +102,14 @@ private:
     std::atomic<jack_nframes_t> posFrames{0};
     std::atomic<bool>           playing_{false};
     std::atomic<bool>           jackAlive{false};
-    // Bar added to every frame->bar (and subtracted in bar->frame) conversion so a
-    // tempo change can pin the current bar without relocating JACK. reanchor()
-    // updates it; seek()/rewind() reset it to 0 (an explicit reposition re-establishes
-    // the identity frame<->bar mapping). Read lock-free on the RT thread.
-    std::atomic<double>         barOffset{0.0};
+    // The frame->bar shift used by reanchor() and by the Loop -> Song hand-off lives
+    // in the Sequencer base (setBarOffset / barOffsetBars) so the plugin gets the same
+    // mechanism; seek()/rewind() clear it, since an explicit reposition re-establishes
+    // the identity frame<->bar mapping.
 
     // ── RT-thread-only state ──────────────────────────────────────────────────
     jack_nframes_t lastFrame  = 0;
     bool           firstCall  = true;
-    // barOffset snapshotted once per cycle so process() and emit() agree even if
-    // the UI thread updates barOffset mid-cycle.
-    double         curBarOffset = 0.0;
 
     // Per-cycle context for emit(): the port buffers and this cycle's length.
     using NamedBuf = std::pair<const std::string*, void*>;

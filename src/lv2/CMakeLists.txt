@@ -25,6 +25,18 @@ target_link_libraries(luvie_dsp PRIVATE
     lv2_headers Threads::Threads ${CMAKE_DL_LIBS}
     nlohmann_json::nlohmann_json)
 
+# Headless DSP harness: dlopen's luvie_dsp.so and drives it with a synthetic
+# time:Position stream plus the loop/state atoms the UI would send, so the RT engine
+# can be exercised — and regressions like the Loop -> Song hand-off checked — without
+# a host or a sound card. Opt-in and never installed:
+#   cmake --build build --target test_host
+#   ./build/test_host build/luvie.lv2/luvie_dsp.so <state.json> --loop 1 --unloop 400 --resume 2
+add_executable(test_host EXCLUDE_FROM_ALL test_host.cpp)
+target_include_directories(test_host PRIVATE ${SRC} ${SRC}/outputs)
+target_link_libraries(test_host PRIVATE lv2_headers ${CMAKE_DL_LIBS})
+set_target_properties(test_host PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
 # UI (links the shared core; LV2 headers; FLTK/jack come via luvie_core)
 add_library(luvie_ui MODULE luvie_ui.cpp)
 target_link_libraries(luvie_ui PRIVATE luvie_core lv2_headers)

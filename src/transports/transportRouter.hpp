@@ -44,6 +44,10 @@ public:
         loopMode_ = loopMode;
         if (active_) active_->setLoopMode(loopMode);
     }
+    void  endLoopMode(float bars) override {
+        loopMode_ = false;
+        if (active_) active_->endLoopMode(bars);
+    }
 };
 
 #endif
