@@ -2,11 +2,17 @@
 
 [← The pattern editors — overview](07-pattern-editors-overview.md) · [Contents](README.md) · [Harmony patterns →](09-harmony-editor.md)
 
+A pattern is a short piece of music that the song editor places on a timeline.
+Luvie has three different types of pattern: pianoroll, harmony, and drum.
+
+The pianoroll editor is a fairly conventional editor - similar to those used in many
+other MIDI sequencers. Being the simplest of the pattern editors we'll also use it 
+to describe the features common to all of the pattern editors. 
+Most of the basic controls and operations are shared with the other two pattern editors.
+
 ## The pianoroll editor
 
-The pianoroll editor is a fairly conventional editor, similar those used in many
-other MIDI sequencers. Being the simplest of the pattern editors we'll also use it 
-to demonstrate the features common to all of the pattern editors.
+<img src="images/pianorollEditor.png" alt="The Luvie pianoroll editor" width="800">
 
 Each row represents one semitone, labelled with its note name. A parameter lane (Modulation, above) can be shown
 beneath the grid.
@@ -30,10 +36,6 @@ It's obscure terminology but don't blame me, I just work here.
 To change it right click on a note and adjust using the slider.
 
 TODO screenshot
-
-
-
-NOTE: the other pattern editors behaviour similarly
 
 ## Automation
 
