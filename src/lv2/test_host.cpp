@@ -217,6 +217,9 @@ int main(int argc, char** argv) {
     LV2_URID uPos   = map_uri(nullptr, LV2_TIME__Position);
     LV2_URID uFrame = map_uri(nullptr, LV2_TIME__frame);
     LV2_URID uSpeed = map_uri(nullptr, LV2_TIME__speed);
+    LV2_URID uBar   = map_uri(nullptr, LV2_TIME__bar);
+    LV2_URID uBeat  = map_uri(nullptr, LV2_TIME__barBeat);
+    LV2_URID uBpb   = map_uri(nullptr, LV2_TIME__beatsPerBar);
     LV2_URID uMidi  = map_uri(nullptr, LV2_MIDI__MidiEvent);
     LV2_URID uState = map_uri(nullptr, LUVIE_STATE_URI);
     LV2_URID uLoop  = map_uri(nullptr, LUVIE_LOOP_URI);
@@ -302,7 +305,8 @@ int main(int argc, char** argv) {
         d->run(inst, nframes);
 
         // Dump each output separately, so it is visible which port a note went to.
-        int posThisCycle = 0;
+        int    posThisCycle = 0;
+        double reportedBar  = -1.0;   // last Position the DSP authored this cycle
         for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
             LV2_Atom_Sequence* mo = (LV2_Atom_Sequence*)midiBuf[o].data();
             LV2_ATOM_SEQUENCE_FOREACH(mo, ev) {
@@ -319,10 +323,27 @@ int main(int argc, char** argv) {
                     perPort[o]++;
                 } else if (ev->body.type == uObj) {
                     posThisCycle++;
+                    // The Position the DSP authors for the UI playhead. Decoding it
+                    // is what makes a reposition testable: after a relocate the bar
+                    // reported here must be the one the host's frame maps to, however
+                    // the DSP got there (a Loop -> Song hand-off shifts its musical
+                    // position away from the frame, and a relocate must undo that).
+                    const LV2_Atom_Object* po = (const LV2_Atom_Object*)&ev->body;
+                    if (o == 0 && po->body.otype == uPos) {
+                        const LV2_Atom *aB = nullptr, *aBB = nullptr, *aP = nullptr;
+                        lv2_atom_object_get(po, uBar, &aB, uBeat, &aBB, uBpb, &aP, 0);
+                        if (aB && aBB && aP)
+                            reportedBar = (double)((const LV2_Atom_Long*)aB)->body
+                                        + ((const LV2_Atom_Float*)aBB)->body
+                                          / ((const LV2_Atom_Float*)aP)->body;
+                    }
                 }
             }
         }
         if (c == 0) printf("cycle 0: %d non-MIDI (Position/State) atoms on the ports\n", posThisCycle);
+        if (c == relocateCycle || c == cycles - 1)
+            printf("cycle %d: DSP reports bar %.4f (host frame %ld)\n",
+                   c, reportedBar, (long)frame);
         frame += nframes;
     }
 

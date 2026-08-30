@@ -164,8 +164,9 @@ protected:
 
     // Musical bar added to every frame->bar conversion (and subtracted in bar->frame),
     // so the playhead can be repositioned without relocating the backend clock. Used
-    // by the tempo re-anchor and by the Loop -> Song hand-off; an explicit seek
-    // clears it. Owner thread writes, RT thread reads; lock-free.
+    // by the tempo re-anchor and by the Loop -> Song hand-off; renderCycle() clears
+    // it on any clock jump (a seek of ours, or a host relocate), which re-establishes
+    // the identity mapping. Owner thread writes, RT thread reads; lock-free.
     void   setBarOffset(double off) { barOffset.store(off, std::memory_order_relaxed); }
     double barOffsetBars() const    { return barOffset.load(std::memory_order_relaxed); }
     // The (possibly wrapped) musical bar playback is currently at — for the UI

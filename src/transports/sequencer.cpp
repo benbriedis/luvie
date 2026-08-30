@@ -386,6 +386,19 @@ bool Sequencer::handoffPoint(double prevBars, double curBars, double& at) const
 bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
                             double cycleStartSecs, double cycleEndSecs)
 {
+    // A clock jump — our own seek, or a relocate that came from outside — puts the
+    // playhead at an absolute point on the clock, which re-establishes the identity
+    // frame<->bar mapping: whatever offset a Loop -> Song hand-off or a tempo
+    // re-anchor left behind goes with it. The standalone backend also clears it in
+    // seek(), where the seek is ours to intercept; in plugin mode it is the host's
+    // to make and reaches the DSP only as a new frame, while the UI converted the
+    // clicked bar to that frame through the plain tempo map. Left in place, the
+    // offset would land the playhead short by however many bars the last Loop-mode
+    // stretch ran — pinned at bar 0 whenever that exceeds the target, which reads
+    // as the ruler having stopped seeking. Before the try_lock: an unreadable
+    // snapshot skips the cycle, but the clock jumped either way.
+    if (jumped) barOffset.store(0.0, std::memory_order_relaxed);
+
     // Hold the snapshot for the whole cycle — including every snapBarToSeconds()
     // call below and in emit(). try_lock keeps the RT thread from blocking on the
     // owner thread's rebuild; on failure the caller leaves wasPlaying untouched so
