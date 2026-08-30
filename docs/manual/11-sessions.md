@@ -4,21 +4,18 @@
 
 ## Export and import
 
-So you started a project in Carla and now decide you want in Ardour? Or maybe as a standalone?
+So you started a project in Carla and now decide you want to move over to Ardour? Or maybe as a standalone?
 This is what export and import is about.
 
 You can also export projects to give you multiple versions, save backups, etc.
 
-## Song files
+## Standalone project files
 
-TODO: what a `.json` song file contains, saving and opening, and passing one on
-the command line (see [Getting started](02-basics.md)).
+When run as a plugin Luvie does not save its own project file. When use New Session Manager (see below)
+it does, and it will be bundled into the overall project directory.
 
-## Auto-save
-
-TODO: the standalone application auto-saves shortly after you stop making
-changes, and saves again on exit. Say plainly what this does and does not
-protect against.
+When used in standalone mode project files have a '.luvie' suffix. These can be specified 
+on the command line (see [Getting started](02-basics.md)).
 
 ## New Session Manager
 
