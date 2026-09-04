@@ -46,9 +46,10 @@ Luvie make extensive use of context menus to organise its operations.
 You display these popup menus by right-clicking on appropriate items.
 Luvie indicates that a popup menu by displaying a special cursor when you
 hover the cursor over a section of the window that has a context menu available.
-When in doubt about how to do something try right clicking on it.
 
 <img src="images/contextCursor.png" alt="The context menu cursor" width="60">
+
+When you see this cursor why not right click and see what options are available?
 
 ## The Transport 
 
