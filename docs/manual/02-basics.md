@@ -50,10 +50,6 @@ When in doubt about how to do something try right clicking on it.
 
 <img src="images/contextCursor.png" alt="The context menu cursor" width="60">
 
-## The playhead
-
-TODO
-
 ## The Transport 
 
 The transport controls sit along the bottom of the window. They consist of a
