@@ -2,10 +2,13 @@
 
 [← The song editor](04-song-editor.md) · [Contents](README.md) · [The pattern editors →](06-pattern-editors.md)
 
+As well as the Song Editor Luvie comes with a Loop Editor. The Loop Editor show what is playing when Luvie is in 'Loop mode' and provides a more live experience that 'Song mode' - see Basics (TODO add link to Basics). When in Loop Mode it is easy to experiment with combining patterns in different ways.
+
 <img src="images/loopEditor.png" alt="The Luvie loop editor" width="800">
 
-Each column is an instrument and each row is a loop slot; the highlighted cells
-are the patterns currently playing.
+In the screenshot above each column contains the patterns that currently exist for an instrument. Press the 'Flip' button to swap the columns for rows.
+
+Any cells that are highlighted are patterns that are currently playing.
 
 TODO: what a loop is, and how it differs from a pattern instance in the song.
 
