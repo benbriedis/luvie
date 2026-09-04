@@ -1,0 +1,23 @@
+<!-- SPDX-FileCopyrightText: Ben Briedis -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- The context-menu cursor, matching contextMenuCursorImage() in src/modern/cursors.cpp -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 23 25" width="46" height="50">
+  <!-- Light backdrop so the cursor reads in both light and dark themes -->
+  <rect x="-3" y="-3" width="23" height="25" rx="2" fill="#eef1f5"/>
+  <!-- White outline under the arrow -->
+  <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round">
+    <polygon points="1,2.814 1,14.002 3.969,11.136 4.397,10.997 9.165,10.997"/>
+    <polygon points="7.751,16.416 5.907,17.190 2.807,9.816 4.648,9.041"/>
+  </g>
+  <!-- Arrow body and tail -->
+  <g fill="#000000">
+    <polygon points="1,2.814 1,14.002 3.969,11.136 4.397,10.997 9.165,10.997"/>
+    <polygon points="7.751,16.416 5.907,17.190 2.807,9.816 4.648,9.041"/>
+  </g>
+  <!-- Menu badge: white border, black panel, three white lines -->
+  <rect x="8" y="8" width="9" height="10" fill="#ffffff"/>
+  <rect x="9" y="9" width="7" height="8" fill="#000000"/>
+  <rect x="9" y="11" width="7" height="1" fill="#ffffff"/>
+  <rect x="9" y="13" width="7" height="1" fill="#ffffff"/>
+  <rect x="9" y="15" width="7" height="1" fill="#ffffff"/>
+</svg>

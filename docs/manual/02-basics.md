@@ -48,7 +48,7 @@ Luvie indicates that a popup menu by displaying a special cursor when you
 hover the cursor over a section of the window that has a context menu available.
 When in doubt about how to do something try right clicking on it.
 
-TODO include image of the special cursor
+<img src="images/contextCursor.png" alt="The context menu cursor" width="60">
 
 ## The playhead
 
