@@ -2,15 +2,16 @@
 
 [← The song editor](04-song-editor.md) · [Contents](README.md) · [The pattern editors →](06-pattern-editors.md)
 
-As well as the Song Editor Luvie comes with a Loop Editor. The Loop Editor show what is playing when Luvie is in 'Loop mode' and provides a more live experience that 'Song mode' - see Basics (TODO add link to Basics). When in Loop Mode it is easy to experiment with combining patterns in different ways.
+Luvie comes with a Loop Editor as well as a Song Editor. The Loop Editor show what is playing when Luvie is in 'Loop Mode' and provides a more live experience that 'Song Mode' - see Basics (TODO add link to Basics). When in Loop Mode it is easy to experiment with combining patterns in different ways. It may in time be suitable for live performance, but early days.
 
 <img src="images/loopEditor.png" alt="The Luvie loop editor" width="800">
 
-In the screenshot above each column contains the patterns that currently exist for an instrument. Press the 'Flip' button to swap the columns for rows.
+[TODO update the screenshot]
 
-Any cells that are highlighted are patterns that are currently playing.
+In the screenshot above each column contains the patterns that currently exist for an instrument. Press the 'Flip' button to swap the columns and rows.
 
-TODO: what a loop is, and how it differs from a pattern instance in the song.
+The patterns that are currently playing are hightlighted.
+
 
 ## The loop editor
 
@@ -22,20 +23,11 @@ It is possible to rename an instrument in the editor by double clicking on the i
 
 ## Switching between modes
 
-It is possible to switch between Song mode and Loop mode while music is playing. 
-If music is playing then Luvie seeks to coordinate the playhead positions between the two modes 
-so that play is uninterrupted. 
+It is possible to switch between Song Mode and Loop Mode while music is playing. 
+Switching modes is designed to minimize glitches in the music during the transition. 
+When switching from Song Mode to Loop Mode the playhead in the Song Editor is frozen and greyed out.
+The currently enabled loops continue to be played and looped, and they can be viewed and controlled from the Loop Editor.
 
-Plays out part bar...
-
-How does this work if there are different time signatures playing and cf BPM.
-
-NB the special mode.
-
-
-TODO: switching modes is designed not to interrupt anything — loops keep playing
-across the switch, the song playhead freezes (and greys) while in loop mode, and
-returning to song mode seeks back to a bar boundary. Worth documenting because
-the button changes colour to signal the pending seek.
-
-NB grey playheads
+When switching from Loop Mode to Song Mode the process enters a temporary switching mode
+(indicated in yellow).  The playhead in the Song Editor is immediately unfrozen but control over the output of
+notes is only transferred to the Song Editor when the next barline is reached.
