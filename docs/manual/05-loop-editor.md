@@ -12,19 +12,30 @@ Any cells that are highlighted are patterns that are currently playing.
 
 TODO: what a loop is, and how it differs from a pattern instance in the song.
 
-## Song mode and loop mode
+## The loop editor
 
-TODO: what each mode plays, and how to switch.
+Left click on a pattern to start or stop playing it. Patterns will continue to play in loops until disabled.
+
+Right click on a pattern block to open a pattern in the corresponding Pattern Editor, or to add, remove, or copy a pattern.
+
+It is possible to rename an instrument in the editor by double clicking on the instrument name.
+
+## Switching between modes
+
+It is possible to switch between Song mode and Loop mode while music is playing. 
+If music is playing then Luvie seeks to coordinate the playhead positions between the two modes 
+so that play is uninterrupted. 
+
+Plays out part bar...
+
+How does this work if there are different time signatures playing and cf BPM.
+
+NB the special mode.
+
 
 TODO: switching modes is designed not to interrupt anything — loops keep playing
 across the switch, the song playhead freezes (and greys) while in loop mode, and
 returning to song mode seeks back to a bar boundary. Worth documenting because
 the button changes colour to signal the pending seek.
 
-## The loop editor
-
-TODO: creating, naming and deleting loops; the loop ruler; the context menu.
-
-TODO: the loop panel is BPM-only — it has no time signature of its own, because
-each pattern brings its own. Cross-reference
-[BPM and time signatures](09-beats-and-times.md).
+NB grey playheads
