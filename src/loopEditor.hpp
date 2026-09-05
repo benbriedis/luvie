@@ -147,6 +147,9 @@ private:
     int   computeDropGap(int mx, int my) const;
     // Toggle a pattern cell's active state (deferred from press to release).
     void  togglePattern(int trackIdx, int laneIdx);
+    // Select a pattern cell. The selection is the app-wide selected lane,
+    // shared with the Song Editor rather than kept privately here.
+    void  selectCell(int trackIdx, int laneIdx);
     // Resolve the drop instrument + lane slot for the current pattern drag.
     void  computePatternDrop(int mx, int my);
 

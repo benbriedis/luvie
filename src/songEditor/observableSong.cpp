@@ -1154,6 +1154,11 @@ int ObservableSong::addLane(int trackId)
         }
         rebuildInstrumentHeaders();
         reconcileLoopLanes();
+        // A newly added block starts selected, so the pattern editor follows it
+        // straight away. The Loop Editor and the Song Editor share this one
+        // selected lane, so both land on the new pattern together.
+        data.selectedTrackIndex = trackIndexForId(trackId);
+        data.selectedLaneId     = laneId;
         notify();
         return laneId;
     }
@@ -1206,6 +1211,11 @@ int ObservableSong::addPianorollLane(int trackId)
         }
         rebuildInstrumentHeaders();
         reconcileLoopLanes();
+        // A newly added block starts selected, so the pattern editor follows it
+        // straight away. The Loop Editor and the Song Editor share this one
+        // selected lane, so both land on the new pattern together.
+        data.selectedTrackIndex = trackIndexForId(trackId);
+        data.selectedLaneId     = laneId;
         notify();
         return laneId;
     }
@@ -1256,6 +1266,11 @@ int ObservableSong::cloneLane(int trackId, int laneId)
         }
         rebuildInstrumentHeaders();
         reconcileLoopLanes();
+        // A newly added block starts selected, so the pattern editor follows it
+        // straight away. The Loop Editor and the Song Editor share this one
+        // selected lane, so both land on the new pattern together.
+        data.selectedTrackIndex = trackIndexForId(trackId);
+        data.selectedLaneId     = newLaneId;
         notify();
         return newLaneId;
     }

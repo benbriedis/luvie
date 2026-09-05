@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "loopEditor.hpp"
+#include "grid.hpp"
 #include "panelStyle.hpp"
 #include "timeSettings.hpp"
 #include "appWindow.hpp"
@@ -533,6 +534,20 @@ void LoopEditor::computePatternDrop(int mx, int my)
     dropForbidden = !timeline->canMoveLaneToTrack(dragLaneId, dt.id);
 }
 
+// Make a block the selected one. There is a single selected lane for the whole
+// app (Timeline::selectedLaneId), shared with the Song Editor's track labels and
+// with whatever the pattern editor is showing, so selecting here moves all three.
+void LoopEditor::selectCell(int trackIdx, int laneIdx)
+{
+    if (!timeline) return;
+    const auto& tracks = timeline->get().tracks;
+    if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return;
+    if (laneIdx < 0 || laneIdx >= (int)tracks[trackIdx].lanes.size()) return;
+    int laneId = tracks[trackIdx].lanes[laneIdx].id;
+    if (timeline->get().selectedLaneId == laneId) return;
+    timeline->selectLane(trackIdx, laneId);
+}
+
 void LoopEditor::togglePattern(int trackIdx, int laneIdx)
 {
     if (!timeline || !loopMgr) return;
@@ -757,6 +772,17 @@ void LoopEditor::draw()
                 fl_rect(bx, by, bw, bh);
                 fl_line_style(0);
 
+                // Selected block. The selection is the Song Editor's selected
+                // lane, so the block outlined here is the pattern the pattern
+                // editor is showing. Amber, because the "on" blue is already
+                // spoken for by the toggle state.
+                if (tracks[ti].lanes[li].id == tl.selectedLaneId) {
+                    fl_color(selectionColor);
+                    fl_line_style(FL_SOLID, 2);
+                    fl_rect(bx + 1, by + 1, bw - 2, bh - 2);
+                    fl_line_style(0);
+                }
+
                 // Pattern name, with the pattern's kind tagged faintly underneath
                 // it (as the song editor's track labels do). The two are stacked
                 // and the pair centred as a block, so the tag reads as belonging
@@ -946,6 +972,12 @@ int LoopEditor::handle(int event)
         int trackIdx = -1, laneIdx = -1, col = -1, row = -1;
         if (!cellAt(mx, my, trackIdx, laneIdx, col, row)) return 0;
         take_focus();
+
+        // Either button selects the block it lands on: a left click goes on to
+        // toggle it, a right click to open its menu, and both read better if the
+        // block they act on is the selected one.
+        if (Fl::event_button() == FL_LEFT_MOUSE || Fl::event_button() == FL_RIGHT_MOUSE)
+            selectCell(trackIdx, laneIdx);
 
         if (Fl::event_button() == FL_LEFT_MOUSE) {
             // Record a drag candidate. The toggle is deferred to FL_RELEASE so a
