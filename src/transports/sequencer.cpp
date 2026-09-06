@@ -58,11 +58,37 @@ void Sequencer::setInstruments(const std::vector<InstrumentRouting>& routings)
 
 void Sequencer::setLoopMode(bool mode)
 {
+    // Already in it: nothing to switch, and nothing to cancel — a hand-off armed for
+    // this mode is still wanted. The guard earns its keep in plugin mode, where the
+    // whole loop-state message is re-sent for changes that have nothing to do with the
+    // mode (a tempo edit, the song-loop region); without it each of those would cancel
+    // a pending hand-off and republish the snapshot under playback.
+    if (mode == loopMode) return;
     // Entering a mode supersedes a hand-off out of one that has not landed yet — the
     // user clicked back into Loop Mode mid-transition.
     cancelHandoff();
     loopMode = mode;
     rebuildSnapshot();
+}
+
+double Sequencer::barAtSeconds(double secs)
+{
+    std::lock_guard<std::mutex> lock(snapMutex);
+    return snapSecondsToBar(secs - secsOffsetSecs());
+}
+
+void Sequencer::reanchorSnapshot(double newSecsOffset)
+{
+    Snapshot newSnap;
+    if (!buildSnapshot(newSnap)) return;
+    std::lock_guard<std::mutex> lock(snapMutex);
+    // A hand-off already armed computes its own offset at the seam, against the map it
+    // is about to adopt — so park the content and leave the clock to it.
+    if (pendingHandoff) { pendingSnap = std::move(newSnap); return; }
+    snap = std::move(newSnap);
+    secsOffset.store(newSecsOffset, std::memory_order_relaxed);
+    // musicalPos is deliberately left alone: it is a bar number, and a tempo change
+    // alters how fast bars pass, not which bar you are in.
 }
 
 void Sequencer::endLoopMode(float resumeBar)
@@ -129,8 +155,12 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
     newSnap.loopMode = loopMode;
 
     // The tempo table is built by the data model, so the RT thread and the UI
-    // cannot disagree about where a bar falls in time.
-    newSnap.segs = timeline->tempoMap();
+    // cannot disagree about where a bar falls in time. Loop Mode takes the held map
+    // — the global tempo pinned at the bar the song playhead stopped on, so a jam
+    // cannot drift into markers further down the song. Song content always takes the
+    // marker-bounded map, including the snapshot endLoopMode() parks while the clock
+    // is still held: those markers are exactly what playback is about to need again.
+    newSnap.segs = loopMode ? timeline->tempoMap() : timeline->songTempoMap();
 
     // Build per-track note data.
     auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx, int trackInstrument) {
@@ -362,12 +392,14 @@ double Sequencer::snapSecondsToBar(double secs) const
 // active sub-segment's time base. A plain snapBarToSeconds(bar) - cycleStart would
 // be wrong for a segment rendered after a loop wrap (its bars map to an *earlier*
 // wall-clock than the cycle start); segCycleStartSecs / segMusicalStart carry the
-// per-segment offset so the arithmetic stays correct across the seam.
+// per-segment offset so the arithmetic stays correct across the seam. The clock's
+// seconds offset needs no mention here: this is a difference of two map lookups, and
+// a shift of the whole timeline cancels out of it.
 long Sequencer::segFrameOffset(double bar) const
 {
     double secs = segCycleStartSecs
-                + snapBarToSeconds(bar             - emitBarOffset)
-                - snapBarToSeconds(segMusicalStart - emitBarOffset);
+                + snapBarToSeconds(bar)
+                - snapBarToSeconds(segMusicalStart);
     return (long)std::llround(secs * sampleRateHz);
 }
 
@@ -393,11 +425,11 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
     // seek(), where the seek is ours to intercept; in plugin mode it is the host's
     // to make and reaches the DSP only as a new frame, while the UI converted the
     // clicked bar to that frame through the plain tempo map. Left in place, the
-    // offset would land the playhead short by however many bars the last Loop-mode
+    // offset would land the playhead short by however long the last Loop-mode
     // stretch ran — pinned at bar 0 whenever that exceeds the target, which reads
     // as the ruler having stopped seeking. Before the try_lock: an unreadable
     // snapshot skips the cycle, but the clock jumped either way.
-    if (jumped) barOffset.store(0.0, std::memory_order_relaxed);
+    if (jumped) secsOffset.store(0.0, std::memory_order_relaxed);
 
     // Hold the snapshot for the whole cycle — including every snapBarToSeconds()
     // call below and in emit(). try_lock keeps the RT thread from blocking on the
@@ -413,11 +445,13 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
 
     const double dtSecs = cycleEndSecs - cycleStartSecs;
 
-    double curBarOffset = barOffset.load(std::memory_order_relaxed);
-    emitBarOffset = curBarOffset;
+    // The clock read against the song's own timeline. Everything below works in that
+    // musical domain, so the offset appears here and in nothing but the reverse
+    // conversions back to wall-clock seconds.
+    double curSecsOffset = secsOffset.load(std::memory_order_relaxed);
 
-    double linPrev = snapSecondsToBar(cycleStartSecs) + curBarOffset;
-    double linCur  = snapSecondsToBar(cycleEndSecs)   + curBarOffset;
+    double linPrev = snapSecondsToBar(cycleStartSecs - curSecsOffset);
+    double linCur  = snapSecondsToBar(cycleEndSecs   - curSecsOffset);
 
     // A transport break resets controllers; a purely musical one (the hand-off below,
     // and the loop seam) only releases what is still held.
@@ -445,8 +479,7 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
                 segMusicalStart   = linPrev;
                 renderWindowLocked(true, cycleReset, linPrev, at);
                 cycleReset = Reset::None;          // consumed by the pre-seam window
-                baseSegOff = snapBarToSeconds(at      - curBarOffset)
-                           - snapBarToSeconds(linPrev - curBarOffset);
+                baseSegOff = snapBarToSeconds(at) - snapBarToSeconds(linPrev);
                 if (baseSegOff < 0.0) baseSegOff = 0.0;
             }
 
@@ -458,18 +491,21 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
             renderWindowLocked(nowPlaying, seamReset, at, at);
             cycleReset = Reset::None;
 
-            // Adopt the song content and the re-anchored bar mapping together. The
-            // offset moves by a whole number of bars (that is what handoffPoint
-            // guarantees), so the beat lands exactly where the loops left it.
+            // Adopt the song content and the re-anchored mapping together. The new
+            // snapshot brings the song's own tempo map with it — Loop Mode ran on a
+            // frozen one — so the offset is recomputed against that map rather than
+            // nudged: slide the song timeline until the resume bar falls on the seam
+            // frame. handoffPoint() put the seam a whole number of bars from the
+            // resume bar, so the beat lands exactly where the loops left it.
+            const double seamSecs = cycleStartSecs + baseSegOff;
             swapSnapshots();
             pendingHandoff  = false;
-            curBarOffset   += (double)pendingResumeBar - at;
-            barOffset.store(curBarOffset, std::memory_order_relaxed);
-            emitBarOffset   = curBarOffset;
+            curSecsOffset   = seamSecs - snapBarToSeconds((double)pendingResumeBar);
+            secsOffset.store(curSecsOffset, std::memory_order_relaxed);
             loopCursorValid = false;
 
             linPrev = pendingResumeBar;
-            linCur  = snapSecondsToBar(cycleEndSecs) + curBarOffset;
+            linCur  = snapSecondsToBar(cycleEndSecs - curSecsOffset);
         }
     }
 
@@ -511,7 +547,7 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
     // tempo change inside the loop region is honoured (rather than reusing the
     // linear delta, which is sampled at a different point on the tempo map).
     const double remainSecs = dtSecs - baseSegOff;
-    const double s0         = snapBarToSeconds(musicalPos - curBarOffset);
+    const double s0         = snapBarToSeconds(musicalPos);
     double remaining        = snapSecondsToBar(s0 + remainSecs) - snapSecondsToBar(s0);
     if (remaining < 0.0) remaining = 0.0;
 
@@ -529,8 +565,7 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
         renderWindowLocked(true, segReset, segStart, segEnd);
 
         remaining -= take;
-        segOff += snapBarToSeconds(segEnd   - curBarOffset)
-                - snapBarToSeconds(segStart - curBarOffset);
+        segOff += snapBarToSeconds(segEnd) - snapBarToSeconds(segStart);
 
         if ((double)le - segEnd <= 1.0e-4) {
             // Reached the loop end: wrap. The next renderWindowLocked() gets a soft

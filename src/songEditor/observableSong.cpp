@@ -43,8 +43,9 @@ void ObservableSong::removeObserver(ITimelineObserver* o)
 void ObservableSong::fanout()
 {
     // Every mutation funnels through here, so this is the one place the cached
-    // tempo map has to be invalidated.
+    // tempo maps have to be invalidated.
     tempoMapDirty = true;
+    heldMapDirty  = true;
     auto copy = observers;
     for (auto* o : copy) o->onTimelineChanged();
 }
@@ -104,6 +105,11 @@ void ObservableSong::redo()
 void ObservableSong::loadTimeline(const Timeline& tl)
 {
     data = tl;
+    // A tempo typed into the Loop Editor belongs to the session, not the project, so
+    // it must not be carried into a song that never saw it. Clearing the hold too:
+    // a load while in Loop Mode would otherwise pin the new song at the old one's bar.
+    globalBpmOn = false;
+    tempoHold   = false;
     // Build rowOrder if absent, or migrate old files where track rows used Track IDs.
     {
         std::set<int> laneIds;
@@ -680,6 +686,18 @@ void ObservableSong::buildTempoMap() const
             breakpoints.insert((double)m.bar + (double)j / (double)top);
     }
 
+    // A tempo the user typed starts a segment of its own at its anchor, and so does
+    // the marker that ends it — inside that stretch the markers' own breakpoints stay
+    // (a time signature still applies there) but every one of them reports the
+    // register's value. The anchor is the one breakpoint here with no marker behind
+    // it, and readTempoFromMap() is what keeps playback from ever reaching it from
+    // below; see the header.
+    const double overrideEnd = globalBpmOn ? nextTempoBreakAfter(globalBpmBar) : 0.0;
+    if (globalBpmOn) {
+        breakpoints.insert((double)globalBpmBar);
+        if (overrideEnd < tempoForever) breakpoints.insert(overrideEnd);
+    }
+
     tempoMapCache.clear();
     tempoMapCache.reserve(breakpoints.size());
 
@@ -694,23 +712,138 @@ void ObservableSong::buildTempoMap() const
         timeSigAt((int)bar, top, bottom);
         // Every breakpoint is a beat boundary of any ramp covering it, so the
         // stepped bpmAtBar() is genuinely constant across the segment.
-        float cpm = bpmAtBar((float)bar) * (float)timeSettings::beatCrotchets(beatAt((int)bar));
+        const bool overridden = globalBpmOn && bar >= (double)globalBpmBar
+                                            && bar <  overrideEnd;
+        float bpm = overridden ? globalBpm : bpmAtBar((float)bar);
+        float cpm = bpm * (float)timeSettings::beatCrotchets(beatAt((int)bar));
         tempoMapCache.push_back({(float)bar, cpm, top,
                                  timeSettings::barCrotchets(top, bottom), accSecs});
     }
     tempoMapDirty = false;
 }
 
-const std::vector<timeSettings::TempoSegment>& ObservableSong::tempoMap() const
+const std::vector<timeSettings::TempoSegment>& ObservableSong::songTempoMap() const
 {
     if (tempoMapDirty) buildTempoMap();
     return tempoMapCache;
+}
+
+const std::vector<timeSettings::TempoSegment>& ObservableSong::tempoMap() const
+{
+    const auto& full = songTempoMap();
+    if (!tempoHold) return full;
+    if (heldMapDirty) {
+        // Keep the run up to and including the segment covering the hold bar and drop
+        // the rest, so that segment's tempo and time signature extrapolate for as
+        // long as Loop Mode lasts. Everything before it is left exactly as it was,
+        // which is what makes the truncation seamless for a clock sitting inside it —
+        // no re-anchor needed on the way in. The kept segment starts exactly on the
+        // hold bar, since holdTempo() makes it a breakpoint.
+        heldMapCache.clear();
+        for (const auto& seg : full) {
+            if (seg.bar > globalBpmBar && !heldMapCache.empty()) break;
+            heldMapCache.push_back(seg);
+        }
+        heldMapDirty = false;
+    }
+    return heldMapCache;
+}
+
+// Where a tempo the user typed at `bar` stops applying: the next tempo marker after
+// it, which is the marker writing the register as playback reaches it. A ramp already
+// under way at `bar` is *not* a bound — its remaining steps belong to the marker the
+// typed value is standing in for. tempoForever when nothing lies ahead.
+double ObservableSong::nextTempoBreakAfter(double bar) const
+{
+    double next = tempoForever;
+    for (const auto& m : data.bpms)
+        if ((double)m.bar > bar && (double)m.bar < next) next = (double)m.bar;
+    return next;
+}
+
+float ObservableSong::globalBpmAt(float bar) const
+{
+    if (globalBpmOn && bar >= globalBpmBar
+        && (tempoHold || (double)bar < nextTempoBreakAfter(globalBpmBar)))
+        return globalBpm;
+    return bpmAtBar(bar);
+}
+
+void ObservableSong::setGlobalBpm(float bpm, float fromBar)
+{
+    if (bpm <= 0.0f) return;
+    // Same treatment a marker edit gets: the map under the rolling clock changes, so
+    // pin the playhead to its musical position and let it advance at the new rate
+    // rather than scrub. reanchoringTempo() also covers a stopped transport, whose
+    // parked position is re-derived through the map.
+    reanchoringTempo([&] {
+        globalBpmOn  = true;
+        globalBpm    = bpm;
+        globalBpmBar = std::max(0.0f, fromBar);
+        tempoMapDirty = true;
+        heldMapDirty  = true;
+        fanout();   // observers redraw; deliberately not notify(), which would undo
+    });
+}
+
+void ObservableSong::readTempoFromMap(float bar)
+{
+    // The playhead has been repositioned, so the register goes back to being whatever
+    // the song's markers say where it now sits — the user's typed tempo does not
+    // survive a jump it did not make. Cheap to call on every seek: once the override
+    // is off there is nothing left to undo, and the first test short-circuits.
+    if (!globalBpmOn || tempoHold) return;
+    reanchoringTempo([&] {
+        // Keep the register's value honest even with the override off: it is what the
+        // LV2 mirror ships, and it should read as the tempo actually in force.
+        globalBpm     = bpmAtBar(std::max(0.0f, bar));
+        globalBpmOn   = false;
+        globalBpmBar  = 0.0f;
+        tempoMapDirty = true;
+        heldMapDirty  = true;
+        fanout();   // observers redraw; as setGlobalBpm, not notify() — no undo entry
+    });
+}
+
+void ObservableSong::holdTempo(float atBar)
+{
+    // Adopt whatever is in force here as the global tempo, so the hold has a value of
+    // its own and releasing it later carries that value into Song Mode.
+    globalBpm    = globalBpmAt(atBar);
+    globalBpmBar = std::max(0.0f, atBar);
+    globalBpmOn  = true;
+    tempoHold    = true;
+    tempoMapDirty = true;
+    heldMapDirty  = true;
+}
+
+void ObservableSong::mirrorGlobalBpm(bool on, float bpm, float fromBar, bool held)
+{
+    globalBpmOn   = on && bpm > 0.0f;
+    globalBpm     = bpm;
+    globalBpmBar  = std::max(0.0f, fromBar);
+    tempoHold     = held;
+    tempoMapDirty = true;
+    heldMapDirty  = true;
+}
+
+void ObservableSong::releaseTempoHold()
+{
+    // The value stays: a tempo set while jamming carries into the song, now bounded
+    // by the next marker like any other global tempo.
+    tempoHold = false;
 }
 
 double ObservableSong::barToSeconds(float targetBar) const
 {
     if (targetBar <= 0.0f) return 0.0;
     return timeSettings::mapBarToSeconds(tempoMap(), targetBar);
+}
+
+double ObservableSong::songBarToSeconds(float targetBar) const
+{
+    if (targetBar <= 0.0f) return 0.0;
+    return timeSettings::mapBarToSeconds(songTempoMap(), targetBar);
 }
 
 float ObservableSong::secondsToBar(double secs) const

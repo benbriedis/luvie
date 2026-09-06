@@ -32,8 +32,14 @@ class Playhead : public ITimelineObserver {
 
 	bool  verbose      = false;
 	bool  loopActive   = false;
-	bool  frozen       = false;   // song view: draw a greyed, fixed playhead at frozenBar
+	// Song view head state. Live: tracks the transport, full colour. Frozen: greyed
+	// and pinned at frozenBar (Loop mode). Handoff: greyed but moving again, tracking
+	// the transport shifted by headOffset — the Loop -> Song run-up, which lands the
+	// head on the resume bar exactly as the engine switches.
+	enum class SongHead { Live, Frozen, Handoff };
+	SongHead songHead  = SongHead::Live;
 	float frozenBar    = 0.0f;
+	float headOffset   = 0.0f;
 	float lastPosition = 0.0f;
 	std::function<bool(int)> loopEnabledFn;
 
@@ -75,6 +81,9 @@ class Playhead : public ITimelineObserver {
 	float     songLoopFold(float raw) const;
 	// Transport position with the song-loop fold applied (song mode only).
 	float     livePosition()          const;
+	// Where the head is drawn: livePosition(), except in the song view's Frozen and
+	// Handoff states. Only for display — note emission always uses livePosition().
+	float     displayBars()           const;
 
 public:
 	std::function<void()>        onEndReached;
@@ -109,6 +118,10 @@ public:
 	// Song view only: freeze the playhead greyed at `bar` (Song→Loop) instead of
 	// tracking the transport; clear to resume tracking (Loop→Song).
 	void setFrozen(bool f, float bar = 0.0f);
+	// Song view only: Loop → Song hand-off. The head tracks the transport again but
+	// stays greyed, displaced by `offsetBars` so it runs up to the resume bar and
+	// gets there just as the engine switches. Clearing it returns to Live.
+	void setHandoff(bool on, float offsetBars = 0.0f);
 	void setPatternTrack(int track) { patternTrack = track; }
 	void setNumCols(int n)        { numCols = n; }
 	void setColWidth(int cw)      { colWidth = cw; }

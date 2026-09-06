@@ -422,9 +422,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // After a rewind, scroll the song grid so the (now possibly off-screen)
     // playhead is visible — followPlayhead only chases it while playing, and we
     // want it in view when we switch back from the Loop/Pattern editor.
-    bottomPane->onRewind = [this, og2]() {
+    bottomPane->onRewind = [this, og2, song, transport]() {
         if (modeController.isSongMode()) {
             og2->requestScrollToPlayhead();
+            // A rewind is a reposition, so the tempo register re-reads the song's
+            // markers where it landed — bar 0, or the loop-ruler Start marker above.
+            // The transport has already moved by the time this runs. In Loop mode
+            // the hold owns the tempo, and readTempoFromMap no-ops under it anyway.
+            song->readTempoFromMap(transport->position());
         } else {
             // Loop mode: rewind put the transport back at bar 0, but each active
             // loop still carries the anchor it was switched on with, so its
@@ -487,6 +492,17 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // Both halves of the saved loop state report through one hook: the mode when it
     // settles (which for Loop -> Song is the end of the hand-off, not the click),
     // and the switched-on set whenever the LoopManager changes.
+    // Loop Mode holds the global tempo at the frozen bar, so the loops free-run at one
+    // tempo and one time signature however long the jam lasts instead of drifting into
+    // markers further down the song. The markers are untouched; they bound the tempo
+    // again once the mode settles back to Song.
+    modeController.setTempoFreeze = [this, song](bool loop, float atBar) {
+        if (loop) song->holdTempo(atBar);
+        else      song->releaseTempoHold();
+        // The freeze notifies nobody by design; the Loop panel's BPM box is the one
+        // thing that has to follow it, since it now speaks for the frozen bar.
+        loopEd->refreshPanel();
+    };
     modeController.onModeSettled = [this]() { checkLoopStateChanged(); };
     loopStateWatch.app = this;
     loopMgr.addObserver(&loopStateWatch);

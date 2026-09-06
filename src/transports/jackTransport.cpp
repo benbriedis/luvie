@@ -150,7 +150,7 @@ void JackTransport::play()  { if (client && jackAlive.load()) jack_transport_sta
 void JackTransport::pause() { if (client && jackAlive.load()) jack_transport_stop(client); }
 void JackTransport::rewind(){
     if (!client || !jackAlive.load()) return;
-    setBarOffset(0.0);
+    setSecsOffset(0.0);
     cancelHandoff();
     jack_transport_locate(client, 0);
 }
@@ -160,7 +160,7 @@ void JackTransport::seek(float bars)
     if (!client || !jackAlive.load() || !timeline) return;
     // An explicit seek re-establishes the identity frame<->bar mapping: drop any
     // accumulated tempo re-anchor offset and locate straight to the target bar.
-    setBarOffset(0.0);
+    setSecsOffset(0.0);
     cancelHandoff();
     double secs  = timeline->barToSeconds(std::max(0.0f, bars));
     auto   frame = static_cast<jack_nframes_t>(secs * sampleRate);
@@ -173,12 +173,12 @@ void JackTransport::reanchor(float bars)
     // A tempo-map change (anchored at bar 0) remapped every frame to a new bar,
     // so the playhead would scrub. Instead of relocating JACK — which dips
     // through JackTransportStarting, flickering play/pause and silencing notes —
-    // leave the frames rolling and shift our frame->bar mapping by a bar offset
-    // so the current frame still reads as `bars` (the pre-change position sampled
-    // by the caller). Future frames then advance at the new tempo. No reposition,
-    // so the RT thread sees a contiguous window and keeps its notes sounding.
+    // leave the frames rolling and slide the song's timeline in time so the current
+    // frame still reads as `bars` (the pre-change position sampled by the caller).
+    // Future frames then advance at the new tempo. No reposition, so the RT thread
+    // sees a contiguous window and keeps its notes sounding.
     double secs = static_cast<double>(posFrames.load()) / sampleRate;
-    setBarOffset(bars - timeline->secondsToBar(secs));
+    setSecsOffset(secs - timeline->barToSeconds(bars));
 }
 
 float JackTransport::position() const
@@ -190,7 +190,7 @@ float JackTransport::position() const
     if (songLoopActive())
         return loopedPosition();
     double secs = static_cast<double>(posFrames.load()) / sampleRate;
-    return static_cast<float>(timeline->secondsToBar(secs) + barOffsetBars());
+    return static_cast<float>(timeline->secondsToBar(secs - secsOffsetSecs()));
 }
 
 // ── JACK process callback (RT thread) ────────────────────────────────────────

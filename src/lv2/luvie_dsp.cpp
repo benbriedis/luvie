@@ -161,11 +161,11 @@ public:
         if (!snapMutex.try_lock())
             return false;
         // The honest playhead position is the sequencer's musical one, not the raw
-        // host frame: a Loop -> Song hand-off shifts it by a bar offset, and the song
-        // loop wraps it inside the RT cycle. In both cases the host frame keeps
-        // rolling linearly and would misreport the bar.
-        float barsTotal = (float)(timeSettings::mapSecondsToBar(snap.segs, secs)
-                                  + barOffsetBars());
+        // host frame: a Loop -> Song hand-off slides the song's timeline in time, and
+        // the song loop wraps it inside the RT cycle. In both cases the host frame
+        // keeps rolling linearly and would misreport the bar.
+        float barsTotal = (float)timeSettings::mapSecondsToBar(snap.segs,
+                                                               secs - secsOffsetSecs());
         if (songLoopActive() && !snap.loopMode)
             barsTotal = loopedPosition();
         float beatsPerBar = 4.0f;
@@ -379,28 +379,65 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
 
     if (luvieDebug())
         fprintf(stderr, "[luvie] applyLoopState: loopMode=%u, %u entries (%zu active), "
-                "songLoop=%u [%.2f,%.2f), handoff=%u@%.2f\n",
+                "songLoop=%u [%.2f,%.2f), handoff=%u@%.2f, bpm=%u %.2f@%.2f\n",
                 hdr.loopMode, count, actives.size(), hdr.songLoop,
                 hdr.songLoopStartBar, hdr.songLoopEndBar,
-                hdr.songHandoff, hdr.songHandoffBar);
+                hdr.songHandoff, hdr.songHandoffBar,
+                hdr.globalBpmOn, hdr.globalBpm, hdr.globalBpmBar);
 
     p->engine->setSongLoop(hdr.songLoop != 0, hdr.songLoopStartBar, hdr.songLoopEndBar);
 
     if (hdr.songHandoff) {
-        /* Loop -> Song hand-off. Hold the rebuilds so the mode flip and the mirrored
-           active set do not each publish a snapshot — an intermediate song snapshot
-           would play at the loop position for a cycle. endLoopMode() then makes the
-           one commit that carries the content and the resume position together. */
+        /* Loop -> Song hand-off. Hold the rebuilds so the mode flip, the released
+           tempo freeze and the mirrored active set do not each publish a snapshot —
+           an intermediate song snapshot would play at the loop position for a cycle.
+           endLoopMode() then makes the one commit that carries the content, the
+           song's own tempo map and the resume position together. */
         p->engine->suspendRebuilds(true);
         p->engine->setLoopMode(false);
+        p->song->mirrorGlobalBpm(hdr.globalBpmOn != 0, hdr.globalBpm, hdr.globalBpmBar,
+                                 /*held=*/false);
         p->loopMgr.mirror(actives, manual, disabled);
         p->engine->suspendRebuilds(false);
         p->engine->endLoopMode(hdr.songHandoffBar);
         return;
     }
 
-    p->engine->setLoopMode(hdr.loopMode != 0);
+    /* A tempo change moves every bar boundary ahead of the clock, so on its own it
+       would make the same host frame read as a different bar and playback would scrub.
+       Standalone avoids that through ObservableSong::reanchoringTempo pinning the
+       transport; the DSP has no transport to pin — its clock IS the host's frame — so
+       it pins the frame->bar mapping instead: read the bar now, change the map, then
+       slide the clock offset until that same bar lands on that same frame. curFrame is
+       a cycle or so stale on this thread, which keeps the error under one buffer. */
+    const bool loopNow = hdr.loopMode != 0;
+    const bool tempoChanged = p->song->globalBpmSet()     != (hdr.globalBpmOn != 0)
+                           || p->song->globalBpmValue()   != hdr.globalBpm
+                           || p->song->globalBpmFromBar() != hdr.globalBpmBar;
+    double nowSecs = 0.0, curBar = 0.0;
+    if (tempoChanged) {
+        nowSecs = (double)p->curFrame / p->engine->sampleRateHz();
+        curBar  = p->engine->barAtSeconds(nowSecs);
+    }
+
+    /* Mirror the global tempo before the mode flip rebuilds against it. Held while
+       Loop Mode is on, so the jam free-runs at one tempo and one time signature
+       instead of drifting into the markers ahead of it. */
+    p->song->mirrorGlobalBpm(hdr.globalBpmOn != 0, hdr.globalBpm, hdr.globalBpmBar,
+                             /*held=*/loopNow);
+    p->engine->setLoopMode(loopNow);
     p->loopMgr.mirror(actives, manual, disabled);
+
+    /* Republish with the new map and the matching offset in one commit. This is also
+       the only rebuild a tempo-only message gets: the mode has not moved, and the
+       mirrored active set has not either. */
+    if (tempoChanged) {
+        const auto&  map    = loopNow ? p->song->tempoMap() : p->song->songTempoMap();
+        const double atSecs = curBar <= 0.0
+                            ? 0.0
+                            : timeSettings::mapBarToSeconds(map, curBar);
+        p->engine->reanchorSnapshot(nowSecs - atSecs);
+    }
 }
 
 /* -----------------------------------------------------------------------

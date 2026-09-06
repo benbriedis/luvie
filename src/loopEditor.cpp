@@ -70,20 +70,47 @@ void LoopPanel::setTimeline(ObservableSong* tl)
     onTimelineChanged();
 }
 
+// The bar this panel's BPM speaks for: wherever playback is, so the box always shows
+// the tempo actually in force. In Loop Mode that is the bar the song playhead froze
+// on, since the clock is pinned there and the free-running position means nothing to
+// the song. In a project that never places a second tempo marker — the usual case —
+// this is always the one project tempo, whichever editor set it.
+float LoopPanel::bpmBar() const
+{
+    if (timeline && timeline->tempoHeld()) return timeline->tempoHoldBar();
+    return transport ? std::max(0.0f, transport->position()) : 0.0f;
+}
+
 void LoopPanel::commitBpm()
 {
     if (!timeline) return;
-    // The spinner already clamps to its [20, 400] range on every change.
-    // ObservableSong::setBpm re-anchors the transport so the playhead keeps its
-    // musical position across the tempo change instead of scrubbing.
-    timeline->setBpm(0, (float)bpmInput.value());
+    // The spinner already clamps to its [20, 400] range on every change. This sets
+    // the *global* tempo from here on, and deliberately writes no marker: markers are
+    // how the song schedules tempo changes, and setting the tempo to jam against is
+    // not a song edit. See ObservableSong::setGlobalBpm.
+    timeline->setGlobalBpm((float)bpmInput.value(), bpmBar());
+}
+
+void LoopEditor::refreshPanel()
+{
+    if (panel) panel->syncBpm();
+}
+
+void LoopPanel::syncBpm()
+{
+    if (!timeline) return;
+    // Never while the box is being typed in or dragged: this runs on the redraw tick,
+    // and overwriting the field mid-edit would fight the user for it.
+    if (bpmInput.contains(Fl::focus())) return;
+    const double want = timeline->globalBpmAt(bpmBar());
+    if (std::fabs(bpmInput.value() - want) < 0.05) return;   // the box shows one decimal
+    bpmInput.value(want);
+    redraw();
 }
 
 void LoopPanel::onTimelineChanged()
 {
-    if (!timeline) return;
-
-    bpmInput.value(timeline->bpmAt(0));
+    syncBpm();
     redraw();
 }
 
@@ -206,12 +233,16 @@ void LoopEditor::setTransport(ITransport* t)
 {
     Fl::remove_timeout(timerCb, this);
     transport = t;
+    if (panel) panel->setTransport(t);
     if (t) Fl::add_timeout(0.05, timerCb, this);
 }
 
 void LoopEditor::timerCb(void* data)
 {
     auto* self = static_cast<LoopEditor*>(data);
+    // Follows playback across tempo markers, and picks up a mode switch — the Loop
+    // Mode tempo hold deliberately notifies nobody (ObservableSong::holdTempo).
+    self->refreshPanel();
     if (self->visible_r()) self->redraw();
 
     double interval = 0.1;

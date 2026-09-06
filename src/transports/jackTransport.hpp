@@ -102,10 +102,10 @@ private:
     std::atomic<jack_nframes_t> posFrames{0};
     std::atomic<bool>           playing_{false};
     std::atomic<bool>           jackAlive{false};
-    // The frame->bar shift used by reanchor() and by the Loop -> Song hand-off lives
-    // in the Sequencer base (setBarOffset / barOffsetBars) so the plugin gets the same
-    // mechanism; seek()/rewind() clear it, since an explicit reposition re-establishes
-    // the identity frame<->bar mapping.
+    // The timeline shift used by reanchor() and by the Loop -> Song hand-off lives
+    // in the Sequencer base (setSecsOffset / secsOffsetSecs) so the plugin gets the
+    // same mechanism; seek()/rewind() clear it, since an explicit reposition
+    // re-establishes the identity frame<->bar mapping.
 
     // ── RT-thread-only state ──────────────────────────────────────────────────
     jack_nframes_t lastFrame  = 0;

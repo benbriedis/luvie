@@ -13,6 +13,9 @@
 // often the visuals check whether the switch has landed.
 static constexpr double kPollInterval      = 0.02;   // 20 ms
 static constexpr int    kMaxTransitionTicks = 250;   // 5 s; see the note in poll()
+// A bar position within this of a bar line counts as being on it: ceil() must not
+// push a playhead sitting exactly on bar 12 out to bar 13 on a float rounding hair.
+static constexpr float  kBarEps            = 1.0e-4f;
 
 LoopModeController::~LoopModeController()
 {
@@ -30,14 +33,12 @@ void LoopModeController::init(ITransport* t, ModernTabs* tb, Editor* se,
 
 void LoopModeController::requestMode(bool loop)
 {
-    // A click during the hand-off cancels it: stay looping (back to a settled Loop).
-    // The engine has an armed hand-off waiting for its bar phase, so it has to be told
-    // — setLoopMode() drops any pending one.
+    // A click during the hand-off cancels it: back to a settled Loop, playhead frozen
+    // again where it was. The engine has an armed hand-off waiting for its bar line,
+    // so it has to be told — setLoopMode() (in applyMode) drops any pending one.
     if (state == State::TransitionToSong) {
         stopPoll();
-        transport->setLoopMode(true);
-        state = State::Loop;
-        tabs->setModeVisual(ModernTabs::ModeVisual::Loop);
+        applyMode(true, true);   // re-freezes the head, dropping the hand-off display
         return;
     }
 
@@ -55,6 +56,12 @@ void LoopModeController::requestMode(bool loop)
 // can leave one of the four out of step.
 void LoopModeController::applyMode(bool loop, bool tellTransport)
 {
+    // The tempo freeze first: Loop Mode runs the clock on a map pinned at the frozen
+    // bar, Song Mode on the song's own, and the transport's rebuild below has to see
+    // the right one. On the way out this lands after the engine has already switched,
+    // which is what keeps the run-up's clock matching the loops that are still
+    // sounding.
+    if (setTempoFreeze) setTempoFreeze(loop, frozenSongBar);
     if (tellTransport) transport->setLoopMode(loop);
     // In loop mode this gates sync() off → the active loop set freezes as-is.
     setEditorsLoopMode(loop);
@@ -85,21 +92,44 @@ void LoopModeController::setMode(bool loop)
 
 void LoopModeController::beginTransition()
 {
-    // Arm the hand-off straight away. The engine holds it until the next frame whose
-    // intra-bar phase matches frozenSongBar's and switches there, so the wait happens
-    // on the RT thread where it can be sample-accurate — rather than here, where the
-    // message's travel time to the engine would shift it off the beat.
-    transport->endLoopMode(frozenSongBar);
-
-    // With no clock advancing there is no phase to wait for: the engine takes the
-    // hand-off on its next cycle, so settle the visuals now.
+    // With no clock advancing there is nothing to run up to and no bar line to wait
+    // for: the engine takes the hand-off on its next cycle, so resume exactly where
+    // the playhead froze and settle the visuals now.
     if (!transport->isPlaying()) {
+        transport->endLoopMode(frozenSongBar);
         finishToSong();
         return;
     }
+
+    // The song comes back in on a bar line — the loops play out the rest of the bar
+    // the playhead froze in, and the downbeat is where the song takes over. An
+    // integer resume bar is also what puts the engine's landing on a bar line, since
+    // it aligns the switch to the resume bar's intra-bar phase (see handoffPoint()).
+    const float resumeBar = std::ceil(frozenSongBar - kBarEps);
+
+    // Where the switch will land: the next bar line of the free-running loop clock.
+    // Same rule the engine applies, so the two agree without a round trip. Read the
+    // clock before arming, while the position is still unambiguously the loops'.
+    const float pos = transport->position();
+    handoffAt = std::ceil(pos - kBarEps);
+
+    // Arm the hand-off straight away. The engine holds it until that bar line and
+    // switches there, so the wait happens on the RT thread where it can be
+    // sample-accurate — rather than here, where the message's travel time to the
+    // engine would shift it off the beat.
+    transport->endLoopMode(resumeBar);
+
+    handoffOffset = resumeBar - handoffAt;
+
     state = State::TransitionToSong;
     tabs->setModeVisual(ModernTabs::ModeVisual::Transitioning);   // yellow, still "Loop"
-    pollPrevPos  = transport->position();
+    // Unfreeze the song playhead — still greyed, since the loops are what is
+    // sounding — displaced so it walks up to resumeBar and arrives there exactly as
+    // the switch lands. What it has to cover is the time left on the clock, which is
+    // the honest thing to show: the head says how long the loops have left.
+    songEditor->setPlayheadHandoff(true, handoffOffset);
+
+    pollPrevPos   = pos;
     pollTicksLeft = kMaxTransitionTicks;
     startPoll();
 }
@@ -108,8 +138,8 @@ void LoopModeController::finishToSong()
 {
     stopPoll();
     // The engine has already switched (or, when stopped, will on its next cycle). This
-    // only brings the editors, the frozen playhead and the button visual across — and
-    // re-enables sync() from the frozen bar onward.
+    // only brings the editors, the playhead — now live and red, at the resume bar the
+    // grey head just walked to — and the button visual across.
     applyMode(false, false);
 }
 
@@ -118,13 +148,17 @@ void LoopModeController::poll()
     if (state != State::TransitionToSong) return;
     if (!transport->isPlaying()) { finishToSong(); return; }
 
-    // Watch for the engine's switch rather than timing one. In Loop mode the clock
-    // free-runs forward, so the only thing that moves the position backwards is the
-    // hand-off landing — and it lands on frozenSongBar, which the second test pins
-    // down (a rewind mid-transition also jumps back, but to bar 0).
+    // Watch for the engine's switch rather than timing one. Normally the loops have
+    // run on past the resume bar, so the switch drags the position back to it — and
+    // a free-running loop clock moves backwards for nothing else. That test is worth
+    // preferring: the clock crosses handoffAt a cycle or two before the engine acts
+    // on it, and settling on the crossing alone would flash the head at the loops'
+    // position. It only fails to fire when the switch does not move the position at
+    // all (the resume bar *is* the bar line being waited for, so the displayed offset
+    // is zero) or moves it forward (a rewind during Loop mode put the clock behind);
+    // in both of those there is nothing to flash, so the crossing is enough.
     const float pos = transport->position();
-    if (pos < pollPrevPos &&
-        pos >= frozenSongBar - 0.01f && pos < frozenSongBar + 0.25f) {
+    if (pos < pollPrevPos || (handoffOffset >= 0.0f && pos >= handoffAt - kBarEps)) {
         finishToSong();
         return;
     }

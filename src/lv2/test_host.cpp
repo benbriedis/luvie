@@ -258,7 +258,9 @@ int main(int argc, char** argv) {
             // LuvieStateChunk header with msgId 0 marks a loop message, not JSON.
             const uint32_t inLoop = loopPattern >= 0 ? 1u : 0u;
             LuvieLoopState ls{ inLoop, inLoop, songLoop ? 1u : 0u,
-                               songLoopStart, songLoopEnd, 0, 0.0f };
+                               songLoopStart, songLoopEnd, 0, 0.0f,
+                               /* no global tempo: the song's own markers time it */
+                               0u, 0.0f, 0.0f };
             LuvieLoopEntry le{ loopPattern, 0.0f, LUVIE_LOOP_ACTIVE | LUVIE_LOOP_MANUAL };
             forgeLoopAtom(&forge, uLoop, ls, inLoop ? &le : nullptr, inLoop);
             printf("cycle 1: sent luvie_loop (%s, pattern %d, songLoop=%d [%.2f,%.2f))\n",
@@ -269,7 +271,7 @@ int main(int argc, char** argv) {
             // Loop -> Song hand-off: mode off, resume bar carried in the same atom so
             // the DSP moves its own musical position instead of the host relocating.
             LuvieLoopState ls{ 0, 0, songLoop ? 1u : 0u, songLoopStart, songLoopEnd,
-                               1, resumeBar };
+                               1, resumeBar, 0u, 0.0f, 0.0f };
             forgeLoopAtom(&forge, uLoop, ls, nullptr, 0);
             printf("cycle %d: sent luvie_loop (song mode, hand-off to bar %.2f)\n",
                    c, resumeBar);

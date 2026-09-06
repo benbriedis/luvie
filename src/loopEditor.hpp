@@ -21,12 +21,14 @@
 // here would change nothing about how the loops play. Both live in the pattern
 // editor's control bar; the song's own markers stay on the song editor's rulers.
 class LoopPanel : public Fl_Group, public ITimelineObserver {
-    ObservableSong* timeline = nullptr;
+    ObservableSong* timeline  = nullptr;
+    ITransport*     transport = nullptr;
 
     Fl_Box        bpmLabel;
     ModernSpinner bpmInput;
 
-    void commitBpm();
+    void  commitBpm();
+    float bpmBar() const;   // the bar whose tempo this panel shows and edits
 
     void draw() override;
 
@@ -37,6 +39,11 @@ public:
     ~LoopPanel();
 
     void setTimeline(ObservableSong* tl);
+    void setTransport(ITransport* t) { transport = t; syncBpm(); }
+    // Re-read the BPM box from the song. Called on every timeline change and on the
+    // editor's redraw tick, so the box follows the tempo in force wherever it was
+    // set — a song-editor marker, a mode switch, or playback crossing a marker.
+    void syncBpm();
     void onTimelineChanged() override;
 };
 
@@ -170,6 +177,10 @@ public:
     void setLoopManager(LoopManager* a);
     void setTransport(ITransport* t);
     void setContextPopup(LoopContextPopup* popup);
+    // Re-read the panel's BPM box. The Loop-Mode tempo freeze deliberately notifies
+    // nobody (see ObservableSong::holdTempo), but it does change which bar's
+    // tempo the panel speaks for, so the mode switch calls this.
+    void refreshPanel();
     bool isEnabled(int trackIdx, int laneIdx) const;
     void onTimelineChanged()       override;
     void onLoopsChanged() override;

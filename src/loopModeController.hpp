@@ -18,10 +18,12 @@ class Editor;
 //                  fixed) and flip the transport to loop mode. The LoopManager's
 //                  active set is NOT cleared, so whatever was sounding keeps
 //                  looping (sync() is gated off while the playhead is loop-active).
-//   Loop → Song  : the looper keeps running (button yellow, "Loop") until the
-//                  transport's position within the bar lines up with the frozen song
-//                  bar, then playback resumes from exactly where the playhead was
-//                  frozen.
+//   Loop → Song  : the looper keeps running (button yellow, "Loop") until the next
+//                  bar line, then the song comes in on that downbeat — at the bar
+//                  line at or after the frozen bar, so the loops play out the rest of
+//                  the bar the playhead froze in. The song playhead unfreezes at the
+//                  click and walks the run-up, greyed, reaching the resume bar as the
+//                  switch lands; there it turns red and the mode settles.
 //
 // The hand-off is *armed* on the click and landed by the engine, not by this class.
 // Two reasons. A seek would relocate the clock — dipping JACK through
@@ -31,11 +33,13 @@ class Editor;
 // arrival snapped playback backwards by that latency however carefully this class had
 // aligned the phase first. ITransport::endLoopMode() therefore hands the engine the
 // resume bar and lets its RT thread pick the frame — the next one whose intra-bar phase
-// matches — which is beat-exact whenever the message happens to arrive.
+// matches, which for an integer resume bar is the next bar line — beat-exact whenever
+// the message happens to arrive.
 //
 // UI-thread only. The FLTK timeout below no longer decides any timing; it only watches
-// for the switch (the position jumping back to the frozen bar) so the editors and the
-// button visual follow it.
+// for the switch so the editors and the button visual follow it. Nor is the grey run-up
+// it draws timed here: the head is displaced by a fixed number of bars, so the clock
+// itself carries it to the resume bar.
 class LoopModeController {
 public:
     ~LoopModeController();
@@ -50,8 +54,13 @@ public:
 
     // Adopt a mode from a loaded project. Settles immediately in both directions:
     // a project load has no in-flight loop phase to hand off, so the Loop → Song
-    // alignment wait (and its seek-back to the frozen bar) would be meaningless.
+    // alignment wait (and its run-up to the next bar line) would be meaningless.
     void setMode(bool loop);
+
+    // Pin / unpin the clock's tempo map (ObservableSong::holdTempo). Called
+    // with the mode and the frozen bar before anything else in a settle, so the
+    // engine's rebuild sees the map the new mode is to run on.
+    std::function<void(bool loop, float atBar)> setTempoFreeze;
 
     // Fired whenever the mode settles — the user's toggle, the end of a Loop →
     // Song hand-off, or setMode(). Lets the owner notice a mode change without
@@ -86,6 +95,8 @@ private:
 
     State state         = State::Song;
     float frozenSongBar = 0.0f;
+    float handoffAt     = 0.0f;    // clock bar the armed hand-off will land on
+    float handoffOffset = 0.0f;    // resume bar - handoffAt: the run-up head's shift
     float pollPrevPos   = 0.0f;    // last transport position seen by poll()
     int   pollTicksLeft = 0;       // safety-net countdown; see poll()
     bool  pollActive    = false;

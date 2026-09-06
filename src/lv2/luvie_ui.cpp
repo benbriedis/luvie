@@ -389,7 +389,12 @@ static void sendLoopState(LuvieUI* ui)
     LuvieLoopState hdr{ loopMode ? 1u : 0u, static_cast<uint32_t>(entries.size()),
                         ui->songLoopEnabled ? 1u : 0u,
                         ui->songLoopStartBar, ui->songLoopEndBar,
-                        ui->songHandoff ? 1u : 0u, ui->songHandoffBar };
+                        ui->songHandoff ? 1u : 0u, ui->songHandoffBar,
+                        /* The global tempo is runtime state, so it rides here rather
+                           than in the saved state the worker parses. loopMode above
+                           tells the DSP whether to hold it. */
+                        ui->song->globalBpmSet() ? 1u : 0u,
+                        ui->song->globalBpmValue(), ui->song->globalBpmFromBar() };
     std::memcpy(p, &hdr, sizeof(hdr));
     p += sizeof(hdr);
 
@@ -593,7 +598,14 @@ static LV2UI_Handle instantiate(
     };
 
     ui->app.onExtraTimelineChange = [ui]() {
-        if (!ui->restoringState) sendState(ui);
+        if (ui->restoringState) return;
+        sendState(ui);
+        /* The global tempo register is runtime state and rides in the loop atom, not
+           in the serialized Timeline sendState() writes — so without this a tempo
+           typed into the Loop Editor, or dropped by a seek, would never reach the
+           DSP's clock. sendLoopState() dedupes against lastLoopMsg, so the timeline
+           changes that leave the tempo alone cost nothing here. */
+        sendLoopState(ui);
     };
 
     /* Transport is host-driven in plugin mode (the engine follows JACK transport),

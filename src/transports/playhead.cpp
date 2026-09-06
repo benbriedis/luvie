@@ -94,8 +94,15 @@ void Playhead::setLoopActive(bool a, std::function<bool(int)> enabledFn)
 
 void Playhead::setFrozen(bool f, float bar)
 {
-	frozen    = f;
+	songHead  = f ? SongHead::Frozen : SongHead::Live;
 	frozenBar = bar;
+	if (owner) owner->redraw();
+}
+
+void Playhead::setHandoff(bool on, float offsetBars)
+{
+	songHead   = on ? SongHead::Handoff : SongHead::Live;
+	headOffset = offsetBars;
 	if (owner) owner->redraw();
 }
 
@@ -323,8 +330,8 @@ float Playhead::pixelToBars(int px) const
 
 Fl_Color Playhead::currentHeadColor() const
 {
-	if (frozen && patternTrack < 0)
-		return headColorDim;   // greyed while the song is frozen in loop mode
+	if (patternTrack < 0 && songHead != SongHead::Live)
+		return headColorDim;   // greyed in loop mode, and through the hand-off
 	if (patternTrack >= 0 && obsTl && loopMgr) {
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack < (int)tracks.size()) {
@@ -351,11 +358,22 @@ float Playhead::livePosition() const
 	return songLoopFold(transport ? transport->position() : 0.0f);
 }
 
+float Playhead::displayBars() const
+{
+	if (patternTrack >= 0) return livePosition();
+	switch (songHead) {
+	case SongHead::Frozen:  return frozenBar;
+	case SongHead::Handoff: return livePosition() + headOffset;
+	default:                return livePosition();
+	}
+}
+
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
 	if (!transport) return;
-	if (patternTrack < 0 && loopActive && !frozen) return;  // loop mode, no frozen bar: hide
-	float bars = (frozen && patternTrack < 0) ? frozenBar : livePosition();
+	// Loop mode with a Live head means no song position worth drawing: hide it.
+	if (patternTrack < 0 && loopActive && songHead == SongHead::Live) return;
+	float bars = displayBars();
 	if (!isInPattern(bars)) return;
 	int px  = rulerX + barsToPixel(bars);
 	int tw  = 11;
@@ -368,8 +386,8 @@ void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 void Playhead::drawLine(int gridX, int gridY, int gridH)
 {
 	if (!transport) return;
-	if (patternTrack < 0 && loopActive && !frozen) return;  // loop mode, no frozen bar: hide
-	float bars = (frozen && patternTrack < 0) ? frozenBar : livePosition();
+	if (patternTrack < 0 && loopActive && songHead == SongHead::Live) return;
+	float bars = displayBars();
 	if (!isInPattern(bars)) return;
 	int px = gridX + barsToPixel(bars);
 	fl_color(currentHeadColor());
@@ -378,7 +396,9 @@ void Playhead::drawLine(int gridX, int gridY, int gridH)
 
 int Playhead::xOffset() const
 {
-	return transport ? barsToPixel(livePosition()) : 0;
+	// Display space: it locates the drawn head (the ruler's grab test), so it has to
+	// follow the head through a freeze or a hand-off rather than the raw position.
+	return transport ? barsToPixel(displayBars()) : 0;
 }
 
 float Playhead::currentBar() const
@@ -568,6 +588,11 @@ void Playhead::allSoftNotesOff()
 void Playhead::seek(int mouseX, int rulerX)
 {
 	if (!transport) return;
-	float bars = pixelToBars(mouseX - rulerX);
-	transport->seek(std::clamp(bars, 0.0f, (float)numCols));
+	float bars = std::clamp(pixelToBars(mouseX - rulerX), 0.0f, (float)numCols);
+	transport->seek(bars);
+	// A user reposition: the tempo register re-reads the song's markers at the bar
+	// landed on. Before the seek would work too — this runs on the UI thread and
+	// re-anchors the transport itself — but after keeps the two in the order they
+	// read: move, then take the tempo from where you are.
+	if (obsTl) obsTl->readTempoFromMap(bars);
 }

@@ -84,9 +84,12 @@ public:
     // the moment on the RT thread makes the hand-off beat-exact regardless.
     //
     // The loops keep playing from the live snapshot until the seam; at it, notes still
-    // held are released, the pre-built snapshot is swapped in and the bar offset is
-    // shifted by a whole number of bars so the position becomes exactly resumeBar. The
-    // backend clock is never relocated and controllers are never reset. Owner thread.
+    // held are released, the pre-built snapshot is swapped in and the song's timeline
+    // is slid in time so the position becomes exactly resumeBar. That snapshot carries
+    // the song's own tempo map — Loop Mode runs on a frozen one — so the slide is
+    // measured against the map playback is about to use, not the one it is leaving.
+    // The backend clock is never relocated and controllers are never reset. Owner
+    // thread.
     void endLoopMode(float resumeBar);
 
     // Drop a hand-off that is armed but has not landed yet — the user clicked back
@@ -100,15 +103,29 @@ public:
     // rebuildSnapshot() or endLoopMode(), which commit regardless. Owner thread.
     void suspendRebuilds(bool on) { rebuildsSuspended = on; }
 
+    // The musical bar the engine currently reads `secs` as, under the live snapshot
+    // and clock offset. Owner-thread counterpart to barInfo(): it blocks on the
+    // snapshot lock rather than skipping the way the RT path does, because a
+    // re-anchor has to have an answer.
+    double barAtSeconds(double secs);
+
+    // Publish a rebuilt snapshot and a new clock offset as one commit. A tempo change
+    // moves every bar boundary ahead of the clock, so a cycle that saw the new map
+    // with the old offset — or the reverse — would read the same frame as a different
+    // bar and playback would jump. renderCycle() loads the offset after taking the
+    // snapshot lock, so storing it here lands both together. Owner thread.
+    void reanchorSnapshot(double newSecsOffset);
+
     // ITimelineObserver / ILoopObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
     void onLoopsChanged() override { rebuildSnapshot(); }
 
 protected:
     // ── Snapshot (RT-readable copy of the timeline) ───────────────────────────
-    // The tempo table is a straight copy of ObservableSong::tempoMap() — see
-    // timeSettings::TempoSegment for what it holds and why a linear tempo ramp
-    // needs no special case here.
+    // The tempo table is a straight copy of one of ObservableSong's maps — the
+    // held tempoMap() for loop content, the marker-bounded songTempoMap() for song
+    // (see buildSnapshot). See timeSettings::TempoSegment for what it holds and why
+    // a linear tempo ramp needs no special case here.
     using TimeSegment = timeSettings::TempoSegment;
     struct NoteSnap    { int midiPitch; float beat; float length; float velocity; };
     struct InstanceSnap {
@@ -162,13 +179,21 @@ protected:
     void   setSampleRate(double sr) { sampleRateHz = sr; }
     bool   songLoopActive() const { return songLoopOn.load(std::memory_order_relaxed); }
 
-    // Musical bar added to every frame->bar conversion (and subtracted in bar->frame),
-    // so the playhead can be repositioned without relocating the backend clock. Used
-    // by the tempo re-anchor and by the Loop -> Song hand-off; renderCycle() clears
-    // it on any clock jump (a seek of ours, or a host relocate), which re-establishes
-    // the identity mapping. Owner thread writes, RT thread reads; lock-free.
-    void   setBarOffset(double off) { barOffset.store(off, std::memory_order_relaxed); }
-    double barOffsetBars() const    { return barOffset.load(std::memory_order_relaxed); }
+    // Seconds subtracted from the backend clock before it is read against the tempo
+    // map, so the playhead can be repositioned without relocating that clock: the
+    // song's timeline is simply slid along in time. Used by the tempo re-anchor and
+    // by the Loop -> Song hand-off; renderCycle() clears it on any clock jump (a seek
+    // of ours, or a host relocate), which re-establishes the identity mapping.
+    //
+    // It is a *time* shift and not a bar shift for a reason. A bar shift moves only
+    // the label: the map would still be read at the raw clock bar, so every tempo and
+    // time-signature marker ahead would take effect early by however many bars the
+    // offset covers. Shifting time instead delays the whole song timeline, leaving
+    // each marker exactly where the user put it.
+    //
+    // Owner thread writes, RT thread reads; lock-free.
+    void   setSecsOffset(double off) { secsOffset.store(off, std::memory_order_relaxed); }
+    double secsOffsetSecs() const    { return secsOffset.load(std::memory_order_relaxed); }
     // The (possibly wrapped) musical bar playback is currently at — for the UI
     // playhead. Published by renderCycle() every cycle; lock-free.
     float  loopedPosition() const { return loopedBar.load(std::memory_order_relaxed); }
@@ -253,8 +278,8 @@ private:
 
     double sampleRateHz = 48000.0;
 
-    // Continuous reposition offset (see setBarOffset).
-    std::atomic<double> barOffset{0.0};
+    // Continuous reposition offset (see setSecsOffset).
+    std::atomic<double> secsOffset{0.0};
 
     // Loop -> Song hand-off, armed by endLoopMode() under snapMutex together with
     // pendingSnap and applied by the RT thread at the next matching bar phase.
@@ -272,7 +297,6 @@ private:
     // renderWindowLocked() call and read by segFrameOffset() via emit().
     double segCycleStartSecs = 0.0;   // seconds from the cycle's first frame to segment start
     double segMusicalStart   = 0.0;   // musical bar at that instant
-    double emitBarOffset     = 0.0;   // backend frame->bar shift for this cycle
     double musicalPos        = 0.0;   // current wrapped musical position
     bool   loopCursorValid   = false; // musicalPos synced to the clock?
 

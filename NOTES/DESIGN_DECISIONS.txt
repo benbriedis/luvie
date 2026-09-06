@@ -88,8 +88,8 @@ Alternate plugin architectures
 Intermediate mode (between Loop and Song modes)
 =================
 When switching from Song Mode to Loop Mode could go into intermediate mode until bar end I guess 
-	BUT I think only required going one way or the other in order to line up bar.
-	MIGHT be clearer when enterring into Loop Mode though than exiting...
+	Probably better to leave it the way it is though as some of the current playing patterns may
+	not extend to the end of the bar.
 
 MISSION STATEMENT
 -----------------
