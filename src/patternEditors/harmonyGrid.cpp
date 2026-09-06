@@ -392,20 +392,23 @@ void HarmonyGrid::setRapidMode(bool r)
     redraw();
 }
 
-bool HarmonyGrid::screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const
+bool HarmonyGrid::screenToCell(int ex, int ey, int& outRow, int& outSlot) const
 {
     int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
     if (ex < 0 || ex >= gridRight || ey < 0 || ey >= h()) return false;
-    outRow    = ey / rowHeight;
-    outAbsCol = ex / colWidth + colOffset;
+    outRow = ey / rowHeight;
+    // Each beat column is split into `divisions` sub-slots; a rapid note fills
+    // one slot, so the slot index is what rapid mode paints in.
+    outSlot = (int)std::floor(ex * (float)divisions / colWidth) + colOffset * divisions;
     return true;
 }
 
-void HarmonyGrid::rapidTryCreate(int visualRow, int absCol)
+void HarmonyGrid::rapidTryCreate(int visualRow, int slot)
 {
-    if (visualRow < 0 || visualRow >= numRows || absCol < 0 || absCol + 1 > numCols) return;
+    int totalSlots = numCols * divisions;
+    if (visualRow < 0 || visualRow >= numRows || slot < 0 || slot + 1 > totalSlots) return;
 
-    auto key = std::make_pair(visualRow, absCol);
+    auto key = std::make_pair(visualRow, slot);
     if (rapidCells.count(key)) return;
     rapidCells.insert(key);
 
@@ -415,20 +418,21 @@ void HarmonyGrid::rapidTryCreate(int visualRow, int absCol)
     int virtualPos = rowOffset + numRows - 1 - visualRow;
     if (!validVirtualPos(virtualPos)) return;
 
-    float col = float(absCol);
+    float length = newNoteLength();          // 1.0 / divisions
+    float col    = slot / (float)divisions;
 
-    // Clear any other note that starts in this same column (same start time),
-    // on any row, so a column holds at most one note-start.
+    // Clear any other note that starts in this same slot (same start time),
+    // on any row, so a slot holds at most one note-start.
     // Collect ids first: removeNote rebuilds `notes`, invalidating iterators.
-    std::vector<int> sameColumn;
+    std::vector<int> sameSlot;
     for (const auto& n : notes) {
-        if ((int)std::floor(n.beat) == absCol)
-            sameColumn.push_back(n.id);
+        if ((int)std::floor(n.beat * divisions) == slot)
+            sameSlot.push_back(n.id);
     }
-    for (int id : sameColumn)
+    for (int id : sameSlot)
         pattern->removeNote(id);
 
-    addNoteAt(virtualPos, col, 1.0f);
+    addNoteAt(virtualPos, col, length);
 }
 
 void HarmonyGrid::processRapidCell(RapidCell cur)
@@ -470,32 +474,31 @@ int HarmonyGrid::handle(int event)
         if (pattern) rapidUndo.emplace(pattern->song());
 
         if (Fl::event_button() == FL_LEFT_MOUSE) {
-            int row, absCol;
-            if (screenToCell(Fl::event_x() - x(), Fl::event_y() - y(), row, absCol)) {
-                float col = float(absCol);
+            int row, slot;
+            if (screenToCell(Fl::event_x() - x(), Fl::event_y() - y(), row, slot)) {
                 bool removed = false;
                 if (pattern && patternId >= 0) {
                     for (const auto& n : notes) {
-                        if ((int)n.row == row && n.beat == col) {
+                        if ((int)n.row == row && (int)std::floor(n.beat * divisions) == slot) {
                             pattern->removeNote(n.id);
                             removed = true;
                             break;
                         }
                     }
                 }
-                        rapidLast           = RapidCell{row, absCol};
+                rapidLast           = RapidCell{row, slot};
                 rapidRemovedOnClick = removed;
                 if (!removed)
-                    rapidTryCreate(row, absCol);
+                    rapidTryCreate(row, slot);
             }
         }
         return 1;
     }
     case FL_DRAG: {
         if (!Fl::event_state(FL_BUTTON1)) return 1;
-        int row, absCol;
-        if (!screenToCell(Fl::event_x() - x(), Fl::event_y() - y(), row, absCol)) return 1;
-        RapidCell cur{row, absCol};
+        int row, slot;
+        if (!screenToCell(Fl::event_x() - x(), Fl::event_y() - y(), row, slot)) return 1;
+        RapidCell cur{row, slot};
         if ((rapidLast    && cur == *rapidLast)    ||
             (rapidPending && cur == *rapidPending)) return 1;
         if (rapidRemovedOnClick && rapidLast) {

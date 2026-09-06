@@ -21,7 +21,7 @@ class HarmonyGrid : public Grid, public ITimelineObserver {
     int                 totalTones      = 0;   // rows the labels show, in virtual-row units
 
     struct RapidCell {
-        int row, col;
+        int row, col;  // col is a subdivision-slot index, not a whole beat
         bool operator==(const RapidCell& o) const { return row == o.row && col == o.col; }
     };
 
@@ -38,8 +38,8 @@ class HarmonyGrid : public Grid, public ITimelineObserver {
     void rebuildNotes();
     // Returns the new note's id, or 0 if it could not be created.
     int  addNoteAt(int virtualPos, float col, float length, float velocity = 0.8f);
-    bool screenToCell(int ex, int ey, int& outRow, int& outAbsCol) const;
-    void rapidTryCreate(int visualRow, int absCol);
+    bool screenToCell(int ex, int ey, int& outRow, int& outSlot) const;
+    void rapidTryCreate(int visualRow, int slot);
     void processRapidCell(RapidCell cur);
     static bool rapidIsDiagonal(RapidCell a, RapidCell b) {
         return std::abs(a.row - b.row) == 1 && std::abs(a.col - b.col) == 1;
