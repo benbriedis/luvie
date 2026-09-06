@@ -35,7 +35,10 @@ public:
     void setDrumMap(const std::map<int, std::string>& m) { drumMap = m; redraw(); }
     void setFallbackNoteNames(bool b) { fallbackNoteNames = b; redraw(); }
 
-    std::function<void(int midiNote, int rowY, int rowH)> onRowDoubleClicked;
+    // Resolve an absolute y to the drum row it falls on: its MIDI pitch and the
+    // row's screen rectangle. Returns false outside the labelled range.
+    bool rowAt(int ey, int& midiNote, int& rowY, int& rowH) const;
+
     std::function<void()>    onRightClick;
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
 };
@@ -110,6 +113,7 @@ private:
     }
     void labelsSetOnRightClick(std::function<void()> fn) override { drumLabels.onRightClick = std::move(fn); }
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { drumLabels.onRowClicked = std::move(fn); }
+    std::function<void()> labelsRenameHandler() override;
 
     void setGridPattern(int patId) override;
     void afterTimelineChanged(int patId) override;

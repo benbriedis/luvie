@@ -108,7 +108,9 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
         popup->open(
             Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
-            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); }
+            [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
+            {},                       // no "Remove automation" from the note labels
+            labelsRenameHandler()
         );
     });
 }

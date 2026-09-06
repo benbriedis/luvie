@@ -78,6 +78,18 @@ void DrumNoteLabels::draw()
     }
 }
 
+bool DrumNoteLabels::rowAt(int ey, int& midiNote, int& rowY, int& rowH) const
+{
+    int r = (ey - y()) / rowHeight;
+    if (r < 0 || r >= numRows) return false;
+    int m = rowOffset + numRows - 1 - r;
+    if (m < 0 || m > 127) return false;
+    midiNote = m;
+    rowY     = y() + r * rowHeight;
+    rowH     = rowHeight;
+    return true;
+}
+
 int DrumNoteLabels::handle(int event)
 {
     if (int r = contextMenuCursorHandle(this, event); r >= 0) return r;
@@ -86,19 +98,10 @@ int DrumNoteLabels::handle(int event)
             if (onRightClick) onRightClick();
             return 1;
         }
-        int r = (Fl::event_y() - y()) / rowHeight;
-        if (r >= 0 && r < numRows) {
-            int midiNote = rowOffset + numRows - 1 - r;
-            if (midiNote >= 0 && midiNote <= 127) {
-                // Second click of a double-click opens the rename editor only —
-                // don't re-audition or flash behind the inline input.
-                if (Fl::event_clicks() >= 1 && onRowDoubleClicked) {
-                    onRowDoubleClicked(midiNote, y() + r * rowHeight, rowHeight);
-                } else {
-                    flash(midiNote);
-                    if (onRowClicked) onRowClicked(midiNote);
-                }
-            }
+        int midiNote, rowY, rowH;
+        if (rowAt(Fl::event_y(), midiNote, rowY, rowH)) {
+            flash(midiNote);
+            if (onRowClicked) onRowClicked(midiNote);
         }
         return 1;
     }
@@ -216,10 +219,6 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     gridPadX = drumGrid.getPadX();
     paramGrid.setPadX(drumGrid.getPadX());
 
-    drumLabels.onRowDoubleClicked = [this](int midiNote, int rowY, int rh) {
-        startDrumLabelEdit(midiNote, rowY, rh);
-    };
-
     drumLabelInput.hide();
     drumLabelInput.box(FL_FLAT_BOX);
     drumLabelInput.color(0x2D374800);
@@ -266,6 +265,16 @@ void DrumPatternEditor::setAllDrumMaps(const std::map<int, std::map<int, std::st
     allDrumMaps      = maps;
     allFallbackModes = fallbacks;
     applyCurrentDrumMap();
+}
+
+// Right-click "Rename": resolve the row under the cursor now, return a closure
+// that opens the inline editor on it when the menu item is chosen.
+std::function<void()> DrumPatternEditor::labelsRenameHandler()
+{
+    int midiNote, rowY, rowH;
+    if (!drumLabels.rowAt(Fl::event_y(), midiNote, rowY, rowH))
+        return {};
+    return [this, midiNote, rowY, rowH]() { startDrumLabelEdit(midiNote, rowY, rowH); };
 }
 
 void DrumPatternEditor::startDrumLabelEdit(int midiNote, int rowY, int rowH)

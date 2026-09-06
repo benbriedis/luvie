@@ -55,6 +55,10 @@ protected:
     virtual void labelsResize(int x, int y, int w, int h) = 0;
     virtual void labelsSetOnRightClick(std::function<void()> fn) = 0;
     virtual void labelsSetOnRowClicked(std::function<void(int midi)> fn) = 0;
+    // Editors whose labels can be renamed (the drum editor) return a closure
+    // that renames the row under the current event; others leave it empty and
+    // the context menu omits its "Rename" item.
+    virtual std::function<void()> labelsRenameHandler() { return {}; }
 
     // Instrument of the currently selected track's pattern (0 if none).
     int currentInstrumentId() const;
