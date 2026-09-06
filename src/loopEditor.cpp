@@ -121,10 +121,17 @@ void LoopPanel::onTimelineChanged()
 
 void LoopPanel::draw()
 {
-    fl_color(panelBorder);
-    fl_rectf(x(), y(), w(), 1);
-    fl_color(panelBg);
-    fl_rectf(x(), y() + 1, w(), h() - 1);
+    // Only paint the strip when the whole panel is damaged. A keystroke in the BPM
+    // box damages just that box, and Fl_Input_ then repaints only the span of text
+    // that changed (minimal_update) — so blanking the strip first left the field
+    // erased everywhere except that span, which is what made the box appear to
+    // shrink and jump about while typing.
+    if (damage() & ~FL_DAMAGE_CHILD) {
+        fl_color(panelBorder);
+        fl_rectf(x(), y(), w(), 1);
+        fl_color(panelBg);
+        fl_rectf(x(), y() + 1, w(), h() - 1);
+    }
     draw_children();
 }
 
