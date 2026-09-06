@@ -374,7 +374,7 @@ int main(int argc, char **argv) {
         jackUp = true;
         jackTransport.setTimeline(&songTimeline);
         jackTransport.setLoopManager(&app.loopMgr);
-        app.pushSongLoopState();   // re-sync the loop region onto the fresh client
+        app.pushSongLoopState();   // re-send the loop region now the client is up
         jackTransport.onTransportEvent = [&]() {
             Fl::awake([](void* data) {
                 static_cast<Transport*>(data)->syncPlayState();
@@ -546,11 +546,13 @@ int main(int argc, char **argv) {
     // either has to dirty the project the same way an edit does.
     app.onLoopStateChanged = [&]() { session->markDirty(); };
 
-    // Song-loop (Start/End markers + toggle) → the RT sequencer, which wraps song
-    // playback at the loop seam sample-accurately. setSongLoop is just atomic
-    // stores, so it is safe to call before JACK is up.
+    // Song-loop (Start/End markers + toggle) → the clock, which owns the wrap: the
+    // JACK backend's RT sequencer splits the cycle at the loop seam sample-accurately,
+    // the internal one folds its own position. Routed so whichever is active gets it
+    // (and so does the other one, when the clock source changes later). Just stores,
+    // so it is safe to call before JACK is up.
     app.onSongLoopChanged = [&](bool en, float start, float end) {
-        jackTransport.setSongLoop(en, start, end);
+        router.setSongLoop(en, start, end);
     };
     app.pushSongLoopState();
 

@@ -28,6 +28,13 @@ public:
 	// Loop mode: when active, generate MIDI only for enabled patterns, looping indefinitely.
 	virtual void setLoopMode(bool /*loopMode*/) {}
 
+	// The song editor's Start/End loop region, in absolute song bars with endBar
+	// exclusive. A backend that sequences owns the wrap: it plays the region round,
+	// and position() reports the wrapped bar — so nothing above has to fold a raw
+	// position, and a paused playhead stays put while the markers are dragged. The
+	// default ignores it (plugin mode ships the region to the DSP instead).
+	virtual void setSongLoop(bool /*enabled*/, float /*startBar*/, float /*endBar*/) {}
+
 	// Loop -> Song hand-off: leave loop mode and resume song playback at `bars` as a
 	// *continuous* move. Backends must not relocate the host clock and must not reset
 	// controllers — the loops' held notes are released, nothing more — and must apply

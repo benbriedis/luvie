@@ -394,7 +394,8 @@ static void sendLoopState(LuvieUI* ui)
                            than in the saved state the worker parses. loopMode above
                            tells the DSP whether to hold it. */
                         ui->song->globalBpmSet() ? 1u : 0u,
-                        ui->song->globalBpmValue(), ui->song->globalBpmFromBar() };
+                        ui->song->globalBpmValue(), ui->song->globalBpmFromBar(),
+                        ui->song->tempoHoldBar() };
     std::memcpy(p, &hdr, sizeof(hdr));
     p += sizeof(hdr);
 

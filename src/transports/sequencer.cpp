@@ -463,7 +463,12 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
         // The musical cursor did not advance this cycle, so it now trails the clock.
         // Drop it and let the next readable cycle re-sync from the clock, otherwise
         // the lost window would become a permanent lag rather than one skipped one.
-        loopCursorValid = false;
+        // Only while rolling, though: stopped there is nothing to trail, and the
+        // linear clock — which ran on past the loop seam — is no substitute for a
+        // cursor that already holds the bar playback ended on. A cycle skipped
+        // exactly as the transport stopped would otherwise throw the playhead
+        // wherever the clock had got to.
+        if (nowPlaying) loopCursorValid = false;
         return false;
     }
 
@@ -543,29 +548,56 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
                              && (le - ls) > 1.0e-4f;
 
     if (!haveRegion || !nowPlaying) {
-        // Straight through. Keep the wrapped-position publisher sensible even when
-        // the toggle is on but playback has not yet crossed the loop end.
+        if (haveRegion) {
+            // Stopped with the region armed. The position is the wrapped cursor, not
+            // the clock: the clock ran past the seam any number of times, and it
+            // crosses whatever tempo and time-signature markers lie beyond the region
+            // while the cursor never leaves it, so the two do not even advance at the
+            // same rate. Settle it once per clock move — the cycle playback stopped
+            // on, or a seek made while stopped — and leave it alone after that,
+            // collapsing the wrap into the clock offset so the frame the transport is
+            // parked at reads as exactly that bar. Re-deriving it every cycle instead
+            // would step the playhead off the bar the loops left it on the moment they
+            // stopped, and would walk it around the ruler while the Start/End markers
+            // are dragged — the position is settled, the region is not. Nothing is
+            // folded here either: a stopped playhead belongs where playback left it or
+            // where the user seeked, even when that is outside the region. Folding is
+            // playback's, and happens below when the transport rolls again.
+            if (jumped || !loopCursorValid) {
+                musicalPos      = linPrev;
+                loopCursorValid = true;
+            }
+            if (jumped || wasPlaying) {
+                curSecsOffset = cycleStartSecs - snapBarToSeconds(musicalPos);
+                secsOffset.store(curSecsOffset, std::memory_order_relaxed);
+            }
+            linPrev = musicalPos;
+            linCur  = snapSecondsToBar(cycleEndSecs - curSecsOffset);
+        } else {
+            loopCursorValid = false;
+        }
         segCycleStartSecs = baseSegOff;
         segMusicalStart   = linPrev;
         renderWindowLocked(nowPlaying, cycleReset, linPrev, linCur);
-        loopCursorValid = false;
-        double pub = nowPlaying ? linCur : linPrev;
-        if (haveRegion && pub >= le)
-            pub = ls + std::fmod(pub - ls, (double)le - ls);
-        loopedBar.store((float)pub, std::memory_order_relaxed);
+        loopedBar.store((float)(nowPlaying ? linCur : linPrev), std::memory_order_relaxed);
         snapMutex.unlock();
         return true;
     }
 
     // Sync the musical cursor to the linear clock on the first looped cycle and
-    // after any jump (seek / host relocate). fmod folds a position that already
-    // ran past the loop end back into the region.
+    // after any jump (seek / host relocate).
     if (!loopCursorValid || jumped) {
-        double p = linPrev;
-        if (p >= le) p = ls + std::fmod(p - ls, (double)le - ls);
-        musicalPos      = p;
+        musicalPos      = linPrev;
         loopCursorValid = true;
     }
+
+    // Fold a cursor sitting past the loop end back into the region. That covers the
+    // position playback starts from (it may be anywhere the user seeked or dragged
+    // the End marker below, both allowed while stopped) as well as one the toggle was
+    // switched on behind. Rendering a window from beyond the end would run it
+    // backwards; folding it here means every window below starts inside the region.
+    if (musicalPos >= le)
+        musicalPos = ls + std::fmod(musicalPos - ls, (double)le - ls);
 
     // Musical bars to advance this cycle, evaluated at the *musical* position so a
     // tempo change inside the loop region is honoured (rather than reusing the

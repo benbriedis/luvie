@@ -63,7 +63,7 @@ void Playhead::onTimelineChanged()
 		if (patternTrack < 0 && !loopActive && !songLooping && clamped != bars)
 			transport->seek(clamped);
 		if (loopMgr && obsTl && patternTrack < 0 && !loopActive)
-			loopMgr->sync(*obsTl, songLoopFold(bars));
+			loopMgr->sync(*obsTl, bars);
 	}
 	if (owner && owner->visible_r()) owner->redraw();
 }
@@ -153,8 +153,18 @@ void Playhead::tick()
 			}
 			lastPosition = curPos;
 		} else {
-			if (wasPlaying) allSoftNotesOff();   // stopped — release held notes
 			float curPos = livePosition();
+			if (wasPlaying) {
+				allSoftNotesOff();   // stopped — release held notes
+				// Stopping ends the stretch a Loop-Editor tempo was jammed for, so the
+				// register goes back to whatever the song's markers say where the
+				// playhead is parked — the same thing a user reposition does, and for
+				// the same reason: the typed tempo belongs to the run it was typed
+				// during. A stop is a state change, not a guess about the position
+				// having moved; nothing here infers a reposition. No-op in Loop Mode,
+				// where the hold owns the tempo and the jam is still what is playing.
+				if (obsTl) obsTl->readTempoFromMap(curPos);
+			}
 			if (loopMgr && obsTl && !loopActive) loopMgr->sync(*obsTl, curPos);
 			lastPosition = curPos;
 		}
@@ -342,20 +352,9 @@ Fl_Color Playhead::currentHeadColor() const
 	return headColor;
 }
 
-// Fold a raw song-mode position into the active loop region. songLoopRange returns
-// false (leaving raw untouched) when the toggle is off or there is no region; the
-// fold only bites once playback has run past the loop end.
-float Playhead::songLoopFold(float raw) const
-{
-	if (patternTrack >= 0 || !songLoopRange) return raw;
-	float ls, le;
-	if (!songLoopRange(ls, le) || le - ls <= 1.0e-4f || raw < le) return raw;
-	return ls + std::fmod(raw - ls, le - ls);
-}
-
 float Playhead::livePosition() const
 {
-	return songLoopFold(transport ? transport->position() : 0.0f);
+	return transport ? transport->position() : 0.0f;
 }
 
 float Playhead::displayBars() const

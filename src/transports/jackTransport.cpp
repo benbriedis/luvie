@@ -244,7 +244,12 @@ int JackTransport::process(jack_nframes_t nframes)
         pendingMutex_.unlock();
     }
 
-    bool jumped = !firstCall && wasPlaying && (pos.frame != lastFrame + nframes);
+    // A relocate: the frame counter did not land where simply playing on (or standing
+    // still) would have put it. Stopped cycles count too — seeking with the transport
+    // paused is a jump the engine has to see, otherwise its musical position stays at
+    // the frame the user just left.
+    bool jumped = !firstCall &&
+                  (pos.frame != lastFrame + (wasPlaying ? nframes : 0));
 
     // Render this buffer's window. renderCycle() converts [pos.frame, +nframes) to
     // a musical window, splits it at the song-loop seam when looping, and calls

@@ -18,6 +18,9 @@ void SimpleTransport::pause() {
 	// A hand-off still waiting for its bar line completes when the clock stops:
 	// there is no phase left to align to. Same rule the RT engine applies when a
 	// cycle arrives with the transport no longer rolling.
+	// position() is already folded into the song loop, so stopping settles the
+	// playhead on the bar the loop left it on: the pause itself moves nothing, and
+	// the saved position no longer re-folds while the markers are dragged.
 	savedPositionBars = (handoffArmed && clockSeconds() < handoffAtSecs) ? handoffResume
 	                                                                    : position();
 	handoffArmed      = false;
@@ -42,10 +45,17 @@ void SimpleTransport::seek(float bars) {
 	}
 }
 
-void SimpleTransport::setLoopMode(bool /*loopMode*/) {
+void SimpleTransport::setLoopMode(bool m) {
 	// Entering a mode supersedes a hand-off out of one that has not landed yet — the
 	// user clicked back into Loop Mode mid-transition. Mirrors Sequencer::setLoopMode.
+	loopMode     = m;
 	handoffArmed = false;
+}
+
+void SimpleTransport::setSongLoop(bool enabled, float startBar, float endBar) {
+	songLoopOn    = enabled;
+	songLoopStart = startBar;
+	songLoopEnd   = endBar;
 }
 
 void SimpleTransport::endLoopMode(float bars) {
@@ -88,7 +98,17 @@ float SimpleTransport::rawPosition() const {
 	return (float)timeline->secondsToBar(clockSeconds());
 }
 
+float SimpleTransport::songLoopFold(float raw) const {
+	if (!songLoopOn || loopMode) return raw;
+	const float len = songLoopEnd - songLoopStart;
+	if (len <= 1.0e-4f || raw < songLoopEnd) return raw;
+	return songLoopStart + std::fmod(raw - songLoopStart, len);
+}
+
 float SimpleTransport::position() const {
+	// Stopped: savedPositionBars was folded when the clock stopped there, so it is
+	// already the position the playhead shows — folding it again against a region the
+	// user may since have dragged would move it.
 	if (!playing || !timeline) return savedPositionBars;
 	double secs = clockSeconds();
 	// Past the point the hand-off was armed for: the loops are done, and the song's
@@ -97,5 +117,5 @@ float SimpleTransport::position() const {
 	// clock (play/seek/rewind/pause) disarms it first.
 	if (handoffArmed && secs >= handoffAtSecs)
 		secs = handoffResumeSecs + (secs - handoffAtSecs);
-	return std::max(0.0f, (float)timeline->secondsToBar(secs));
+	return songLoopFold(std::max(0.0f, (float)timeline->secondsToBar(secs)));
 }

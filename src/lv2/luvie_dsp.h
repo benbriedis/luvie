@@ -83,9 +83,11 @@ typedef struct {
    globalBpm* mirror ObservableSong's global tempo register: the tempo the clock is
    actually running at. globalBpmOn says whether the value is one the user typed into
    the Loop Editor — carried from globalBpmBar until the song's next tempo marker, and
-   unbounded (the time signature pinned with it) while loopMode is set — or whether the
-   register is simply what the markers say, which is the state every reposition of the
-   playhead returns it to. It is runtime state like the rest of this message; the song's
+   unbounded (the time signature pinned at globalBpmHoldBar) while loopMode is set — or
+   whether the register is simply what the markers say, which is the state every
+   reposition of the playhead returns it to. globalBpmBar is a marker's bar (or a ramp
+   step, or 0), never wherever the playhead happened to be: the register may only
+   recolour segments the song's markers already define, never add one of its own. It is runtime state like the rest of this message; the song's
    markers, which travel as saved state, are never touched by it. Without it the DSP's
    clock would free-run into the markers ahead of a jam, and a tempo set in the Loop
    Editor would never reach playback at all. */
@@ -99,7 +101,9 @@ typedef struct {
     float    songHandoffBar;   /* bar the frozen song playhead is handed back to */
     uint32_t globalBpmOn;      /* 1 = a global tempo is set (see below) */
     float    globalBpm;         /* the tempo the clock runs at from globalBpmBar */
-    float    globalBpmBar;      /* bar it applies from; also the Loop Mode hold bar */
+    float    globalBpmBar;      /* bar it applies from: always a tempo marker or a
+                                  ramp step of one, never a playhead position */
+    float    globalBpmHoldBar; /* Loop Mode's frozen bar, where the held map ends */
 } LuvieLoopState;
 
 /* One pattern's loop state. A pattern appears here if it is active, manual, or

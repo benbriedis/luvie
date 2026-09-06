@@ -72,6 +72,9 @@ public:
     float position()  const override;
     bool  isPlaying() const override { return playing_.load(); }
     void  setLoopMode(bool loopMode) override { Sequencer::setLoopMode(loopMode); }
+    void  setSongLoop(bool enabled, float startBar, float endBar) override {
+        Sequencer::setSongLoop(enabled, startBar, endBar);
+    }
     // No jack_transport_locate: the Sequencer shifts its bar offset and swaps to the
     // song snapshot on the same RT cycle, leaving the JACK timeline rolling.
     void  endLoopMode(float bars)    override { Sequencer::endLoopMode(bars); }

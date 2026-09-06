@@ -13,6 +13,11 @@
 class TransportRouter : public ITransport {
     ITransport* active_   = nullptr;
     bool        loopMode_ = false;
+    // Song loop, kept here as well: it is set once and lives for the whole session,
+    // so a backend that becomes active later has to be told about it too.
+    bool        songLoopOn_    = false;
+    float       songLoopStart_ = 0.0f;
+    float       songLoopEnd_   = 0.0f;
 
 public:
     void setActive(ITransport* t) {
@@ -27,6 +32,7 @@ public:
         active_ = t;
         if (active_) {
             active_->setLoopMode(loopMode_);
+            active_->setSongLoop(songLoopOn_, songLoopStart_, songLoopEnd_);
             active_->seek(pos);
             if (playing) active_->play();
         }
@@ -43,6 +49,12 @@ public:
     void  setLoopMode(bool loopMode) override {
         loopMode_ = loopMode;
         if (active_) active_->setLoopMode(loopMode);
+    }
+    void  setSongLoop(bool enabled, float startBar, float endBar) override {
+        songLoopOn_    = enabled;
+        songLoopStart_ = startBar;
+        songLoopEnd_   = endBar;
+        if (active_) active_->setSongLoop(enabled, startBar, endBar);
     }
     void  endLoopMode(float bars) override {
         loopMode_ = false;

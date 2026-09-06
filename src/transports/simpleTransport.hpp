@@ -15,6 +15,19 @@ class SimpleTransport : public ITransport {
 	bool   playing                       = false;
 	std::chrono::steady_clock::time_point playStart;
 
+	// Song loop (the Start/End markers), endBar exclusive. There is no RT engine here
+	// to wrap playback at the seam, so this clock does it itself: it free-runs and
+	// position() folds the raw bar back into the region, exactly as the Sequencer's
+	// wrapped cursor does. Song mode only — in Loop mode the patterns free-run and
+	// the song playhead is frozen, so folding would misreport it.
+	bool   songLoopOn    = false;
+	float  songLoopStart = 0.0f;
+	float  songLoopEnd   = 0.0f;
+	bool   loopMode      = false;
+	// `raw` folded into the loop region; unchanged when the loop is off, when there
+	// is no region, or before playback has run past its end.
+	float  songLoopFold(float raw) const;
+
 	// Loop -> Song hand-off, armed by endLoopMode() and landed by position() on the
 	// way past handoffAtSecs. See the note there.
 	bool   handoffArmed     = false;
@@ -37,6 +50,7 @@ public:
 
 	void  setLoopMode(bool loopMode) override;
 	void  endLoopMode(float bars)    override;
+	void  setSongLoop(bool enabled, float startBar, float endBar) override;
 
 	float position()  const override;
 	bool  isPlaying() const override { return playing; }

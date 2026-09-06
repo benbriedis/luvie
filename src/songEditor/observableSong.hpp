@@ -108,41 +108,54 @@ public:
     //   * the Loop Editor's BPM box (setGlobalBpm), which writes the register and
     //     never a marker — markers are how the *song* schedules tempo changes, and
     //     a jam is not a song edit;
-    //   * a reposition of the playhead the *user* made (readTempoFromMap) — a ruler
-    //     seek or the rewind button — which re-reads it from the markers at the
-    //     position landed on, dropping whatever the user last typed.
+    //   * the end of the run the typed value belongs to (readTempoFromMap), which
+    //     re-reads it from the markers at the bar the playhead is left on, dropping
+    //     whatever the user last typed. Two things end a run: a reposition the *user*
+    //     made — a ruler seek or the rewind button — and the transport stopping. Both
+    //     are events, never guesses; see the paragraph below.
     //
     // Nothing else may write it, and in particular nothing may infer a reposition
     // from the playhead having moved backwards. That was tried and it broke the
     // Loop -> Song hand-off in plugin mode: the UI settles the switch when the loop
     // clock crosses the bar line, a round trip before the engine actually lands it,
     // so the position drops afterwards and read as a reposition — throwing away the
-    // very tempo the jam existed to carry. A song loop wrapping back over an anchor
-    // is the one case left uncovered; it re-applies the tempo each pass.
+    // very tempo the jam existed to carry.
     //
-    // The tempo map itself is therefore only ever the song's own markers, and every
-    // tempo change playback can reach has one.
+    // A value the user typed carries an anchor bar internally, and applies from there
+    // up to the next tempo marker. That is how a register is handed to a clock with no
+    // playback history to consult: in plugin mode the host gives the DSP a frame and
+    // expects a bar back, so bar <-> seconds has to stay a pure function of position.
     //
-    // A value the user typed still carries an anchor bar internally, and applies
-    // from there up to the next marker. That is not a second kind of tempo change:
-    // it is how a register is handed to a clock that has no playback history to
-    // consult — in plugin mode the host gives the DSP a frame and expects a bar
-    // back, so bar <-> seconds has to stay a pure function of position. What makes
-    // it invisible is the third rule above: the anchor is set at the playhead's own
-    // position, playback only ever leaves it going forward, and every route back
-    // behind it re-reads the map. So it can never be crossed from below, and never
-    // sounds as an unmarked tempo change. Nothing here is saved or undoable.
+    // THE ANCHOR RULE — the register may only ever recolour segments the song's own
+    // markers already define; it may never introduce one of its own. So the anchor is
+    // snapped back to the last tempo breakpoint at or before the bar it was set at (a
+    // marker, one of a ramp's per-beat steps, or bar 0), which means the register
+    // governs a whole marker-to-marker stretch rather than starting mid-stretch. The
+    // guarantee that buys: every tempo change in the map coincides with a tempo
+    // marker, whichever direction playback crosses it from and however it got there.
+    //
+    // It was not always so. The anchor used to sit at the playhead's own position,
+    // relying on "playback only ever leaves it going forward, and every route back
+    // re-reads the map" to keep that extra breakpoint invisible — and a song loop
+    // wrapping back over it broke exactly that: an unmarked tempo change, at the bar
+    // the user happened to leave Loop Mode on. Position-anchored patches to the map
+    // are hidden markers by construction; do not reintroduce one.
+    //
+    // Nothing here is saved or undoable.
     //
     // Loop Mode *holds* the register (holdTempo): the value stops being bounded by
     // the markers ahead and the time signature is pinned with it, so a jam on the
     // free-running clock keeps one tempo and one meter however long it lasts. The
     // hold is released on the way back to Song Mode and the value survives, which
-    // is what carries a tempo set while jamming into the song that follows.
+    // is what carries a tempo set while jamming into the song that follows — until
+    // the transport stops, which is where that carried value runs out (below).
     void  setGlobalBpm(float bpm, float fromBar);
     float globalBpmAt(float bar) const;   // the tempo the clock will run at, there
-    // A reposition of the playhead: the register takes whatever the song's markers
-    // say at `bar`. No-op while Loop Mode holds the tempo, and no-op when nothing is
-    // overridden — so it costs nothing on the repositions that happen constantly.
+    // The run the typed tempo belonged to has ended — the playhead was repositioned,
+    // or playback stopped — so the register takes whatever the song's markers say at
+    // `bar`. No-op while Loop Mode holds the tempo (the jam is still what is playing),
+    // and no-op when nothing is overridden, so it costs nothing on the repositions
+    // that happen constantly.
     void  readTempoFromMap(float bar);
     // Forget the register entirely. Only for opening a different project: a jam tempo
     // belongs to the session, and the song being loaded never saw it. Note this is not
@@ -156,7 +169,11 @@ public:
     void  holdTempo(float atBar);
     void  releaseTempoHold();
     bool  tempoHeld()    const { return tempoHold; }
-    float tempoHoldBar() const { return globalBpmBar; }
+    // The bar Loop Mode froze on — where the held map stops, and the bar the Loop
+    // panel's BPM box speaks for. Not the register's anchor: that is snapped back to
+    // a marker (see the anchor rule), and truncating there instead would drop a
+    // time-signature marker the playhead had already passed, pinning the wrong meter.
+    float tempoHoldBar() const { return holdBar; }
 
     // Raw accessors + setter for mirroring the global tempo across a process
     // boundary (the LV2 UI ships these to the DSP in the loop atom). The setter is
@@ -165,7 +182,7 @@ public:
     bool  globalBpmSet()     const { return globalBpmOn; }
     float globalBpmValue()   const { return globalBpm; }
     float globalBpmFromBar() const { return globalBpmBar; }
-    void  mirrorGlobalBpm(bool on, float bpm, float fromBar, bool held);
+    void  mirrorGlobalBpm(bool on, float bpm, float fromBar, bool held, float atHoldBar);
 
     // Time conversion — integrates over the tempo map above
     double barToSeconds(float bar) const;
@@ -345,12 +362,21 @@ private:
     float globalBpm    = 0.0f;
     float globalBpmBar = 0.0f;
     bool  tempoHold    = false;   // Loop Mode: unbounded, and the meter pinned too
+    float holdBar      = 0.0f;    // the bar Loop Mode froze on; where the held map ends
     mutable std::vector<timeSettings::TempoSegment> heldMapCache;
     mutable bool heldMapDirty = true;
     // Stand-in for "no marker ahead": a bar count no song will reach.
     static constexpr double tempoForever = 1.0e9;
     // First tempo breakpoint after `bar`, or tempoForever if there is none.
     double nextTempoBreakAfter(double bar) const;
+    // The last tempo breakpoint at or before `bar`: a marker's bar, one of a ramp's
+    // per-beat steps, or 0. Every one of them is already a segment start in the map,
+    // which is the point — see the anchor rule above.
+    double tempoBreakAtOrBefore(double bar) const;
+    // Is the register the tempo in force at `bar`? The one test behind globalBpmAt()
+    // and behind the anchor rule: a write that lands inside the stretch the register
+    // already governs changes its value, never where it applies.
+    bool   overrideCovers(float bar) const;
 
     Timeline data;
     // Funnel for all pattern-name creation/changes; binds to data.patterns.

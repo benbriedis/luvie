@@ -396,7 +396,7 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
         p->engine->suspendRebuilds(true);
         p->engine->setLoopMode(false);
         p->song->mirrorGlobalBpm(hdr.globalBpmOn != 0, hdr.globalBpm, hdr.globalBpmBar,
-                                 /*held=*/false);
+                                 /*held=*/false, hdr.globalBpmHoldBar);
         p->loopMgr.mirror(actives, manual, disabled);
         p->engine->suspendRebuilds(false);
         p->engine->endLoopMode(hdr.songHandoffBar);
@@ -413,7 +413,8 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
     const bool loopNow = hdr.loopMode != 0;
     const bool tempoChanged = p->song->globalBpmSet()     != (hdr.globalBpmOn != 0)
                            || p->song->globalBpmValue()   != hdr.globalBpm
-                           || p->song->globalBpmFromBar() != hdr.globalBpmBar;
+                           || p->song->globalBpmFromBar() != hdr.globalBpmBar
+                           || p->song->tempoHoldBar()     != hdr.globalBpmHoldBar;
     double nowSecs = 0.0, curBar = 0.0;
     if (tempoChanged) {
         nowSecs = (double)p->curFrame / p->engine->sampleRateHz();
@@ -424,7 +425,7 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
        Loop Mode is on, so the jam free-runs at one tempo and one time signature
        instead of drifting into the markers ahead of it. */
     p->song->mirrorGlobalBpm(hdr.globalBpmOn != 0, hdr.globalBpm, hdr.globalBpmBar,
-                             /*held=*/loopNow);
+                             /*held=*/loopNow, hdr.globalBpmHoldBar);
     p->engine->setLoopMode(loopNow);
     p->loopMgr.mirror(actives, manual, disabled);
 
