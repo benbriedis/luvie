@@ -40,6 +40,25 @@ void ObservableSong::removeObserver(ITimelineObserver* o)
     observers.erase(std::remove(observers.begin(), observers.end(), o), observers.end());
 }
 
+void ObservableSong::addTempoObserver(IGlobalTempoObserver* o)
+{
+    tempoObservers.push_back(o);
+}
+
+void ObservableSong::removeTempoObserver(IGlobalTempoObserver* o)
+{
+    tempoObservers.erase(std::remove(tempoObservers.begin(), tempoObservers.end(), o),
+                         tempoObservers.end());
+}
+
+void ObservableSong::tempoFanout()
+{
+    tempoMapDirty = true;
+    heldMapDirty  = true;
+    auto copy = tempoObservers;
+    for (auto* o : copy) o->onGlobalTempoChanged();
+}
+
 void ObservableSong::fanout()
 {
     // Every mutation funnels through here, so this is the one place the cached
@@ -105,11 +124,6 @@ void ObservableSong::redo()
 void ObservableSong::loadTimeline(const Timeline& tl)
 {
     data = tl;
-    // A tempo typed into the Loop Editor belongs to the session, not the project, so
-    // it must not be carried into a song that never saw it. Clearing the hold too:
-    // a load while in Loop Mode would otherwise pin the new song at the old one's bar.
-    globalBpmOn = false;
-    tempoHold   = false;
     // Build rowOrder if absent, or migrate old files where track rows used Track IDs.
     {
         std::set<int> laneIds;
@@ -780,10 +794,20 @@ void ObservableSong::setGlobalBpm(float bpm, float fromBar)
         globalBpmOn  = true;
         globalBpm    = bpm;
         globalBpmBar = std::max(0.0f, fromBar);
-        tempoMapDirty = true;
-        heldMapDirty  = true;
-        fanout();   // observers redraw; deliberately not notify(), which would undo
+        tempoFanout();   // the tempo channel only — not notify(), and not fanout()
     });
+}
+
+void ObservableSong::resetGlobalTempo()
+{
+    // Deliberately NOT part of loadTimeline(). That is also how the plugin ships an
+    // ordinary edit from the UI to the DSP, so clearing there wiped the DSP's register
+    // whenever anything in the song changed — settling the mode was enough to do it,
+    // which is exactly the "Loop Mode reverts to the song tempo" the user saw. Opening
+    // a different project is the only thing that should forget a jam tempo.
+    globalBpmOn = false;
+    tempoHold   = false;
+    tempoFanout();
 }
 
 void ObservableSong::readTempoFromMap(float bar)
@@ -796,12 +820,10 @@ void ObservableSong::readTempoFromMap(float bar)
     reanchoringTempo([&] {
         // Keep the register's value honest even with the override off: it is what the
         // LV2 mirror ships, and it should read as the tempo actually in force.
-        globalBpm     = bpmAtBar(std::max(0.0f, bar));
-        globalBpmOn   = false;
-        globalBpmBar  = 0.0f;
-        tempoMapDirty = true;
-        heldMapDirty  = true;
-        fanout();   // observers redraw; as setGlobalBpm, not notify() — no undo entry
+        globalBpm    = bpmAtBar(std::max(0.0f, bar));
+        globalBpmOn  = false;
+        globalBpmBar = 0.0f;
+        tempoFanout();
     });
 }
 

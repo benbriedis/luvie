@@ -432,11 +432,11 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
        the only rebuild a tempo-only message gets: the mode has not moved, and the
        mirrored active set has not either. */
     if (tempoChanged) {
-        const auto&  map    = loopNow ? p->song->tempoMap() : p->song->songTempoMap();
+        const auto&  map    = p->engine->activeTempoMap();
         const double atSecs = curBar <= 0.0
                             ? 0.0
                             : timeSettings::mapBarToSeconds(map, curBar);
-        p->engine->reanchorSnapshot(nowSecs - atSecs);
+        p->engine->retempoSnapshot(map, nowSecs - atSecs);
     }
 }
 

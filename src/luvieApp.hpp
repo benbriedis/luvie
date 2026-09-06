@@ -77,6 +77,11 @@ public:
     std::function<void()>           onExtraSeek;
     std::function<void()>           onExtraParamsChanged;
     std::function<void()>           onExtraTimelineChange;
+    // The global tempo register changed (IGlobalTempoObserver). Separate from
+    // onExtraTimelineChange on purpose: the register is not project content, so
+    // the plugin ships it in the small live loop atom rather than re-serializing
+    // the whole song. See ObservableSong's "Global tempo" block.
+    std::function<void()>           onGlobalTempoChanged;
     std::function<void()>           onInstrumentsChanged;
 
     static std::string lastFileDir;  // remembered across Save As / Import / Export
@@ -203,4 +208,12 @@ private:
         explicit ChangeNotifier(LuvieApp* a) : app(a) {}
         void onTimelineChanged() override;
     } changeNotifier_{this};
+
+    struct TempoNotifier : IGlobalTempoObserver {
+        LuvieApp* app;
+        explicit TempoNotifier(LuvieApp* a) : app(a) {}
+        void onGlobalTempoChanged() override {
+            if (app->onGlobalTempoChanged) app->onGlobalTempoChanged();
+        }
+    } tempoNotifier_{this};
 };

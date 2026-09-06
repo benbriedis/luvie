@@ -47,7 +47,8 @@ inline bool isNoteOff(const uint8_t* data, int len)
  *     Loop -> Song hand-off.
  *   - emit() is called only from renderCycle() (RT thread) and must not allocate.
  */
-class Sequencer : public ITimelineObserver, public ILoopObserver {
+class Sequencer : public ITimelineObserver, public ILoopObserver,
+                  public IGlobalTempoObserver {
 public:
     Sequencer();
     ~Sequencer() override;
@@ -109,16 +110,29 @@ public:
     // re-anchor has to have an answer.
     double barAtSeconds(double secs);
 
-    // Publish a rebuilt snapshot and a new clock offset as one commit. A tempo change
-    // moves every bar boundary ahead of the clock, so a cycle that saw the new map
-    // with the old offset — or the reverse — would read the same frame as a different
-    // bar and playback would jump. renderCycle() loads the offset after taking the
-    // snapshot lock, so storing it here lands both together. Owner thread.
-    void reanchorSnapshot(double newSecsOffset);
+    // Publish a new tempo table and clock offset as one commit, leaving the rest of
+    // the snapshot in place. Two reasons it is not a rebuildSnapshot():
+    //   * a tempo change moves no note, track or routing data, so copying the whole
+    //     song for one would be waste — and a dragged BPM spinner fires this many
+    //     times a second, holding the lock long enough for the RT thread's try_lock
+    //     to start failing, which is a skipped cycle and an audible dropout;
+    //   * the map and the offset have to land together. A cycle that saw the new map
+    //     with the old offset — or the reverse — would read the same frame as a
+    //     different bar and playback would jump. renderCycle() loads the offset after
+    //     taking the snapshot lock, so storing it here is atomic against a cycle.
+    // Owner thread.
+    void retempoSnapshot(std::vector<timeSettings::TempoSegment> segs,
+                         double newSecsOffset);
 
-    // ITimelineObserver / ILoopObserver
+    // ITimelineObserver / ILoopObserver / IGlobalTempoObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
     void onLoopsChanged() override { rebuildSnapshot(); }
+    void onGlobalTempoChanged()    override;
+
+    // The tempo table this engine's snapshot is built from, chosen by the mode the
+    // way buildSnapshot() chooses it: Loop Mode runs on the held map, song content on
+    // the marker-bounded one.
+    const std::vector<timeSettings::TempoSegment>& activeTempoMap() const;
 
 protected:
     // ── Snapshot (RT-readable copy of the timeline) ───────────────────────────

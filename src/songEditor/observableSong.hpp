@@ -24,6 +24,11 @@ public:
     void addObserver(ITimelineObserver* o);
     void removeObserver(ITimelineObserver* o);
 
+    // The global tempo register's own channel; see IGlobalTempoObserver. Changes to it
+    // reach these and nobody else, so a BPM edit never masquerades as a project edit.
+    void addTempoObserver(IGlobalTempoObserver* o);
+    void removeTempoObserver(IGlobalTempoObserver* o);
+
     const Timeline& get() const { return data; }
 
     // Optional transport, used only to keep the playhead musically anchored
@@ -139,6 +144,11 @@ public:
     // say at `bar`. No-op while Loop Mode holds the tempo, and no-op when nothing is
     // overridden — so it costs nothing on the repositions that happen constantly.
     void  readTempoFromMap(float bar);
+    // Forget the register entirely. Only for opening a different project: a jam tempo
+    // belongs to the session, and the song being loaded never saw it. Note this is not
+    // loadTimeline()'s job — in plugin mode that call is also the routine UI -> DSP
+    // sync for any edit at all.
+    void  resetGlobalTempo();
     // Loop Mode pin/unpin. Nothing is notified: an observer fan-out here would have
     // the Sequencer resnapshot while the mode flag still says the old mode,
     // publishing song content over the running loops for a cycle. The mode change
@@ -345,7 +355,8 @@ private:
     Timeline data;
     // Funnel for all pattern-name creation/changes; binds to data.patterns.
     PatternNames patternNames{data};
-    std::vector<ITimelineObserver*> observers;
+    std::vector<ITimelineObserver*>   observers;
+    std::vector<IGlobalTempoObserver*> tempoObservers;
     ITransport* transport = nullptr;
     int nextId = 1;
 
@@ -365,6 +376,10 @@ private:
     // The observer fan-out on its own, with no undo bookkeeping. notify() and
     // the undo machinery both go through it.
     void fanout();
+    // The global tempo's fan-out: invalidates the cached maps and tells the tempo
+    // observers, and does nothing else. No undo entry, and no timeline notification —
+    // the register is not song content.
+    void tempoFanout();
     // Swap in a snapshot without recording one. Deliberately NOT loadTimeline():
     // that re-runs file migration and recomputes nextId from the data, which
     // would walk the counter backwards on every undo and let a later edit

@@ -356,6 +356,7 @@ int main(int argc, char **argv) {
     // the NSM open handler. Callers suppress dirty tracking around this, since
     // loadTimeline() fires onTimelineChanged().
     auto applyLoadedState = [&](const AppState& state) {
+        songTimeline.resetGlobalTempo();   // a jam tempo is the session's, not this song's
         songTimeline.loadTimeline(state.timeline);
         applyLoadedOutputs(state);
         if (state.transport >= 0 && !app.pluginMode && app.transportOverlay)

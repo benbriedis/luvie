@@ -27,16 +27,16 @@ Sequencer::Sequencer()
 Sequencer::~Sequencer()
 {
     if (loopMgr)      loopMgr->removeObserver(this);
-    if (timeline) timeline->removeObserver(this);
+    if (timeline) { timeline->removeObserver(this); timeline->removeTempoObserver(this); }
 }
 
 // ── Owner-thread setters ──────────────────────────────────────────────────────
 
 void Sequencer::setTimeline(ObservableSong* tl)
 {
-    if (timeline) timeline->removeObserver(this);
+    if (timeline) { timeline->removeObserver(this); timeline->removeTempoObserver(this); }
     timeline = tl;
-    if (timeline) timeline->addObserver(this);
+    if (timeline) { timeline->addObserver(this); timeline->addTempoObserver(this); }
     rebuildSnapshot();
 }
 
@@ -77,18 +77,42 @@ double Sequencer::barAtSeconds(double secs)
     return snapSecondsToBar(secs - secsOffsetSecs());
 }
 
-void Sequencer::reanchorSnapshot(double newSecsOffset)
+const std::vector<timeSettings::TempoSegment>& Sequencer::activeTempoMap() const
 {
-    Snapshot newSnap;
-    if (!buildSnapshot(newSnap)) return;
-    std::lock_guard<std::mutex> lock(snapMutex);
-    // A hand-off already armed computes its own offset at the seam, against the map it
-    // is about to adopt — so park the content and leave the clock to it.
-    if (pendingHandoff) { pendingSnap = std::move(newSnap); return; }
-    snap = std::move(newSnap);
-    secsOffset.store(newSecsOffset, std::memory_order_relaxed);
-    // musicalPos is deliberately left alone: it is a bar number, and a tempo change
-    // alters how fast bars pass, not which bar you are in.
+    return loopMode ? timeline->tempoMap() : timeline->songTempoMap();
+}
+
+void Sequencer::retempoSnapshot(std::vector<timeSettings::TempoSegment> segs,
+                                double newSecsOffset)
+{
+    // Whatever is displaced ends up in these and is freed on the way out, after the
+    // lock: releasing a vector inside it would lengthen the hold for no reason.
+    std::vector<timeSettings::TempoSegment> displaced;
+    {
+        std::lock_guard<std::mutex> lock(snapMutex);
+        if (pendingHandoff) {
+            // The parked snapshot is what the switch will land on, so it takes the new
+            // map; the clock offset is endLoopMode()'s to compute at the seam, against
+            // that very map, so it is not touched here.
+            pendingSnap.segs.swap(segs);
+        } else {
+            displaced.swap(snap.segs);
+            snap.segs = std::move(segs);
+            secsOffset.store(newSecsOffset, std::memory_order_relaxed);
+            // musicalPos is deliberately left alone: it is a bar number, and a tempo
+            // change alters how fast bars pass, not which bar you are in.
+        }
+    }
+}
+
+void Sequencer::onGlobalTempoChanged()
+{
+    if (!timeline || rebuildsSuspended) return;
+    // The clock offset is not ours to compute here: the standalone backends re-anchor
+    // through ITransport::reanchor (ObservableSong::reanchoringTempo calls it straight
+    // after this), and the plugin's DSP does it from the host frame in applyLoopState.
+    // Carry the current one through so this publication changes only the map.
+    retempoSnapshot(activeTempoMap(), secsOffsetSecs());
 }
 
 void Sequencer::endLoopMode(float resumeBar)
@@ -160,7 +184,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
     // cannot drift into markers further down the song. Song content always takes the
     // marker-bounded map, including the snapshot endLoopMode() parks while the clock
     // is still held: those markers are exactly what playback is about to need again.
-    newSnap.segs = loopMode ? timeline->tempoMap() : timeline->songTempoMap();
+    newSnap.segs = activeTempoMap();
 
     // Build per-track note data.
     auto buildNotes = [&](InstanceSnap& is, const Pattern* pat, int trackIdx, int trackInstrument) {

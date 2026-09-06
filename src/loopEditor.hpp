@@ -20,7 +20,8 @@
 // its pattern's own time signature and beat definition, so a song-level signature
 // here would change nothing about how the loops play. Both live in the pattern
 // editor's control bar; the song's own markers stay on the song editor's rulers.
-class LoopPanel : public Fl_Group, public ITimelineObserver {
+class LoopPanel : public Fl_Group, public ITimelineObserver,
+                  public IGlobalTempoObserver {
     ObservableSong* timeline  = nullptr;
     ITransport*     transport = nullptr;
 
@@ -45,6 +46,10 @@ public:
     // set — a song-editor marker, a mode switch, or playback crossing a marker.
     void syncBpm();
     void onTimelineChanged() override;
+    // The tempo channel: the register changed under us (the song editor, a mode
+    // switch, or this box's own commit). Cheaper and far quieter than riding on
+    // onTimelineChanged, which fires for every note edit in the project.
+    void onGlobalTempoChanged() override { syncBpm(); }
 };
 
 // 2D grid of pattern toggle buttons.

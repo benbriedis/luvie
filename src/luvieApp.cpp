@@ -120,6 +120,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     AppState state;
     if (!loadAppState(path, state)) return;
 
+    app->song_->resetGlobalTempo();   // a jam tempo is the session's, not this song's
     app->song_->loadTimeline(state.timeline);
     if (app->onApplyOutputs) app->onApplyOutputs(state);
     app->applyLoopState(state.loopMode, state.activeLoopPatterns);
@@ -649,6 +650,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Timeline observers ----
     song_->addObserver(&editorSwitcher_);
     song_->addObserver(&changeNotifier_);
+    song_->addTempoObserver(&tempoNotifier_);
 
     // Wire pattern panel to instrument observable
     if (patternPanel)
@@ -745,6 +747,7 @@ LuvieApp::~LuvieApp() {
     if (song_) {
         song_->removeObserver(&editorSwitcher_);
         song_->removeObserver(&changeNotifier_);
+        song_->removeTempoObserver(&tempoNotifier_);
     }
     loopMgr.removeObserver(&loopStateWatch);
 }

@@ -456,6 +456,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
         return;
     }
     ui->restoringState = true;
+    ui->song->resetGlobalTempo();   /* a jam tempo is the session's, not this song's */
     ui->song->loadTimeline(state.timeline);
     applyOverlayOutputs(ui, state);
     /* After the timeline: applyLoopState() gates sync() off for Loop Mode, and
@@ -598,14 +599,17 @@ static LV2UI_Handle instantiate(
     };
 
     ui->app.onExtraTimelineChange = [ui]() {
-        if (ui->restoringState) return;
-        sendState(ui);
-        /* The global tempo register is runtime state and rides in the loop atom, not
-           in the serialized Timeline sendState() writes — so without this a tempo
-           typed into the Loop Editor, or dropped by a seek, would never reach the
-           DSP's clock. sendLoopState() dedupes against lastLoopMsg, so the timeline
-           changes that leave the tempo alone cost nothing here. */
-        sendLoopState(ui);
+        if (!ui->restoringState) sendState(ui);
+    };
+
+    /* The global tempo register has its own channel precisely so it does NOT go
+       through sendState(): it is runtime state, absent from the serialized Timeline,
+       and re-sending the whole project for it would chunk the song across to the
+       worker and rebuild the DSP snapshot dozens of times a second while a BPM
+       spinner is dragged. The live loop atom carries it, and the DSP applies it as a
+       tempo-table swap. */
+    ui->app.onGlobalTempoChanged = [ui]() {
+        if (!ui->restoringState) sendLoopState(ui);
     };
 
     /* Transport is host-driven in plugin mode (the engine follows JACK transport),

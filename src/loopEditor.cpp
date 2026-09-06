@@ -61,12 +61,15 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
 
 LoopPanel::~LoopPanel()
 {
+    if (timeline) timeline->removeTempoObserver(this);
     swapObserver(timeline, nullptr, this);
 }
 
 void LoopPanel::setTimeline(ObservableSong* tl)
 {
+    if (timeline) timeline->removeTempoObserver(this);
     swapObserver(timeline, tl, this);
+    if (timeline) timeline->addTempoObserver(this);
     onTimelineChanged();
 }
 
@@ -110,8 +113,10 @@ void LoopPanel::syncBpm()
 
 void LoopPanel::onTimelineChanged()
 {
+    // syncBpm() redraws if and only if the displayed value actually moved. Nothing
+    // else on this strip depends on the timeline, so an unconditional redraw here
+    // would repaint the BPM box for every note edit in the project.
     syncBpm();
-    redraw();
 }
 
 void LoopPanel::draw()
@@ -243,7 +248,14 @@ void LoopEditor::timerCb(void* data)
     // Follows playback across tempo markers, and picks up a mode switch — the Loop
     // Mode tempo hold deliberately notifies nobody (ObservableSong::holdTempo).
     self->refreshPanel();
-    if (self->visible_r()) self->redraw();
+    // Damage only the cell area, never the whole widget. draw() ends in
+    // draw_children(), so a blanket redraw() here repainted the control strip too —
+    // the BPM spinner's text field rebuilt from scratch dozens of times a second,
+    // which is what made the box feel like it was fighting the user. Only the beat
+    // progress inside the pattern blocks animates, and it lives above the panel;
+    // FLTK clips to this box, so draw_children() skips the panel entirely.
+    if (self->visible_r())
+        self->damage(FL_DAMAGE_ALL, self->x(), self->y(), self->w(), self->gridAreaH());
 
     double interval = 0.1;
     if (self->transport && self->transport->isPlaying() && self->timeline) {
