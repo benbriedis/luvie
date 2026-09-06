@@ -44,7 +44,7 @@ See the screenshot above for an example. Note that this automation applies at a 
 
 To create a lane right-click on the track in the left hand column and choose 'Add automation'.
 
-TODO screenshot
+<img src="images/addAutomation.png" alt="Add automation menu" width="400">
 
 You can add dots on the rubberbands by clicking on it. You can click and drag them around, and you can delete them
 either by hovering over them and pressing delete or by right-clicking on them and using the menu option.
