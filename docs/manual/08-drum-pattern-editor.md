@@ -10,8 +10,8 @@ soloing and muting them.
 Notes are single hits lacking a sustain. They can be added and removed by single clicking, 
 and the velocity changed via a right-click.
 
-The names of individual drums can be modified by double clicking the labels in the left column.
-These will of course be saved in the project, but it is also possible to export a drum map for use in
+The names of individual drums can be modified by right clicking the labels in the left column.
+These names will of course be saved in the project, but it is also possible to export a drum map for use in
 other projects via the "Instruments and Overlays" window.
 
 The "Instruments and Overlays" window contains a few features to help populate the drum names.
