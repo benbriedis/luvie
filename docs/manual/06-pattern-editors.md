@@ -35,7 +35,7 @@ It's obscure terminology but don't blame me, I just work here.
 
 To change it right click on a note and adjust using the slider.
 
-TODO screenshot
+<img src="images/addVelocity.png" alt="Velocity control" width="400">
 
 ## Automation
 
