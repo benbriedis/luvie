@@ -77,16 +77,37 @@ protected:
     std::vector<RecordingNote> recNotes_;
 
     // Write one finished note into the pattern. `lenBeats` is the played duration,
-    // already wrapped and clamped to the pattern; editors that record on the
-    // note-on ignore it. Default does nothing, so an editor that cannot record
-    // silently accepts (and drops) anything sent its way.
+    // already clipped to the pattern; editors that record on the note-on ignore
+    // it. Default does nothing, so an editor that cannot record silently accepts
+    // (and drops) anything sent its way.
     virtual void commitRecordedNote(int /*pitch*/, float /*startBeat*/,
                                     float /*lenBeats*/, int /*velocity*/) {}
     // True for editors whose notes have no length (the drum editor), which are
     // written as soon as the key goes down rather than when it comes up.
     virtual bool recordsOnNoteOn() const { return false; }
-    // Pattern length in beats — the wrap point for a note held across the loop.
+    // Pattern length in beats — where a held note is clipped.
     int  recordPatternBeats() const { return gridNumCols(); }
+    // The Snap quantum in beats, from the panel's Div setting, or 0 when Snap is
+    // off. The same value the grids snap mouse edits to.
+    float snapBeats_ = 0.0f;
+    // `beat` rounded to the nearest division, or unchanged when Snap is off.
+    float quantiseBeat(float beat) const;
+    // Turns the beats a key went down and came up at — both pattern-relative and
+    // unrounded — into the note to write.
+    //
+    // With Snap on, start and end are each rounded to the nearest division, and a
+    // note too short to survive that rounding is given one division rather than
+    // disappearing. The raw beats, not the rounded ones, decide whether the
+    // pattern wrapped under the key, because rounding can collapse a genuinely
+    // short note onto the same answer as a key held for a whole pass.
+    //
+    // Either way the note is kept inside the pattern: if the pattern wrapped, or
+    // the key outlasted what was left, it is clipped at the end rather than
+    // wrapped round to the front. That is the rule the grid already applies to a
+    // note dragged or pasted past the end, and in a loop the alternative — a note
+    // reappearing at bar 1 with no key pressed — is not what was played.
+    void recordedNoteSpan(float rawStart, float rawEnd,
+                          float& startBeat, float& lenBeats) const;
 
     // onTimelineChanged skeleton hooks
     virtual void setGridPattern(int patId)    = 0;
@@ -108,7 +129,7 @@ public:
     ~BasePatternEditor();
 
     virtual void focusPattern() {}
-    virtual void setSnap(float s) { paramGrid.setSnap(s); }
+    virtual void setSnap(float s) { snapBeats_ = s; paramGrid.setSnap(s); }
     // Beat subdivisions (1 = None): drawn as faint grid lines, independent of snapping.
     virtual void setDivisions(int d) { (void)d; }
     // Zoom factor (1/2/4): scales column width from its x1 base; note minimum

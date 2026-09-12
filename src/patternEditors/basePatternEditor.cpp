@@ -6,6 +6,7 @@
 #include "luvieDebug.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
+#include <cmath>
 
 BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                                      int rowHeight, int colWidth, float snap, int lw)
@@ -18,6 +19,7 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
     rulerOffsetX = scrollbarW + lw;
     seekingEnabled = false;
     baseColWidth   = colWidth;
+    snapBeats_     = snap;
 
     const int gridH        = numRows * rowHeight;
     const int paramY       = y + rulerH + gridH;
@@ -128,10 +130,43 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
     if (!recUndo_) recUndo_.emplace(pattern->song());    // the take starts here
 
     if (recordsOnNoteOn()) {
-        commitRecordedNote(pitch, beat, 0.0f, velocity);
+        // No length to work out, but the start is quantised like any other.
+        float start = 0.0f, len = 0.0f;
+        recordedNoteSpan(beat, beat, start, len);
+        commitRecordedNote(pitch, start, len, velocity);
         return;
     }
     recNotes_.push_back({pitch, beat, velocity});
+}
+
+float BasePatternEditor::quantiseBeat(float beat) const
+{
+    if (snapBeats_ <= 0.0f) return beat;            // Snap off: play it as played
+    return std::round(beat / snapBeats_) * snapBeats_;
+}
+
+void BasePatternEditor::recordedNoteSpan(float rawStart, float rawEnd,
+                                         float& startBeat, float& lenBeats) const
+{
+    const float total = (float)recordPatternBeats();
+    const float q     = snapBeats_;
+
+    startBeat = quantiseBeat(rawStart);
+    // Rounding up can put the start on the end of the pattern, where no note
+    // fits; the last division is the nearest place it can actually go.
+    if (q > 0.0f) startBeat = std::clamp(startBeat, 0.0f, std::max(0.0f, total - q));
+
+    const float room = total - startBeat;   // what is left of the pattern
+    if (rawEnd < rawStart) {                // the pattern wrapped under the key
+        lenBeats = room;
+        return;
+    }
+
+    lenBeats = quantiseBeat(rawEnd) - startBeat;
+    // Start and end rounded to the same division: a note was played, so it gets
+    // the shortest one the grid can show rather than vanishing.
+    if (q > 0.0f && lenBeats < q) lenBeats = q;
+    if (lenBeats > room) lenBeats = room;
 }
 
 void BasePatternEditor::midiNoteOff(int pitch)
@@ -145,14 +180,9 @@ void BasePatternEditor::midiNoteOff(int pitch)
 
         const float end = playhead.patternBeat(playhead.transportBars());
         if (end >= 0.0f && pattern) {
-            // The pattern may have wrapped under a held key, putting the end
-            // before the start; one pattern length brings it back. A key held
-            // longer than the pattern is clamped rather than allowed to lap it.
-            const float total = (float)recordPatternBeats();
-            float len = end - n.startBeat;
-            if (len <= 0.0f) len += total;
-            if (len > total)  len = total;
-            commitRecordedNote(n.pitch, n.startBeat, len, n.velocity);
+            float start = 0.0f, len = 0.0f;
+            recordedNoteSpan(n.startBeat, end, start, len);
+            commitRecordedNote(n.pitch, start, len, n.velocity);
         }
         break;   // one note-off releases one note-on
     }
@@ -170,11 +200,9 @@ void BasePatternEditor::releaseMidiNotes()
             if (!pattern) continue;
             const float end = playhead.patternBeat(playhead.transportBars());
             if (end < 0.0f) continue;
-            const float total = (float)recordPatternBeats();
-            float len = end - n.startBeat;
-            if (len <= 0.0f) len += total;
-            if (len > total)  len = total;
-            commitRecordedNote(n.pitch, n.startBeat, len, n.velocity);
+            float start = 0.0f, len = 0.0f;
+            recordedNoteSpan(n.startBeat, end, start, len);
+            commitRecordedNote(n.pitch, start, len, n.velocity);
         }
     }
     recUndo_.reset();   // the take is closed; the next one gets its own undo entry

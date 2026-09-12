@@ -26,7 +26,9 @@ You can change the length of a note by clicking the left or right hand side of i
 dragging.
 
 Let's say you want your notes to be longer or shorter... change the 'Div' setting in the
-timing panel, or click on 'Snap' to disable it.
+timing panel, or click on 'Snap' to disable it. The same two settings quantise notes
+played in from a MIDI keyboard — see
+[Recording from a MIDI keyboard](#recording-from-a-midi-keyboard) below.
 
 ## Velocity
 
@@ -104,9 +106,17 @@ your place, and start when you are ready.
 
 What gets recorded:
 
-- **Notes go where you played them.** There is no quantisation: a note starts
-  where the playhead was and lasts as long as you held the key. In the drum
-  editor the length is ignored, because drum notes do not have one.
+- **Snap quantises what you play.** With **Snap** on, the start and end of each
+  note are rounded to the nearest division — the same **Div** setting that
+  positions notes you add with the mouse. A note too short to survive the
+  rounding is given one division rather than disappearing. Turn Snap off and
+  notes are written exactly where you played them, for as long as you held the
+  key. In the drum editor only the start is quantised, because drum notes have
+  no length.
+- **Notes stop at the end of the pattern.** Hold a key past the last beat — over
+  a loop's turnaround, say — and the note ends there rather than running past it
+  or reappearing at the start. Let go and press again on the next pass to record
+  the note a second time.
 - **Recording adds, never replaces.** Playing over a part that already has notes
   leaves them alone, so you can build a part up in several passes.
 - **A whole pass is one undo.** However many notes a take contains, one Ctrl+Z

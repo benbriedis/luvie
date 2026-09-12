@@ -504,7 +504,7 @@ void PatternPanel::initTimeControls()
     ds.snapBtn.labelcolor(panelText);
     ds.snapBtn.setBorderWidth(1);
     ds.snapBtn.setBorderColor(panelCtrlBorder);
-    ds.snapBtn.tooltip("Snap new notes and resized edges to the divisions");
+    ds.snapBtn.tooltip("Snap new notes, resized edges and recorded notes to the divisions");
     ds.snapBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
         auto& ds   = self->timeControls.divSec;

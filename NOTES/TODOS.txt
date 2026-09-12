@@ -420,3 +420,14 @@ TO MAKE THIS A GREAT COMPOSITION TOOL STILL WANT
 4. EXTRA: tool to move from pianoroll to harmony.
 5. EXTRA: scenes and triggers to move between them.
 6. EXTRA: metronome - visual and auditory.
+
+overdub /replace toggle
+record automation points
+
+
+CHECK if Jack is used as an input and Jack is not active create an alert
+
+Record button: should be a circle
+
+Where is my multi-select in LV2... not seeing it
+
