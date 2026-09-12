@@ -175,6 +175,11 @@ int main(int argc, char** argv) {
     float    resumeBar     = 0.0f;
     int      relocateCycle = -1;
     int      cycles        = 0;      // 0 = default, see below
+    int      midiInNote    = -1;     // --midi-in: pitch fed to the plugin on cycle 1
+    // --midi-in-ctrl: deliver that note on control_in instead of midi_in, the way
+    // Ardour and Carla route MIDI (to the plugin's first atom input).
+    bool     midiInOnControl = false;
+    bool     midiInOnBoth    = false;   // --midi-in-both: send it on both ports
     bool     restate       = false;
     bool     songLoop      = false;
     float    songLoopStart = 0.0f, songLoopEnd = 0.0f;
@@ -188,6 +193,9 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--worker-delay") && i + 1 < argc) g_workerDelay = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--restate")) restate = true;
         else if (!strcmp(argv[i], "--cycles") && i + 1 < argc) cycles = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--midi-in") && i + 1 < argc) midiInNote = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--midi-in-ctrl")) midiInOnControl = true;
+        else if (!strcmp(argv[i], "--midi-in-both")) midiInOnBoth = true;
         else if (!strcmp(argv[i], "--song-loop") && i + 2 < argc) {
             songLoopStart = (float)atof(argv[++i]);
             songLoopEnd   = (float)atof(argv[++i]);
@@ -195,6 +203,7 @@ int main(int argc, char** argv) {
         }
     }
     if (chunkBytes == 0) chunkBytes = 1;
+
 
     // Port buffers: control_in (0) and every MIDI output (1 .. LUVIE_NUM_MIDI_OUTS).
     // control_in is sized to hold every chunk atom this harness emits in cycle 0 (a
@@ -204,9 +213,13 @@ int main(int argc, char** argv) {
     std::vector<uint8_t> ctrlBuf(json.size() + numChunks * perChunk + 8192);
     std::vector<std::vector<uint8_t>> midiBuf(LUVIE_NUM_MIDI_OUTS,
                                               std::vector<uint8_t>(8192));
+    // The MIDI input. --midi-in <note> plays that note into the plugin on cycle 1,
+    // which is enough to see the relay to out1 as a luvie_midi_in atom.
+    std::vector<uint8_t> midiInBuf(8192);
     d->connect_port(inst, 0, ctrlBuf.data());
     for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
         d->connect_port(inst, (uint32_t)(PORT_OUT + o), midiBuf[o].data());
+    d->connect_port(inst, (uint32_t)PORT_MIDI_IN, midiInBuf.data());
 
     if (d->activate) d->activate(inst);
 
@@ -221,11 +234,14 @@ int main(int argc, char** argv) {
     LV2_URID uBeat  = map_uri(nullptr, LV2_TIME__barBeat);
     LV2_URID uBpb   = map_uri(nullptr, LV2_TIME__beatsPerBar);
     LV2_URID uMidi  = map_uri(nullptr, LV2_MIDI__MidiEvent);
+    LV2_URID uMidiIn = map_uri(nullptr, "https://github.com/benbriedis/luvie#MidiIn");
+    LV2_URID uMidiBytes = map_uri(nullptr, "https://github.com/benbriedis/luvie#midiBytes");
     LV2_URID uState = map_uri(nullptr, LUVIE_STATE_URI);
     LV2_URID uLoop  = map_uri(nullptr, LUVIE_LOOP_URI);
 
     int64_t frame = 0;
     int totalEmitted = 0;
+    int totalMidiInRelayed = 0;   // luvie_midi_in atoms seen coming back out
     int totalResets  = 0;   // CC 121 / CC 123: the signature of a transport relocate
     int perPort[LUVIE_NUM_MIDI_OUTS] = {};
     // ~5.3 s at 256 frames / 48 kHz; --cycles runs longer, e.g. to watch a song loop
@@ -293,7 +309,31 @@ int main(int argc, char** argv) {
             lv2_atom_forge_float(&forge, 1.0f);
             lv2_atom_forge_pop(&forge, &objF);
         }
+        if (midiInNote >= 0 && (midiInOnControl || midiInOnBoth) && c == 1) {
+            const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
+            lv2_atom_forge_frame_time(&forge, 0);
+            lv2_atom_forge_atom(&forge, 3, uMidi);
+            lv2_atom_forge_write(&forge, note, 3);
+        }
         lv2_atom_forge_pop(&forge, &seqF);
+
+        // MIDI input: a host writes a sequence here every cycle, empty or not.
+        {
+            LV2_Atom_Sequence* mi = (LV2_Atom_Sequence*)midiInBuf.data();
+            LV2_Atom_Forge inForge;
+            lv2_atom_forge_init(&inForge, &map);
+            lv2_atom_forge_set_buffer(&inForge, midiInBuf.data(), midiInBuf.size());
+            LV2_Atom_Forge_Frame inF;
+            lv2_atom_forge_sequence_head(&inForge, &inF, 0);
+            if (midiInNote >= 0 && (!midiInOnControl || midiInOnBoth) && c == 1) {
+                const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
+                lv2_atom_forge_frame_time(&inForge, 0);
+                lv2_atom_forge_atom(&inForge, 3, uMidi);
+                lv2_atom_forge_write(&inForge, note, 3);
+            }
+            lv2_atom_forge_pop(&inForge, &inF);
+            mi->atom.type = uSeq;
+        }
 
         // Output ports: host sets capacity in atom.size before run().
         for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
@@ -312,6 +352,13 @@ int main(int argc, char** argv) {
         for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
             LV2_Atom_Sequence* mo = (LV2_Atom_Sequence*)midiBuf[o].data();
             LV2_ATOM_SEQUENCE_FOREACH(mo, ev) {
+                if (getenv("LUVIE_DUMP_ATOMS") && o == 0)
+                    printf("    [dump] out0 atom type=%u size=%u otype=%u "
+                           "(uObj=%u uMidi=%u uMidiIn=%u)\n",
+                           ev->body.type, ev->body.size,
+                           ev->body.type == uObj
+                               ? ((const LV2_Atom_Object*)&ev->body)->body.otype : 0u,
+                           uObj, uMidi, uMidiIn);
                 if (ev->body.type == uMidi) {
                     const uint8_t* m = (const uint8_t*)(ev + 1);
                     if (ev->body.size >= 2 && (m[0] & 0xF0) == 0xB0 &&
@@ -323,6 +370,20 @@ int main(int argc, char** argv) {
                     printf("\n");
                     totalEmitted++;
                     perPort[o]++;
+                } else if (ev->body.type == uObj &&
+                           ((const LV2_Atom_Object*)&ev->body)->body.otype == uMidiIn) {
+                    /* The relay: an Object carrying the bytes as a chunk. */
+                    const LV2_Atom_Object* mo = (const LV2_Atom_Object*)&ev->body;
+                    const LV2_Atom* bytes = nullptr;
+                    lv2_atom_object_get(mo, uMidiBytes, &bytes, 0);
+                    printf("cycle %d frame %ld @%ld out%d: MIDI-IN relay ",
+                           c, (long)frame, (long)ev->time.frames, o + 1);
+                    if (bytes) {
+                        const uint8_t* m = (const uint8_t*)LV2_ATOM_BODY_CONST(bytes);
+                        for (uint32_t i = 0; i < bytes->size; i++) printf("%02X ", m[i]);
+                    } else printf("(no bytes!)");
+                    printf("\n");
+                    totalMidiInRelayed++;
                 } else if (ev->body.type == uObj) {
                     posThisCycle++;
                     // The Position the DSP authors for the UI playhead. Decoding it
@@ -350,6 +411,8 @@ int main(int argc, char** argv) {
     }
 
     printf("TOTAL MIDI events emitted: %d\n", totalEmitted);
+    if (midiInNote >= 0)
+        printf("TOTAL MIDI-IN atoms relayed to the UI: %d\n", totalMidiInRelayed);
     printf("Reset All Controllers / All Notes Off messages: %d\n", totalResets);
     for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
         if (perPort[o]) printf("  midi_out %d: %d events\n", o + 1, perPort[o]);

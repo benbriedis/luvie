@@ -57,6 +57,8 @@ FUTURE FUNCTIONALITY
 
 - Pianoroll and drum patterns - should support recording of patterns... (inc parameter changes)
 
+- Allow multiple MIDI inputs.
+
 - cf Is pitch randomisation possible for drums?
 
 - Maybe add some "basic backups" - see DESIGN_DECISIONS.txt
@@ -377,6 +379,9 @@ BUG: clicking a dragging two blocks in a collapsed track can be dragged into a s
 Check out Entropictron
 
 
+Re DISTRO: Ubuntu seems to be favouring Snap for apps like Ardour now.
+   Maybe should use that instead - probably works for other distros etc too.
+
 TAG distro
 
 CAN always use luvie --test for soundless experience.
@@ -398,3 +403,20 @@ BUG: There's may be a sample or two off on looping when in song mode...
 	 I have had Claude look at it.
    (probably since fix to song looping)
 
+
+TO MAKE THIS A GREAT COMPOSITION TOOL STILL WANT 
+================================================
+1. Ability to record (1 MIDI input is fine for the moment)
+   DONE: one MIDI input (Jack/Native/Plugin + channel) in Instruments and I/O,
+   routed to the open pattern editor, with a Record toggle on the pianoroll and
+   drum control rows. Plays what arrives, and records it when armed and rolling.
+   Still open: quantisation (notes keep the length played), parameter/automation
+   recording, a replace mode (it only overdubs), recording into the harmony
+   editor, and item 2 below - a take cannot grow the pattern.
+2. Indefinite length patterns - autogrow when recording (or adding notes...
+    similar rule to Song Editor?). Will want zoom and location tools...
+	don't necessary ALWAYS need them.
+3. Ability to copy and paste between patterns of like type.
+4. EXTRA: tool to move from pianoroll to harmony.
+5. EXTRA: scenes and triggers to move between them.
+6. EXTRA: metronome - visual and auditory.

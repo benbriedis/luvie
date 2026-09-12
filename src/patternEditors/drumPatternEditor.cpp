@@ -381,3 +381,13 @@ int DrumPatternEditor::handle(int event)
     }
     return Editor::handle(event);
 }
+
+// Overdub only, and written on the note-on: a drum note has no length, so
+// lenBeats is not used. No quantisation — the beat is where the key landed.
+void DrumPatternEditor::commitRecordedNote(int pitch, float startBeat, float /*lenBeats*/,
+                                           int velocity)
+{
+    if (!pattern || lastPatId < 0) return;
+    if (pitch < 0 || pitch > 127) return;
+    pattern->addDrumNote(lastPatId, pitch, startBeat, velocity / 127.0f);
+}

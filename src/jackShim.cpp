@@ -101,6 +101,8 @@ struct JackFns {
     decltype(&jack_transport_query)      transport_query      = nullptr;
     decltype(&jack_midi_clear_buffer)    midi_clear_buffer    = nullptr;
     decltype(&jack_midi_event_write)     midi_event_write     = nullptr;
+    decltype(&jack_midi_get_event_count) midi_get_event_count = nullptr;
+    decltype(&jack_midi_event_get)       midi_event_get       = nullptr;
 };
 
 JackFns   g;
@@ -138,6 +140,8 @@ bool ensureLoaded() {
     LV_LOAD(transport_query,      jack_transport_query);
     LV_LOAD(midi_clear_buffer,    jack_midi_clear_buffer);
     LV_LOAD(midi_event_write,     jack_midi_event_write);
+    LV_LOAD(midi_get_event_count, jack_midi_get_event_count);
+    LV_LOAD(midi_event_get,       jack_midi_event_get);
     #undef LV_LOAD
     return true;
 }
@@ -254,6 +258,16 @@ int jack_midi_event_write(void* port_buffer, jack_nframes_t time,
                           const jack_midi_data_t* data, size_t data_size) {
     if (!ensureLoaded() || !g.midi_event_write) return -1;
     return g.midi_event_write(port_buffer, time, data, data_size);
+}
+
+uint32_t jack_midi_get_event_count(void* port_buffer) {
+    if (!ensureLoaded() || !g.midi_get_event_count) return 0;
+    return g.midi_get_event_count(port_buffer);
+}
+
+int jack_midi_event_get(jack_midi_event_t* event, void* port_buffer, uint32_t event_index) {
+    if (!ensureLoaded() || !g.midi_event_get) return -1;
+    return g.midi_event_get(event, port_buffer, event_index);
 }
 
 } // extern "C"

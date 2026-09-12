@@ -34,7 +34,10 @@
 enum {
     PORT_CONTROL_IN = 0,
     PORT_OUT        = 1,   /* .. PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1 */
-    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1
+    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1,
+    /* The MIDI input, deliberately last: appending it leaves every existing port
+       index untouched, so sessions saved before it existed still connect. */
+    PORT_MIDI_IN    = PORT_OUT_LAST + 1
 };
 
 /* The UI sends the project JSON to control_in as one or more `luvie_state` atoms.
@@ -138,6 +141,8 @@ typedef struct {
     LV2_URID atom_Chunk;
     LV2_URID luvie_state;         /* full JSON state blob */
     LV2_URID luvie_midi;          /* one-shot audition MIDI (raw bytes), UI -> DSP */
+    LV2_URID luvie_midi_in;       /* otype of the DSP -> UI "host sent us MIDI" object */
+    LV2_URID luvie_midi_bytes;    /* its one property: the raw MIDI bytes */
     LV2_URID luvie_loop;          /* loop mode + active loop set, UI -> DSP */
     LV2_URID state_StateChanged;  /* notify host that state is dirty */
 } URIs;

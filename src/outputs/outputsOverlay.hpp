@@ -22,6 +22,11 @@ class OutputsOverlay : public OverlayWindow {
     ModernButton* addInstrBtn     = nullptr;
     ModernButton* addDrumInstrBtn = nullptr;
     Fl_Choice*    defaultTypeChoice = nullptr;  // "Default port type" for new ports
+    // The MIDI Input section. One input for now, so unlike the port and instrument
+    // sections this is a fixed single row: the widgets are built once in the ctor
+    // and only repositioned afterwards, never torn down and rebuilt.
+    Fl_Choice*    midiInTypeChoice  = nullptr;
+    Fl_Choice*    midiInChanChoice  = nullptr;
 
     int nextPortId_ = 1;
     // True when hosted as an LV2 plugin. Decides which backends the port dropdowns
@@ -29,6 +34,8 @@ class OutputsOverlay : public OverlayWindow {
     // moved between standalone and plugin still shows what it was set to.
     bool pluginMode_ = false;
     MidiBackend defaultBackend_ = MidiBackend::Jack;  // type assigned to newly added ports
+    MidiBackend midiInBackend_  = MidiBackend::Jack;  // the MIDI input's type
+    int         midiInChannel_  = 0;                  // 0 = Any; 1-16 = that channel
     ObservableInstrument* instrObs_ = nullptr;
 
     // ── Port data ──────────────────────────────────────────────────────────────
@@ -95,10 +102,14 @@ class OutputsOverlay : public OverlayWindow {
     int instrRowsTopY_    = 0;
     int instrNameW_       = 0;
     int instrPortW_       = 0;
+    int midiInSectionTopY_ = 0;
 
     void rebuildRows();
     void rebuildInstrumentRows();
     void rebuildPortChoices();
+    // Places the MIDI Input row under the instrument section and returns the Y
+    // just past it, so the caller can size the scroll extent to include it.
+    int  layoutMidiInputRow(int y);
     void syncFromInputs();
 
     // What a port is shown as. Hosted, a Plugin-backed port is displayed as the LV2
@@ -127,6 +138,8 @@ class OutputsOverlay : public OverlayWindow {
     static void inputCb            (Fl_Widget*, void*);
     static void backendChoiceCb    (Fl_Widget*, void*);
     static void defaultTypeChoiceCb(Fl_Widget*, void*);
+    static void midiInTypeCb    (Fl_Widget*, void*);
+    static void midiInChanCb    (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
     static void instrNameCb     (Fl_Widget*, void*);
     static void instrDeleteCb   (Fl_Widget*, void*);
@@ -166,6 +179,10 @@ public:
     // Show/hide the red "JACK server not running" warning under the title.
     void setJackWarning(bool show);
 
+    // MIDI input API (the single input at the bottom of the window).
+    void      setMidiInput(const MidiInput& in);
+    MidiInput getMidiInput() const;
+
     // Instrument API
     struct InstrumentInfo {
         int         id;
@@ -190,6 +207,9 @@ public:
     std::function<void(const std::string& oldName, const std::string& newName)> onPortRenamed;
     // Fired when any port's backend (Jack/Native/Debug) changes; main re-syncs the port set.
     std::function<void()>                                                       onPortBackendChanged;
+    // Fired when the MIDI input's type or channel changes; the owner reopens the
+    // underlying port to match.
+    std::function<void()>                                                       onMidiInputChanged;
 
     // Fired whenever the instruments list or any instrument's fields change.
     std::function<void()> onInstrumentsChanged;

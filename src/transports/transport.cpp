@@ -268,7 +268,7 @@ void Transport::syncPlayState()
 {
 	bool playing = transport && transport->isPlaying();
 	if (playing != lastPlayingState) {
-		lastPlayingState = playing;
+		setPlayingState(playing);
 		playPauseBtn->setAlt(playing);
 		playPauseBtn->redraw();
 		if (playing)
@@ -371,7 +371,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		else
 			ct->rewind();
 		t->stoppedAtEnd     = false;
-		t->lastPlayingState = false;
+		t->setPlayingState(false);
 		t->playPauseBtn->setAlt(false);
 		t->playPauseBtn->redraw();
 		if (t->onRewind) t->onRewind();
@@ -386,7 +386,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		if (!ct) return;
 		if (t->transport->isPlaying()) {
 			ct->pause();
-			t->lastPlayingState = false;
+			t->setPlayingState(false);
 			btn->setAlt(false);
 		} else {
 			if (t->stoppedAtEnd) {
@@ -394,7 +394,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 				t->stoppedAtEnd = false;
 			}
 			ct->play();
-			t->lastPlayingState = true;
+			t->setPlayingState(true);
 			btn->setAlt(true);
 		}
 		btn->redraw();

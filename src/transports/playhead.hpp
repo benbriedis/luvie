@@ -122,6 +122,14 @@ public:
 	// gets there just as the engine switches. Clearing it returns to Live.
 	void setHandoff(bool on, float offsetBars = 0.0f);
 	void setPatternTrack(int track) { patternTrack = track; }
+	// Pattern-local beat for a transport position, or -1 when the pattern is not
+	// running (see the definition). Recording asks this where to put a note, so it
+	// and the drawn playhead can never disagree.
+	float patternBeat(float bars) const;
+	// The live transport position, as patternBeat() wants it.
+	float transportBars() const { return livePosition(); }
+	// Is the transport rolling? Recording asks before writing anything.
+	bool  transportPlaying() const { return transport && transport->isPlaying(); }
 	void setNumCols(int n)        { numCols = n; }
 	void setColWidth(int cw)      { colWidth = cw; }
 

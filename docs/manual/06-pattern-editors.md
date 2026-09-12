@@ -85,3 +85,36 @@ The next control determines the number of bars in the pattern.
 The next control declares how many parts to divide each beat into. This determines the granularity to to use when 
 adding and resizing notes. It is possible to go free-form by deselecting the 'Snap' control.
   
+
+## Recording from a MIDI keyboard
+
+The **Record** toggle at the right-hand end of the control row arms recording. It
+appears for the pianoroll and drum editors; the harmony editor has no Record
+toggle, because its rows are chord degrees rather than pitches and there is no
+reliable way to turn a played note back into one.
+
+Set the MIDI input up first — see
+[MIDI input, output and instruments](03-outputs.md). Once a keyboard is
+connected, playing it sounds the open pattern's instrument whether or not you are
+recording, so you can try things out before committing to them.
+
+Notes are written only when **Record is armed *and* the transport is running**.
+Nothing is recorded while playback is stopped, so you can arm the toggle, find
+your place, and start when you are ready.
+
+What gets recorded:
+
+- **Notes go where you played them.** There is no quantisation: a note starts
+  where the playhead was and lasts as long as you held the key. In the drum
+  editor the length is ignored, because drum notes do not have one.
+- **Recording adds, never replaces.** Playing over a part that already has notes
+  leaves them alone, so you can build a part up in several passes.
+- **A whole pass is one undo.** However many notes a take contains, one Ctrl+Z
+  removes all of them. A take ends when you disarm the toggle, stop the
+  transport, or leave the editor — the next one is its own undo entry.
+
+The toggle stays armed between takes, so stopping and starting the transport
+records again without re-arming. It disarms itself when you leave the editor:
+switching to the Song or Loop tab, or selecting a pattern of another type. A key
+still held down when that happens is written with the length it reached rather
+than being lost.

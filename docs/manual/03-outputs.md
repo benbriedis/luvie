@@ -1,11 +1,11 @@
-# MIDI output and instruments
+# MIDI input, output and instruments
 
 [← Getting started](02-basics.md) · [Contents](README.md) · [The song editor →](04-song-editor.md)
 
-The gear icon at the top right of the window opens the **Instruments & Outputs**
+The gear icon at the top right of the window opens the **Instruments and I/O**
 dialog, where everything in this chapter is set up:
 
-<img src="images/settings.png" alt="The Instruments and Outputs dialog" width="800">
+<img src="images/settings.png" alt="The Instruments and I/O dialog" width="800">
 
 ## MIDI Output ports and channels
 
@@ -76,3 +76,37 @@ instance — and for those, none of this needs touching.
 
 TODO: naming drum instruments and reusing a kit across patterns.
 Cross-reference [The drum pattern editor](08-drum-pattern-editor.md).
+
+## MIDI input
+
+At the bottom of the window is the MIDI input. There is exactly one, and it has
+two settings:
+
+**Type** — where the input comes from, on the same terms as the output ports, so
+only the ones this mode can actually use are offered:
+
+- **Standalone**: Jack and Native. Plugin is greyed out.
+- **As an LV2 plugin**: Plugin only. Jack and Native are greyed out — the host
+  owns the connection. Luvie accepts the host's MIDI on either of its two atom
+  inputs, *MIDI In* or *Control In*, because hosts disagree about which one a
+  plugin's MIDI belongs on: Ardour and Carla send it to the first atom input
+  (*Control In*), others use the dedicated port. Whichever your host picks, the
+  notes arrive, and if it sends to both you still get one copy of each.
+
+There is no Debug type here: Debug is a place to send MIDI to, not somewhere it
+can come from. As with the output ports the setting is kept even when this mode
+cannot use it, so moving a project between the standalone app and a host does
+not lose it.
+
+**MIDI channel** — which channel to listen on. The default, **Any**, accepts
+everything, which is what you want for a single keyboard. Set it to 1-16 to
+ignore everything else, which is useful when a controller sends on several
+channels at once, or when something else is sharing the port.
+
+The Jack and Native inputs both appear to the outside world as a port named
+`midi_in`, which is what you connect your keyboard to — `midi_in` in a JACK
+patchbay, or `luvie:midi_in` in an ALSA one.
+
+Incoming notes go to whichever pattern editor is open, and are played on that
+pattern's instrument so you hear what you are playing. Recording them is
+described in [The pattern editors](06-pattern-editors.md).

@@ -147,3 +147,13 @@ void PianorollEditor::setGridPattern(int patId)
         }
     }
 }
+
+// Overdub only: the note is added, never replacing whatever is already there.
+// No quantisation — startBeat and lenBeats are exactly what was played.
+void PianorollEditor::commitRecordedNote(int pitch, float startBeat, float lenBeats,
+                                         int velocity)
+{
+    if (!pattern || lastPatId < 0) return;
+    if (lenBeats <= 0.0f) return;
+    pattern->addNote(lastPatId, startBeat, pitch, lenBeats, velocity / 127.0f);
+}

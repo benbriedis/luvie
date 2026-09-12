@@ -41,10 +41,13 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "pluginPorts.hpp"
 #include "patternPanel.hpp"
 #include "luvieApp.hpp"
+#include "luvieDebug.hpp"
 #include "timelineIO.hpp"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
+#define LUVIE_MIDI_IN_URI "https://github.com/benbriedis/luvie#MidiIn"
+#define LUVIE_MIDI_BYTES_URI "https://github.com/benbriedis/luvie#midiBytes"
 #define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
 
 /* File used to pass state between DSP restore and UI open, and between UI sessions */
@@ -119,6 +122,8 @@ struct LuvieUI {
     LV2_URID                atom_eventTransfer  = 0;
     LV2_URID                luvie_state_urid    = 0;
     LV2_URID                luvie_midi_urid     = 0;
+    LV2_URID                luvie_midi_in_urid  = 0;
+    LV2_URID                luvie_midi_bytes_urid = 0;
     LV2_URID                luvie_loop_urid     = 0;
     LV2_URID                atom_Object         = 0;
     LV2_URID                atom_Blank          = 0;
@@ -217,6 +222,7 @@ static void collectOverlayOutputs(LuvieUI* ui, AppState& state)
     if (!overlay) return;
     state.defaultPortBackend = overlay->getDefaultBackend();
     state.jackOutputs        = overlay->getOutputsFull();  // names + backends
+    state.midiInput          = overlay->getMidiInput();
     state.jackInstruments.clear();
     for (const auto& ci : overlay->getInstruments())
         state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
@@ -240,6 +246,11 @@ static void applyOverlayOutputs(LuvieUI* ui, const AppState& state)
                           c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                           c.gm1Instrument});
     overlay->setInstruments(instrs);
+    // Hosted, nothing is opened for the input — the host owns the connection and
+    // port_event feeds the sink — but the setting still round-trips, so a project
+    // taken back to the standalone app keeps the type and channel it was given.
+    overlay->setMidiInput(state.midiInput);
+    ui->app.midiIn.apply(overlay->getMidiInput(), nullptr);
     ui->app.pushInstruments();
 }
 
@@ -555,6 +566,8 @@ static LV2UI_Handle instantiate(
         ui->atom_eventTransfer  = m(LV2_ATOM__eventTransfer);
         ui->luvie_state_urid    = m(LUVIE_STATE_URI);
         ui->luvie_midi_urid     = m(LUVIE_MIDI_URI);
+        ui->luvie_midi_in_urid  = m(LUVIE_MIDI_IN_URI);
+        ui->luvie_midi_bytes_urid = m(LUVIE_MIDI_BYTES_URI);
         ui->luvie_loop_urid     = m(LUVIE_LOOP_URI);
         ui->atom_Object         = m(LV2_ATOM__Object);
         ui->atom_Blank          = m(LV2_ATOM__Blank);
@@ -721,6 +734,17 @@ static LV2UI_Handle instantiate(
            its routing from the project state, so every change just re-sends the
            current state atom. */
         overlay->setDefaultBackend(MidiBackend::Plugin);
+        /* Same reasoning for the input: Plugin is the only type that works here,
+           and it is the one that opens no local resource. */
+        overlay->setMidiInput({MidiBackend::Plugin, overlay->getMidiInput().channel});
+        /* apply() opens nothing for Plugin, but it is still what carries the
+           channel filter into the manager, so injectFromHost() honours it. */
+        ui->app.midiIn.apply(overlay->getMidiInput(), nullptr);
+        overlay->onMidiInputChanged = [ui]() {
+            if (auto* ov = ui->app.outputsOverlay)
+                ui->app.midiIn.apply(ov->getMidiInput(), nullptr);
+            if (!ui->restoringState) sendState(ui);
+        };
         overlay->onPortAdded   = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };
         overlay->onPortRemoved = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };
         overlay->onPortRenamed = [ui](const std::string&, const std::string&) { if (!ui->restoringState) sendState(ui); };
@@ -802,15 +826,30 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
     const LV2_Atom* atom = static_cast<const LV2_Atom*>(buffer);
 
     /* The single output port carries time:Position (for the playhead), the MIDI
-       events going to the instrument, and state:StateChanged (for the host). Only
-       the Position concerns the UI; MIDI and StateChanged atoms fall through the
-       type checks below and are ignored. */
-    if ((atom->type != ui->atom_Object && atom->type != ui->atom_Blank) ||
-        !ui->simpleTransport)
+       events going to the instrument, state:StateChanged (for the host), and our
+       own relay of whatever MIDI the host sent the plugin. Only the last two
+       concern the UI; MIDI and StateChanged atoms fall through and are ignored. */
+    if (atom->type != ui->atom_Object && atom->type != ui->atom_Blank)
         return;
 
     const LV2_Atom_Object* obj = reinterpret_cast<const LV2_Atom_Object*>(atom);
-    if (obj->body.otype != ui->time_Position)
+
+    /* MIDI the DSP received from the host and passed on. This is the plugin-mode
+       equivalent of MidiInputManager's Jack/Native callbacks, except that it is
+       already on the UI thread, so it goes straight to the sink with no ring. */
+    if (obj->body.otype == ui->luvie_midi_in_urid) {
+        const LV2_Atom* bytes = nullptr;
+        lv2_atom_object_get(obj, ui->luvie_midi_bytes_urid, &bytes, 0);
+        if (!bytes || bytes->size < 1) return;
+        const uint8_t* msg = static_cast<const uint8_t*>(LV2_ATOM_BODY_CONST(bytes));
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] ui got midi_in relay: %02X %02X (size %u)\n",
+                    msg[0], bytes->size > 1 ? msg[1] : 0, bytes->size);
+        ui->app.midiIn.injectFromHost(msg, static_cast<int>(bytes->size));
+        return;
+    }
+
+    if (!ui->simpleTransport || obj->body.otype != ui->time_Position)
         return;
 
     const LV2_Atom_Long*  aBar   = nullptr;

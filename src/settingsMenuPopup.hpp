@@ -35,7 +35,7 @@ public:
         auto* importBtn   = addItem(1, "Import");
         auto* exportBtn   = addItem(2, "Export");
         auto* transportBtn= addItem(3, "Transport");
-        auto* outputsBtn  = addItem(4, "Instruments & Outputs");
+        auto* outputsBtn  = addItem(4, "Instruments and I/O");
 
         // Separate the file items (Save As/Import/Export) from the view items
         // (Transport/Outputs), as the old menu's divider did: nudge the view

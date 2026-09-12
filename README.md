@@ -43,10 +43,10 @@ Launch and stop patterns live without touching the song arrangement.
 
 <img src="screenshots/loopEditor.png" alt="Luvie loop editor" width="700">
 
-### Instruments &amp; Outputs
-Define MIDI output ports and map instruments and drumkits onto them.
+### Instruments and I/O
+Define MIDI output ports and the MIDI input, and map instruments and drumkits onto them.
 
-<img src="screenshots/settings.png" alt="Luvie instruments and outputs settings" width="700">
+<img src="screenshots/settings.png" alt="Luvie instruments and I/O settings" width="700">
 
 # Dependencies
 JACK is optional, but desirable.

@@ -65,8 +65,13 @@ private:
 
     void setGridPattern(int patId) override;
 
+    // Recording. The pianoroll maps straight off the wire: a MIDI pitch is a
+    // pitch, and the note keeps the length it was played for.
+    void commitRecordedNote(int pitch, float startBeat, float lenBeats, int velocity) override;
+
 public:
     void focusPattern() override;
+    bool canRecord() const override { return true; }
     void setSnap(float s) override { grid.setSnap(s); BasePatternEditor::setSnap(s); }
     void setDivisions(int d) override { grid.setDivisions(d); }
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,

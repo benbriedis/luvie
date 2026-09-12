@@ -21,6 +21,7 @@ add_library(luvie_core STATIC
     outputs/outputsOverlay.cpp paramDotPopup.cpp patternEditors/patternParamGrid.cpp
     outputs/jackPort.cpp
     outputs/rtMidiPort.cpp outputs/debugPort.cpp outputs/portRegistry.cpp jackShim.cpp
+    outputs/midiInPort.cpp
     patternEditors/noteAuditioner.cpp
     session/standaloneSession.cpp session/nsmSession.cpp
 )

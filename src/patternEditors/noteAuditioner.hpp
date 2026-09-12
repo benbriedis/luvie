@@ -33,6 +33,12 @@ public:
     // Note-on to the instrument's port now; note-off after `seconds`.
     void play(int instrumentId, int midi, int velocity, float seconds);
 
+    // Held notes, for MIDI input: the length is the player's, not a timeout's, so
+    // these come in pairs rather than as one timed play(). A noteOn without its
+    // noteOff is released by the destructor, as a timed one would be.
+    void noteOn (int instrumentId, int midi, int velocity);
+    void noteOff(int instrumentId, int midi);
+
 private:
     struct Pending { NoteAuditioner* self; std::string portName; int channel; int pitch; };
     static void offCb(void* data);
@@ -42,6 +48,10 @@ private:
     std::function<MidiInstrRoute(int)> instrRoute;
     MidiSink                           midiSink;   // plugin-mode emission
     std::vector<Pending*>              pending;   // outstanding timeout payloads
+    // Notes turned on by noteOn() and not yet turned off. Held separately from
+    // `pending` because no timeout owns them — only a matching noteOff (or the
+    // destructor) ends them.
+    std::vector<Pending*>              heldNotes;
 };
 
 #endif

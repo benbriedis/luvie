@@ -116,6 +116,12 @@ private:
     std::function<void()> labelsRenameHandler() override;
 
     void setGridPattern(int patId) override;
+
+    // Recording. A drum note has no length, so it is written as soon as the key
+    // goes down and the played duration is ignored. Drum maps are keyed by MIDI
+    // note already, so the pitch needs no translation.
+    void commitRecordedNote(int pitch, float startBeat, float lenBeats, int velocity) override;
+    bool recordsOnNoteOn() const override { return true; }
     void afterTimelineChanged(int patId) override;
 
 public:
@@ -126,6 +132,7 @@ public:
     std::function<void(int instrId, int midiNote, const std::string& label)> onDrumLabelChanged;
 
     void focusPattern() override;
+    bool canRecord() const override { return true; }
     void setSnap(float s) override { drumGrid.setSnap(s); BasePatternEditor::setSnap(s); }
     void setDivisions(int d) override { drumGrid.setDivisions(d); }
     void setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps,

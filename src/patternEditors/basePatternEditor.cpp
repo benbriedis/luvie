@@ -3,6 +3,7 @@
 
 #include "basePatternEditor.hpp"
 #include "noteAuditioner.hpp"
+#include "luvieDebug.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
 
@@ -90,6 +91,95 @@ int BasePatternEditor::currentInstrumentId() const
     return 0;
 }
 
+// ── MIDI input and recording ─────────────────────────────────────────────────
+
+void BasePatternEditor::setRecordArmed(bool on)
+{
+    if (on == recArmed_) return;
+    recArmed_ = on;
+    // Disarming ends the take: held notes are committed with the length they
+    // reached, and the undo group closes so the next take is its own entry.
+    if (!on) releaseMidiNotes();
+}
+
+void BasePatternEditor::midiNoteOn(int pitch, int velocity)
+{
+    if (pitch < 0 || pitch > 127) return;
+    if (velocity <= 0) { midiNoteOff(pitch); return; }   // running-status note-off
+
+    // Always audible, armed or not: trying a note out is half of what a keyboard
+    // is for, and it costs nothing when the transport is stopped.
+    if (auditioner) auditioner->noteOn(currentInstrumentId(), pitch, velocity);
+
+    if (!recArmed_ || !canRecord() || !pattern) return;
+
+    // Three things have to be true to record, and "nothing happened" looks the
+    // same for all of them, so say which one failed when tracing is on.
+    const bool rolling = playhead.transportPlaying();
+    const float beat   = rolling ? playhead.patternBeat(playhead.transportBars()) : -1.0f;
+    if (luvieDebug() && (!rolling || beat < 0.0f))
+        fprintf(stderr, "[luvie] not recorded: %s\n", !rolling
+                ? "transport is not rolling"
+                : "this pattern is not playing right now - in Song mode the "
+                  "playhead has to be inside one of its blocks, in Loop mode it "
+                  "has to be switched on in the Loop Editor");
+    if (!rolling || beat < 0.0f) return;
+
+    if (!recUndo_) recUndo_.emplace(pattern->song());    // the take starts here
+
+    if (recordsOnNoteOn()) {
+        commitRecordedNote(pitch, beat, 0.0f, velocity);
+        return;
+    }
+    recNotes_.push_back({pitch, beat, velocity});
+}
+
+void BasePatternEditor::midiNoteOff(int pitch)
+{
+    if (auditioner) auditioner->noteOff(currentInstrumentId(), pitch);
+
+    for (int i = (int)recNotes_.size() - 1; i >= 0; i--) {
+        if (recNotes_[i].pitch != pitch) continue;
+        const RecordingNote n = recNotes_[i];
+        recNotes_.erase(recNotes_.begin() + i);
+
+        const float end = playhead.patternBeat(playhead.transportBars());
+        if (end >= 0.0f && pattern) {
+            // The pattern may have wrapped under a held key, putting the end
+            // before the start; one pattern length brings it back. A key held
+            // longer than the pattern is clamped rather than allowed to lap it.
+            const float total = (float)recordPatternBeats();
+            float len = end - n.startBeat;
+            if (len <= 0.0f) len += total;
+            if (len > total)  len = total;
+            commitRecordedNote(n.pitch, n.startBeat, len, n.velocity);
+        }
+        break;   // one note-off releases one note-on
+    }
+}
+
+void BasePatternEditor::releaseMidiNotes()
+{
+    // Commit before silencing: patternBeat() is still meaningful here, and a key
+    // the user is holding when they disarm is a note they played.
+    if (!recNotes_.empty()) {
+        auto pending = recNotes_;
+        recNotes_.clear();
+        for (const auto& n : pending) {
+            if (auditioner) auditioner->noteOff(currentInstrumentId(), n.pitch);
+            if (!pattern) continue;
+            const float end = playhead.patternBeat(playhead.transportBars());
+            if (end < 0.0f) continue;
+            const float total = (float)recordPatternBeats();
+            float len = end - n.startBeat;
+            if (len <= 0.0f) len += total;
+            if (len > total)  len = total;
+            commitRecordedNote(n.pitch, n.startBeat, len, n.velocity);
+        }
+    }
+    recUndo_.reset();   // the take is closed; the next one gets its own undo entry
+}
+
 void BasePatternEditor::setAuditioner(NoteAuditioner* a)
 {
     auditioner = a;
@@ -149,6 +239,13 @@ void BasePatternEditor::onTimelineChanged()
     }
     int patId = tl.patternIdForSelectedLane();
     bool patChanged = (patId != lastPatId);
+
+    // A take belongs to the pattern it was played into. Close it before lastPatId
+    // moves, or a key still held while the user selects another pattern would have
+    // its note committed to that one instead.
+    if ((patChanged || trackChanged) && (!recNotes_.empty() || recUndo_))
+        releaseMidiNotes();
+
     lastPatId = patId;
 
     if (trackChanged) playhead.setPatternTrack(sel);

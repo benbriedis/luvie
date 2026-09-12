@@ -10,7 +10,7 @@ This manual is written for people using Luvie. Notes about building it are in
 
 1. [Configuration](01-configuration.md)
 2. [Getting started](02-basics.md)
-3. [MIDI output and instruments](03-outputs.md)
+3. [MIDI input, output and instruments](03-outputs.md)
 4. [The song editor](04-song-editor.md)
 5. [Loops](05-loop-editor.md)
 6. [The pattern editors](06-pattern-editors.md)

@@ -53,6 +53,11 @@ static constexpr int drumFallbackChoiceW = 90;
 static constexpr int drumBtnGap        = 8;
 static constexpr int scrollbarW        = OverlayWindow::scrollbarW;
 
+// MIDI Input section: a heading strip then one row of two dropdowns.
+static constexpr int midiInSecH     = 44;   // heading strip, as chanSecH is for Instruments
+static constexpr int midiInTypeW    = 90;   // matches backendW, so the columns line up
+static constexpr int midiInChanW    = 90;
+
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 static constexpr Fl_Color bgCol      = OverlayWindow::bgCol;
@@ -173,8 +178,30 @@ static void fillBackendChoice(ModernChoice* c, bool pluginMode)
     }
 }
 
+// The MIDI input's type dropdown. Debug is absent (it is an output-only sink), so
+// unlike fillBackendChoice() above the item index is NOT the enum value — hence
+// inputBackendFromIndex/ToIndex rather than a cast. The greying rule is the same
+// one the port dropdown uses, so an input keeps showing the type it was saved with
+// even in a mode that cannot drive it.
+static void fillInputTypeChoice(ModernChoice* c, bool pluginMode)
+{
+    for (int i = 0; i < kNumInputBackends; i++) {
+        c->add(inputBackendName(kInputBackends[i]));
+        if (!backendSupported(kInputBackends[i], pluginMode))
+            c->mode(i, c->mode(i) | FL_MENU_INACTIVE);
+    }
+}
+
+// "Any" then 1-16, so the item index is the stored channel value directly.
+static void fillInputChanChoice(ModernChoice* c)
+{
+    c->add("Any");
+    for (int i = 1; i <= 16; i++)
+        c->add(std::to_string(i).c_str());
+}
+
 OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
-    : OverlayWindow(x, y, w, h, "Instruments & Outputs"),
+    : OverlayWindow(x, y, w, h, "Instruments and I/O"),
       pluginMode_(pluginMode),
       defaultBackend_(defaultBackendFor(pluginMode))
 {
@@ -239,6 +266,33 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
         self->rebuildInstrumentRows();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
+
+    // ── MIDI Input ────────────────────────────────────────────────────────────
+    // Built once: there is exactly one input, so this row never rebuilds.
+    midiInBackend_ = defaultBackendFor(pluginMode_);
+
+    auto styleChoice = [this](ModernChoice* c) {
+        c->color(inputBgCol);
+        c->labelcolor(textCol);
+        c->textsize(12);
+        c->setBorderColor(borderCol);
+        c->setArrowColor(subTextCol);
+        c->setHoverColor(0xF3F4F600);
+    };
+
+    auto* mit = new ModernChoice(0, 0, midiInTypeW, inputH);
+    styleChoice(mit);
+    fillInputTypeChoice(mit, pluginMode_);
+    mit->value(std::max(0, inputBackendToIndex(midiInBackend_)));
+    mit->callback(midiInTypeCb, this);
+    midiInTypeChoice = mit;
+
+    auto* mic = new ModernChoice(0, 0, midiInChanW, inputH);
+    styleChoice(mic);
+    fillInputChanChoice(mic);
+    mic->value(midiInChannel_);
+    mic->callback(midiInChanCb, this);
+    midiInChanChoice = mic;
 
     end();
 
@@ -315,6 +369,22 @@ void OutputsOverlay::setOutputs(const std::vector<JackOutput>& ports) {
     if (outputs_.empty())
         addDefaultOutputs();
     rebuildRows();
+}
+
+// Loading a project. Like setDefaultBackend(), a stored type this mode cannot
+// drive falls back to the one it can, so the input is never left dead — but the
+// greyed item stays in the list so it is clear what the project asked for.
+void OutputsOverlay::setMidiInput(const MidiInput& in) {
+    midiInBackend_ = backendSupported(in.backend, pluginMode_)
+                       ? in.backend : defaultBackendFor(pluginMode_);
+    midiInChannel_ = (in.channel >= 0 && in.channel <= 16) ? in.channel : 0;
+    if (midiInTypeChoice)
+        midiInTypeChoice->value(std::max(0, inputBackendToIndex(midiInBackend_)));
+    if (midiInChanChoice) midiInChanChoice->value(midiInChannel_);
+}
+
+MidiInput OutputsOverlay::getMidiInput() const {
+    return { midiInBackend_, midiInChannel_ };
 }
 
 std::vector<std::string> OutputsOverlay::getOutputs() const {
@@ -834,9 +904,29 @@ void OutputsOverlay::rebuildInstrumentRows() {
     addInstrBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad - scrollY_);
     addDrumInstrBtn->position(w() - scrollbarW - pad - 2*addBtnW - chanGap, y + addBtnPad - scrollY_);
 
-    totalContentH_ = (y + addBtnPad + addBtnH + addBtnPad) - headerH;
+    y += addBtnPad + addBtnH + addBtnPad;
+
+    // The MIDI Input section sits below everything else, and its bottom is what
+    // the scroll extent has to reach — so lay it out before sizing the content.
+    y = layoutMidiInputRow(y);
+
+    totalContentH_ = y - headerH;
     updateScrollbar();
     redraw();
+}
+
+// One fixed row of two dropdowns under a heading. Returns the Y just past it.
+int OutputsOverlay::layoutMidiInputRow(int y)
+{
+    midiInSectionTopY_ = y;
+    const int rowTop = y + midiInSecH + chanColH2;
+    const int iy     = rowTop + (rowH - inputH) / 2 - scrollY_;
+
+    if (midiInTypeChoice) midiInTypeChoice->position(pad, iy);
+    if (midiInChanChoice)
+        midiInChanChoice->position(pad + midiInTypeW + chanGap, iy);
+
+    return rowTop + rowH + addBtnPad;
 }
 
 void OutputsOverlay::onScroll(int delta) {
@@ -857,6 +947,7 @@ void OutputsOverlay::onScroll(int delta) {
         mv(row.progLabel);      mv(row.gm1Label);
     }
     mv(addInstrBtn); mv(addDrumInstrBtn);
+    mv(midiInTypeChoice); mv(midiInChanChoice);
 }
 
 void OutputsOverlay::rebuildPortChoices() {
@@ -931,6 +1022,23 @@ void OutputsOverlay::defaultTypeChoiceCb(Fl_Widget* w, void* d) {
     int idx = static_cast<Fl_Choice*>(w)->value();
     if (idx < 0) return;
     self->defaultBackend_ = static_cast<MidiBackend>(idx);
+}
+
+void OutputsOverlay::midiInTypeCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    int idx = static_cast<Fl_Choice*>(w)->value();
+    if (idx < 0) return;
+    // Item index is not the enum value here: Debug is missing from this list.
+    self->midiInBackend_ = inputBackendFromIndex(idx);
+    if (self->onMidiInputChanged) self->onMidiInputChanged();
+}
+
+void OutputsOverlay::midiInChanCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    int idx = static_cast<Fl_Choice*>(w)->value();
+    if (idx < 0) return;
+    self->midiInChannel_ = idx;   // item 0 is "Any", items 1-16 are the channel
+    if (self->onMidiInputChanged) self->onMidiInputChanged();
 }
 
 void OutputsOverlay::deleteCb(Fl_Widget* w, void* d) {
@@ -1172,6 +1280,8 @@ std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
         if (row.deleteBtn && row.deleteBtn->active())       order.push_back(row.deleteBtn);
     }
     order.push_back(addInstrBtn);
+    if (midiInTypeChoice && midiInTypeChoice->active()) order.push_back(midiInTypeChoice);
+    if (midiInChanChoice && midiInChanChoice->active()) order.push_back(midiInChanChoice);
     order.push_back(closeBtn_);
     return order;
 }
@@ -1262,6 +1372,31 @@ void OutputsOverlay::drawStaticContent(int sy, int sbW) {
         fl_color(dividerCol);
         fl_line_style(FL_SOLID, 1);
         fl_line(pad, instrRowsTopY_ - sy, w() - sbW - pad, instrRowsTopY_ - sy);
+        fl_line_style(0);
+    }
+
+    // ── MIDI input section ───────────────────────────────────────────────
+    if (midiInSectionTopY_ > 0) {
+        fl_color(dividerCol);
+        fl_line_style(FL_SOLID, 1);
+        fl_line(0, midiInSectionTopY_ - sy, w() - sbW, midiInSectionTopY_ - sy);
+        fl_line_style(0);
+
+        fl_font(FL_HELVETICA_BOLD, 13);
+        fl_color(textCol);
+        fl_draw("MIDI Input", titlePad, midiInSectionTopY_ + 12 - sy,
+                w() - 2*titlePad, midiInSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+        const int colY  = midiInSectionTopY_ + midiInSecH;
+        const int chanX = pad + midiInTypeW + chanGap;
+        fl_font(FL_HELVETICA, 10);
+        fl_color(subTextCol);
+        fl_draw("TYPE",         pad,   colY - sy, midiInTypeW, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("MIDI CHANNEL", chanX, colY - sy, midiInChanW, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+        fl_color(dividerCol);
+        fl_line_style(FL_SOLID, 1);
+        fl_line(pad, colY + chanColH2 - sy, w() - sbW - pad, colY + chanColH2 - sy);
         fl_line_style(0);
     }
 }

@@ -256,6 +256,14 @@ int main(int argc, char **argv) {
         updateAlerts();
     };
 
+    // Open (or reopen) the MIDI input to match the overlay. Separate from
+    // syncPorts() because the input is not part of the Port set: it has its own
+    // resource and its own backend, and a change to one does not affect the other.
+    auto syncMidiInput = [&]() {
+        if (!connOverlay) return;
+        app.midiIn.apply(connOverlay->getMidiInput(), &jackTransport);
+    };
+
     // Reconcile the Port set with the overlay, then refresh JACK want/warning state
     // and tell the song playhead whether any soft (Native/Debug) ports need driving.
     auto syncPorts = [&]() {
@@ -293,6 +301,7 @@ int main(int argc, char **argv) {
         connOverlay->onPortAdded         = [&](const std::string&) { syncPorts(); };
         connOverlay->onPortRemoved       = [&](const std::string&) { syncPorts(); };
         connOverlay->onPortBackendChanged = [&]() { syncPorts(); };
+        connOverlay->onMidiInputChanged   = [&]() { syncMidiInput(); };
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             portReg.rename(oldName, newName);
             if (app.onInstrumentsChanged) app.onInstrumentsChanged();
@@ -316,8 +325,10 @@ int main(int argc, char **argv) {
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument});
         connOverlay->setInstruments(instrs);
+        connOverlay->setMidiInput(state.midiInput);
         app.pushInstruments();
         syncPorts();
+        syncMidiInput();
         if (app.onInstrumentsChanged) app.onInstrumentsChanged();
         sendAllProgramChanges();
     };
@@ -327,6 +338,7 @@ int main(int argc, char **argv) {
         if (!connOverlay) return;
         state.defaultPortBackend = connOverlay->getDefaultBackend();
         state.jackOutputs = connOverlay->getOutputsFull();
+        state.midiInput   = connOverlay->getMidiInput();
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
             state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
@@ -385,11 +397,15 @@ int main(int argc, char **argv) {
         // observer to drop back to polling. onShutdown fires from a JACK-internal
         // thread, so marshal it to the FLTK main thread via Fl::awake.
         jackTransport.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
+        // Same marshalling for MIDI input: the events are queued lock-free on the
+        // JACK (or RtMidi) thread and drained here, on the FLTK main thread.
+        app.midiIn.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
         jackTransport.onShutdown = [&]() {
             jackUp = false;
             jackObserver.serverLost();
         };
         portReg.reregisterJack();   // (re)register Jack ports on the fresh client
+        app.midiIn.reregisterJack(); // and the input port, which is registered the same way
         if (app.onInstrumentsChanged) app.onInstrumentsChanged();
         sendAllProgramChanges();
     };
@@ -472,6 +488,13 @@ int main(int argc, char **argv) {
 
     // Initial reconcile of the default port set (and JACK want/warning state).
     syncPorts();
+    // The smoke test runs headless with no JACK server and no one to play into
+    // it, so it opens no input — Plugin is the one backend that opens nothing.
+    if (testMode) {
+        if (connOverlay) connOverlay->setMidiInput({MidiBackend::Plugin, 0});
+    } else {
+        syncMidiInput();
+    }
 
     // --- New-project startup dialog ---------------------------------------
     // Applies its two choices live to the existing overlays. The MIDI-output

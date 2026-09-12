@@ -77,6 +77,13 @@ class Transport : public Fl_Group, public ITimelineObserver {
 	ITransport*         controlTransport = nullptr;  // if set, buttons use this; otherwise transport
 	bool                stoppedAtEnd     = false;
 	bool                lastPlayingState = false;
+	// Single writer for lastPlayingState, so onPlayStateChanged cannot be missed
+	// by one of the several places that change it.
+	void setPlayingState(bool playing) {
+		if (playing == lastPlayingState) return;
+		lastPlayingState = playing;
+		if (onPlayStateChanged) onPlayStateChanged(playing);
+	}
 	bool                loopOn           = false;  // song-loop toggle state
 
 public:
@@ -102,6 +109,11 @@ public:
 	// Fired after the rewind button repositions the transport, so views can scroll
 	// the (possibly off-screen) playhead into view even when stopped.
 	std::function<void()> onRewind;
+
+	// Fired whenever playback starts or stops, however it happened — the button,
+	// the host, or another JACK client. MIDI recording listens so that stopping
+	// closes the take rather than leaving it open across the pause.
+	std::function<void(bool playing)> onPlayStateChanged;
 
 	void onTimelineChanged() override;
 	void resize(int x, int y, int w, int h) override;

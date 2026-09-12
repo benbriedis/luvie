@@ -1,6 +1,6 @@
 # The song editor
 
-[← MIDI output and instruments](03-outputs.md) · [Contents](README.md) · [Loops →](05-loop-editor.md)
+[← MIDI input, output and instruments](03-outputs.md) · [Contents](README.md) · [Loops →](05-loop-editor.md)
 
 <img src="images/songEditor.png" alt="Luvie song editor" width="1000">
 

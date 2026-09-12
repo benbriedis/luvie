@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "luvieApp.hpp"
+#include "luvieDebug.hpp"
 #include "FL/Fl_Menu_Item.H"
 #include "FL/Fl_Native_File_Chooser.H"
 #include "timelineIO.hpp"
@@ -96,6 +97,37 @@ void LuvieApp::EditorSwitcher::onTimelineChanged() {
     } else {
         app->drumEd->hide(); app->pianorollEd->hide(); app->harmonyEd->show();
     }
+    // Runs on every timeline notify, but updateMidiTarget() returns immediately
+    // unless the visible editor actually changed.
+    app->updateMidiTarget();
+}
+
+// Which pattern editor is on screen, if any. Two things decide it: the selected
+// tab, and — within the Pattern Editor tab — which of the three editors
+// EditorSwitcher has shown for the selected pattern's type.
+void LuvieApp::updateMidiTarget()
+{
+    BasePatternEditor* next = nullptr;
+    if (tabs && patternTab && tabs->value() == patternTab) {
+        if (pianorollEd && pianorollEd->visible())      next = pianorollEd;
+        else if (drumEd && drumEd->visible())           next = drumEd;
+        else if (harmonyEd && harmonyEd->visible())     next = harmonyEd;
+    }
+    if (next == midiTarget) return;
+
+    // Leaving an editor ends its take and releases anything it was sounding, so a
+    // key held while switching tabs neither hangs nor keeps recording.
+    if (midiTarget) {
+        midiTarget->setRecordArmed(false);
+        midiTarget->releaseMidiNotes();
+    }
+    if (patternPanel) patternPanel->stopRecording();
+    midiTarget = next;
+}
+
+void LuvieApp::stopMidiRecording()
+{
+    if (midiTarget) midiTarget->releaseMidiNotes();
 }
 
 void LuvieApp::saveAsCb(Fl_Widget*, void* data) {
@@ -443,6 +475,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         song->selectLane(trackIndex, laneId);
         tabs->value(tab2);
         tabs->redraw();
+        // Fl_Tabs::value() does not fire the widget callback, so the tab-change
+        // hook never sees this. Without it, opening a pattern from the song editor
+        // leaves the MIDI target on the tab we just left (i.e. nowhere) and the
+        // keyboard does nothing. selectLane() above notifies too early to help:
+        // it runs while the Song tab is still the current one.
+        updateMidiTarget();
     };
     og2->onPatternDoubleClick = openPatternTab;
     og2->onOpenPattern        = openPatternTab;
@@ -534,6 +572,55 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     harmonyEd->setAuditioner(&auditioner);
     drumEd->setAuditioner(&auditioner);
     pianorollEd->setAuditioner(&auditioner);
+
+    // ---- MIDI input ----
+    // Everything arriving on the input lands here, on the UI thread, already
+    // filtered to the configured channel. It goes to whichever pattern editor is
+    // showing; with none showing (Song or Loop tab) it is simply dropped.
+    midiIn.setSink([this](const uint8_t* data, int len) {
+        // Recompute first. Every path that changes the visible editor is supposed
+        // to call this, but a missed one would silently swallow MIDI rather than
+        // fail visibly, so the cheap pointer compare is worth doing here too.
+        updateMidiTarget();
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] midi in: %02X %02X%s target=%s\n",
+                    data[0], len > 1 ? data[1] : 0,
+                    len > 2 ? " .." : "", midiTarget ? "yes" : "NONE");
+        if (!midiTarget || len < 2) return;
+        const int status = data[0] & 0xF0;
+        const int pitch  = data[1] & 0x7F;
+        if (status == 0x90) {
+            const int vel = (len >= 3) ? (data[2] & 0x7F) : 0;
+            // Velocity 0 is a note-off by the running-status convention; the
+            // editor handles that, so it is passed through as sent.
+            midiTarget->midiNoteOn(pitch, vel);
+        } else if (status == 0x80) {
+            midiTarget->midiNoteOff(pitch);
+        }
+        // Anything else (CC, pitch bend, program change) is ignored for now:
+        // parameter recording is not part of this.
+    });
+
+    // The Record toggle arms whichever editor is currently the target.
+    patternPanel->onRecordChanged = [this](bool on) {
+        if (midiTarget) midiTarget->setRecordArmed(on);
+    };
+
+    // Tab clicks fire nothing by default, so the target would go stale when the
+    // user leaves the Pattern Editor tab. Fl_Tabs calls this on every change.
+    tabs->callback([](Fl_Widget*, void* d) {
+        static_cast<LuvieApp*>(d)->updateMidiTarget();
+    }, this);
+    updateMidiTarget();
+
+    // Stopping ends the take: notes still held are committed with the length they
+    // reached and the undo group closes, so the next run is its own undo entry.
+    // The toggle stays armed, so hitting play again starts recording straight away.
+    if (bottomPane) {
+        bottomPane->onPlayStateChanged = [this](bool playing) {
+            if (!playing) stopMidiRecording();
+        };
+    }
 
     // ---- Note label / params sync ----
     auto syncHarmonyLabels = [this]() {

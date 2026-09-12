@@ -13,6 +13,8 @@
 #include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
 #include <functional>
+#include <optional>
+#include <vector>
 
 class NoteAuditioner;
 
@@ -63,6 +65,29 @@ protected:
     // Instrument of the currently selected track's pattern (0 if none).
     int currentInstrumentId() const;
 
+    // ── Recording ────────────────────────────────────────────────────────────
+    bool recArmed_ = false;
+    // One undo entry for a whole take rather than one per note: UndoGroup keeps
+    // notifying (so notes appear as they are played) but snapshots only once.
+    // Held open across the take, released when it ends.
+    std::optional<ObservableSong::UndoGroup> recUndo_;
+    // Notes waiting on their note-off, so the length can be what was played.
+    // Editors that record on the note-on (drums) never put anything here.
+    struct RecordingNote { int pitch; float startBeat; int velocity; };
+    std::vector<RecordingNote> recNotes_;
+
+    // Write one finished note into the pattern. `lenBeats` is the played duration,
+    // already wrapped and clamped to the pattern; editors that record on the
+    // note-on ignore it. Default does nothing, so an editor that cannot record
+    // silently accepts (and drops) anything sent its way.
+    virtual void commitRecordedNote(int /*pitch*/, float /*startBeat*/,
+                                    float /*lenBeats*/, int /*velocity*/) {}
+    // True for editors whose notes have no length (the drum editor), which are
+    // written as soon as the key goes down rather than when it comes up.
+    virtual bool recordsOnNoteOn() const { return false; }
+    // Pattern length in beats — the wrap point for a note held across the loop.
+    int  recordPatternBeats() const { return gridNumCols(); }
+
     // onTimelineChanged skeleton hooks
     virtual void setGridPattern(int patId)    = 0;
     virtual void afterTimelineChanged(int /*patId*/) {}
@@ -91,6 +116,24 @@ public:
     void setZoom(int factor);
     void setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex);
     void setAuditioner(NoteAuditioner* a);
+
+    // ── MIDI input ───────────────────────────────────────────────────────────
+    // Editors that can take dictation from the MIDI input. Harmony cannot: its
+    // rows are chord degrees and the reverse mapping from a played pitch is lossy,
+    // so it auditions incoming notes but never records them.
+    virtual bool canRecord() const { return false; }
+    void setRecordArmed(bool on);
+    bool recordArmed() const { return recArmed_; }
+
+    // Fed from the MIDI input on the UI thread. Both always audition, so the
+    // player hears the instrument; they additionally record when armed and the
+    // transport is rolling.
+    void midiNoteOn(int pitch, int velocity);
+    void midiNoteOff(int pitch);
+    // Releases everything still sounding and closes the open take, committing any
+    // held notes with the length they reached. Called when the editor stops being
+    // the MIDI target and when the transport stops.
+    void releaseMidiNotes();
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }

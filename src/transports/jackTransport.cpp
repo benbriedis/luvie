@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "jackTransport.hpp"
+#include "midiInPort.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -227,6 +228,29 @@ int JackTransport::process(jack_nframes_t nframes)
         portsMutex.unlock();
     }
 
+    // ── MIDI input (RT thread) ────────────────────────────────────────────────
+    // Copy anything that arrived into the sink's lock-free ring, then post at most
+    // one wakeup for the whole cycle. jack_midi_event_get() does not allocate and
+    // the ring push is a store plus one atomic, so nothing here is RT-unsafe; the
+    // single Fl::awake pipe write is what claimWakeup() bounds.
+    if (MidiInputManager* inSink = midiInSink_.load(std::memory_order_acquire)) {
+        jack_port_t* inPort = nullptr;
+        if (portsMutex.try_lock()) {
+            inPort = midiInPort_;
+            portsMutex.unlock();
+        }
+        if (inPort) {
+            void* inBuf = jack_port_get_buffer(inPort, nframes);
+            const jack_nframes_t nIn = jack_midi_get_event_count(inBuf);
+            for (jack_nframes_t i = 0; i < nIn; i++) {
+                jack_midi_event_t ev;
+                if (jack_midi_event_get(&ev, inBuf, i) != 0) continue;
+                inSink->pushFromRt(ev.buffer, static_cast<int>(ev.size));
+            }
+            if (nIn > 0 && inSink->claimWakeup()) inSink->postWakeup();
+        }
+    }
+
     outEvents.clear();
     curNframes    = nframes;
 
@@ -329,6 +353,42 @@ bool JackTransport::addMidiPort(const std::string& name) {
     }
     std::lock_guard<std::mutex> lk(portsMutex);
     midiPorts_[name] = p;
+    return true;
+}
+
+// ── MIDI input port ───────────────────────────────────────────────────────────
+
+void JackTransport::setMidiInSink(MidiInputManager* s) {
+    midiInSink_.store(s, std::memory_order_release);
+}
+
+bool JackTransport::addMidiInPort(const std::string& name) {
+    if (!client || !midiEnabled || name.empty()) return false;
+    // Registers unconditionally and overwrites, as PortRegistry::reregisterJack()
+    // does for the outputs: after a server restart `client` is a new one and any
+    // handle we are still holding is stale, so keeping the old one would leave the
+    // input permanently dead.
+    jack_port_t* p = jack_port_register(client, name.c_str(),
+                                        JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+    if (!p) {
+        fprintf(stderr, "JackTransport: could not register input port '%s'\n", name.c_str());
+        return false;
+    }
+    std::lock_guard<std::mutex> lk(portsMutex);
+    midiInPort_ = p;
+    return true;
+}
+
+bool JackTransport::removeMidiInPort() {
+    if (!client) return false;
+    jack_port_t* p = nullptr;
+    {
+        std::lock_guard<std::mutex> lk(portsMutex);
+        if (!midiInPort_) return false;
+        p = midiInPort_;
+        midiInPort_ = nullptr;
+    }
+    jack_port_unregister(client, p);
     return true;
 }
 

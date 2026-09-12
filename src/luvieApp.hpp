@@ -13,6 +13,7 @@
 #include "loopManager.hpp"
 #include "loopModeController.hpp"
 #include "noteAuditioner.hpp"
+#include "midiInPort.hpp"
 
 struct AppState;
 class ObservableSong;
@@ -44,6 +45,8 @@ class StartupOverlay;
 // Builds and wires the shared Luvie UI layout (tabs, editors, transport bar, popups).
 // Callers create AppWindow, ObservableSong, ObservablePattern, and ITransport,
 // configure the optional callbacks, then call build().
+class BasePatternEditor;
+
 class LuvieApp {
 public:
     LuvieApp() = default;
@@ -139,8 +142,18 @@ public:
     // performs the bar-aligned hand-off back to song mode. Wired in build().
     LoopModeController modeController;
 
-    // Auditions single notes when a pattern-editor row label is clicked.
+    // Auditions single notes when a pattern-editor row label is clicked, and when
+    // a note arrives on the MIDI input.
     NoteAuditioner auditioner;
+
+    // The pattern editor incoming MIDI is going to, or null when the Song or Loop
+    // tab is showing. Owned by the tab group, not by us.
+    BasePatternEditor* midiTarget = nullptr;
+
+    // The project's single MIDI input. Lives here rather than in main.cpp because
+    // the plugin UI needs it too: hosted, nothing is opened and the LV2 port_event
+    // feeds it directly, but the sink and the routing below are the same either way.
+    MidiInputManager midiIn;
 
     // Widgets — valid after build()
     SettingsButton*    settingsButton = nullptr;
@@ -159,6 +172,18 @@ public:
     OutputsOverlay*    outputsOverlay = nullptr;
     TransportOverlay*  transportOverlay = nullptr;
     StartupOverlay*    startupOverlay = nullptr;
+
+    // ── MIDI input routing ───────────────────────────────────────────────────
+    // Incoming MIDI goes to whichever pattern editor is on screen: it auditions
+    // there, and records there when that editor's Record toggle is armed. The Song
+    // and Loop tabs are not targets, so moving to one stops recording.
+    //
+    // Call after anything that can change which editor is visible — a tab switch,
+    // or a selection change that swaps one pattern editor for another.
+    void updateMidiTarget();
+    // Releases held notes and closes any open take. Called when the transport
+    // stops, so a key held across the stop does not hang or keep recording.
+    void stopMidiRecording();
 
     void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
                ObservableInstrument* instruments, ITransport* transport);

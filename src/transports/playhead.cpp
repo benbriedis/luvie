@@ -301,6 +301,32 @@ int Playhead::displayedPatternId() const
 	return track.lanes[0].patternId;
 }
 
+// Where a transport position falls inside the pattern, in beats. Split out of
+// barsToPixel() so that recording lands a note exactly where the head is drawn:
+// the anchor, the loop wrap and the time signature are all handled once, here.
+//
+// Returns -1 when the pattern is not running. barsToPixel() still has somewhere to
+// draw in that case — a virtual position showing where beat 0 *would* land on the
+// next bar — but that is a preview, not a real place in the pattern, so it is not
+// somewhere a note may be recorded.
+float Playhead::patternBeat(float bars) const
+{
+	if (patternTrack < 0 || !obsTl) return -1.0f;
+	const auto& tracks = obsTl->get().tracks;
+	if (patternTrack >= (int)tracks.size()) return -1.0f;
+	int patId = displayedPatternId();
+	if (!loopMgr || !loopMgr->isPatternActive(patId)) return -1.0f;
+
+	// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
+	float beatsPerBar = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
+	                                              patId);
+	float anchor  = loopMgr->patternAnchorBar(patId);
+	float elapsed = (bars - anchor) * beatsPerBar;
+	float beats   = std::fmod(elapsed, (float)numCols);
+	if (beats < 0.0f) beats += numCols;
+	return beats;
+}
+
 int Playhead::barsToPixel(float bars) const
 {
 	if (patternTrack >= 0) {
@@ -309,17 +335,13 @@ int Playhead::barsToPixel(float bars) const
 		if (patternTrack >= (int)tracks.size()) return 0;
 		int patId = displayedPatternId();
 
+		float beats = patternBeat(bars);
+		if (beats >= 0.0f)
+			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
+
 		// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
 		float beatsPerBar = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
 		                                              patId);
-
-		if (loopMgr && loopMgr->isPatternActive(patId)) {
-			float anchor  = loopMgr->patternAnchorBar(patId);
-			float elapsed = (bars - anchor) * beatsPerBar;
-			float beats   = std::fmod(elapsed, (float)numCols);
-			if (beats < 0.0f) beats += numCols;
-			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
-		}
 
 		// Virtual position: beat 0 of the pattern will land on the next bar boundary.
 		float nextBar     = std::floor(bars) + 1.0f;

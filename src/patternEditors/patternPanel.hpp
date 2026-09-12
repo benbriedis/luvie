@@ -187,6 +187,9 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     HarmonyControls harmonyControls;
     TimeControls    timeControls;
     ModernButton    rapidBtn;
+    // Record arm, on the right of the bar. Pianoroll and drum only — the harmony
+    // editor cannot record, so it hides this (and disarms it) like it does Rapid.
+    ModernButton    recordBtn;
 
     float computeSnapBeats() const;
     int   computeDivisions() const;
@@ -202,6 +205,10 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     void initTimeControls();
     void initOutChoice();
     void initRapidBtn();
+    void initRecordBtn();
+    // Turns the toggle off and tells the editor, if it is on. Used whenever
+    // recording has to stop for a reason other than the user clicking it.
+    void disarmRecord();
     void initInput();
 
     void configureHarmonyRow();
@@ -234,6 +241,8 @@ public:
     std::function<void(int)>   onDivisionsChanged;
     std::function<void(int)>   onZoomChanged;
     std::function<void(bool)>  onRapidChanged;
+    // Record arm/disarm from the toggle. The owner passes it to the editor.
+    std::function<void(bool)>  onRecordChanged;
 
     void commitEdit();
 
@@ -244,6 +253,9 @@ public:
         return chordDefs[idx].hash;
     }
     bool isSharp()   const { return useSharp; }
+
+    // Disarms recording from outside — leaving the Pattern Editor tab, say.
+    void stopRecording() { disarmRecord(); }
 
     void setParams(int root, std::string_view chordHash, bool sharp);
     void setInstruments(ObservableInstrument* instr);

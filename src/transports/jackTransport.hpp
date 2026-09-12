@@ -27,6 +27,8 @@
  *   - Public ITransport methods and the inherited Sequencer setters run on the UI thread.
  *   - processCallback() runs on the JACK real-time thread and calls renderCycle().
  */
+class MidiInputManager;
+
 class JackTransport : public Sequencer, public ITransport {
 public:
     JackTransport();
@@ -53,6 +55,13 @@ public:
     bool addMidiPort(const std::string& name);
     bool removeMidiPort(const std::string& name);
     bool renameMidiPort(const std::string& oldName, const std::string& newName);
+
+    // The single MIDI input port. Events read in process() are handed to the sink
+    // on the RT thread, which queues them lock-free for the UI thread — see
+    // MidiInputManager. Null sink means the input is simply not read.
+    bool addMidiInPort(const std::string& name);
+    bool removeMidiInPort();
+    void setMidiInSink(MidiInputManager* s);
 
     std::function<void()> onTransportEvent;
 
@@ -96,6 +105,8 @@ private:
 
     std::mutex                           portsMutex;
     std::map<std::string, jack_port_t*>  midiPorts_;
+    jack_port_t*                         midiInPort_ = nullptr;   // guarded by portsMutex
+    std::atomic<MidiInputManager*>       midiInSink_{nullptr};
 
     struct PendingMsg { std::string portName; uint8_t data[3]; int len; };
     std::mutex              pendingMutex_;

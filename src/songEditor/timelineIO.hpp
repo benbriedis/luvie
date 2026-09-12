@@ -13,6 +13,14 @@ struct JackOutput {
     MidiBackend backend = MidiBackend::Jack;  // where the port sends (Jack/Native/Debug)
 };
 
+// The project's single MIDI input. A struct rather than loose AppState fields so
+// that allowing a second one later is a vector change, not a rename of everything
+// that touches it. Jack/Native/Plugin only — Debug is an output-only sink.
+struct MidiInput {
+    MidiBackend backend = MidiBackend::Jack;
+    int         channel = 0;   // 0 = Any; 1-16 = listen on that channel alone
+};
+
 struct JackInstrument {
     int         id                = 0;   // timeline Instrument ID (0 if unset)
     std::string name;
@@ -34,6 +42,7 @@ struct AppState {
     MidiBackend defaultPortBackend = MidiBackend::Jack;  // type assigned to newly added ports
     std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;
+    MidiInput midiInput;
 
     // Song/Loop mode, and in Loop mode which patterns the Loop Editor has switched
     // on. The LoopManager is otherwise runtime-only state, but these two survive so
