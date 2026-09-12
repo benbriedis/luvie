@@ -34,10 +34,7 @@
 enum {
     PORT_CONTROL_IN = 0,
     PORT_OUT        = 1,   /* .. PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1 */
-    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1,
-    /* The MIDI input, deliberately last: appending it leaves every existing port
-       index untouched, so sessions saved before it existed still connect. */
-    PORT_MIDI_IN    = PORT_OUT_LAST + 1
+    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1
 };
 
 /* The UI sends the project JSON to control_in as one or more `luvie_state` atoms.

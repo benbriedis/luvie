@@ -87,11 +87,9 @@ only the ones this mode can actually use are offered:
 
 - **Standalone**: Jack and Native. Plugin is greyed out.
 - **As an LV2 plugin**: Plugin only. Jack and Native are greyed out — the host
-  owns the connection. Luvie accepts the host's MIDI on either of its two atom
-  inputs, *MIDI In* or *Control In*, because hosts disagree about which one a
-  plugin's MIDI belongs on: Ardour and Carla send it to the first atom input
-  (*Control In*), others use the dedicated port. Whichever your host picks, the
-  notes arrive, and if it sends to both you still get one copy of each.
+  owns the connection. The plugin has one MIDI input, shown by the host as
+  *Control In* (or *events-in* in Carla); connect your keyboard to that and the
+  notes arrive.
 
 There is no Debug type here: Debug is a place to send MIDI to, not somewhere it
 can come from. As with the output ports the setting is kept even when this mode

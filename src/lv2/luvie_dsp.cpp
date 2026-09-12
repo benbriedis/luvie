@@ -238,10 +238,6 @@ struct Plugin {
        and state:StateChanged (host dirty flag). A host need not connect them all,
        so every use is null-checked. */
     LV2_Atom_Sequence*       out[LUVIE_NUM_MIDI_OUTS] = {};
-    /* The MIDI input. The DSP does not act on it itself — it is the editor that
-       auditions and records — so run() simply relays what arrives to the UI as
-       luvie_midi_in atoms on out[0]. A host need not connect it. */
-    const LV2_Atom_Sequence* midiIn = nullptr;
 
     ObservableSong* song   = nullptr;
     Lv2Engine*      engine = nullptr;
@@ -586,8 +582,6 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
         p->controlIn = (const LV2_Atom_Sequence*)data;
     else if (port >= (uint32_t)PORT_OUT && port <= (uint32_t)PORT_OUT_LAST)
         p->out[port - (uint32_t)PORT_OUT] = (LV2_Atom_Sequence*)data;
-    else if (port == (uint32_t)PORT_MIDI_IN)
-        p->midiIn = (const LV2_Atom_Sequence*)data;
 }
 
 static void activate(LV2_Handle instance)   { (void)instance; }
@@ -626,12 +620,10 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     int     auditionCount = 0;
 
     /* MIDI arriving from the host, on its way to the editor (see the relay below).
-       Filled from BOTH atom inputs: hosts disagree about where a plugin's MIDI
-       goes. Ardour and Carla deliver it to the first atom input port — which here
-       is control_in, the designated control port — while a host that reads the TTL
-       strictly uses the dedicated midi_in port. Taking it from either means the
-       keyboard works everywhere, and a host that sends to only one (all of them, in
-       practice) costs nothing for the other.
+       It comes in on control_in: that port carries lv2:control, and a host routes
+       the player's keyboard to the designated control port — Carla reads incoming
+       events from that port and no other, which is why a separate MIDI-only input
+       port, however correctly declared, never receives a note.
 
        Fixed stack buffer: run() is the RT thread and must not allocate. A cycle
        carrying more than this is a stuck controller, not a performance. */
@@ -678,11 +670,8 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                                 ev->body.size, (int)ws);
                 }
             } else if (ev->body.type == uris->midi_MidiEvent) {
-                /* Not advertised in the TTL — control_in deliberately does not
-                   declare MIDI support, so no host should list it as a MIDI input.
-                   But a host is free to put MIDI on any atom input it likes, and
-                   silently dropping it would be a bug that looks like dead silence.
-                   Costs one type comparison per event. */
+                /* The player's keyboard. control_in declares atom:supports
+                   midi:MidiEvent for exactly this. */
                 takeMidiIn(ev);
             } else if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
                 const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
@@ -714,24 +703,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
        out[0] is where it goes — the one output the UI subscribes to, and already
        the carrier for time:Position and state:StateChanged. Wrapped in our own
        luvie_midi_in type rather than midi:MidiEvent, so a host routing out[0] to an
-       instrument does not hear the player's own keyboard echoed back.
-
-       Fixed stack buffer: run() is the RT thread and must not allocate. A cycle
-       carrying more than this is a stuck controller, not a performance, so the
-       excess is dropped. */
-    /* Now the dedicated port. Both atom inputs declare MIDI support, so a host is
-       free to connect the player's keyboard to either - or, awkwardly, to both, in
-       which case every note would arrive twice and record twice. The dedicated port
-       wins: its first event discards anything control_in contributed this cycle, so
-       exactly one copy survives whatever the host does. */
-    if (p->midiIn) {
-        bool tookDedicated = false;
-        LV2_ATOM_SEQUENCE_FOREACH(p->midiIn, ev) {
-            if (ev->body.type != uris->midi_MidiEvent) continue;
-            if (!tookDedicated) { midiInCount = 0; tookDedicated = true; }
-            takeMidiIn(ev);
-        }
-    }
+       instrument does not hear the player's own keyboard echoed back. */
     if (luvieDebug() && midiInCount > 0)
         fprintf(stderr, "[luvie] dsp midi_in: %d event(s), first %02X %02X\n",
                 midiInCount, midiInBuf[0][0], midiInBuf[0][1]);
@@ -845,12 +817,6 @@ static void run(LV2_Handle instance, uint32_t sample_count)
         p->curFrame += sample_count;
 
     if (luvieDebug()) {
-        static bool saidMidiIn = false;
-        if (!saidMidiIn) {
-            saidMidiIn = true;
-            fprintf(stderr, "[luvie] dsp midi_in port is %s\n",
-                    p->midiIn ? "CONNECTED by the host" : "NOT CONNECTED by the host");
-        }
         static int dbgAccum = 0;
         dbgAccum += (int)sample_count;
         int emitted = p->engine ? p->engine->lastEmittedCount() : 0;

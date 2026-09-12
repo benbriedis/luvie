@@ -175,11 +175,9 @@ int main(int argc, char** argv) {
     float    resumeBar     = 0.0f;
     int      relocateCycle = -1;
     int      cycles        = 0;      // 0 = default, see below
-    int      midiInNote    = -1;     // --midi-in: pitch fed to the plugin on cycle 1
-    // --midi-in-ctrl: deliver that note on control_in instead of midi_in, the way
-    // Ardour and Carla route MIDI (to the plugin's first atom input).
-    bool     midiInOnControl = false;
-    bool     midiInOnBoth    = false;   // --midi-in-both: send it on both ports
+    // --midi-in: pitch played into the plugin on cycle 1. It arrives on control_in,
+    // which is where a host puts the performer's keyboard (see luvie_dsp.ttl).
+    int      midiInNote    = -1;
     bool     restate       = false;
     bool     songLoop      = false;
     float    songLoopStart = 0.0f, songLoopEnd = 0.0f;
@@ -194,8 +192,6 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--restate")) restate = true;
         else if (!strcmp(argv[i], "--cycles") && i + 1 < argc) cycles = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--midi-in") && i + 1 < argc) midiInNote = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--midi-in-ctrl")) midiInOnControl = true;
-        else if (!strcmp(argv[i], "--midi-in-both")) midiInOnBoth = true;
         else if (!strcmp(argv[i], "--song-loop") && i + 2 < argc) {
             songLoopStart = (float)atof(argv[++i]);
             songLoopEnd   = (float)atof(argv[++i]);
@@ -213,13 +209,9 @@ int main(int argc, char** argv) {
     std::vector<uint8_t> ctrlBuf(json.size() + numChunks * perChunk + 8192);
     std::vector<std::vector<uint8_t>> midiBuf(LUVIE_NUM_MIDI_OUTS,
                                               std::vector<uint8_t>(8192));
-    // The MIDI input. --midi-in <note> plays that note into the plugin on cycle 1,
-    // which is enough to see the relay to out1 as a luvie_midi_in atom.
-    std::vector<uint8_t> midiInBuf(8192);
     d->connect_port(inst, 0, ctrlBuf.data());
     for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
         d->connect_port(inst, (uint32_t)(PORT_OUT + o), midiBuf[o].data());
-    d->connect_port(inst, (uint32_t)PORT_MIDI_IN, midiInBuf.data());
 
     if (d->activate) d->activate(inst);
 
@@ -309,31 +301,13 @@ int main(int argc, char** argv) {
             lv2_atom_forge_float(&forge, 1.0f);
             lv2_atom_forge_pop(&forge, &objF);
         }
-        if (midiInNote >= 0 && (midiInOnControl || midiInOnBoth) && c == 1) {
+        if (midiInNote >= 0 && c == 1) {
             const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
             lv2_atom_forge_frame_time(&forge, 0);
             lv2_atom_forge_atom(&forge, 3, uMidi);
             lv2_atom_forge_write(&forge, note, 3);
         }
         lv2_atom_forge_pop(&forge, &seqF);
-
-        // MIDI input: a host writes a sequence here every cycle, empty or not.
-        {
-            LV2_Atom_Sequence* mi = (LV2_Atom_Sequence*)midiInBuf.data();
-            LV2_Atom_Forge inForge;
-            lv2_atom_forge_init(&inForge, &map);
-            lv2_atom_forge_set_buffer(&inForge, midiInBuf.data(), midiInBuf.size());
-            LV2_Atom_Forge_Frame inF;
-            lv2_atom_forge_sequence_head(&inForge, &inF, 0);
-            if (midiInNote >= 0 && (!midiInOnControl || midiInOnBoth) && c == 1) {
-                const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
-                lv2_atom_forge_frame_time(&inForge, 0);
-                lv2_atom_forge_atom(&inForge, 3, uMidi);
-                lv2_atom_forge_write(&inForge, note, 3);
-            }
-            lv2_atom_forge_pop(&inForge, &inF);
-            mi->atom.type = uSeq;
-        }
 
         // Output ports: host sets capacity in atom.size before run().
         for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
