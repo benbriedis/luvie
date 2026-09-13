@@ -122,6 +122,14 @@ void LoopManager::restore(const std::vector<int>& patterns, float anchorBar)
 	if (changed) notify();
 }
 
+void LoopManager::reanchor(int patId, float anchorBar)
+{
+	auto it = activePats.find(patId);
+	if (it == activePats.end() || it->second == anchorBar) return;
+	it->second = anchorBar;
+	notify();
+}
+
 void LoopManager::reanchorAll(float anchorBar)
 {
 	bool changed = false;

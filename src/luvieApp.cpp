@@ -119,6 +119,7 @@ void LuvieApp::updateMidiTarget()
     // key held while switching tabs neither hangs nor keeps recording.
     if (midiTarget) {
         midiTarget->setRecordArmed(false);
+        midiTarget->setGrowArmed(false);
         midiTarget->releaseMidiNotes();
     }
     if (patternPanel) patternPanel->stopRecording();
@@ -604,6 +605,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // The Record toggle arms whichever editor is currently the target.
     patternPanel->onRecordChanged = [this](bool on) {
         if (midiTarget) midiTarget->setRecordArmed(on);
+    };
+
+    // Grow goes to the same place, and shares Record's lifetime: it stays on between
+    // takes but is cleared whenever the visible editor changes, so flexible bars are
+    // always something the user has just asked for.
+    patternPanel->onGrowChanged = [this](bool on) {
+        if (midiTarget) midiTarget->setGrowArmed(on);
     };
 
     // Tab clicks fire nothing by default, so the target would go stale when the

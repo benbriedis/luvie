@@ -34,6 +34,10 @@ static constexpr int colouredRowIndent = 6;  // left inset of the folded coloure
 static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
 static constexpr int      recordBtnW        = 64;
 static constexpr Fl_Color kRecordActiveColor = 0xDC262600;   // red while armed
+static constexpr int      growBtnW          = 52;
+// Amber: next to Record's red without reading as a second record button, and clear
+// of the blue the Snap and Rapid toggles use.
+static constexpr Fl_Color kGrowActiveColor  = 0xD9770600;
 static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 
 // Divisions split one beat (a time-signature denominator unit) into this many
@@ -212,6 +216,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       harmonyControls(0, 0, ctrlH),
       timeControls   (0, 0, ctrlH),
       rapidBtn       (0, 0, rapidBtnW,   ctrlH, "Rapid"),
+      growBtn        (0, 0, growBtnW,    ctrlH, "Grow"),
       recordBtn      (0, 0, recordBtnW,  ctrlH, "Record")
 {
     initControls();
@@ -221,6 +226,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
     initTimeControls();
     initOutChoice();
     initRapidBtn();
+    initGrowBtn();
     initRecordBtn();
     initInput();
     end();
@@ -260,11 +266,16 @@ std::vector<PanelRow> PatternPanel::buildLayout(int availW)
     // with the rest: it is the bar's only destructive action, and keeping it out
     // of the left-hand run means it does not shift about as controls come and go.
     const PanelItem record{&recordBtn, recordBtnW};
+    // Grow belongs to Record — it changes what a take does — so it travels with it
+    // on the right edge. The right run is laid out from the edge inwards, so
+    // pushing Grow first puts it to Record's left.
+    const PanelItem grow{&growBtn, growBtnW};
 
     PanelRow single;
     single.left = dark;
     single.left.insert(single.left.end(), coloured.begin(), coloured.end());
     single.left.push_back(rapid);
+    single.right.push_back(grow);
     single.right.push_back(record);
 
     if (!canFold || rowWidth(single) <= availW)
@@ -280,6 +291,7 @@ std::vector<PanelRow> PatternPanel::buildLayout(int availW)
     PanelRow darkRow;
     darkRow.left = dark;
     darkRow.left.push_back({ rapid.widget, rapid.width, rapidFoldedGap });
+    darkRow.right.push_back(grow);
     darkRow.right.push_back(record);
 
     return { darkRow, colouredRow };
@@ -577,6 +589,36 @@ void PatternPanel::initRecordBtn()
     }, this);
 }
 
+void PatternPanel::initGrowBtn()
+{
+    growBtn.type(FL_TOGGLE_BUTTON);
+    growBtn.color(panelBg);
+    growBtn.labelcolor(panelText);
+    growBtn.setBorderWidth(1);
+    growBtn.setBorderColor(panelCtrlBorder);
+    growBtn.tooltip("Add a bar whenever recording reaches the end of the pattern, "
+                    "instead of looping; empty bars are trimmed when the take ends");
+    growBtn.hide();   // shown alongside Record, for the types that can record
+    growBtn.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<PatternPanel*>(d);
+        bool on = self->growBtn.value() != 0;
+        self->growBtn.color(on ? kGrowActiveColor : panelBg);
+        self->growBtn.labelcolor(on ? FL_WHITE : panelText);
+        self->growBtn.redraw();
+        if (self->onGrowChanged) self->onGrowChanged(on);
+    }, this);
+}
+
+void PatternPanel::disarmGrow()
+{
+    if (!growBtn.value()) return;
+    growBtn.value(0);
+    growBtn.color(panelBg);
+    growBtn.labelcolor(panelText);
+    growBtn.redraw();
+    if (onGrowChanged) onGrowChanged(false);
+}
+
 // Everything that turns recording off other than a click on the toggle itself
 // goes through here, so the button, the editor and the colour never disagree.
 void PatternPanel::disarmRecord()
@@ -841,6 +883,9 @@ void PatternPanel::configureHarmonyRow()
     // armed take with it, exactly as switching away from Rapid cancels that.
     disarmRecord();
     recordBtn.hide();
+    // Only hidden here: the toggle itself is cleared by stopRecording(), which the
+    // change of MIDI target runs on the way into this editor.
+    growBtn.hide();
     zoomChoice.activate();
     canFold = true;
     relayout();
@@ -855,6 +900,7 @@ void PatternPanel::configureDrumRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
+    growBtn.show();
     recordBtn.show();
     zoomChoice.activate();
     canFold = false;
@@ -870,6 +916,7 @@ void PatternPanel::configurePianorollRow()
         if (onRapidChanged) onRapidChanged(false);
     }
     rapidBtn.hide();
+    growBtn.show();
     recordBtn.show();
     zoomChoice.activate();
     canFold = false;

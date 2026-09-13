@@ -128,3 +128,39 @@ records again without re-arming. It disarms itself when you leave the editor:
 switching to the Song or Loop tab, or selecting a pattern of another type. A key
 still held down when that happens is written with the length it reached rather
 than being lost.
+
+## Flexible bars
+
+Ordinarily you have to decide how many bars the pattern is before you play it.
+The **Grow** toggle, immediately left of **Record**, lets you decide afterwards.
+
+Arm **Record** and **Grow**, and start the transport. Nothing changes at first:
+the pattern loops the way it always does, so you can wait for your entry. The
+moment you play your first note the pattern stops looping, and from then on it
+gains a bar each time the playhead approaches the end. Keep playing for as long
+as the part lasts.
+
+When the take ends — you stop the transport, disarm **Record** or **Grow**, or
+leave the editor — the bars you did not play into are taken off again. The
+pattern never ends up shorter than it was before the take, and never shorter
+than one bar. As always, the whole take is one Ctrl+Z, and that includes the
+bars it added.
+
+In the Song Editor the pattern's block grows with it, so what you played is what
+the song plays back. Two things stop the growth, and in both cases recording
+simply carries on as it would with **Grow** off:
+
+- the next block on the same track, which the growing block will not overlap;
+- 64 bars, the longest the **Bars** control can describe.
+
+A few things worth knowing:
+
+- **Growth needs somewhere to grow.** In the Song Editor the pattern has to have
+  a block under the playhead on the track you are editing, and you have to start
+  the take in the block's first pass through the pattern — if the block is
+  several repeats long and you come in during the second, the take records
+  normally instead. Run Luvie with `LUVIE_DEBUG=1` and it will say so on the
+  terminal.
+- **A pattern is shared.** Placing the same pattern in several parts of the song
+  and then growing it makes all of them longer, because they are all the same
+  pattern. Copy it first if you only want one of them to change.

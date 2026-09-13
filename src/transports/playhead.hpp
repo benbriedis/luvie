@@ -122,6 +122,25 @@ public:
 	// gets there just as the engine switches. Clearing it returns to Live.
 	void setHandoff(bool on, float offsetBars = 0.0f);
 	void setPatternTrack(int track) { patternTrack = track; }
+
+	// Everything the displayed pattern's phase depends on, sampled together. Growth
+	// (flexible-bars recording) needs the anchor and the beat scale as well as the
+	// position, and reading them through separate calls would let them come from
+	// different instants — the one thing re-phasing must not do.
+	struct PatternPos {
+		bool  running      = false;  // false: not playing now; nothing below is set
+		float elapsedBeats = 0.0f;   // beats since the anchor, NOT folded by the length
+		float beatsPerBar  = 0.0f;   // pattern beats per SONG bar (not per pattern bar)
+		float anchorBar    = 0.0f;   // song bar where pattern beat 0 falls
+		bool  manualLoop   = false;  // anchored by a Loop-Editor switch, not a song block
+	};
+	PatternPos patternPos(float bars) const;
+	// Re-anchor the displayed pattern. Only meaningful where the LoopManager anchor is
+	// the real phase origin: Loop Mode, or a manual loop layered over Song Mode. In
+	// plain Song Mode the engine takes its phase from the pattern block instead, so
+	// moving this alone would split the UI from what is heard.
+	void reanchorPattern(float anchorBar);
+
 	// Pattern-local beat for a transport position, or -1 when the pattern is not
 	// running (see the definition). Recording asks this where to put a note, so it
 	// and the drawn playhead can never disagree.

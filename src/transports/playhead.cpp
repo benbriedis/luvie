@@ -309,20 +309,36 @@ int Playhead::displayedPatternId() const
 // draw in that case — a virtual position showing where beat 0 *would* land on the
 // next bar — but that is a preview, not a real place in the pattern, so it is not
 // somewhere a note may be recorded.
-float Playhead::patternBeat(float bars) const
+Playhead::PatternPos Playhead::patternPos(float bars) const
 {
-	if (patternTrack < 0 || !obsTl) return -1.0f;
+	PatternPos pp;
+	if (patternTrack < 0 || !obsTl) return pp;
 	const auto& tracks = obsTl->get().tracks;
-	if (patternTrack >= (int)tracks.size()) return -1.0f;
+	if (patternTrack >= (int)tracks.size()) return pp;
 	int patId = displayedPatternId();
-	if (!loopMgr || !loopMgr->isPatternActive(patId)) return -1.0f;
+	if (!loopMgr || !loopMgr->isPatternActive(patId)) return pp;
 
 	// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
-	float beatsPerBar = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
-	                                              patId);
-	float anchor  = loopMgr->patternAnchorBar(patId);
-	float elapsed = (bars - anchor) * beatsPerBar;
-	float beats   = std::fmod(elapsed, (float)numCols);
+	pp.beatsPerBar  = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
+	                                            patId);
+	pp.anchorBar    = loopMgr->patternAnchorBar(patId);
+	pp.elapsedBeats = (bars - pp.anchorBar) * pp.beatsPerBar;
+	pp.manualLoop   = loopMgr->isManual(patId);
+	pp.running      = true;
+	return pp;
+}
+
+void Playhead::reanchorPattern(float anchorBar)
+{
+	if (!loopMgr) return;
+	loopMgr->reanchor(displayedPatternId(), anchorBar);
+}
+
+float Playhead::patternBeat(float bars) const
+{
+	const PatternPos pp = patternPos(bars);
+	if (!pp.running) return -1.0f;
+	float beats = std::fmod(pp.elapsedBeats, (float)numCols);
 	if (beats < 0.0f) beats += numCols;
 	return beats;
 }

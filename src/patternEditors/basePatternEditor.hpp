@@ -109,6 +109,44 @@ protected:
     void recordedNoteSpan(float rawStart, float rawEnd,
                           float& startBeat, float& lenBeats) const;
 
+    // ── Flexible bars ("Grow") ───────────────────────────────────────────────
+    // With Grow armed the pattern loops as usual until the take's first note; from
+    // there it gains a bar whenever the playhead nears the end, and the trailing
+    // empty bars are trimmed off when the take finishes. Nothing here runs on the
+    // RT thread: growth is an ordinary UI-thread edit, and the engine picks up the
+    // new length through the snapshot it rebuilds for every other edit too.
+    bool  growArmed_          = false;  // the toggle; session-only, never saved
+    bool  growActive_         = false;  // this take is growing
+    int   growInstId_         = 0;      // song block being grown; 0 on the loop path
+    float growBaseBeats_      = 0.0f;   // pattern length at engagement — the trim floor
+    float growBaseInstLength_ = 0.0f;   // block length at engagement — its trim floor
+
+    // Beats in one of the PATTERN's own bars (its timeSigTop), or 0 with no pattern.
+    // Distinct from Playhead::PatternPos::beatsPerBar, which counts pattern beats per
+    // SONG bar; growth adds pattern bars but resizes blocks in song bars.
+    float patternBarBeats() const;
+    // The pattern's current length in beats, or 0 when there is no pattern. Growth
+    // works from this rather than gridNumCols(), which is an int: a pattern whose
+    // length is not a whole number of beats would otherwise have the grid and the
+    // engine's modulo disagree about where it ends.
+    float patternLengthBeats() const;
+    // The song block of the displayed pattern under the playhead on the selected
+    // lane, or nullptr — in Loop Mode, under a manual loop, or when the placement is
+    // not the one the phase came from.
+    const PatternInstance* growableInstance(float bars,
+                                           const Playhead::PatternPos& pp) const;
+
+    // Called on the first recorded note of a take. Re-phases the pattern so the pass
+    // in progress becomes pass 0 and growth extends it rather than moving the loop
+    // point under the playhead; then applies the invariant once.
+    void engageGrow();
+    // Per-tick, from the playhead's existing timer: keep at least one whole empty bar
+    // beyond the bar the playhead is in, so growth is never on the critical path of a
+    // tick interval or (in plugin mode) a trip through the host's worker thread.
+    void growTick();
+    // End of take: trim the bars nothing was recorded into and drop the state.
+    void endGrow();
+
     // onTimelineChanged skeleton hooks
     virtual void setGridPattern(int patId)    = 0;
     virtual void afterTimelineChanged(int /*patId*/) {}
@@ -145,6 +183,11 @@ public:
     virtual bool canRecord() const { return false; }
     void setRecordArmed(bool on);
     bool recordArmed() const { return recArmed_; }
+    // Arm flexible bars. Only meaningful alongside Record, and like Record it is
+    // session state — the project never stores it. Turning it off mid-take settles
+    // the length there and then, the way disarming Record ends the take.
+    void setGrowArmed(bool on);
+    bool growArmed() const { return growArmed_; }
 
     // Fed from the MIDI input on the UI thread. Both always audition, so the
     // player hears the instrument; they additionally record when armed and the

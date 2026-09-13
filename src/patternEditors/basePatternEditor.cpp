@@ -21,6 +21,13 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
     baseColWidth   = colWidth;
     snapBeats_     = snap;
 
+    // Growth rides the playhead's own timer rather than one of its own. It already
+    // runs at 16-50 ms while the transport rolls, which is far finer than the one
+    // check per bar growth actually needs, and the project has no polling threads to
+    // add one to. Only the song editor sets onTick, so the pattern editors' copies
+    // are free.
+    playhead.onTick = [this]() { growTick(); };
+
     const int gridH        = numRows * rowHeight;
     const int paramY       = y + rulerH + gridH;
     const int visibleGridW = visibleW - scrollbarW - lw;
@@ -128,6 +135,9 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
     if (!rolling || beat < 0.0f) return;
 
     if (!recUndo_) recUndo_.emplace(pattern->song());    // the take starts here
+    // Before the note is placed, so a pattern about to stop looping has already
+    // gained the room the note may need.
+    engageGrow();
 
     if (recordsOnNoteOn()) {
         // No length to work out, but the start is quantised like any other.
@@ -205,7 +215,281 @@ void BasePatternEditor::releaseMidiNotes()
             commitRecordedNote(n.pitch, start, len, n.velocity);
         }
     }
+    // Inside the still-open undo group, and after the commits above: the trim has to
+    // see the notes this take just wrote, and the bars it removes belong to the same
+    // ctrl-Z as the notes that caused them.
+    endGrow();
     recUndo_.reset();   // the take is closed; the next one gets its own undo entry
+}
+
+// ── Flexible bars ("Grow") ───────────────────────────────────────────────────
+//
+// The engine never "wraps" a position at the end of a pattern. The drawn playhead
+// (Playhead::patternBeat) and the RT sequencer (forEachFiring) both take the
+// pattern's anchor and re-derive where they are modulo its length. So lengthening
+// the pattern in time IS the feature: the modulo simply never comes round, the head
+// runs on into the new bar and the sequencer stops re-firing the pattern's notes.
+// Nothing new happens on the RT thread; it picks the change up in the snapshot it
+// rebuilds for every other edit as well.
+//
+// The one precondition is that the pass in progress must be pass 0 — with the head
+// in a later pass, changing the length moves the modulo boundary and the position
+// jumps. See engageGrow() for how each mode is brought to that state.
+
+// The Bars spinner tops out here (patternPanel.cpp), and growth must not produce a
+// pattern that control cannot then express.
+static constexpr int   kGrowMaxBars = 64;
+// A hair of slack for float beats. quantiseBeat() is round(beat/q)*q, so a note that
+// "ends exactly on the bar line" can land a few millionths past it; a bare ceil()
+// would then buy it a whole empty bar.
+static constexpr float kGrowEps     = 1.0e-3f;
+
+float BasePatternEditor::patternBarBeats() const
+{
+    if (!pattern || lastPatId <= 0) return 0.0f;
+    for (const auto& p : pattern->get().patterns)
+        if (p.id == lastPatId) return (float)std::max(1, p.timeSigTop);
+    return 0.0f;
+}
+
+float BasePatternEditor::patternLengthBeats() const
+{
+    if (!pattern || lastPatId <= 0) return 0.0f;
+    for (const auto& p : pattern->get().patterns)
+        if (p.id == lastPatId) return p.lengthBeats;
+    return 0.0f;
+}
+
+const PatternInstance*
+BasePatternEditor::growableInstance(float bars, const Playhead::PatternPos& pp) const
+{
+    if (!pattern || lastPatId <= 0) return nullptr;
+    const auto& tl = pattern->get();
+    if (lastSelectedTrack < 0 || lastSelectedTrack >= (int)tl.tracks.size()) return nullptr;
+    const Track& track = tl.tracks[lastSelectedTrack];
+
+    const Pattern* pat = nullptr;
+    for (const auto& p : tl.patterns)
+        if (p.id == lastPatId) { pat = &p; break; }
+    if (!pat) return nullptr;
+
+    // The lane the editor is showing, chosen exactly as patternIdForSelectedLane()
+    // chooses it, so the block we grow is the one whose pattern is on screen.
+    const Lane* lane = nullptr;
+    for (const auto& l : track.lanes)
+        if (l.id == lastSelectedLaneId) { lane = &l; break; }
+    if (!lane && !track.lanes.empty()) lane = &track.lanes[0];
+    if (!lane) return nullptr;
+
+    for (const auto& inst : lane->patterns) {
+        if (inst.patternId != lastPatId) continue;
+        if (bars < inst.startBar || bars >= inst.startBar + inst.length) continue;
+        // LoopManager::sync() reads the time signature at the block's start bar while
+        // the playhead reads it at the current one. Across a time-signature marker
+        // those disagree, and every conversion below would then be measured in one
+        // unit and applied in the other — so leave such a take alone.
+        const float instBpb = pattern->song()->patternBeatsPerBar((int)inst.startBar, *pat);
+        if (instBpb <= 0.0f) return nullptr;
+        if (std::fabs(instBpb - pp.beatsPerBar) > kGrowEps) return nullptr;
+        // The placement has to be the one the phase came from; the same pattern
+        // sitting on two lanes under the playhead would otherwise let us grow a block
+        // that is not the one being heard.
+        const float instAnchor = inst.startBar - inst.startOffset / instBpb;
+        if (std::fabs(instAnchor - pp.anchorBar) > kGrowEps) return nullptr;
+        return &inst;
+    }
+    return nullptr;
+}
+
+void BasePatternEditor::setGrowArmed(bool on)
+{
+    if (on == growArmed_) return;
+    growArmed_ = on;
+    // Switching it off stops the growth where it is and trims what was not played
+    // into, rather than leaving a take growing that the user has said to stop.
+    if (!on) endGrow();
+}
+
+void BasePatternEditor::engageGrow()
+{
+    if (!growArmed_ || growActive_ || !pattern || lastPatId <= 0) return;
+
+    const float bars = playhead.transportBars();
+    const Playhead::PatternPos pp = playhead.patternPos(bars);
+    if (!pp.running || pp.beatsPerBar <= 0.0f) return;
+
+    const float len = patternLengthBeats();
+    const float bar = patternBarBeats();
+    if (len <= 0.0f || bar <= 0.0f) return;
+
+    const int cycle = (int)std::floor(pp.elapsedBeats / len);
+    // Where the phase actually comes from. A Loop-Editor switch layered over Song
+    // Mode counts as a loop: the Sequencer drops that pattern's song blocks and
+    // plays it from the LoopManager anchor instead.
+    const bool anchorIsOrigin = playhead.isLoopActive() || pp.manualLoop;
+
+    if (anchorIsOrigin) {
+        growInstId_         = 0;
+        growBaseInstLength_ = 0.0f;
+        // Advance the anchor by the whole passes already played. That is an exact
+        // multiple of the pattern length, so it maps the firing set onto itself:
+        // nothing moves and nothing is heard, but the pass in progress becomes pass
+        // 0 and growing the pattern now extends it.
+        if (cycle > 0)
+            playhead.reanchorPattern(pp.anchorBar + (float)cycle * len / pp.beatsPerBar);
+    } else {
+        const PatternInstance* inst = growableInstance(bars, pp);
+        if (!inst || cycle > 0) {
+            // In Song Mode the engine takes its phase from the block, not from the
+            // LoopManager, so there is nothing we can re-anchor: moving the anchor
+            // alone would split the drawn head from what is played. Record normally.
+            if (luvieDebug())
+                fprintf(stderr, "[luvie] not growing: %s\n", !inst
+                        ? "no usable pattern block under the playhead on the selected "
+                          "lane - in Song mode the pattern grows with its block, so "
+                          "there has to be exactly one, and no time signature change "
+                          "inside it"
+                        : "the block is longer than the pattern and the playhead is "
+                          "past its first pass - start the take in the first pass");
+            return;
+        }
+        growInstId_         = inst->id;
+        growBaseInstLength_ = inst->length;
+    }
+
+    growBaseBeats_ = len;
+    growActive_    = true;
+    growTick();     // apply the invariant now, not one tick from now
+}
+
+void BasePatternEditor::growTick()
+{
+    if (!growActive_ || !pattern || lastPatId <= 0) return;
+    if (!playhead.transportPlaying()) return;
+
+    const Playhead::PatternPos pp = playhead.patternPos(playhead.transportBars());
+    if (!pp.running || pp.beatsPerBar <= 0.0f) return;
+
+    const float len = patternLengthBeats();
+    const float bar = patternBarBeats();
+    if (len <= 0.0f || bar <= 0.0f) { growActive_ = false; return; }
+
+    // One whole empty bar beyond the bar the head is in. Growing exactly at the
+    // boundary would put a tick interval - and in plugin mode a trip through the
+    // host's worker thread - on the critical path; the spare bar takes both off it.
+    const int head = (int)std::floor(pp.elapsedBeats / bar);
+    float     want = (float)(head + 2) * bar;
+    float     cap  = (float)kGrowMaxBars * bar;
+
+    const PatternInstance* inst = nullptr;
+    if (growInstId_) {
+        inst = pattern->song()->instanceById(growInstId_);
+        if (!inst) { growActive_ = false; growInstId_ = 0; return; }
+        // Same-lane blocks may not overlap - SongGrid rejects a drag that would make
+        // them - so stop where the next one starts. Recomputed every step, because
+        // the neighbour can be dragged while the take runs.
+        float nextStart = 0.0f;
+        bool  haveNext  = false;
+        const int laneId = pattern->song()->laneIdForInstance(growInstId_);
+        for (const auto& track : pattern->get().tracks)
+            for (const auto& lane : track.lanes) {
+                if (lane.id != laneId) continue;
+                for (const auto& other : lane.patterns) {
+                    if (other.id == growInstId_) continue;
+                    if (other.startBar <= inst->startBar) continue;
+                    if (!haveNext || other.startBar < nextStart) {
+                        nextStart = other.startBar;
+                        haveNext  = true;
+                    }
+                }
+            }
+        if (haveNext)
+            cap = std::min(cap, (nextStart - pp.anchorBar) * pp.beatsPerBar);
+    }
+
+    want = std::min(want, cap);
+    // Capped is not finished: the take keeps recording (the pattern simply wraps
+    // again, which is what the existing clip-at-the-end path already handles) and
+    // growActive_ stays set so the end-of-take trim still runs.
+    if (want <= len + kGrowEps) return;
+
+    {
+        ObservableSong::Batch batch(pattern->song());
+        pattern->setPatternLength(lastPatId, want);
+        if (growInstId_) {
+            // Required, not cosmetic: the sequencer clamps a song instance's firing
+            // window to its placement, sync() drops the pattern once the playhead
+            // leaves it, and the song grid's length - which is what stops the
+            // transport at the end of the song - is derived from it too.
+            inst = pattern->song()->instanceById(growInstId_);   // the notify may move it
+            if (!inst) { growActive_ = false; growInstId_ = 0; return; }
+            const float need = pp.anchorBar + want / pp.beatsPerBar - inst->startBar;
+            if (need > inst->length) pattern->song()->resizePattern(growInstId_, need);
+        }
+    }
+
+    // Keep the head on screen as the grid outgrows the viewport.
+    const int colW = gridColWidth();
+    if (colW > 0) {
+        const int visibleCols = gridWidgetW() / colW;
+        const int headCol     = (int)pp.elapsedBeats;
+        if (visibleCols > 1 && headCol >= colOffset + visibleCols - 1)
+            setColOffset(headCol - visibleCols + 2);
+    }
+}
+
+void BasePatternEditor::endGrow()
+{
+    if (!growActive_) return;
+    growActive_ = false;
+    const int   instId      = growInstId_;
+    const float baseBeats   = growBaseBeats_;
+    const float baseInstLen = growBaseInstLength_;
+    growInstId_ = 0;
+
+    if (!pattern || lastPatId <= 0) return;
+    const Pattern* p = nullptr;
+    for (const auto& q : pattern->get().patterns)
+        if (q.id == lastPatId) { p = &q; break; }
+    if (!p) return;                         // undone out from under us
+
+    const float bar = (float)std::max(1, p->timeSigTop);
+
+    // The bar after the last one anything sits in. Note the two predicates:
+    // setPatternLength's truncation drops a note whose END is past the length but a
+    // drum hit whose START is at or past it, so a hit exactly on the final bar line
+    // needs the bar after it while a note ending exactly there does not.
+    float used = 0.0f;
+    for (const auto& n : p->notes)
+        used = std::max(used, std::ceil((n.beat + n.length) / bar - kGrowEps) * bar);
+    for (const auto& d : p->drumNotes)
+        used = std::max(used, (std::floor(d.beat / bar) + 1.0f) * bar);
+    // Automation survives a shrink either way (truncation leaves param lanes alone),
+    // but a bar carrying a dot is not an empty bar.
+    for (const auto& lane : p->paramLanes)
+        for (const auto& pt : lane.points)
+            if (!pt.anchor) used = std::max(used, (std::floor(pt.beat / bar) + 1.0f) * bar);
+
+    // Never below what the pattern was before the take, and never below one bar.
+    float finalBeats = std::max({ baseBeats, used, bar });
+    if (finalBeats >= p->lengthBeats - kGrowEps) return;    // nothing grew, or nothing to give back
+
+    ObservableSong::Batch batch(pattern->song());
+    pattern->setPatternLength(lastPatId, finalBeats);
+    if (instId) {
+        const PatternInstance* inst = pattern->song()->instanceById(instId);
+        if (!inst) return;
+        const Pattern* pat = nullptr;
+        for (const auto& q : pattern->get().patterns)
+            if (q.id == lastPatId) { pat = &q; break; }
+        if (!pat) return;
+        const float bpb = pattern->song()->patternBeatsPerBar((int)inst->startBar, *pat);
+        if (bpb <= 0.0f) return;
+        const float anchor = inst->startBar - inst->startOffset / bpb;
+        const float want   = std::max(baseInstLen,
+                                      anchor + finalBeats / bpb - inst->startBar);
+        if (want < inst->length) pattern->song()->resizePattern(instId, want);
+    }
 }
 
 void BasePatternEditor::setAuditioner(NoteAuditioner* a)
@@ -305,7 +589,18 @@ void BasePatternEditor::applyPatternLength(int patId)
     gridSetNumCols((int)lb);
     paramGrid.setNumCols((int)lb);
     playhead.setNumCols((int)lb);
+
+    // setColOffset() shows and hides the horizontal scrollbar, but the strip it
+    // occupies is reserved by relayout(), so a length that crosses the overflow
+    // threshold has to re-run the layout or the scrollbar appears over the bottom
+    // row of notes. Flexible-bars recording crosses it mid-take; the Bars spinner
+    // has always been able to cross it too.
+    const bool hadHScroll = hScrollbar && hScrollbar->visible();
     setColOffset(colOffset);
+    if (hScrollbar && hScrollbar->visible() != hadHScroll) {
+        relayout();
+        setColOffset(colOffset);
+    }
     redraw();
 }
 

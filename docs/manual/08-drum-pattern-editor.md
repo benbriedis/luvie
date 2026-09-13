@@ -25,3 +25,7 @@ see [Recording from a MIDI keyboard](06-pattern-editors.md#recording-from-a-midi
 Drum maps are keyed by MIDI note already, so a pad lands on the row its note
 names. The one difference is that how long you hold a pad makes no difference: a
 drum note has no length, so it is written the moment the pad goes down.
+
+The **Grow** toggle works here too — see
+[Flexible bars](06-pattern-editors.md#flexible-bars) — so a fill can run as long
+as it needs to without deciding the bar count first.

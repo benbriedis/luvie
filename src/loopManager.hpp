@@ -37,6 +37,14 @@ public:
 	// Song mode. Notifies if anything changed.
 	void restore(const std::vector<int>& patterns, float anchorBar);
 
+	// Move one active pattern's anchor, leaving the manual and disabled sets alone.
+	// activate() cannot serve: it also marks the pattern manually active, and the
+	// Sequencer drops a manual pattern's song blocks entirely. Used by flexible-bars
+	// recording, which re-phases the pattern onto the pass in progress so growing it
+	// extends that pass instead of moving the loop point under the playhead. No-op
+	// when the pattern is not active or the anchor is unchanged.
+	void reanchor(int patId, float anchorBar);
+
 	// Move every active pattern's anchor to anchorBar, so each one restarts from
 	// its first beat when the transport reaches that bar. Used by the rewind
 	// button in Loop mode: without it a pattern keeps the phase it was switched

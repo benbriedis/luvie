@@ -410,12 +410,17 @@ TO MAKE THIS A GREAT COMPOSITION TOOL STILL WANT
    DONE: one MIDI input (Jack/Native/Plugin + channel) in Instruments and I/O,
    routed to the open pattern editor, with a Record toggle on the pianoroll and
    drum control rows. Plays what arrives, and records it when armed and rolling.
-   Still open: quantisation (notes keep the length played), parameter/automation
-   recording, a replace mode (it only overdubs), recording into the harmony
-   editor, and item 2 below - a take cannot grow the pattern.
+   Still open: parameter/automation recording, a replace mode (it only overdubs),
+   and recording into the harmony editor.
 2. Indefinite length patterns - autogrow when recording (or adding notes...
     similar rule to Song Editor?). Will want zoom and location tools...
 	don't necessary ALWAYS need them.
+   DONE for recording: a 'Grow' toggle next to Record. The pattern loops as usual
+   until the take's first note, then gains a bar whenever the playhead nears the
+   end; the bars nothing was played into come off again when the take ends. In
+   song mode the pattern's block grows with it, stopping at the next block on the
+   lane or at 64 bars. The grid follows the playhead as it outgrows the viewport.
+   Still open: autogrow when adding notes with the mouse, and the location tools.
 3. Ability to copy and paste between patterns of like type.
 4. EXTRA: tool to move from pianoroll to harmony.
 5. EXTRA: scenes and triggers to move between them.
@@ -429,5 +434,14 @@ CHECK if Jack is used as an input and Jack is not active create an alert
 
 Record button: should be a circle
 
-Where is my multi-select in LV2... not seeing it
+----
 
+Where is my multi-select in LV2... not seeing it
+Mention 'grow' option on website + docs (inc use case)
+
+Allow recording in song mode
+If the pattern is in the Song Editor auto-grow the song block
+
+NB some horizontal red lines in Song Editor are thicker than others...
+
+TODO test plugin version of flexi
