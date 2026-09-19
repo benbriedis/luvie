@@ -7,10 +7,15 @@
 #include "modern/contextMenuPopup.hpp"
 #include "observablePattern.hpp"
 #include "parameterSubmenu.hpp"
+#include "midiLearn.hpp"
+#include <string>
 
 class ParamLaneContextPopup : public ContextMenuPopup {
     ObservablePattern* timeline = nullptr;
     int                laneId   = -1;
+    std::string        laneType;          // what MIDI learn binds
+    ModernButton*      learnBtn      = nullptr;
+    ModernButton*      clearLearnBtn = nullptr;
 
     void doShowParamSubmenu() {
         if (!paramSubmenu) return;
@@ -29,11 +34,15 @@ public:
     static constexpr int popW = 160;
 
     ParameterSubmenu* paramSubmenu = nullptr;
+    // Where "MIDI learn" and "Clear MIDI learn" act. Without it they never show.
+    MidiLearnMap*     midiLearn    = nullptr;
 
-    ParamLaneContextPopup() : ContextMenuPopup(popW, 2*30+2) {
+    ParamLaneContextPopup() : ContextMenuPopup(popW, 4*30+2) {
         auto* addParamBtn = addItem(0, "Add automation");
         addParamBtn->setSubmenuArrow(true);
         auto* removeBtn   = addItem(1, "Remove automation");
+        learnBtn          = addItem(2, "MIDI learn");
+        clearLearnBtn     = addItem(3, "Clear MIDI learn");
 
         addParamBtn->callback([](Fl_Widget*, void* d) {
             static_cast<ParamLaneContextPopup*>(d)->doShowParamSubmenu();
@@ -42,9 +51,21 @@ public:
             static_cast<ParamLaneContextPopup*>(d)->doRemove();
         }, this);
 
-        removeBtn->onEnter = [this]() {
-            if (paramSubmenu) paramSubmenu->hide();
-        };
+        learnBtn->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<ParamLaneContextPopup*>(d);
+            self->hide();
+            if (self->midiLearn) self->midiLearn->toggleLearn(self->laneType);
+        }, this);
+        clearLearnBtn->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<ParamLaneContextPopup*>(d);
+            self->hide();
+            if (self->midiLearn) self->midiLearn->clear(self->laneType);
+        }, this);
+
+        auto closeSubmenu = [this]() { if (paramSubmenu) paramSubmenu->hide(); };
+        removeBtn->onEnter     = closeSubmenu;
+        learnBtn->onEnter      = closeSubmenu;
+        clearLearnBtn->onEnter = closeSubmenu;
 
         paramSubmenu = new ParameterSubmenu();
         paramSubmenu->onSelect = [this](const char* type) {
@@ -67,6 +88,27 @@ public:
     void open(int laneId_, ObservablePattern* tl, int wx, int wy) {
         timeline = tl;
         laneId   = laneId_;
+        laneType.clear();
+        if (tl)
+            for (const auto& l : tl->get().paramLanes)
+                if (l.id == laneId) { laneType = l.type; break; }
+
+        // "Clear MIDI learn" only when there is a binding to clear. The rows below
+        // the fixed two are stacked, and popH follows, because
+        // ContextMenuPopup::resize() snaps the window back to popH.
+        const bool canLearn = midiLearn && !laneType.empty();
+        int shown = 2;
+        auto place = [&](ModernButton* b, bool vis) {
+            if (!vis) { b->hide(); return; }
+            b->resize(b->x(), 1 + shown * btnH, b->w(), b->h());
+            b->show();
+            shown++;
+        };
+        if (canLearn) learnBtn->copy_label(midiLearn->learnMenuLabel(laneType).c_str());
+        place(learnBtn,      canLearn);
+        place(clearLearnBtn, canLearn && midiLearn->bindingFor(laneType));
+        popH = shown * btnH + 2;
+        size(popW, popH);
         openAt(wx, wy);
     }
 };

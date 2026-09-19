@@ -4,6 +4,8 @@
 #include "basePatternEditor.hpp"
 #include "noteAuditioner.hpp"
 #include "luvieDebug.hpp"
+#include "chords.hpp"          // ccForType
+#include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
 #include <cmath>
@@ -26,7 +28,14 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
     // check per bar growth actually needs, and the project has no polling threads to
     // add one to. Only the song editor sets onTick, so the pattern editors' copies
     // are free.
-    playhead.onTick = [this]() { growTick(); };
+    playhead.onTick = [this]() {
+        growTick();
+        // Same timer, for the same reason: recorded controller values are written
+        // out in batches rather than per message (see flushRecordedParams).
+        if (!recParams_.empty() &&
+            std::chrono::duration<double>(Clock::now() - lastParamFlush_).count() >= kParamFlushSecs)
+            flushRecordedParams();
+    };
 
     const int gridH        = numRows * rowHeight;
     const int paramY       = y + rulerH + gridH;
@@ -120,17 +129,32 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
     // is for, and it costs nothing when the transport is stopped.
     if (auditioner) auditioner->noteOn(currentInstrumentId(), pitch, velocity);
 
-    if (!recArmed_ || !canRecord() || !pattern) return;
+    float beat = 0.0f;
+    if (!beginRecordedEvent(beat)) return;
+
+    if (recordsOnNoteOn()) {
+        // No length to work out, but the start is quantised like any other.
+        float start = 0.0f, len = 0.0f;
+        recordedNoteSpan(beat, beat, start, len);
+        commitRecordedNote(pitch, start, len, velocity);
+        return;
+    }
+    recNotes_.push_back({pitch, beat, velocity});
+}
+
+bool BasePatternEditor::beginRecordedEvent(float& beat)
+{
+    if (!recArmed_ || !canRecord() || !pattern) return false;
 
     // Three things have to be true to record, and "nothing happened" looks the
     // same for all of them, so say which one failed when tracing is on.
     const bool rolling = playhead.transportPlaying();
-    const float beat   = rolling ? playhead.patternBeat(playhead.transportBars()) : -1.0f;
+    beat = rolling ? playhead.patternBeat(playhead.transportBars()) : -1.0f;
     if (luvieDebug() && (!rolling || beat < 0.0f))
         fprintf(stderr, "[luvie] not recorded: %s\n", !rolling
                 ? "transport is not rolling"
                 : "there is no pattern on screen to record into");
-    if (!rolling || beat < 0.0f) return;
+    if (!rolling || beat < 0.0f) return false;
 
     if (!recUndo_) {
         recUndo_.emplace(pattern->song());              // the take starts here
@@ -142,18 +166,148 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
         // is there in the Song Editor rather than only in the pattern.
         ensureSongBlock();
     }
-    // Before the note is placed, so a pattern about to stop looping has already
-    // gained the room the note may need.
+    // Before the event is placed, so a pattern about to stop looping has already
+    // gained the room it may need.
     engageGrow();
+    return true;
+}
 
-    if (recordsOnNoteOn()) {
-        // No length to work out, but the start is quantised like any other.
-        float start = 0.0f, len = 0.0f;
-        recordedNoteSpan(beat, beat, start, len);
-        commitRecordedNote(pitch, start, len, velocity);
-        return;
+void BasePatternEditor::midiParam(const std::string& type, int value)
+{
+    // Heard as it moves, armed or not, exactly as a played note is.
+    if (auditioner) auditioner->param(currentInstrumentId(), ccForType(type), value);
+
+    float beat = 0.0f;
+    if (!beginRecordedEvent(beat)) return;
+
+    const Clock::time_point now = Clock::now();
+    ParamTouch& t = recParamTouch_[type];
+    const bool gestureStart = t.value < 0 ||
+        std::chrono::duration<double>(now - t.at).count() > kParamGestureGapSecs;
+    t.at = now;
+    // A control can repeat itself (some send on a timer); a repeat adds nothing.
+    if (!gestureStart && value == t.value) return;
+    t.value = value;
+
+    if (recParams_.empty()) lastParamFlush_ = now;   // the batch starts its clock
+    recParams_.push_back({type, beat, value, gestureStart});
+}
+
+void BasePatternEditor::flushRecordedParams()
+{
+    lastParamFlush_ = Clock::now();
+    if (recParams_.empty()) return;
+    auto pending = std::move(recParams_);
+    recParams_.clear();
+    if (!pattern || lastPatId <= 0) return;
+
+    // A point this close to the start is the anchor's job: it cannot be deleted or
+    // moved, so a value landing on it becomes the anchor's value instead.
+    constexpr float kAnchorEps = 1.0f / 256.0f;
+
+    ObservableSong::Batch batch(pattern->song());
+    for (const RecordingParam& e : pending) {
+        // Look the lane up each time: the pattern is edited as we go.
+        const Pattern* pat = nullptr;
+        for (const auto& p : pattern->get().patterns)
+            if (p.id == lastPatId) { pat = &p; break; }
+        if (!pat) return;
+
+        int laneId = -1;
+        for (const auto& l : pat->paramLanes)
+            if (l.type == e.type) { laneId = l.id; break; }
+        if (laneId < 0) {
+            laneId = pattern->addPatternParamLane(lastPatId, e.type);
+            if (laneId < 0) continue;
+            pat = nullptr;   // the vector the lane lives in may have moved
+            for (const auto& p : pattern->get().patterns)
+                if (p.id == lastPatId) { pat = &p; break; }
+            if (!pat) return;
+        }
+        const ParamLane* lane = nullptr;
+        for (const auto& l : pat->paramLanes)
+            if (l.id == laneId) { lane = &l; break; }
+        if (!lane) continue;
+
+        // Touch: within one movement, whatever was on the lane between the previous
+        // value and this one is what the player just replaced. If the pattern
+        // wrapped in between, that span runs off the end and in again at the start.
+        // Messages drained together all read the same playhead position, so the
+        // span can be empty: then the value already written there is the one being
+        // replaced, rather than two points stacking on one beat.
+        ParamTouch& t = recParamTouch_[e.type];
+        std::vector<int> doomed;
+        int anchorId = -1;
+        const bool sameBeat = std::fabs(e.beat - t.beat) < 1e-6f;
+        for (const auto& pt : lane->points) {
+            if (pt.anchor) { anchorId = pt.id; continue; }
+            if (e.gestureStart || t.beat < 0.0f) continue;
+            const bool inSpan = sameBeat ? std::fabs(pt.beat - e.beat) < 1e-6f
+                              : (e.beat > t.beat) ? (pt.beat > t.beat && pt.beat <= e.beat)
+                              : (pt.beat > t.beat || pt.beat <= e.beat);
+            if (inSpan) doomed.push_back(pt.id);
+        }
+        auto& taken = takeParamPoints_[laneId];
+        for (int id : doomed) {
+            pattern->removeParamPoint(id);
+            taken.erase(id);
+        }
+        // A movement carried across the loop point passes over the anchor too, so it
+        // takes the value the control had when it came round.
+        const bool wrapped = !e.gestureStart && t.beat >= 0.0f && !sameBeat && e.beat < t.beat;
+        t.beat = e.beat;
+
+        if (anchorId >= 0 && (wrapped || e.beat < kAnchorEps))
+            pattern->moveParamPoint(anchorId, 0.0f, e.value);
+        if (e.beat < kAnchorEps) continue;
+        const int id = pattern->addPatternParamPoint(lastPatId, laneId, e.beat, e.value);
+        if (id >= 0) taken.insert(id);
     }
-    recNotes_.push_back({pitch, beat, velocity});
+}
+
+void BasePatternEditor::thinRecordedParams()
+{
+    if (takeParamPoints_.empty()) return;
+    auto taken = std::move(takeParamPoints_);
+    takeParamPoints_.clear();
+    if (!pattern || lastPatId <= 0) return;
+
+    const Pattern* pat = nullptr;
+    for (const auto& p : pattern->get().patterns)
+        if (p.id == lastPatId) { pat = &p; break; }
+    if (!pat) return;
+
+    // Only runs of points this take wrote are thinned; anything the take left
+    // alone, and the ends of each run, stay exactly where they were.
+    std::vector<int> drop;
+    std::vector<float> beats;
+    std::vector<int>   values, ids;
+    std::vector<char>  keep;
+    for (const auto& lane : pat->paramLanes) {
+        auto it = taken.find(lane.id);
+        if (it == taken.end()) continue;
+        const double tol = laneMaxValue(lane.type) / 100.0;   // ~1 CC step
+        auto flushRun = [&]() {
+            if (ids.size() > 2) {
+                thinParamRun(beats, values, tol, keep);
+                for (size_t i = 0; i < ids.size(); i++)
+                    if (!keep[i]) drop.push_back(ids[i]);
+            }
+            beats.clear(); values.clear(); ids.clear();
+        };
+        for (const auto& pt : lane.points) {
+            if (pt.anchor || !it->second.count(pt.id)) { flushRun(); continue; }
+            beats.push_back(pt.beat);
+            values.push_back(pt.value);
+            ids.push_back(pt.id);
+        }
+        flushRun();
+    }
+    if (luvieDebug() && !drop.empty())
+        fprintf(stderr, "[luvie] automation thinned: %zu points dropped\n", drop.size());
+    if (drop.empty()) return;
+    ObservableSong::Batch batch(pattern->song());
+    for (int id : drop) pattern->removeParamPoint(id);
 }
 
 float BasePatternEditor::quantiseBeat(float beat) const
@@ -222,6 +376,13 @@ void BasePatternEditor::releaseMidiNotes()
             commitRecordedNote(n.pitch, start, len, n.velocity);
         }
     }
+    // Controller values still buffered belong to this take, and the thinning has to
+    // see all of them. Both inside the take's undo group, so one ctrl-Z undoes the
+    // notes and the automation together.
+    flushRecordedParams();
+    thinRecordedParams();
+    recParamTouch_.clear();
+
     // Inside the still-open undo group, and after the commits above: the trim has to
     // see the notes this take just wrote, and the bars it removes belong to the same
     // ctrl-Z as the notes that caused them.
@@ -600,13 +761,20 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
         if (lastSelectedTrack >= (int)pattern->get().tracks.size()) return;
         int patId = pattern->get().patternIdForSelectedLane();
         std::function<void()> onRemove;
-        if (laneId >= 0)
+        std::string laneType;   // for MIDI learn, which binds the type, not this lane
+        if (laneId >= 0) {
             onRemove = [this, laneId]() { pattern->removePatternParamLane(laneId); };
+            for (const auto& p : pattern->get().patterns)
+                for (const auto& l : p.paramLanes)
+                    if (l.id == laneId) laneType = l.type;
+        }
         popup->open(
             Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
             [this, patId](const char* type) { pattern->addPatternParamLane(patId, type); },
-            std::move(onRemove)
+            std::move(onRemove),
+            {},                       // no "Rename" for a param lane
+            std::move(laneType)
         );
     };
 }

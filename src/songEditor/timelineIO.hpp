@@ -21,6 +21,28 @@ struct MidiInput {
     int         channel = 0;   // 0 = Any; 1-16 = listen on that channel alone
 };
 
+// A hardware control, as MIDI learn identifies it. Always read on the input's
+// configured channel, so the channel is not part of it. num is the CC number and
+// is unused for the other kinds.
+enum class MidiSrcKind { None, CC, PitchBend, Pressure };
+struct MidiSrc {
+    MidiSrcKind kind = MidiSrcKind::None;
+    int         num  = 0;
+    bool operator==(const MidiSrc& o) const {
+        return kind == o.kind && (kind != MidiSrcKind::CC || num == o.num);
+    }
+    bool operator!=(const MidiSrc& o) const { return !(*this == o); }
+};
+// Param-lane type ("Modulation", "Pitch", ...) -> the control that drives it. One
+// binding per type for the whole project: every pattern's lane of that type and the
+// Song Editor's share it.
+using MidiLearnBindings = std::map<std::string, MidiSrc>;
+// What a new project starts with: the two controls nearly every keyboard has.
+inline MidiLearnBindings defaultMidiLearnBindings() {
+    return { {"Pitch",      {MidiSrcKind::PitchBend, 0}},
+             {"Modulation", {MidiSrcKind::CC,        1}} };
+}
+
 struct JackInstrument {
     int         id                = 0;   // timeline Instrument ID (0 if unset)
     std::string name;
@@ -43,6 +65,9 @@ struct AppState {
     std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;
     MidiInput midiInput;
+    // Starts at the defaults so a project saved before MIDI learn existed, which
+    // has no "midiLearn" key, loads with them rather than with nothing bound.
+    MidiLearnBindings midiLearn = defaultMidiLearnBindings();
 
     // Song/Loop mode, and in Loop mode which patterns the Loop Editor has switched
     // on. The LoopManager is otherwise runtime-only state, but these two survive so

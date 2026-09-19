@@ -361,6 +361,7 @@ int main(int argc, char **argv) {
         state.loopMode           = app.isLoopMode();
         state.activeLoopPatterns = app.activeLoopPatterns();
         app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
+        state.midiLearn = app.midiLearn.bindings();
         return state;
     };
 
@@ -377,6 +378,7 @@ int main(int argc, char **argv) {
         // above fires the sync that would otherwise repopulate the active set.
         app.applyLoopState(state.loopMode, state.activeLoopPatterns);
         app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
+        app.midiLearn.setBindings(state.midiLearn);
     };
 
     // --- Transport selection ----------------------------------------------
@@ -568,6 +570,8 @@ int main(int argc, char **argv) {
     // so the tracker above never sees them — but they are saved now, so a change to
     // either has to dirty the project the same way an edit does.
     app.onLoopStateChanged = [&]() { session->markDirty(); };
+    // MIDI-learn bindings are saved but live outside the timeline too.
+    app.onMidiLearnChanged = [&]() { session->markDirty(); };
 
     // Song-loop (Start/End markers + toggle) → the clock, which owns the wrap: the
     // JACK backend's RT sequencer splits the cycle at the loop seam sample-accurately,

@@ -20,8 +20,11 @@ inline constexpr int kParamAreaH   = kMaxVisParams * kParamRowH;
 
 // ── Left column: type labels for each visible param lane ─────────────────────
 
+class MidiLearnMap;
+
 class PatternParamLabels : public Fl_Widget {
     ObservablePattern* pattern   = nullptr;
+    const MidiLearnMap* midiLearn = nullptr;
     int                 patternId  = -1;
     int                 laneOffset = 0;
 
@@ -40,6 +43,8 @@ public:
         redraw();
     }
     void setLaneOffset(int off) { laneOffset = off; redraw(); }
+    // Shows each lane's MIDI-learn binding and live value under its name.
+    void setMidiLearn(const MidiLearnMap* m) { midiLearn = m; redraw(); }
 };
 
 // ── Rubberband editing grid ───────────────────────────────────────────────────

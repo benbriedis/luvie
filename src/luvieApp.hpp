@@ -14,6 +14,7 @@
 #include "loopModeController.hpp"
 #include "noteAuditioner.hpp"
 #include "midiInPort.hpp"
+#include "midiLearn.hpp"
 
 struct AppState;
 class ObservableSong;
@@ -154,6 +155,14 @@ public:
     // the plugin UI needs it too: hosted, nothing is opened and the LV2 port_event
     // feeds it directly, but the sink and the routing below are the same either way.
     MidiInputManager midiIn;
+
+    // Which hardware control drives each param-lane type, shared by every pattern and
+    // the Song Editor. Saved with the project (AppState::midiLearn) but kept out of
+    // the timeline, so undo never changes a binding.
+    MidiLearnMap midiLearn;
+    // The user bound or cleared a control: the project needs saving (standalone), or
+    // the state re-sending to the DSP (plugin). Loading bindings does not fire it.
+    std::function<void()> onMidiLearnChanged;
 
     // Widgets — valid after build()
     SettingsButton*    settingsButton = nullptr;

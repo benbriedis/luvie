@@ -33,6 +33,7 @@
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
 #include "pianorollEditor.hpp"
+#include "chords.hpp"          // ccForType
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
 #include "transportOverlay.hpp"
@@ -157,6 +158,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     app->song_->loadTimeline(state.timeline);
     if (app->onApplyOutputs) app->onApplyOutputs(state);
     app->applyLoopState(state.loopMode, state.activeLoopPatterns);
+    app->midiLearn.setBindings(state.midiLearn);
 }
 
 void LuvieApp::exportCb(Fl_Widget*, void* data) {
@@ -181,6 +183,7 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     if (app->onCollectOutputs) app->onCollectOutputs(state);
     state.loopMode           = app->isLoopMode();
     state.activeLoopPatterns = app->activeLoopPatterns();
+    state.midiLearn          = app->midiLearn.bindings();
     saveAppState(state, path);
 }
 
@@ -563,6 +566,22 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     harmonyEd->setParamLabelsContextPopup(nlCtxPop);
     drumEd->setParamLabelsContextPopup(nlCtxPop);
     pianorollEd->setParamLabelsContextPopup(nlCtxPop);
+    // MIDI learn: the param-lane menus bind controls, and every param label shows
+    // what is bound and what it last sent.
+    nlCtxPop->midiLearn = &midiLearn;
+    plcPop->midiLearn   = &midiLearn;
+    for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
+                                  (BasePatternEditor*)pianorollEd})
+        ed->setMidiLearn(&midiLearn);
+    songEd->setMidiLearn(&midiLearn);
+    midiLearn.onDisplayChanged = [this]() {
+        for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
+                                      (BasePatternEditor*)pianorollEd})
+            ed->redrawParamLabels();
+        songEd->redrawTrackLabels();
+    };
+    midiLearn.onEdited = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
+
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
@@ -587,8 +606,28 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             fprintf(stderr, "[luvie] midi in: %02X %02X%s target=%s\n",
                     data[0], len > 1 ? data[1] : 0,
                     len > 2 ? " .." : "", midiTarget ? "yes" : "NONE");
-        if (!midiTarget || len < 2) return;
+        if (len < 2) return;
         const int status = data[0] & 0xF0;
+
+        // Controllers: MIDI learn decides what they are. Checked before the target,
+        // because learning and the labels' live values work from any tab.
+        if (status == 0xB0 || status == 0xD0 || status == 0xE0) {
+            std::string type;
+            int         value = 0;
+            if (!midiLearn.handle(data, len, type, value)) return;
+            if (midiTarget) {
+                midiTarget->midiParam(type, value);
+            } else if (song_) {
+                // No pattern editor showing: still heard, on the selected track's
+                // instrument, so the control behaves the same from the Song tab.
+                const auto& tl  = song_->get();
+                const int   sel = tl.selectedTrackIndex;
+                if (sel >= 0 && sel < (int)tl.tracks.size())
+                    auditioner.param(tl.tracks[sel].instrumentId, ccForType(type), value);
+            }
+            return;
+        }
+        if (!midiTarget) return;
         const int pitch  = data[1] & 0x7F;
         if (status == 0x90) {
             const int vel = (len >= 3) ? (data[2] & 0x7F) : 0;
@@ -598,8 +637,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         } else if (status == 0x80) {
             midiTarget->midiNoteOff(pitch);
         }
-        // Anything else (CC, pitch bend, program change) is ignored for now:
-        // parameter recording is not part of this.
     });
 
     // The Record toggle arms whichever editor is currently the target.

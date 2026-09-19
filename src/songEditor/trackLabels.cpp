@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "trackLabels.hpp"
+#include "midiLearnBadge.hpp"
 #include "trackContextPopup.hpp"
 #include "cursors.hpp"
 #include "paramLaneContextPopup.hpp"
@@ -487,6 +488,14 @@ void TrackLabels::draw()
                     if (lane.id == ref.id) {
                         fl_draw(lane.type.c_str(), x() + 4, ry, w() - 8, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                        // Right of the name, on the same line: these rows are too
+                        // short to stack it underneath as the pattern editors do.
+                        const Fl_Font     font = fl_font();
+                        const Fl_Fontsize size = fl_size();
+                        const int nameW = (int)fl_width(lane.type.c_str()) + 10;
+                        drawMidiLearnBadge(midiLearn, lane.type, x() + 4 + nameW, ry,
+                                           w() - 8 - nameW, rh, FL_ALIGN_RIGHT);
+                        fl_font(font, size);
                         break;
                     }
             }

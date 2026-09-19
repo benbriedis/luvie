@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "patternParamGrid.hpp"
+#include "midiLearnBadge.hpp"
 #include "cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -45,10 +46,18 @@ void PatternParamLabels::draw()
         if (pat) {
             int li = r + laneOffset;
             if (li < (int)pat->paramLanes.size()) {
+                const std::string& type = pat->paramLanes[li].type;
+                const bool badge = midiLearn &&
+                    (midiLearn->bindingFor(type) || midiLearn->isLearning(type));
+                // With a badge the name moves up to make room for it underneath.
+                const int nameH = badge ? kParamRowH / 2 + 4 : kParamRowH;
+                fl_font(FL_HELVETICA, 10);
                 fl_color(kText);
-                fl_draw(pat->paramLanes[li].type.c_str(),
-                        x() + 4, rowY, w() - 8, kParamRowH,
+                fl_draw(type.c_str(), x() + 4, rowY + (badge ? 4 : 0), w() - 8, nameH,
                         FL_ALIGN_LEFT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
+                if (badge)
+                    drawMidiLearnBadge(midiLearn, type, x() + 4, rowY + kParamRowH / 2,
+                                       w() - 8, kParamRowH / 2 - 4, FL_ALIGN_LEFT);
             }
         }
     }

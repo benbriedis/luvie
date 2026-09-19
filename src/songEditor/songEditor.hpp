@@ -79,6 +79,9 @@ public:
     void setPattern(ObservablePattern* p);
     void setContextPopup(TrackContextPopup* p);
     void setParamLaneContextPopup(ParamLaneContextPopup* p);
+    // Param rows show their type's MIDI-learn binding and live value.
+    void setMidiLearn(const MidiLearnMap* m) { trackLabels.setMidiLearn(m); }
+    void redrawTrackLabels() { trackLabels.redraw(); }
     void setTrackView(int trackIndex, bool beatResolution);
 
     // Ask for the playhead to be scrolled to the left edge (if off-screen) on the

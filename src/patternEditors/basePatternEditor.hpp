@@ -12,8 +12,12 @@
 #include "itransport.hpp"
 #include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
+#include <chrono>
 #include <functional>
+#include <map>
 #include <optional>
+#include <set>
+#include <string>
 #include <vector>
 
 class NoteAuditioner;
@@ -75,6 +79,36 @@ protected:
     // Editors that record on the note-on (drums) never put anything here.
     struct RecordingNote { int pitch; float startBeat; int velocity; };
     std::vector<RecordingNote> recNotes_;
+
+    // The shared front half of recording anything: checks the editor is armed and
+    // the transport is rolling over a pattern, sets `beat` to where the playhead is
+    // (pattern-relative), and opens the take on its first event. False means this
+    // event is not recorded.
+    bool beginRecordedEvent(float& beat);
+
+    // ── Recording controller automation ──────────────────────────────────────
+    // Values from a bound MIDI-learn control. They are buffered rather than written
+    // one by one because every write is a notify(), which rebuilds the Sequencer
+    // snapshot and, hosted, re-sends the whole timeline to the DSP — too much at
+    // the rate a mod wheel sends. The buffer is written out from the playhead's
+    // existing tick, at most every kParamFlushSecs, and at the end of the take.
+    using Clock = std::chrono::steady_clock;
+    static constexpr double kParamFlushSecs = 0.1;
+    // Messages further apart than this belong to separate movements of the control.
+    // Within one movement ("touch"), what was already on the lane between two
+    // successive values is replaced; between movements it is left alone.
+    static constexpr double kParamGestureGapSecs = 0.25;
+    struct RecordingParam { std::string type; float beat; int value; bool gestureStart; };
+    std::vector<RecordingParam> recParams_;
+    struct ParamTouch { float beat = -1.0f; int value = -1; Clock::time_point at; };
+    std::map<std::string, ParamTouch> recParamTouch_;   // per type, this take
+    std::map<int, std::set<int>>      takeParamPoints_; // lane id -> points written this take
+    Clock::time_point                 lastParamFlush_;
+    // Write the buffered values into the pattern's lanes, creating a lane that is
+    // missing, as one notify.
+    void flushRecordedParams();
+    // End of take: thin what this take wrote down to the points that shape it.
+    void thinRecordedParams();
 
     // Write one finished note into the pattern. `lenBeats` is the played duration,
     // already clipped to the pattern; editors that record on the note-on ignore
@@ -205,6 +239,10 @@ public:
     // transport is rolling.
     void midiNoteOn(int pitch, int velocity);
     void midiNoteOff(int pitch);
+    // A bound MIDI-learn control moved. `value` is already in the lane's units.
+    // Always sent through to the instrument; recorded into the pattern's lane of
+    // that type when armed and rolling.
+    void midiParam(const std::string& type, int value);
     // Releases everything still sounding and closes the open take, committing any
     // held notes with the length they reached. Called when the editor stops being
     // the MIDI target and when the transport stops.
@@ -212,6 +250,9 @@ public:
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
+    // The param labels show each lane's MIDI-learn binding and live value.
+    void setMidiLearn(const MidiLearnMap* m) { paramLabels.setMidiLearn(m); }
+    void redrawParamLabels() { paramLabels.redraw(); }
     void onTimelineChanged() override;
 };
 

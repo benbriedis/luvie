@@ -5,6 +5,7 @@
 #define NOTE_AUDITIONER_HPP
 
 #include "playhead.hpp"   // MidiInstrRoute
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -23,11 +24,11 @@ public:
     void setInstrRoute(std::function<MidiInstrRoute(int)> r) { instrRoute = std::move(r); }
 
     // Alternative sink used when there is no local PortRegistry (LV2 plugin mode):
-    // the note is emitted by the host instead, e.g. forwarded to the DSP's MIDI out.
-    // (portName, ch, midi, velocity, on) — on=false is the matching note-off. The
-    // port name is passed through so the sink can pick the right output, exactly as
-    // the PortRegistry path does.
-    using MidiSink = std::function<void(const std::string&, int, int, int, bool)>;
+    // the message is emitted by the host instead, e.g. forwarded to the DSP's MIDI
+    // out. (portName, bytes, len) — a complete channel message, channel included.
+    // The port name is passed through so the sink can pick the right output,
+    // exactly as the PortRegistry path does.
+    using MidiSink = std::function<void(const std::string&, const uint8_t*, int)>;
     void setMidiSink(MidiSink s) { midiSink = std::move(s); }
 
     // Note-on to the instrument's port now; note-off after `seconds`.
@@ -39,10 +40,16 @@ public:
     void noteOn (int instrumentId, int midi, int velocity);
     void noteOff(int instrumentId, int midi);
 
+    // A controller value, sent straight through — how a bound MIDI-learn control is
+    // heard as it moves. ccNumber < 0 means pitch bend (value 0-16383), following
+    // ccForType(); otherwise a CC with value 0-127.
+    void param(int instrumentId, int ccNumber, int value);
+
 private:
     struct Pending { NoteAuditioner* self; std::string portName; int channel; int pitch; };
     static void offCb(void* data);
     void        sendOff(const Pending* p);
+    void        sendNote(const std::string& portName, int ch, int midi, int velocity, bool on);
 
     PortRegistry*                      portReg = nullptr;
     std::function<MidiInstrRoute(int)> instrRoute;

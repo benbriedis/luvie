@@ -268,6 +268,7 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
     state.loopMode           = ui->app.isLoopMode();
     state.activeLoopPatterns = ui->app.activeLoopPatterns();
     ui->app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
+    state.midiLearn = ui->app.midiLearn.bindings();
     return true;
 }
 
@@ -476,6 +477,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
        active set from the song. */
     ui->app.applyLoopState(state.loopMode, state.activeLoopPatterns);
     ui->loopMode = state.loopMode;
+    ui->app.midiLearn.setBindings(state.midiLearn);
     /* Song-loop region: applySongLoop() sets the ruler + toggle and pushes through
        onSongLoopChanged, which updates ui->songLoop* below. Done while
        restoringState is still true so the push's sendLoopState() is deferred to the
@@ -659,6 +661,11 @@ static LV2UI_Handle instantiate(
        that is what dsp_save stores and what a reopened editor reads back. Narrow by
        design: this fires only when the saved values change, never on the several
        sync() churns a bar that Song Mode produces. */
+    /* MIDI-learn bindings are part of the saved project, so a change goes to the
+       DSP the same way, for dsp_save to persist. */
+    ui->app.onMidiLearnChanged = [ui]() {
+        if (!ui->restoringState) sendState(ui);
+    };
     ui->app.onLoopStateChanged = [ui]() {
         if (!ui->restoringState) sendState(ui);
     };
@@ -685,16 +692,11 @@ static LV2UI_Handle instantiate(
 
     /* Emit auditioned notes (and their note-offs) to the DSP as raw MIDI. */
     ui->app.auditioner.setMidiSink(
-        [ui](const std::string& portName, int ch, int midi, int vel, bool on) {
-            uint8_t m[3] = {
-                static_cast<uint8_t>((on ? 0x90 : 0x80) | (ch & 0x0F)),
-                static_cast<uint8_t>(midi & 0x7F),
-                static_cast<uint8_t>(on ? (vel & 0x7F) : 0),
-            };
+        [ui](const std::string& portName, const uint8_t* m, int len) {
             int portIdx = 0;
             if (auto* ov = ui->app.outputsOverlay)
                 portIdx = pluginPortIndex(ov->getOutputsFull(), portName);
-            sendAuditionMidi(ui, portIdx, m, 3);
+            sendAuditionMidi(ui, portIdx, m, len);
         });
 
     /* ---- JACK transport control (Issue #2) ----

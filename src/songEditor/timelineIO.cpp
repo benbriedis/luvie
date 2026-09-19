@@ -338,6 +338,15 @@ std::string appStateToJsonString(const AppState& state) {
                            {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
                            {"gm1Instrument", c.gm1Instrument}});
     }
+    json jlearn = json::object();
+    for (const auto& [type, src] : state.midiLearn) {
+        switch (src.kind) {
+        case MidiSrcKind::CC:        jlearn[type] = {{"kind", "cc"}, {"num", src.num}}; break;
+        case MidiSrcKind::PitchBend: jlearn[type] = {{"kind", "bend"}};                 break;
+        case MidiSrcKind::Pressure:  jlearn[type] = {{"kind", "pressure"}};             break;
+        case MidiSrcKind::None:      break;
+        }
+    }
     json j = {
         {"version",         1},
         {"transport",       state.transport},
@@ -346,6 +355,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"jackOutputs",     jconns},
         {"midiInput",       {{"backend", backendToString(state.midiInput.backend)},
                              {"channel", state.midiInput.channel}}},
+        {"midiLearn",       jlearn},
         {"jackInstruments", jinstrs},
         {"loopMode",           state.loopMode},
         {"activeLoopPatterns", state.activeLoopPatterns},
@@ -384,6 +394,21 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         const auto& mi = j.at("midiInput");
         state.midiInput.backend = backendFromString(mi.value("backend", "jack"));
         state.midiInput.channel = mi.value("channel", 0);
+    }
+    // Absent in projects saved before MIDI learn: they keep the defaults AppState
+    // starts with. Present but empty means the user cleared them all, so it is
+    // honoured rather than refilled.
+    if (j.contains("midiLearn")) {
+        state.midiLearn.clear();
+        for (auto& [type, js] : j.at("midiLearn").items()) {
+            const std::string kind = js.value("kind", "");
+            MidiSrc src;
+            if (kind == "cc")            src = {MidiSrcKind::CC, std::clamp(js.value("num", 0), 0, 127)};
+            else if (kind == "bend")     src = {MidiSrcKind::PitchBend, 0};
+            else if (kind == "pressure") src = {MidiSrcKind::Pressure, 0};
+            else continue;
+            state.midiLearn[type] = src;
+        }
     }
     auto instrArray = j.contains("jackInstruments") ? j.value("jackInstruments", json::array())
                                                     : j.value("jackChannels",    json::array());

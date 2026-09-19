@@ -10,6 +10,7 @@
 
 class TrackContextPopup;
 class ParamLaneContextPopup;
+class MidiLearnMap;
 class ObservablePattern;
 
 class TrackLabels : public Fl_Group, public ITimelineObserver {
@@ -17,6 +18,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     ObservablePattern*      patternObs        = nullptr;
     TrackContextPopup*      contextPopup      = nullptr;
     ParamLaneContextPopup*  paramLanePopup    = nullptr;
+    const MidiLearnMap*     midiLearn         = nullptr;
     int                  numVisibleRows;
     int                  rowHeight;
     int                  rowOffset         = 0;
@@ -58,6 +60,8 @@ public:
 
     void setTimeline(ObservableSong* tl);
     void setPattern(ObservablePattern* p) { patternObs = p; }
+    // Param rows show their type's MIDI-learn binding and live value.
+    void setMidiLearn(const MidiLearnMap* m) { midiLearn = m; redraw(); }
     void setContextPopup(TrackContextPopup* p) { contextPopup = p; }
     void setParamLaneContextPopup(ParamLaneContextPopup* p) { paramLanePopup = p; }
     void setScroll(int rowOff, int pxOff);

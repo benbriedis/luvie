@@ -6,7 +6,9 @@
 
 #include "modern/contextMenuPopup.hpp"
 #include "parameterSubmenu.hpp"
+#include "midiLearn.hpp"
 #include <functional>
+#include <string>
 
 class NoteLabelsContextPopup : public ContextMenuPopup {
     std::function<void(const char*)> pendingOnSelect;
@@ -16,6 +18,9 @@ class NoteLabelsContextPopup : public ContextMenuPopup {
     ModernButton*                    renameBtn = nullptr;
     ModernButton*                    addBtn    = nullptr;
     ModernButton*                    removeBtn = nullptr;
+    ModernButton*                    learnBtn      = nullptr;
+    ModernButton*                    clearLearnBtn = nullptr;
+    std::string                      learnType_;
 
     void doShowParamSubmenu() {
         if (paramSubmenu) paramSubmenu->showFor(this, y() + addBtn->y(), hasFn_);
@@ -25,12 +30,16 @@ public:
     static constexpr int popW = 160;
 
     ParameterSubmenu* paramSubmenu = nullptr;
+    // Where "MIDI learn" and "Clear MIDI learn" act. Without it they never show.
+    MidiLearnMap*     midiLearn    = nullptr;
 
-    NoteLabelsContextPopup() : ContextMenuPopup(popW, 3*30+2) {
+    NoteLabelsContextPopup() : ContextMenuPopup(popW, 5*30+2) {
         renameBtn = addItem(0, "Rename");
         addBtn    = addItem(1, "Add automation");
         addBtn->setSubmenuArrow(true);
         removeBtn = addItem(2, "Remove automation");
+        learnBtn      = addItem(3, "MIDI learn");
+        clearLearnBtn = addItem(4, "Clear MIDI learn");
 
         renameBtn->callback([](Fl_Widget*, void* d) {
             auto* self = static_cast<NoteLabelsContextPopup*>(d);
@@ -46,6 +55,23 @@ public:
             if (self->pendingOnRemove) self->pendingOnRemove();
         }, this);
 
+        learnBtn->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<NoteLabelsContextPopup*>(d);
+            self->hide();
+            if (self->midiLearn) self->midiLearn->toggleLearn(self->learnType_);
+        }, this);
+        clearLearnBtn->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<NoteLabelsContextPopup*>(d);
+            self->hide();
+            if (self->midiLearn) self->midiLearn->clear(self->learnType_);
+        }, this);
+        // Moving down onto them from "Add automation" closes its submenu, as
+        // "Remove automation" does for the Song Editor's menu.
+        auto closeSubmenu = [this]() { if (paramSubmenu) paramSubmenu->hide(); };
+        removeBtn->onEnter     = closeSubmenu;
+        learnBtn->onEnter      = closeSubmenu;
+        clearLearnBtn->onEnter = closeSubmenu;
+
         paramSubmenu = new ParameterSubmenu();
         paramSubmenu->onSelect = [this](const char* type) {
             hide();
@@ -60,12 +86,17 @@ public:
               std::function<bool(const char*)> hasFn,
               std::function<void(const char*)> onSelect,
               std::function<void()> onRemove = {},
-              std::function<void()> onRename = {})
+              std::function<void()> onRename = {},
+              std::string learnType = {})
     {
         hasFn_          = std::move(hasFn);
         pendingOnSelect = std::move(onSelect);
         pendingOnRemove = std::move(onRemove);
         pendingOnRename = std::move(onRename);
+        learnType_      = std::move(learnType);
+        // The MIDI-learn items are for a param lane that was right-clicked.
+        const bool canLearn = midiLearn && !learnType_.empty();
+        if (canLearn) learnBtn->copy_label(midiLearn->learnMenuLabel(learnType_).c_str());
 
         // Stack the visible rows from the top with no gaps. "Rename" only shows
         // for editors that supply a rename handler (the drum editor); "Remove
@@ -83,6 +114,8 @@ public:
         place(renameBtn, (bool)pendingOnRename);
         place(addBtn,    true);
         place(removeBtn, (bool)pendingOnRemove);
+        place(learnBtn,      canLearn);
+        place(clearLearnBtn, canLearn && midiLearn->bindingFor(learnType_));
 
         popH = shown * btnH + 2;
         size(popW, popH);
