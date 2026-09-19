@@ -278,8 +278,9 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 bool Playhead::isInPattern(float /*bars*/) const
 {
-	// Always show the playhead in the pattern editor — inactive patterns show
-	// a virtual position indicating next-bar-aligned start (see barsToPixel).
+	// Always show the playhead in the pattern editor: every displayed pattern has a
+	// real position whether or not anything is playing it (see patternPos), and the
+	// head is dimmed rather than hidden when nothing is.
 	return true;
 }
 
@@ -305,10 +306,13 @@ int Playhead::displayedPatternId() const
 // barsToPixel() so that recording lands a note exactly where the head is drawn:
 // the anchor, the loop wrap and the time signature are all handled once, here.
 //
-// Returns -1 when the pattern is not running. barsToPixel() still has somewhere to
-// draw in that case — a virtual position showing where beat 0 *would* land on the
-// next bar — but that is a preview, not a real place in the pattern, so it is not
-// somewhere a note may be recorded.
+// The pattern on screen always has a position, whether or not anything is playing
+// it. Being switched on in the Loop Editor, or sitting under the playhead in the
+// song, decides where the phase comes from and whether you hear it — not whether
+// the editor knows where you are. Recording needs the answer either way, and the
+// head is drawn dimmed (see currentHeadColor) when nothing is sounding it.
+//
+// Not running means there is no pattern at all: no track, or an empty lane.
 Playhead::PatternPos Playhead::patternPos(float bars) const
 {
 	PatternPos pp;
@@ -316,22 +320,57 @@ Playhead::PatternPos Playhead::patternPos(float bars) const
 	const auto& tracks = obsTl->get().tracks;
 	if (patternTrack >= (int)tracks.size()) return pp;
 	int patId = displayedPatternId();
-	if (!loopMgr || !loopMgr->isPatternActive(patId)) return pp;
+	if (patId <= 0) return pp;
 
 	// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
-	pp.beatsPerBar  = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
-	                                            patId);
-	pp.anchorBar    = loopMgr->patternAnchorBar(patId);
+	pp.beatsPerBar = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
+	                                           patId);
+	if (loopMgr && loopMgr->isPatternActive(patId)) {
+		pp.anchorBar  = loopMgr->patternAnchorBar(patId);
+		pp.manualLoop = loopMgr->isManual(patId);
+	} else {
+		// Nothing is playing it. The editor's own anchor then decides where it sits,
+		// which by default tiles it across the song from bar 0 — the same phase a
+		// loop switched on at bar 0 would have, and stable from take to take. The
+		// anchor belongs to the pattern it was set for and is read back only for
+		// that one, rather than being cleared when the selection moves: clearing it
+		// would be a write racing the editor's own handling of the same change.
+		pp.anchorBar = freeAnchorFor(patId);
+		pp.free      = true;
+	}
 	pp.elapsedBeats = (bars - pp.anchorBar) * pp.beatsPerBar;
-	pp.manualLoop   = loopMgr->isManual(patId);
 	pp.running      = true;
 	return pp;
 }
 
+float Playhead::freeAnchorFor(int patId) const
+{
+	return freeAnchorPatId == patId ? freeAnchorBar : 0.0f;
+}
+
 void Playhead::reanchorPattern(float anchorBar)
 {
-	if (!loopMgr) return;
-	loopMgr->reanchor(displayedPatternId(), anchorBar);
+	int patId = displayedPatternId();
+	if (patId <= 0) return;
+	if (loopMgr && loopMgr->isPatternActive(patId)) {
+		loopMgr->reanchor(patId, anchorBar);
+		return;
+	}
+	freeAnchorBar   = anchorBar;
+	freeAnchorPatId = patId;
+}
+
+void Playhead::pinPatternAnchor()
+{
+	int patId = displayedPatternId();
+	if (patId <= 0) return;
+	// Adopt the anchor the pattern has right now — the block's when one is playing
+	// it, otherwise the one it already had (freeAnchorFor, so a pattern never
+	// inherits the phase left behind on a different one).
+	freeAnchorBar   = (loopMgr && loopMgr->isPatternActive(patId))
+	                ? loopMgr->patternAnchorBar(patId)
+	                : freeAnchorFor(patId);
+	freeAnchorPatId = patId;
 }
 
 float Playhead::patternBeat(float bars) const
@@ -349,22 +388,15 @@ int Playhead::barsToPixel(float bars) const
 		if (!obsTl) return 0;
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack >= (int)tracks.size()) return 0;
-		int patId = displayedPatternId();
-
+		// A pattern that is not switched on used to be drawn at a "virtual" position
+		// — where its beat 0 would land if you switched it on at the next bar. That
+		// was a preview rather than a place, and it could not be recorded into.
+		// patternBeat() now answers for every displayed pattern, and the head is
+		// dimmed instead to say that nothing is sounding it. The Loop Editor keeps a
+		// preview of its own on the switches, which is where that question belongs.
 		float beats = patternBeat(bars);
-		if (beats >= 0.0f)
-			return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
-
-		// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
-		float beatsPerBar = obsTl->patternBeatsPerBar(loopActive ? 0 : (int)std::max(0.0f, bars),
-		                                              patId);
-
-		// Virtual position: beat 0 of the pattern will land on the next bar boundary.
-		float nextBar     = std::floor(bars) + 1.0f;
-		float beatsToNext = (nextBar - bars) * beatsPerBar;
-		float virtualBeat = std::fmod((float)numCols - beatsToNext, (float)numCols);
-		if (virtualBeat < 0.0f) virtualBeat += numCols;
-		return std::clamp((int)(virtualBeat * colWidth), 0, numCols * colWidth - 2);
+		if (beats < 0.0f) return 0;          // no pattern on screen at all
+		return std::clamp((int)(beats * colWidth), 0, numCols * colWidth - 2);
 	}
 
 	int px = (int)(bars * colWidth);

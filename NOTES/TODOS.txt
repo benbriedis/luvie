@@ -432,9 +432,15 @@ record automation points
 
 CHECK if Jack is used as an input and Jack is not active create an alert
 
-Record button: should be a circle
+Record button: should be a circl
 
 ----
+
+In Drums pattern - playing a note on MIDI out should highlight/flash the note being played
+
+Consider allowing notes to hang over into start of the pattern...
+   recording and with mouse. How to support? 
+   cf wrapping but not starting with a dark line on the LHS.
 
 Where is my multi-select in LV2... not seeing it
 Mention 'grow' option on website + docs (inc use case)
@@ -444,4 +450,11 @@ If the pattern is in the Song Editor auto-grow the song block
 
 NB some horizontal red lines in Song Editor are thicker than others...
 
-TODO test plugin version of flexi
+Create SVG glyphs for a bunch of icons:
+  - Record button
+  - Right triangle used in menus
+  - Settings gear
+  - Transport icons
+  - Also NB # glyphs not used in pianoroll in label column. Can we have flats as an option too?
+
+TODO test plugin version of flexi when recordin in song mode

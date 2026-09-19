@@ -17,7 +17,7 @@ static constexpr int groupGap      = 12;
 static constexpr int labelW        = 55;
 static constexpr int nameW         = 150;
 static constexpr int recentreBtnW  = 26;
-static constexpr int zoomChoiceW   = 52;
+static constexpr int zoomChoiceW   = 58;   // fits "0.5x" beside the chevron
 static constexpr int toggleBtnW    = 26;
 static constexpr int rootChoiceW   = 110;
 static constexpr int choiceW       = 130;
@@ -45,8 +45,22 @@ static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 // "1/7".
 static constexpr int kDivisors[]       = { 1, 2, 3, 4, 5, 6, 7 };
 static constexpr int kDivisionsDefault = 0;  // None
-static constexpr int kZoomFactors[]    = { 1, 2, 4 };
-static constexpr int kZoomDefault      = 1;  // x2
+// Horizontal zoom, as a percentage of the column width the editors were built
+// at. Ordered coarsest to finest so the dropdown reads as a scale; the labels
+// pair with the percentages by index, and the percentage -- not the index -- is
+// what a pattern stores, so this list can be reordered without disturbing songs
+// already saved.
+static constexpr int     kZoomPercents[] = { 20, 50, 100, 200, 400 };
+static const char* const kZoomLabels[]   = { "0.2x", "0.5x", "1x", "2x", "4x" };
+static constexpr int     kZoomDefault    = 3;  // 2x
+
+// The dropdown entry showing `pct`, or the default when nothing does.
+static int zoomIndexForPct(int pct)
+{
+    for (int i = 0; i < (int)std::size(kZoomPercents); i++)
+        if (kZoomPercents[i] == pct) return i;
+    return kZoomDefault;
+}
 
 // ---------------------------------------------------------------------------
 // Section struct constructors
@@ -199,11 +213,18 @@ int PatternPanel::computeDivisions() const
     return kDivisors[idx];
 }
 
-int PatternPanel::computeZoomFactor() const
+float PatternPanel::computeZoomFactor() const
 {
     int idx = zoomChoice.value();
-    if (idx < 0 || idx >= (int)std::size(kZoomFactors)) idx = kZoomDefault;
-    return kZoomFactors[idx];
+    if (idx < 0 || idx >= (int)std::size(kZoomPercents)) idx = kZoomDefault;
+    return kZoomPercents[idx] / 100.0f;
+}
+
+int PatternPanel::selectedZoomPct() const
+{
+    int idx = zoomChoice.value();
+    if (idx < 0 || idx >= (int)std::size(kZoomPercents)) idx = kZoomDefault;
+    return kZoomPercents[idx];
 }
 
 PatternPanel::PatternPanel(int x, int y, int w, int h)
@@ -376,7 +397,7 @@ static void snapBeatTo(TimeSigSection& ts, int top)
 
 void PatternPanel::initZoomChoice()
 {
-    for (const char* v : {"x1", "x2", "x4"})
+    for (const char* v : kZoomLabels)
         zoomChoice.add(v);
     zoomChoice.value(kZoomDefault);
     // Sitting first in the row, it would otherwise grab the window's initial
@@ -390,7 +411,7 @@ void PatternPanel::initZoomChoice()
         auto* self = static_cast<PatternPanel*>(d);
         int patId = self->selectedPatternId();
         if (patId != 0 && self->pattern)
-            self->pattern->setPatternZoom(patId, self->zoomChoice.value());
+            self->pattern->setPatternZoom(patId, self->selectedZoomPct());
         if (self->onZoomChanged) self->onZoomChanged(self->computeZoomFactor());
     }, this);
 }
@@ -843,7 +864,7 @@ void PatternPanel::refreshZoom()
     int patId = selectedPatternId();
     for (const auto& p : pattern->get().patterns) {
         if (p.id != patId) continue;
-        zoomChoice.value(p.zoom);
+        zoomChoice.value(zoomIndexForPct(p.zoomPct));
         zoomChoice.redraw();
         return;
     }

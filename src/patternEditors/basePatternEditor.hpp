@@ -130,11 +130,21 @@ protected:
     // length is not a whole number of beats would otherwise have the grid and the
     // engine's modulo disagree about where it ends.
     float patternLengthBeats() const;
+    // The lane the editor is showing, chosen exactly as patternIdForSelectedLane()
+    // chooses it. Null when there is no track or it has no lanes.
+    const Lane* selectedLane() const;
     // The song block of the displayed pattern under the playhead on the selected
     // lane, or nullptr — in Loop Mode, under a manual loop, or when the placement is
     // not the one the phase came from.
     const PatternInstance* growableInstance(float bars,
                                            const Playhead::PatternPos& pp) const;
+    // Song Mode only: give the take a block to record into. A pattern can be edited
+    // and recorded into with no placement at all — it simply runs alongside the song
+    // — but a take is something you want to hear back, so the first note of one
+    // places the pattern where it was played, on the pass the playhead is in. Does
+    // nothing when a block is already there, and declines rather than overlap a
+    // neighbour, since the song editor does not allow that.
+    void ensureSongBlock();
 
     // Called on the first recorded note of a take. Re-phases the pattern so the pass
     // in progress becomes pass 0 and growth extends it rather than moving the loop
@@ -170,9 +180,10 @@ public:
     virtual void setSnap(float s) { snapBeats_ = s; paramGrid.setSnap(s); }
     // Beat subdivisions (1 = None): drawn as faint grid lines, independent of snapping.
     virtual void setDivisions(int d) { (void)d; }
-    // Zoom factor (1/2/4): scales column width from its x1 base; note minimum
-    // pixel widths are unaffected, so shorter notes remain creatable when zoomed.
-    void setZoom(int factor);
+    // Horizontal zoom: `factor` scales the column width from its x1 base (so 0.2
+    // through 4). Note minimum pixel widths are unaffected, so shorter notes
+    // remain creatable when zoomed.
+    void setZoom(float factor);
     void setPatternPlayhead(ITransport* t, ObservablePattern* pat, int trackIndex);
     void setAuditioner(NoteAuditioner* a);
 

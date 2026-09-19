@@ -28,7 +28,8 @@ public:
 
     NoteLabelsContextPopup() : ContextMenuPopup(popW, 3*30+2) {
         renameBtn = addItem(0, "Rename");
-        addBtn    = addItem(1, "Add automation \xe2\x96\xb6");
+        addBtn    = addItem(1, "Add automation");
+        addBtn->setSubmenuArrow(true);
         removeBtn = addItem(2, "Remove automation");
 
         renameBtn->callback([](Fl_Widget*, void* d) {

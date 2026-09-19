@@ -14,11 +14,6 @@ class ParameterSubmenu : public ContextMenuPopup {
     static constexpr const char* typeNames[] = {
         "Pitch", "Modulation", "Volume", "Pan", "Expression"
     };
-    static constexpr const char* tickedLabels[] = {
-        "\xe2\x9c\x93 Pitch", "\xe2\x9c\x93 Modulation", "\xe2\x9c\x93 Volume",
-        "\xe2\x9c\x93 Pan",   "\xe2\x9c\x93 Expression"
-    };
-
     struct ItemData { ParameterSubmenu* self; int idx; };
     ModernButton* items[numItems];
     ItemData      itemData[numItems];
@@ -33,6 +28,7 @@ public:
         for (int i = 0; i < numItems; ++i) {
             itemData[i] = {this, i};
             items[i] = addItem(i, typeNames[i]);
+            items[i]->reserveTick(true);
             items[i]->callback([](Fl_Widget*, void* d) {
                 auto* data = static_cast<ItemData*>(d);
                 data->self->hide();
@@ -46,7 +42,7 @@ public:
     void update(const std::function<bool(const char*)>& hasFn) {
         for (int i = 0; i < numItems; ++i) {
             bool has = hasFn(typeNames[i]);
-            items[i]->label(has ? tickedLabels[i] : typeNames[i]);
+            items[i]->setTicked(has);
             has ? items[i]->deactivate() : items[i]->activate();
         }
         redraw();

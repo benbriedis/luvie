@@ -78,7 +78,7 @@ public:
     void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp);
     void setPatternDivisions(int patId, int divisions);
     void setPatternSnapEnabled(int patId, bool enabled);
-    void setPatternZoom(int patId, int zoom);
+    void setPatternZoom(int patId, int zoomPct);
     void setPatternInstrument(int patId, int instrumentId);
 
     // Pattern-level param lanes

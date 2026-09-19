@@ -104,6 +104,32 @@ Notes are written only when **Record is armed *and* the transport is running**.
 Nothing is recorded while playback is stopped, so you can arm the toggle, find
 your place, and start when you are ready.
 
+That is the whole requirement. It does not matter whether the pattern is switched
+on in the Loop Editor, or whether the song playhead happens to be inside one of
+its blocks: whatever is on screen is what you record into, in Song Mode and Loop
+Mode alike. When nothing is playing the pattern it simply runs alongside the song
+from bar 1, and the playhead in the editor is drawn greyed to show that you are
+recording into it without hearing it. Switch it on in the Loop Editor if you want
+to hear it as well.
+
+## Recording into the song
+
+A take in Song Mode is something you want to hear back in its place, so the first
+note of one puts the pattern there: a block appears on the track you are editing,
+covering the pass of the pattern you played into. Swap to the Song Editor
+afterwards and it is waiting for you, and from that moment you hear the pattern
+as you overdub further passes. Undoing the take takes the block with it.
+
+Nothing is placed if there is already a block under the playhead — you are
+recording into that one — and nothing is placed in Loop Mode, or when the pattern
+is switched on in the Loop Editor, because then you are working on the pattern
+rather than on the song.
+
+The one case where no block appears is when it would have to overlap a
+neighbouring block on the same track, which the Song Editor does not allow. The
+take still records; move or shorten the neighbour and place the pattern yourself.
+Run Luvie with `LUVIE_DEBUG=1` and it will say when this happens.
+
 What gets recorded:
 
 - **Snap quantises what you play.** With **Snap** on, the start and end of each
@@ -146,21 +172,22 @@ pattern never ends up shorter than it was before the take, and never shorter
 than one bar. As always, the whole take is one Ctrl+Z, and that includes the
 bars it added.
 
-In the Song Editor the pattern's block grows with it, so what you played is what
-the song plays back. Two things stop the growth, and in both cases recording
-simply carries on as it would with **Grow** off:
+In Song Mode the block grows with the pattern — the one placed for the take, or
+the one you were already recording into — so what you played is what the song
+plays back. Two things stop the growth, and in both cases recording simply
+carries on as it would with **Grow** off:
 
 - the next block on the same track, which the growing block will not overlap;
 - 64 bars, the longest the **Bars** control can describe.
 
-A few things worth knowing:
+A couple of things worth knowing:
 
-- **Growth needs somewhere to grow.** In the Song Editor the pattern has to have
-  a block under the playhead on the track you are editing, and you have to start
-  the take in the block's first pass through the pattern — if the block is
-  several repeats long and you come in during the second, the take records
-  normally instead. Run Luvie with `LUVIE_DEBUG=1` and it will say so on the
-  terminal.
+- **Starting inside a block means starting at its beginning.** A block can be
+  several repeats of its pattern long. If you come in during the second repeat
+  there is no way to extend the one you are in without moving what is already
+  playing, so the take records normally instead. Run Luvie with `LUVIE_DEBUG=1`
+  and it will say so on the terminal. A block placed for the take is always one
+  repeat long, so this only comes up on blocks you stretched yourself.
 - **A pattern is shared.** Placing the same pattern in several parts of the song
   and then growing it makes all of them longer, because they are all the same
   pattern. Copy it first if you only want one of them to change.

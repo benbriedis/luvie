@@ -82,7 +82,7 @@ struct Pattern {
 	bool useSharp  = false;  // #/b display spelling
 	int  divisions = 0;      // divChoice index; 0 = None (kDivisionsDefault in patternPanel.cpp)
 	bool snapEnabled = true; // snap new notes and resized edges to the divisions
-	int  zoom      = 1;      // zoomChoice index; 1 = x2 (kZoomDefault in patternPanel.cpp)
+	int  zoomPct   = 200;    // horizontal zoom, % of the x1 column width (kZoomPercents in patternPanel.cpp)
 };
 
 // MIDI pitch a stored note sounds at. A pianoroll pattern keeps the MIDI note

@@ -43,6 +43,17 @@ class Playhead : public ITimelineObserver {
 	float lastPosition = 0.0f;
 	std::function<bool(int)> loopEnabledFn;
 
+	// Phase for a displayed pattern that nothing is playing — not switched on in the
+	// Loop Editor and not under a song block. Nothing is sounding it, so the editor
+	// owns where it sits: it tiles the song from this bar. Recording needs a real
+	// place to put a note whether or not the pattern is switched on, and the drawn
+	// head has to agree with it. Held for one pattern at a time and read back only
+	// for that one (freeAnchorFor), so a pattern never inherits the phase that
+	// flexible-bars recording left on another.
+	float freeAnchorBar   = 0.0f;
+	int   freeAnchorPatId = 0;
+	float freeAnchorFor(int patId) const;
+
 	// ── Soft (Native/Debug) output, driven from the same crossing logic ──────────
 	PortRegistry* portReg     = nullptr;
 	bool          anySoftPort = false;   // are any Native/Debug ports present?
@@ -128,18 +139,29 @@ public:
 	// position, and reading them through separate calls would let them come from
 	// different instants — the one thing re-phasing must not do.
 	struct PatternPos {
-		bool  running      = false;  // false: not playing now; nothing below is set
+		bool  running      = false;  // false: there is no pattern; nothing below is set
 		float elapsedBeats = 0.0f;   // beats since the anchor, NOT folded by the length
 		float beatsPerBar  = 0.0f;   // pattern beats per SONG bar (not per pattern bar)
 		float anchorBar    = 0.0f;   // song bar where pattern beat 0 falls
 		bool  manualLoop   = false;  // anchored by a Loop-Editor switch, not a song block
+		// Nothing is playing this pattern, so the anchor above is the editor's own
+		// (see freeAnchorBar) rather than anything the engine is following. Moving it
+		// is therefore free: there is no playback to fall out of step with.
+		bool  free         = false;
 	};
 	PatternPos patternPos(float bars) const;
-	// Re-anchor the displayed pattern. Only meaningful where the LoopManager anchor is
-	// the real phase origin: Loop Mode, or a manual loop layered over Song Mode. In
-	// plain Song Mode the engine takes its phase from the pattern block instead, so
-	// moving this alone would split the UI from what is heard.
+	// Re-anchor the displayed pattern: the LoopManager anchor when something is
+	// playing it from there (Loop Mode, or a manual loop layered over Song Mode), the
+	// editor's own free anchor when nothing is playing it at all. Not for a pattern
+	// running from a song block — there the engine takes its phase from the block, so
+	// moving this alone would split the UI from what is heard. PatternPos says which
+	// case applies.
 	void reanchorPattern(float anchorBar);
+	// Take the phase the displayed pattern has right now as its free anchor, so that
+	// if something stops playing it part-way through — the song block under the
+	// playhead ends — the position carries on from where it was instead of snapping
+	// to the default tiling. Called when a take opens.
+	void pinPatternAnchor();
 
 	// Pattern-local beat for a transport position, or -1 when the pattern is not
 	// running (see the definition). Recording asks this where to put a note, so it

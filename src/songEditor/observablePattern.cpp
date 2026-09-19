@@ -455,11 +455,11 @@ void ObservablePattern::setPatternSnapEnabled(int patId, bool enabled)
     }
 }
 
-void ObservablePattern::setPatternZoom(int patId, int zoom)
+void ObservablePattern::setPatternZoom(int patId, int zoomPct)
 {
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
-            p.zoom = zoom;
+            p.zoomPct = zoomPct;
             song_->notifyViewState();
             return;
         }

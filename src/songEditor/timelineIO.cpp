@@ -85,7 +85,7 @@ static json patternToJson(const Pattern& p) {
         {"useSharp",     p.useSharp},
         {"divisions",    p.divisions},
         {"snapEnabled",  p.snapEnabled},
-        {"zoom",         p.zoom},
+        {"zoomPct",      p.zoomPct},
     };
 }
 
@@ -104,7 +104,16 @@ static Pattern patternFromJson(const json& j) {
     p.useSharp     = j.value("useSharp",  false);
     p.divisions    = j.value("divisions",   0);
     p.snapEnabled  = j.value("snapEnabled", true);
-    p.zoom         = j.value("zoom",        1);
+    // Zoom was once stored as an index into the panel's dropdown, which adding
+    // x0.5 and x0.2 reordered. A song saved before that carries "zoom" instead,
+    // so map its index back to the percentage it stood for.
+    if (j.contains("zoomPct")) {
+        p.zoomPct = j.value("zoomPct", 200);
+    } else {
+        static constexpr int legacyZoomPct[] = { 100, 200, 400 };
+        int idx = j.value("zoom", 1);
+        p.zoomPct = legacyZoomPct[(idx >= 0 && idx < 3) ? idx : 1];
+    }
     for (const auto& jn : j.value("notes",     json::array())) p.notes.push_back(noteFromJson(jn));
     for (const auto& jd : j.value("drumNotes", json::array())) p.drumNotes.push_back(drumNoteFromJson(jd));
     for (int n : j.value("drumSolo", json::array())) p.drumSolo.insert(n);

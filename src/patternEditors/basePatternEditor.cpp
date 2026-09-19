@@ -129,12 +129,19 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
     if (luvieDebug() && (!rolling || beat < 0.0f))
         fprintf(stderr, "[luvie] not recorded: %s\n", !rolling
                 ? "transport is not rolling"
-                : "this pattern is not playing right now - in Song mode the "
-                  "playhead has to be inside one of its blocks, in Loop mode it "
-                  "has to be switched on in the Loop Editor");
+                : "there is no pattern on screen to record into");
     if (!rolling || beat < 0.0f) return;
 
-    if (!recUndo_) recUndo_.emplace(pattern->song());    // the take starts here
+    if (!recUndo_) {
+        recUndo_.emplace(pattern->song());              // the take starts here
+        // Hold on to the phase the take begins with. In Song Mode the pattern stops
+        // being played when the playhead leaves its block, and without this the
+        // position would jump to the default tiling half way through a take.
+        playhead.pinPatternAnchor();
+        // And give the take somewhere to live in the song, so what was just played
+        // is there in the Song Editor rather than only in the pattern.
+        ensureSongBlock();
+    }
     // Before the note is placed, so a pattern about to stop looping has already
     // gained the room the note may need.
     engageGrow();
@@ -260,25 +267,29 @@ float BasePatternEditor::patternLengthBeats() const
     return 0.0f;
 }
 
+const Lane* BasePatternEditor::selectedLane() const
+{
+    if (!pattern) return nullptr;
+    const auto& tl = pattern->get();
+    if (lastSelectedTrack < 0 || lastSelectedTrack >= (int)tl.tracks.size()) return nullptr;
+    const Track& track = tl.tracks[lastSelectedTrack];
+    for (const auto& l : track.lanes)
+        if (l.id == lastSelectedLaneId) return &l;
+    return track.lanes.empty() ? nullptr : &track.lanes[0];
+}
+
 const PatternInstance*
 BasePatternEditor::growableInstance(float bars, const Playhead::PatternPos& pp) const
 {
     if (!pattern || lastPatId <= 0) return nullptr;
     const auto& tl = pattern->get();
-    if (lastSelectedTrack < 0 || lastSelectedTrack >= (int)tl.tracks.size()) return nullptr;
-    const Track& track = tl.tracks[lastSelectedTrack];
 
     const Pattern* pat = nullptr;
     for (const auto& p : tl.patterns)
         if (p.id == lastPatId) { pat = &p; break; }
     if (!pat) return nullptr;
 
-    // The lane the editor is showing, chosen exactly as patternIdForSelectedLane()
-    // chooses it, so the block we grow is the one whose pattern is on screen.
-    const Lane* lane = nullptr;
-    for (const auto& l : track.lanes)
-        if (l.id == lastSelectedLaneId) { lane = &l; break; }
-    if (!lane && !track.lanes.empty()) lane = &track.lanes[0];
+    const Lane* lane = selectedLane();
     if (!lane) return nullptr;
 
     for (const auto& inst : lane->patterns) {
@@ -299,6 +310,64 @@ BasePatternEditor::growableInstance(float bars, const Playhead::PatternPos& pp) 
         return &inst;
     }
     return nullptr;
+}
+
+void BasePatternEditor::ensureSongBlock()
+{
+    if (!pattern || lastPatId <= 0) return;
+
+    const float bars = playhead.transportBars();
+    const Playhead::PatternPos pp = playhead.patternPos(bars);
+    if (!pp.running || pp.beatsPerBar <= 0.0f) return;
+    // Loop Mode, and a Loop-Editor switch layered over Song Mode, are both the user
+    // working on the pattern rather than on the song. Nothing gets placed.
+    if (playhead.isLoopActive() || pp.manualLoop) return;
+
+    const float len = patternLengthBeats();
+    if (len <= 0.0f) return;
+
+    const Lane* lane = selectedLane();
+    if (!lane) return;
+
+    // Already placed here — including the case that put the pattern under the
+    // playhead in the first place, which is what made it active.
+    for (const auto& inst : lane->patterns)
+        if (bars >= inst.startBar && bars < inst.startBar + inst.length) return;
+
+    // The pass the playhead is in. Whole passes have already gone by if the pattern
+    // has been tiling the song since the anchor, and the take belongs to the one it
+    // is in, not to the first.
+    const int   cycle     = (int)std::floor(pp.elapsedBeats / len);
+    const float lenBars   = len / pp.beatsPerBar;
+    const float passStart = pp.anchorBar + (float)cycle * lenBars;
+    if (passStart < 0.0f) return;
+
+    // The song editor does not allow two blocks to overlap in a lane, so neither
+    // will we. Nothing can be sitting on the playhead itself (that was checked
+    // above), but a neighbour can still be inside the pass.
+    for (const auto& inst : lane->patterns) {
+        const float aEnd = passStart + lenBars;
+        const float bEnd = inst.startBar + inst.length;
+        if (passStart < bEnd - kGrowEps && inst.startBar < aEnd - kGrowEps) {
+            if (luvieDebug())
+                fprintf(stderr, "[luvie] no block placed: bars %.2f-%.2f would overlap "
+                        "the block at %.2f-%.2f on this lane\n",
+                        passStart, aEnd, inst.startBar, bEnd);
+            return;
+        }
+    }
+
+    const int instId = pattern->song()->placePattern(lane->id, lastPatId,
+                                                     passStart, lenBars);
+    if (!instId) return;
+    if (luvieDebug())
+        fprintf(stderr, "[luvie] placed a block for the take at bar %.2f (%.2f bars)\n",
+                passStart, lenBars);
+    // Line the editor's own phase up with the block it just made. LoopManager::sync()
+    // will derive exactly this anchor on its next tick; doing it here means the beats
+    // recorded between now and then are measured against the same origin, so nothing
+    // shifts when the song takes the pattern over.
+    playhead.reanchorPattern(passStart);
 }
 
 void BasePatternEditor::setGrowArmed(bool on)
@@ -323,38 +392,45 @@ void BasePatternEditor::engageGrow()
     if (len <= 0.0f || bar <= 0.0f) return;
 
     const int cycle = (int)std::floor(pp.elapsedBeats / len);
-    // Where the phase actually comes from. A Loop-Editor switch layered over Song
-    // Mode counts as a loop: the Sequencer drops that pattern's song blocks and
-    // plays it from the LoopManager anchor instead.
-    const bool anchorIsOrigin = playhead.isLoopActive() || pp.manualLoop;
 
-    if (anchorIsOrigin) {
-        growInstId_         = 0;
-        growBaseInstLength_ = 0.0f;
-        // Advance the anchor by the whole passes already played. That is an exact
-        // multiple of the pattern length, so it maps the firing set onto itself:
-        // nothing moves and nothing is heard, but the pass in progress becomes pass
-        // 0 and growing the pattern now extends it.
-        if (cycle > 0)
-            playhead.reanchorPattern(pp.anchorBar + (float)cycle * len / pp.beatsPerBar);
-    } else {
-        const PatternInstance* inst = growableInstance(bars, pp);
-        if (!inst || cycle > 0) {
-            // In Song Mode the engine takes its phase from the block, not from the
-            // LoopManager, so there is nothing we can re-anchor: moving the anchor
-            // alone would split the drawn head from what is played. Record normally.
+    // A song block playing the pattern owns its phase — the engine reads the block,
+    // not the LoopManager — so that is what has to grow. ensureSongBlock() has
+    // normally just placed one for the take; when there is none to be had, the
+    // pattern is running on the editor's own anchor and we move that instead.
+    const bool loopPhase = playhead.isLoopActive() || pp.manualLoop;
+    const PatternInstance* inst = loopPhase ? nullptr : growableInstance(bars, pp);
+
+    if (inst) {
+        if (cycle > 0) {
+            // The block is several passes long and we came in after the first. The
+            // pass in progress cannot be extended without moving what is already
+            // playing, and the anchor is not ours to move here. Record normally.
             if (luvieDebug())
-                fprintf(stderr, "[luvie] not growing: %s\n", !inst
-                        ? "no usable pattern block under the playhead on the selected "
-                          "lane - in Song mode the pattern grows with its block, so "
-                          "there has to be exactly one, and no time signature change "
-                          "inside it"
-                        : "the block is longer than the pattern and the playhead is "
-                          "past its first pass - start the take in the first pass");
+                fprintf(stderr, "[luvie] not growing: the block is longer than the "
+                        "pattern and the playhead is past its first pass - start the "
+                        "take in the first pass\n");
             return;
         }
         growInstId_         = inst->id;
         growBaseInstLength_ = inst->length;
+    } else if (loopPhase || pp.free) {
+        // Nothing is playing it from a block: Loop Mode, a Loop-Editor switch, or a
+        // pattern with no placement at all. The anchor is ours.
+        growInstId_         = 0;
+        growBaseInstLength_ = 0.0f;
+        // Advance it by the whole passes already played. That is an exact multiple of
+        // the pattern length, so it maps the firing set onto itself: nothing moves
+        // and nothing is heard, but the pass in progress becomes pass 0 and growing
+        // the pattern now extends it.
+        if (cycle > 0)
+            playhead.reanchorPattern(pp.anchorBar + (float)cycle * len / pp.beatsPerBar);
+    } else {
+        // A block is playing it, but not one we can work with — a time signature
+        // change inside it, or the same pattern on another lane supplying the phase.
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] not growing: no usable pattern block under the "
+                    "playhead on the selected lane\n");
+        return;
     }
 
     growBaseBeats_ = len;
@@ -604,10 +680,12 @@ void BasePatternEditor::applyPatternLength(int patId)
     redraw();
 }
 
-void BasePatternEditor::setZoom(int factor)
+void BasePatternEditor::setZoom(float factor)
 {
-    int cw = baseColWidth * std::max(1, factor);
-    if (cw <= 0 || cw == gridColWidth()) return;
+    // A column narrower than a pixel would divide by zero in the column-offset
+    // arithmetic, so zooming out bottoms out rather than collapsing.
+    int cw = std::max(1, (int)std::lround(baseColWidth * factor));
+    if (cw == gridColWidth()) return;
     gridSetColWidth(cw);
     paramGrid.setColWidth(cw);
     playhead.setColWidth(cw);

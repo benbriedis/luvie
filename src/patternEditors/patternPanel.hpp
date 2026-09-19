@@ -198,7 +198,8 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
 
     float computeSnapBeats() const;
     int   computeDivisions() const;
-    int   computeZoomFactor() const;
+    float computeZoomFactor() const;
+    int   selectedZoomPct() const;
 
     std::vector<PanelRow> buildLayout(int availW) override;
     void                  afterLayout() override;
@@ -246,7 +247,7 @@ public:
     std::function<void()>      onFocus;
     std::function<void(float)> onSnapChanged;
     std::function<void(int)>   onDivisionsChanged;
-    std::function<void(int)>   onZoomChanged;
+    std::function<void(float)> onZoomChanged;
     std::function<void(bool)>  onRapidChanged;
     // Record arm/disarm from the toggle. The owner passes it to the editor.
     std::function<void(bool)>  onRecordChanged;

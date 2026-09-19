@@ -6,6 +6,7 @@
 
 #include <FL/Fl_Button.H>
 #include <FL/fl_draw.H>
+#include "menuGlyphs.hpp"
 #include <functional>
 
 class ModernButton : public Fl_Button {
@@ -13,6 +14,9 @@ class ModernButton : public Fl_Button {
     int       borderWidth = 2;
     Fl_Color  borderCol   = 0xCBD5E100;  // matches transport buttons by default
     Fl_Color  hoverCol    = 0;           // 0 = auto-derive (lighter of bg)
+    bool      arrow       = false;       // trailing "opens a submenu" triangle
+    bool      tickSlot    = false;       // leading gutter kept free for a tick
+    bool      ticked      = false;       // and a tick drawn in it
 
 public:
     std::function<void()> onEnter;
@@ -58,9 +62,21 @@ protected:
     // face is a picture rather than words (see SharpFlatButton) override this. bg
     // is the colour already painted behind it, which an inactive label fades into.
     virtual void drawContent(int X, int Y, int W, int H, Fl_Color bg) {
+        Fl_Color col = active() ? labelcolor() : fl_color_average(labelcolor(), bg, 0.4f);
+        if (arrow) {
+            menuGlyphs::submenuArrow(X + W - 6, Y + H / 2, col);
+            W -= 12;
+        }
+        if (tickSlot) {
+            // The gutter is reserved whether or not this row is ticked, so the
+            // words stay put as ticks come and go.
+            if (ticked) menuGlyphs::tick(X + 7, Y + H / 2, col);
+            X += menuGlyphs::tickSlotW;
+            W -= menuGlyphs::tickSlotW;
+        }
         if (!label()) return;
         fl_font(labelfont(), labelsize());
-        fl_color(active() ? labelcolor() : fl_color_average(labelcolor(), bg, 0.4f));
+        fl_color(col);
         fl_draw(label(), X, Y, W, H, align());
     }
 
@@ -71,6 +87,11 @@ public:
     void setBorderWidth(int w)      { borderWidth = w; }
     void setBorderColor(Fl_Color c) { borderCol   = c; }
     void setHoverColor(Fl_Color c)  { hoverCol    = c; }
+
+    // Menu decorations; see menuGlyphs.hpp for why these are not label text.
+    void setSubmenuArrow(bool on) { arrow    = on; redraw(); }
+    void reserveTick(bool on)     { tickSlot = on; redraw(); }
+    void setTicked(bool on)       { ticked   = on; redraw(); }
 };
 
 #endif

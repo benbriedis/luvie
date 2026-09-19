@@ -13,7 +13,8 @@ TrackContextPopup::TrackContextPopup()
     addPianorollLaneBtn = addItem(2, "Add pianoroll pattern");
     cloneLaneBtn        = addItem(3, "Clone pattern");
     removeLaneBtn       = addItem(4, "Remove pattern");
-    addParamBtn         = addItem(5, "Add automation \xe2\x96\xb6");
+    addParamBtn         = addItem(5, "Add automation");
+    addParamBtn->setSubmenuArrow(true);
     showInstrumentsBtn  = addItem(6, "Show instruments");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
