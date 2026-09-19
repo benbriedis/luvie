@@ -427,6 +427,8 @@ TODO test plugin version of flexi when recording in song mode
 
 .........
 
+Probably should allow multiple MIDI inputs
+
 Allow other parametera to be added
 
 cf allowing copying from pianoroll into harmony as chromatic. Maybe not very useful though.
@@ -450,4 +452,5 @@ Manual:
    multi-select move, copy, delete descriptions.
    Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
    + Alt-click-sweep slice selection and copying
+
 

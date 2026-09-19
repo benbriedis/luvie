@@ -630,6 +630,15 @@ void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
 		softSkips.erase(it);
 		return;
 	}
+	// The same pitch still sounding here ends now, or its note-off would cut this
+	// note short. See Sequencer::fireNoteEvents.
+	for (auto it = softNotes.begin(); it != softNotes.end(); ++it) {
+		if (it->pitch != midi || it->channel != r.channel0 || it->portName != r.portName)
+			continue;
+		p->noteOff(it->channel, it->pitch);
+		softNotes.erase(it);
+		break;
+	}
 	int vel = (int)(velocity * 127.0f);
 	vel = std::clamp(vel, 1, 127);
 	p->noteOn(r.channel0, midi, vel);

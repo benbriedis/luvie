@@ -790,6 +790,24 @@ void Sequencer::fireNoteEvents(double prevBars, double curBars)
                     // Already heard: the recorder played it live (skipNoteOnce).
                     if (consumeSkip(inst.portName, inst.midiChannel, note.midiPitch, onBar))
                         return;
+                    // The same pitch still sounding on this port and channel ends here.
+                    // Left alone, its note-off would land after this note-on and cut
+                    // it dead. Float beats make that routine rather than rare: a
+                    // triplet at 1/3 ends a hair after the next one at 2/3 starts, and
+                    // when a buffer boundary falls between the two, the note-off can
+                    // no longer be pulled back the one frame that orders them.
+                    for (auto it = activeNotes.begin(); it != activeNotes.end(); ++it) {
+                        if (it->midiPitch != note.midiPitch || it->channel != inst.midiChannel ||
+                            std::strcmp(it->portName, inst.portName.c_str()) != 0)
+                            continue;
+                        uint8_t offMsg[3] = {
+                            static_cast<uint8_t>(0x80 | (it->channel & 0x0F)),
+                            static_cast<uint8_t>(it->midiPitch), 0
+                        };
+                        emit(inst.portName, onBar, offMsg, 3);
+                        activeNotes.erase(it);
+                        break;
+                    }
                     uint8_t vel = static_cast<uint8_t>(
                         std::clamp(static_cast<int>(note.velocity * 127), 1, 127));
                     uint8_t onMsg[3] = {

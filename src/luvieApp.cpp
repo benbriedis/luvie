@@ -673,10 +673,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // Stopping ends the take: notes still held are committed with the length they
     // reached and the undo group closes, so the next run is its own undo entry.
-    // The toggle stays armed, so hitting play again starts recording straight away.
+    // Pause and rewind both come through here, and they disarm Record too: the next
+    // take is something the user asks for again, not something play resumes.
     if (bottomPane) {
         bottomPane->onPlayStateChanged = [this](bool playing) {
-            if (!playing) stopMidiRecording();
+            if (playing) return;
+            stopMidiRecording();
+            if (patternPanel) patternPanel->endTake();
         };
     }
 

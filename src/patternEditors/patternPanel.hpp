@@ -269,6 +269,9 @@ public:
     // with it: it is a property of the take, and like the arm it should be something
     // the user chose for the editor in front of them rather than something inherited.
     void stopRecording() { disarmRecord(); disarmGrow(); }
+    // Disarms Record alone, when the transport stops. Grow stays: it is kept between
+    // takes in the same editor.
+    void endTake() { disarmRecord(); }
 
     void setParams(int root, std::string_view chordHash, bool sharp);
     void setInstruments(ObservableInstrument* instr);

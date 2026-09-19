@@ -115,7 +115,11 @@ int main(int argc, char** argv) {
     const char* so    = argc > 1 ? argv[1] : "build/luvie.lv2/luvie_dsp.so";
     const char* state = argc > 2 ? argv[2] : "/tmp/luvie_state_240663.json";
     const double sr   = 48000.0;
-    const uint32_t nframes = 256;
+    // --nframes: the host's buffer size. Hosts differ, and a note falling on a buffer
+    // boundary is exactly the case a fixed size would never exercise.
+    uint32_t nframes = 256;
+    for (int i = 3; i + 1 < argc; i++)
+        if (!strcmp(argv[i], "--nframes")) nframes = (uint32_t)atoi(argv[i + 1]);
 
     // Read the project state into memory; we send it as an atom, not via a file.
     std::string json;
@@ -192,6 +196,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--restate")) restate = true;
         else if (!strcmp(argv[i], "--cycles") && i + 1 < argc) cycles = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--midi-in") && i + 1 < argc) midiInNote = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--nframes") && i + 1 < argc) ++i;   // read above
         else if (!strcmp(argv[i], "--song-loop") && i + 2 < argc) {
             songLoopStart = (float)atof(argv[++i]);
             songLoopEnd   = (float)atof(argv[++i]);
