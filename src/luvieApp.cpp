@@ -642,6 +642,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // The Record toggle arms whichever editor is currently the target.
     patternPanel->onRecordChanged = [this](bool on) {
         if (midiTarget) midiTarget->setRecordArmed(on);
+        if (onRecordArmChanged) onRecordArmChanged();
     };
 
     // Grow goes to the same place, and shares Record's lifetime: it stays on between
@@ -766,7 +767,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // clicking away.
     {
         const int dlgW = 380;
-        const int dlgH = 250;
+        const int dlgH = 294;
         const int dx = (winW - dlgW) / 2;
         const int dy = (window->h() - dlgH) / 2;
         startupOverlay = new StartupOverlay(dx, dy, dlgW, dlgH, pluginMode);

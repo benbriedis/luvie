@@ -11,15 +11,18 @@
 #include <functional>
 
 // Shown once when Luvie opens a brand-new (unsaved) project. It lets the user
-// pick the two settings that are awkward to change after the fact:
+// pick the settings that are awkward to change after the fact:
 //   • the transport clock source   (mirrors the Transport overlay)
+//   • the MIDI input type           (mirrors the Outputs overlay's MIDI Input "Type")
 //   • the default MIDI output type  (mirrors the Outputs overlay's "Default port type")
 //
-// Selections apply live via onTransportChanged / onDefaultBackendChanged; the
+// Selections apply live via onTransportChanged / onDefaultBackendChanged /
+// onMidiInputBackendChanged; the
 // "Create Project" button (and the close box) simply dismiss the dialog.
 //
 //   transport index 0 = Host, 1 = Internal, 2 = Jack
 //   backend         0 = Jack, 1 = Native,   2 = Debug
+//   MIDI input      0 = Jack, 1 = Native   (kInputBackends order)
 class StartupOverlay : public OverlayWindow {
     static constexpr int pad     = 16;
     static constexpr int labelW  = 150;
@@ -32,7 +35,8 @@ class StartupOverlay : public OverlayWindow {
     static constexpr int row0Y   = msgY + msgH + 8;
     static constexpr int rowGap  = 44;
     static constexpr int row1Y   = row0Y + rowGap;
-    static constexpr int btnY    = row1Y + rowGap;
+    static constexpr int row2Y   = row1Y + rowGap;
+    static constexpr int btnY    = row2Y + rowGap;
     static constexpr int btnW    = 130;
     static constexpr int btnH    = 30;
 
@@ -40,13 +44,14 @@ class StartupOverlay : public OverlayWindow {
 
     ModernChoice* transportChoice_ = nullptr;
     ModernChoice* backendChoice_   = nullptr;
+    ModernChoice* midiInChoice_    = nullptr;
     ModernButton* confirmBtn_      = nullptr;
     bool          pluginMode_      = false;
 
     void drawStaticContent(int sy, int /*sbW*/) override {
         fl_font(FL_HELVETICA, 12);
         fl_color(subTextCol);
-        fl_draw("Please select the transport and MIDI output type to use for your "
+        fl_draw("Please select the transport and MIDI types to use for your "
                 "new project.",
                 pad, msgY - sy, w() - 2*pad, msgH,
                 FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_WRAP | FL_ALIGN_INSIDE);
@@ -55,7 +60,9 @@ class StartupOverlay : public OverlayWindow {
         fl_color(textCol);
         fl_draw("Transport", pad, row0Y - sy, labelW, choiceH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-        fl_draw("Default MIDI output", pad, row1Y - sy, labelW, choiceH,
+        fl_draw("MIDI input", pad, row1Y - sy, labelW, choiceH,
+                FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        fl_draw("Default MIDI output", pad, row2Y - sy, labelW, choiceH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     }
 
@@ -73,6 +80,7 @@ class StartupOverlay : public OverlayWindow {
 public:
     std::function<void(int)>         onTransportChanged;       // 0=Host,1=Internal,2=Jack
     std::function<void(MidiBackend)> onDefaultBackendChanged;  // Jack/Native/Debug
+    std::function<void(MidiBackend)> onMidiInputBackendChanged; // Jack/Native
 
     StartupOverlay(int x, int y, int w, int h, bool pluginMode)
         : OverlayWindow(x, y, w, h, "Project Settings"), pluginMode_(pluginMode)
@@ -98,10 +106,23 @@ public:
                 self->onTransportChanged(static_cast<Fl_Choice*>(wd)->value());
         }, this);
 
+        // Standalone input backends only (Plugin omitted), in kInputBackends order
+        // so item index maps through inputBackendFromIndex().
+        midiInChoice_ = makeChoice(choiceX, row1Y);
+        midiInChoice_->add("Jack");
+        midiInChoice_->add("Native");
+        midiInChoice_->value(0);
+        midiInChoice_->callback([](Fl_Widget* wd, void* d) {
+            auto* self = static_cast<StartupOverlay*>(d);
+            if (self->onMidiInputBackendChanged)
+                self->onMidiInputBackendChanged(
+                    inputBackendFromIndex(static_cast<Fl_Choice*>(wd)->value()));
+        }, this);
+
         // This is the new-project dialog, which only ever appears standalone, so it
         // offers the standalone backends only — MidiBackend::Plugin is deliberately
         // absent rather than greyed. Item index is still the enum value.
-        backendChoice_ = makeChoice(choiceX, row1Y);
+        backendChoice_ = makeChoice(choiceX, row2Y);
         backendChoice_->add("Jack");
         backendChoice_->add("Native");
         backendChoice_->add("Debug");
@@ -128,10 +149,12 @@ public:
     }
 
     // Initialise the dropdowns to the app's current defaults (no callbacks fired).
-    void setSelections(int transportIndex, MidiBackend backend) {
+    void setSelections(int transportIndex, MidiBackend backend, MidiBackend midiIn) {
         if (transportChoice_ && !pluginMode_ && transportIndex >= 0)
             transportChoice_->value(transportIndex);
         if (backendChoice_)
             backendChoice_->value(static_cast<int>(backend));
+        if (midiInChoice_)   // only Jack/Native are offered; anything else shows Jack
+            midiInChoice_->value(midiIn == MidiBackend::Native ? 1 : 0);
     }
 };

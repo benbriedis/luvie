@@ -223,19 +223,24 @@ int main(int argc, char **argv) {
         }
     };
 
-    // JACK is "wanted" (observer running) if the clock is Jack OR any port outputs to
-    // Jack. --test skips JACK entirely (per --help).
+    auto midiInIsJack = [&]() {
+        return connOverlay && connOverlay->getMidiInput().backend == MidiBackend::Jack;
+    };
+
+    // JACK is "wanted" (observer running) if the clock is Jack, any port outputs to
+    // Jack, or the MIDI input is Jack. --test skips JACK entirely (per --help).
     auto updateJackWanted = [&]() {
         if (testMode) { jackObserver.stop(); return; }
-        bool wantJack = portReg.anyJack();
+        bool wantJack = portReg.anyJack() || midiInIsJack();
         if (app.transportOverlay && app.transportOverlay->selection() == 2) wantJack = true;
         if (wantJack) jackObserver.start();
         else          jackObserver.stop();
     };
 
-    // Refresh the transport-bar alert indicator. Two JACK-related alerts can be
-    // active; both clear once JACK connects, the clock source moves off Jack, or
-    // the last Jack MIDI output goes away.
+    // Refresh the transport-bar alert indicator. Three JACK-related alerts can be
+    // active; each clears once JACK connects or its own trigger goes away: the clock
+    // source moves off Jack, the last Jack MIDI output goes away, or the MIDI input
+    // moves off Jack / Record is disarmed.
     auto updateAlerts = [&]() {
         if (!app.bottomPane) return;
         bool jackDown    = jackObserver.state() != JackObserver::State::Up;
@@ -245,6 +250,8 @@ int main(int argc, char **argv) {
             alerts.push_back("Jack transport selected but JACK is not running");
         if (portReg.anyJack() && jackDown)
             alerts.push_back("Jack MIDI output in use but JACK is not running");
+        if (midiInIsJack() && app.patternPanel && app.patternPanel->isRecordArmed() && jackDown)
+            alerts.push_back("Recording from Jack MIDI input but JACK is not running");
         app.bottomPane->setAlerts(alerts);
     };
 
@@ -262,7 +269,10 @@ int main(int argc, char **argv) {
     auto syncMidiInput = [&]() {
         if (!connOverlay) return;
         app.midiIn.apply(connOverlay->getMidiInput(), &jackTransport);
+        updateJackWanted();
+        updateAlerts();
     };
+    app.onRecordArmChanged = [&]() { updateAlerts(); };
 
     // Reconcile the Port set with the overlay, then refresh JACK want/warning state
     // and tell the song playhead whether any soft (Native/Debug) ports need driving.
@@ -499,7 +509,7 @@ int main(int argc, char **argv) {
     }
 
     // --- New-project startup dialog ---------------------------------------
-    // Applies its two choices live to the existing overlays. The MIDI-output
+    // Applies its choices live to the existing overlays. The MIDI-output
     // choice sets the default for new ports and also retypes the ports already
     // present so the pick takes effect on this fresh project.
     if (app.startupOverlay) {
@@ -514,6 +524,13 @@ int main(int argc, char **argv) {
             connOverlay->setOutputs(outs);
             syncPorts();
         };
+        app.startupOverlay->onMidiInputBackendChanged = [&](MidiBackend backend) {
+            if (!connOverlay) return;
+            MidiInput in = connOverlay->getMidiInput();
+            in.backend = backend;
+            connOverlay->setMidiInput(in);
+            syncMidiInput();
+        };
     }
 
     // Pop the new-project dialog, seeded with the current defaults. Shown for a
@@ -522,7 +539,8 @@ int main(int argc, char **argv) {
         if (app.pluginMode || !app.startupOverlay) return;
         app.startupOverlay->setSelections(
             app.transportOverlay ? app.transportOverlay->selection() : 2,
-            connOverlay ? connOverlay->getDefaultBackend() : MidiBackend::Jack);
+            connOverlay ? connOverlay->getDefaultBackend() : MidiBackend::Jack,
+            connOverlay ? connOverlay->getMidiInput().backend : MidiBackend::Jack);
         app.startupOverlay->show();
     };
 

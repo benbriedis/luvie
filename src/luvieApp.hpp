@@ -193,6 +193,8 @@ public:
     // Releases held notes and closes any open take. Called when the transport
     // stops, so a key held across the stop does not hang or keep recording.
     void stopMidiRecording();
+    // Fired whenever the Record toggle arms or disarms, after the editor is told.
+    std::function<void()> onRecordArmChanged;
 
     void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
                ObservableInstrument* instruments, ITransport* transport);

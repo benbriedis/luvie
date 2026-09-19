@@ -263,6 +263,7 @@ public:
         return chordDefs[idx].hash;
     }
     bool isSharp()   const { return useSharp; }
+    bool isRecordArmed() const { return recordBtn.value() != 0; }
 
     // Disarms recording from outside — leaving the Pattern Editor tab, say. Grow goes
     // with it: it is a property of the take, and like the arm it should be something

@@ -427,12 +427,7 @@ TO MAKE THIS A GREAT COMPOSITION TOOL STILL WANT
 6. EXTRA: metronome - visual and auditory.
 
 overdub /replace toggle
-record automation points
 
-
-CHECK if Jack is used as an input and Jack is not active create an alert
-
-Record button: should be a circl
 
 ----
 
@@ -457,4 +452,28 @@ Create SVG glyphs for a bunch of icons:
   - Transport icons
   - Also NB # glyphs not used in pianoroll in label column. Can we have flats as an option too?
 
-TODO test plugin version of flexi when recordin in song mode
+TODO test plugin version of flexi when recording in song mode
+
+.........
+
+
+cf allowing copying from pianoroll into harmony as chromatic. Maybe not very useful though.
+
+Probably want a tool really...
+   Could allow extra notes
+   Could have an autodiscover option + a specify option...
+   + Have a harmony --> pianoroll option
+   
+   
+- Loop Editor sets + being able to switch (cf intermediate mode going in or out? immediate?)
+
+- Drums and pianoroll - highlight note etc as it is being played
+
+Allow more parameters to be shown via click and drag.
+Allow some/all parameters to be hidden
+Allow parameter recording sensitivity to be set - record more or less parameters
+
+
+NB Alt-click-sweep may clash with WM. Probably need shortcut window.
+Document Alt-click-sweep slice selection and copying
+
