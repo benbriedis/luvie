@@ -3,6 +3,8 @@
 
 #include "midiLearn.hpp"
 #include "paramLaneTypes.hpp"
+#include "luvieDebug.hpp"
+#include <cstdio>
 
 namespace {
 
@@ -52,6 +54,7 @@ void MidiLearnMap::setBindings(const MidiLearnBindings& b)
 
 void MidiLearnMap::startLearn(const std::string& type)
 {
+    if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: waiting for a control for %s\n", type.c_str());
     learning_ = type;
     displayChanged();
 }
@@ -59,6 +62,7 @@ void MidiLearnMap::startLearn(const std::string& type)
 void MidiLearnMap::cancelLearn()
 {
     if (learning_.empty()) return;
+    if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: cancelled for %s\n", learning_.c_str());
     learning_.clear();
     displayChanged();
 }
@@ -66,6 +70,7 @@ void MidiLearnMap::cancelLearn()
 void MidiLearnMap::clear(const std::string& type)
 {
     if (isLearning(type)) learning_.clear();
+    if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: cleared %s\n", type.c_str());
     if (bindings_.erase(type) == 0) { displayChanged(); return; }
     values_.erase(type);
     if (onEdited) onEdited();
@@ -103,6 +108,9 @@ bool MidiLearnMap::handle(const uint8_t* data, int len, std::string& typeOut, in
             }
         }
         bindings_[learning_] = src;
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] midi learn: %s -> %s\n",
+                    learning_.c_str(), describe(src).c_str());
         learning_.clear();
         if (onEdited) onEdited();
     }
