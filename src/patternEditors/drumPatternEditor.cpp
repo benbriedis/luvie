@@ -213,6 +213,8 @@ DrumPatternEditor::DrumPatternEditor(int x, int y, int visibleW, int numRows, in
     drumGrid.position(x + scrollbarW + labelsW + controlsW, y + rulerH);
     drumGrid.size(visibleGridW, gridH);
     drumGrid.setPlayhead(&playhead);
+    drumGrid.setSliceController(&sliceCtl, &paramGrid);
+    sliceCtl.addView(&drumGrid);
 
     // Align the ruler triangle/seek and the param lanes with the grid's left
     // margin before beat 0.

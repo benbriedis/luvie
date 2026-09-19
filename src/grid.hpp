@@ -16,6 +16,7 @@
 #include <variant>
 
 class Playhead;
+class SliceController;
 
 // Faint grey used for the beat-subdivision lines, drawn under the row lines.
 constexpr Fl_Color subdivLineColor = 0xDDDDDD00;
@@ -35,6 +36,9 @@ class Selection;
 // (originX, originY). Free-standing because DrumGrid is not a Grid but sweeps
 // the same band.
 void drawSelectionBand(const Selection& selection, int originX, int originY);
+// The band's translucent fill on its own, for the time slice, which draws its
+// own edges.
+void drawBandWash(int x, int y, int w, int h);
 
 enum class Side { Left, Right };
 struct Point { int row; float col; };
@@ -110,6 +114,14 @@ protected:
     // not rebuilt mid-drag (see isActiveDrag).
     struct GroupOrig { int idx; float beat; int row; };
     std::vector<GroupOrig> groupOrig;
+
+    // The pattern editors' time slice, shared with the automation lanes below
+    // the grid; null in the song editor, which has none. `partner` is that other
+    // widget, so a click or a paste there still counts as inside this host.
+    SliceController* slice   = nullptr;
+    Fl_Widget*       partner = nullptr;
+    // Unsnapped beat at window x-coordinate `wx`.
+    float beatAtX(int wx) const { return (float)(wx - x()) / (float)colWidth + colOffset; }
 
     Playhead* playhead  = nullptr;
     int       colOffset = 0;
@@ -314,18 +326,20 @@ public:
     // unset simply does not auto-scroll.
     std::function<int(int cols)> onEdgeScroll;
 
-    // ISelectionHost
-    void clearSelection() override     { if (!selection.empty()) { selection.clear(); redraw(); } }
-    void selectAllItems() override     { selectAll(); redraw(); }
+    // ISelectionHost. A time slice, where there is one, counts as the selection:
+    // the two kinds never coexist, so the commands act on whichever is live.
+    void clearSelection() override;
+    void selectAllItems() override;
     void deleteSelectedItems() override;
-    bool hasSelection() const override { return !selection.empty(); }
+    bool hasSelection() const override;
     void copySelection() override;
     void pasteClipboard(int wx, int wy) override;
     void setSelectionPopup(SelectionContextPopup* p) override { selectionPopup = p; }
     void setPastePopup(PasteContextPopup* p) override         { pastePopup = p; }
     bool showing() const override      { return visible_r(); }
-    bool ownsWindowPoint(int wx, int wy) const override
-    { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }
+    bool ownsWindowPoint(int wx, int wy) const override;
+
+    void setSliceController(SliceController* s, Fl_Widget* partnerWidget);
 
     void setPlayhead(Playhead* p) { playhead  = p; }
     void setColOffset(int off)    { colOffset = off; redraw(); }

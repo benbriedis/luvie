@@ -21,6 +21,8 @@ HarmonyEditor::HarmonyEditor(int x, int y, int visibleW, int numRows, int numCol
     harmonyGrid.position(x + scrollbarW + labelsW, y + rulerH);
     harmonyGrid.size(visibleGridW, gridH);
     harmonyGrid.setPlayhead(&playhead);
+    harmonyGrid.setSliceController(&sliceCtl, &paramGrid);
+    sliceCtl.addView(&harmonyGrid);
 
     gridPane.add(harmonyLabels);
     gridPane.add(harmonyGrid);

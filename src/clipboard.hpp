@@ -4,6 +4,7 @@
 #ifndef CLIPBOARD_HPP
 #define CLIPBOARD_HPP
 
+#include "sliceClip.hpp"
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -12,7 +13,12 @@
 // a song block, a chord degree, a MIDI pitch and a drum hit all count rows in
 // their own units, so the numbers below only mean anything back where they came
 // from.
-enum class ClipKind { None, SongInstances, HarmonyNotes, PianorollNotes, DrumNotes };
+//
+// The *Slice kinds are time slices (see SliceController), which carry a whole
+// stretch of a pattern rather than a set of items. A harmony slice can go into
+// any harmony pattern whatever its chord, since it carries chord degrees.
+enum class ClipKind { None, SongInstances, HarmonyNotes, PianorollNotes, DrumNotes,
+                      HarmonySlice, PianorollSlice, DrumSlice };
 
 // One copied item, held relative to the top-left corner of what was copied:
 // `dRow` counts screen rows downwards and `dBeat` beats to the right. Relative,
@@ -35,8 +41,20 @@ class Clipboard {
 public:
     ClipKind kind = ClipKind::None;
     std::vector<ClipItem> items;
+    SliceClip slice;   // the contents when `kind` is one of the slice kinds
 
     bool holds(ClipKind k) const { return k != ClipKind::None && kind == k && !items.empty(); }
+    bool holdsSlice(ClipKind k) const { return k != ClipKind::None && kind == k && slice.length > 0.0f; }
+
+    // One clipboard for both kinds of copy, so whichever was copied last is what
+    // a paste gets.
+    void setSlice(ClipKind k, SliceClip in)
+    {
+        if (!(in.length > 0.0f)) return;
+        kind  = k;
+        items.clear();
+        slice = std::move(in);
+    }
 
     // Replace the contents, rebasing on the top-left corner of what was copied so
     // that corner is what lands under the cursor on a paste.
@@ -52,9 +70,10 @@ public:
         for (auto& i : in) { i.dRow -= minRow; i.dBeat -= minBeat; }
         kind  = k;
         items = std::move(in);
+        slice = {};
     }
 
-    void clear() { kind = ClipKind::None; items.clear(); }
+    void clear() { kind = ClipKind::None; items.clear(); slice = {}; }
 };
 
 // Shared by every grid in the process. A function-local static rather than a

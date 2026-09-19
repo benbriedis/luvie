@@ -15,6 +15,7 @@
 #include <variant>
 
 class Playhead;
+class SliceController;
 
 // ---------------------------------------------------------------------------
 // Interaction states
@@ -67,6 +68,13 @@ class DrumGrid : public Fl_Box, public ITimelineObserver, public ISelectionHost 
     PasteContextPopup*     pastePopup     = nullptr;
     DrumState  state;
     Selection  selection;
+
+    // The editor's time slice, shared with the automation lanes, which are
+    // `partner`; see Grid.
+    SliceController* slice   = nullptr;
+    Fl_Widget*       partner = nullptr;
+    // Unsnapped beat at window x-coordinate `wx`.
+    float beatAtX(int wx) const { return (float)(wx - x() - padX) / (float)colWidth + colOffset; }
 
     // Set by a press that must not create a note when the button comes back up —
     // a ctrl-click, or a plain click that only dismissed a selection. Cleared on
@@ -137,18 +145,19 @@ public:
     void setDivisions(int d)   { divisions = d > 1 ? d : 1; redraw(); }
     void onTimelineChanged()   override;
 
-    // ISelectionHost
-    void clearSelection() override     { if (!selection.empty()) { selection.clear(); redraw(); } }
-    void selectAllItems() override     { selectAllNotes(); redraw(); }
+    // ISelectionHost. A time slice, where there is one, counts as the selection.
+    void clearSelection() override;
+    void selectAllItems() override;
     void deleteSelectedItems() override;
-    bool hasSelection() const override { return !selection.empty(); }
+    bool hasSelection() const override;
     void copySelection() override;
     void pasteClipboard(int wx, int wy) override;
     void setSelectionPopup(SelectionContextPopup* p) override { selectionPopup = p; }
     void setPastePopup(PasteContextPopup* p) override         { pastePopup = p; }
     bool showing() const override      { return visible_r(); }
-    bool ownsWindowPoint(int wx, int wy) const override
-    { return wx >= x() && wx < x() + w() && wy >= y() && wy < y() + h(); }
+    bool ownsWindowPoint(int wx, int wy) const override;
+
+    void setSliceController(SliceController* s, Fl_Widget* partnerWidget);
 
     int getRowOffset() const { return rowOffset; }
     int getPadX() const { return padX; }

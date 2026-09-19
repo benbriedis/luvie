@@ -12,6 +12,7 @@
 #include "itransport.hpp"
 #include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
+#include "sliceController.hpp"
 #include <chrono>
 #include <functional>
 #include <map>
@@ -31,6 +32,9 @@ protected:
     GridScrollPane*    paramScrollbar = nullptr;
     PatternParamLabels paramLabels;
     PatternParamGrid   paramGrid;
+    // The time slice, shared by the note or drum grid and the automation lanes;
+    // each subclass hands it to its grid. See SliceController.
+    SliceController    sliceCtl;
     ObservablePattern* pattern             = nullptr;
     NoteAuditioner*    auditioner          = nullptr;
     int                lastSelectedTrack  = -1;
@@ -211,7 +215,7 @@ public:
     ~BasePatternEditor();
 
     virtual void focusPattern() {}
-    virtual void setSnap(float s) { snapBeats_ = s; paramGrid.setSnap(s); }
+    virtual void setSnap(float s) { snapBeats_ = s; paramGrid.setSnap(s); sliceCtl.setSnap(s); }
     // Beat subdivisions (1 = None): drawn as faint grid lines, independent of snapping.
     virtual void setDivisions(int d) { (void)d; }
     // Horizontal zoom: `factor` scales the column width from its x1 base (so 0.2

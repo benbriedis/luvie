@@ -14,6 +14,7 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_RGB_Image.H>
 #include "cursors.hpp"
+#include "sliceController.hpp"
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Item.H>
 
@@ -105,7 +106,17 @@ void Grid::draw()
             fl_line(x0, y() + top, x0, y() + bottom);
     }
 
-    for (const Note& note : notes) {
+    // While a time slice is being dragged, what it carries is previewed at the
+    // offset the drag has reached: every note overlapping the slice, the same
+    // rule that decides what the move takes.
+    const float sliceShift = slice ? slice->dragOffset() : 0.0f;
+    const float sliceFrom  = slice ? slice->sliceStart() : 0.0f;
+    const float sliceLen   = slice ? slice->sliceEnd() - sliceFrom : 0.0f;
+
+    for (const Note& drawn : notes) {
+        Note note = drawn;
+        if (sliceShift != 0.0f && beatsOverlap(sliceFrom, sliceLen, note.beat, note.length))
+            note.beat += sliceShift;
         // Derive left and right edges by rounding each independently, then take
         // the width from their difference. Computing width from note.length on
         // its own truncates separately from x0, so with non-power-of-two
@@ -125,6 +136,7 @@ void Grid::draw()
             drawSelectionOutline(x0, y0, width, rh);
     }
 
+    if (slice) slice->draw(x() - colOffset * colWidth, y(), h(), colWidth);
     drawBand();
 
     if (playhead)
@@ -155,6 +167,19 @@ int Grid::handle(int event)
                 findNoteForCursor();
 
             const int mods = Fl::event_state();
+            if (slice && Fl::event_button() == FL_LEFT_MOUSE) {
+                // The time slice goes first: Alt sweeps a new one wherever the
+                // press lands, and a press inside one drags it.
+                auto r = slice->press(beatAtX(Fl::event_x()), (mods & FL_ALT) != 0,
+                                      (mods & (FL_SHIFT | FL_COMMAND)) != 0);
+                if (r == SliceController::Press::Consumed) {
+                    state = StateIdle{};
+                    creationForbidden = true;
+                    if (slice->busy()) window()->cursor(FL_CURSOR_HAND);
+                    redraw();
+                    return 1;
+                }
+            }
             if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_SHIFT)) {
                 // Shift-drag always sweeps a band, even when the press lands on
                 // a note — otherwise notes could not be band-selected from the
@@ -179,6 +204,15 @@ int Grid::handle(int event)
                 return 1;
             }
 
+            if (Fl::event_button() == FL_RIGHT_MOUSE && slice && selectionPopup &&
+                slice->contains(beatAtX(Fl::event_x()))) {
+                // Anywhere in a slice, notes included, the menu is the slice's.
+                selectionPopup->open(this,
+                    [this]() { cutSelection(); redraw(); },
+                    [this]() { copySelection(); },
+                    [this]() { deleteSelectedItems(); redraw(); });
+                return 1;
+            }
             if (Fl::event_button() == FL_RIGHT_MOUSE) {
                 int idx = -1;
                 if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
@@ -243,6 +277,10 @@ int Grid::handle(int event)
         }
 
         case FL_DRAG:
+            if (slice && slice->busy()) {
+                slice->drag(beatAtX(Fl::event_x()));
+                return 1;
+            }
             if (auto* s = std::get_if<StateDragMove>  (&state)) moving(*s);
             else if (auto* s = std::get_if<StateDragResize>(&state)) resizing(*s);
             else if (auto* s = std::get_if<StateDragGroup> (&state)) movingGroup(*s);
@@ -255,6 +293,12 @@ int Grid::handle(int event)
 
         case FL_RELEASE:
             stopEdgeScroll();
+            if (slice && slice->busy()) {
+                slice->release();
+                creationForbidden = false;
+                window()->cursor(FL_CURSOR_DEFAULT);
+                return 1;
+            }
             if (auto* s = std::get_if<StateBandSelect>(&state)) {
                 bool additive = s->additive;
                 state = StateIdle{};
@@ -314,6 +358,9 @@ int Grid::handle(int event)
 
         case FL_MOVE:
             findNoteForCursor();
+            // Over a slice, whatever is under the cursor, a press drags the slice.
+            if (slice && slice->contains(beatAtX(Fl::event_x())))
+                window()->cursor(FL_CURSOR_HAND);
             return 0;
 
         case FL_KEYBOARD:
@@ -363,11 +410,45 @@ std::unordered_set<int> Grid::liveItemIds() const
 void Grid::selectAll()       { selection.clear(); for (const Note& n : notes) selection.add(n.id); }
 void Grid::deleteSelection() {}
 
+void Grid::clearSelection()
+{
+    if (slice) slice->clear();
+    if (!selection.empty()) { selection.clear(); redraw(); }
+}
+
+void Grid::selectAllItems()
+{
+    if (slice) slice->clear();
+    selectAll();
+    redraw();
+}
+
+void Grid::setSliceController(SliceController* s, Fl_Widget* partnerWidget)
+{
+    slice   = s;
+    partner = partnerWidget;
+    slice->onSweepStart = [this]() { if (!selection.empty()) { selection.clear(); redraw(); } };
+}
+
+bool Grid::hasSelection() const
+{
+    return !selection.empty() || (slice && slice->active());
+}
+
+bool Grid::ownsWindowPoint(int wx, int wy) const
+{
+    auto inside = [wx, wy](const Fl_Widget* wd) {
+        return wx >= wd->x() && wx < wd->x() + wd->w() && wy >= wd->y() && wy < wd->y() + wd->h();
+    };
+    return inside(this) || (partner && partner->visible_r() && inside(partner));
+}
+
 // Delete arrives from AppWindow, which knows nothing of hover, so the state has
 // to be dropped here: it may name a note that no longer exists.
 void Grid::deleteSelectedItems()
 {
-    deleteSelection();
+    if (slice && slice->active()) slice->deleteRange();
+    else                          deleteSelection();
     state = StateIdle{};
     if (window()) window()->cursor(FL_CURSOR_DEFAULT);
 }
@@ -396,18 +477,29 @@ float Grid::pasteAnchorBeat(int wx) const
 
 void Grid::copySelection()
 {
+    if (slice && slice->active()) { slice->copy(); return; }
     if (clipKind() == ClipKind::None || selection.empty()) return;
     clipboard().set(clipKind(), selectedForClipboard());
 }
 
 void Grid::pasteClipboard(int wx, int wy)
 {
+    // A slice spans every row, so only the beat under the cursor matters.
+    if (slice && slice->canPaste()) {
+        if (slice->pasteAt(beatAtX(wx))) {
+            if (!selection.empty()) { selection.clear(); redraw(); }
+        }
+        else flashForbiddenCursor(window());
+        return;
+    }
     const Clipboard& cb = clipboard();
     // Nothing of this grid's kind to paste, or nowhere here it would fit: either
     // way nothing happens, and the cursor is what says so.
     if (!cb.holds(clipKind()) ||
         !pasteAt(cb.items, rowAtPixelY(wy - y()), pasteAnchorBeat(wx)))
         flashForbiddenCursor(window());
+    else if (slice)
+        slice->clear();   // the pasted items are the selection now
 }
 
 bool Grid::openSelectionMenu(int noteIdx)
@@ -425,7 +517,8 @@ bool Grid::openSelectionMenu(int noteIdx)
 
 bool Grid::openPasteMenu()
 {
-    if (!pastePopup || !clipboard().holds(clipKind())) return false;
+    if (!pastePopup) return false;
+    if (!clipboard().holds(clipKind()) && !(slice && slice->canPaste())) return false;
     // Capture where the right-click landed: that is the spot the user picked,
     // and by the time the menu item runs the event position is the click on the
     // item itself.
@@ -650,25 +743,29 @@ void drawSelectionBand(const Selection& selection, int originX, int originY)
     const int by = originY + selection.bandTop(),  bh = selection.bandBottom() - selection.bandTop();
     if (bw <= 0 && bh <= 0) return;
 
+    if (bw > 0 && bh > 0) drawBandWash(bx, by, bw, bh);
+    fl_color(bandColor);
+    fl_rect(bx, by, bw, bh);
+}
+
+void drawBandWash(int bx, int by, int bw, int bh)
+{
     // The fill is a wash rather than an opaque rectangle, so whatever the band
     // sweeps over stays visible while it is being dragged. FLTK has no
     // alpha-aware rectangle, so stretch a single translucent pixel: the driver
     // pads it out, which costs nothing per frame and needs no pixel buffer.
-    if (bw > 0 && bh > 0) {
-        if (fl_can_do_alpha_blending()) {
-            static const uchar pixel[4] = {
-                uchar(bandColor >> 24), uchar(bandColor >> 16), uchar(bandColor >> 8), bandFillAlpha };
-            static Fl_RGB_Image wash(pixel, 1, 1, 4);
-            wash.scale(bw, bh, 0, 1);
-            wash.draw(bx, by);
-        }
-        else {
-            fl_color(fl_color_average(bandColor, bgColor, 0.18f));
-            fl_rectf(bx, by, bw, bh);
-        }
+    if (bw <= 0 || bh <= 0) return;
+    if (fl_can_do_alpha_blending()) {
+        static const uchar pixel[4] = {
+            uchar(bandColor >> 24), uchar(bandColor >> 16), uchar(bandColor >> 8), bandFillAlpha };
+        static Fl_RGB_Image wash(pixel, 1, 1, 4);
+        wash.scale(bw, bh, 0, 1);
+        wash.draw(bx, by);
     }
-    fl_color(bandColor);
-    fl_rect(bx, by, bw, bh);
+    else {
+        fl_color(fl_color_average(bandColor, bgColor, 0.18f));
+        fl_rectf(bx, by, bw, bh);
+    }
 }
 
 void Grid::drawBand() const

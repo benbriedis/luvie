@@ -4,6 +4,7 @@
 #include "patternParamGrid.hpp"
 #include "midiLearnBadge.hpp"
 #include "cursors.hpp"
+#include "sliceController.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -173,6 +174,8 @@ void PatternParamGrid::draw()
         drawParamRow(li, y() + r * kParamRowH, gridRight);
     }
 
+    if (slice) slice->draw(x() + padX_ - colOffset_ * colWidth_, y(), h(), colWidth_);
+
     fl_pop_clip();
 }
 
@@ -311,6 +314,30 @@ int PatternParamGrid::handle(int event)
         }
         return false;
     };
+
+    // The time slice, which runs through the lanes from the note grid above.
+    // Alt sweeps a new one and a press inside one drags it, dots and all; a
+    // sweep or drag begun here is carried through to its release.
+    if (slice) {
+        if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE &&
+            std::holds_alternative<ParamIdle>(paramState)) {
+            const int mods = Fl::event_state();
+            auto r = slice->press(beatAtX(Fl::event_x()), (mods & FL_ALT) != 0,
+                                  (mods & (FL_SHIFT | FL_COMMAND)) != 0);
+            if (r == SliceController::Press::Consumed) {
+                if (slice->busy() && window()) window()->cursor(FL_CURSOR_HAND);
+                return 1;
+            }
+        }
+        if (slice->busy()) {
+            if (event == FL_DRAG)    { slice->drag(beatAtX(Fl::event_x())); return 1; }
+            if (event == FL_RELEASE) {
+                slice->release();
+                if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+                return 1;
+            }
+        }
+    }
 
     // Active drag: route everything here
     if (!std::holds_alternative<ParamIdle>(paramState)) {
@@ -492,8 +519,10 @@ int PatternParamGrid::handle(int event)
             }
         }
         if (window()) {
-            if (useHand) window()->cursor(contextMenuCursorImage(), 0, 0);
-            else         window()->cursor(FL_CURSOR_DEFAULT);
+            if (slice && slice->contains(beatAtX(Fl::event_x())))
+                window()->cursor(FL_CURSOR_HAND);   // a press drags the slice
+            else if (useHand) window()->cursor(contextMenuCursorImage(), 0, 0);
+            else              window()->cursor(FL_CURSOR_DEFAULT);
         }
         return 0;
     }

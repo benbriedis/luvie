@@ -22,6 +22,9 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
     seekingEnabled = false;
     baseColWidth   = colWidth;
     snapBeats_     = snap;
+    sliceCtl.setSnap(snap);
+    paramGrid.setSliceController(&sliceCtl);
+    sliceCtl.addView(&paramGrid);
 
     // Growth rides the playhead's own timer rather than one of its own. It already
     // runs at 16-50 ms while the transport rolls, which is far finer than the one
@@ -790,6 +793,7 @@ void BasePatternEditor::onTimelineChanged()
     lastSelectedLaneId = selLane;
 
     if (sel < 0 || sel >= (int)tl.tracks.size()) {
+        sliceCtl.setPattern(pattern, -1);
         afterTimelineChanged(-1);
         return;
     }
@@ -803,6 +807,8 @@ void BasePatternEditor::onTimelineChanged()
         releaseMidiNotes();
 
     lastPatId = patId;
+    // Drops the slice when the pattern changes, trims it when it shrinks.
+    sliceCtl.setPattern(pattern, patId);
 
     if (trackChanged) playhead.setPatternTrack(sel);
     if (trackChanged || patChanged) {

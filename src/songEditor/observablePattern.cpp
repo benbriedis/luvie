@@ -163,31 +163,40 @@ std::vector<Note> ObservablePattern::buildPatternNotes(int patternId) const
     return {};
 }
 
+// Place a harmony note given as (pitch group, degree) — coordinates that mean
+// the same in every chord — into the row encoding of a chord of `chordSize`
+// degrees. A degree the chord has no room for becomes a bonus note, which keeps
+// it so a later, bigger chord can take it back.
+static void encodeHarmonyNote(Note& note, int pitchGroup, int degree, int chordSize)
+{
+    if (degree < chordSize) {
+        note.row         = pitchGroup * chordSize + degree;
+        note.bonus       = false;
+        note.bonusDegree = -1;
+    } else {
+        note.row         = pitchGroup;
+        note.bonus       = true;
+        note.bonusDegree = degree;
+    }
+}
+
+// The inverse: a stored harmony note's pitch group and degree.
+static void decodeHarmonyNote(const Note& note, int chordSize, int& pitchGroup, int& degree)
+{
+    if (note.bonus) { pitchGroup = note.row; degree = note.bonusDegree; }
+    else            { pitchGroup = note.row / chordSize; degree = note.row % chordSize; }
+}
+
 void ObservablePattern::remapPatternNotes(int patId, int oldSize, int newSize)
 {
     for (auto& pat : song_->data.patterns) {
         if (pat.id != patId) continue;
         for (auto& note : pat.notes) {
-            if (note.bonus) {
-                // The new chord is big enough to hold this degree again: fold the
-                // bonus note back into an ordinary row.
-                if (note.bonusDegree >= 0 && note.bonusDegree < newSize) {
-                    note.row         = note.row * newSize + note.bonusDegree;
-                    note.bonus       = false;
-                    note.bonusDegree = -1;
-                }
-            } else {
-                int degree     = note.row % oldSize;
-                int pitchGroup = note.row / oldSize;
-                if (degree < newSize) {
-                    note.row = pitchGroup * newSize + degree;
-                } else {
-                    // Degree fell off the end of the new chord: keep it as a bonus note.
-                    note.bonus       = true;
-                    note.bonusDegree = degree;
-                    note.row         = pitchGroup;
-                }
-            }
+            // A bonus note whose degree is out of range has nowhere to go back to.
+            if (note.bonus && note.bonusDegree < 0) continue;
+            int pitchGroup, degree;
+            decodeHarmonyNote(note, oldSize, pitchGroup, degree);
+            encodeHarmonyNote(note, pitchGroup, degree, newSize);
         }
         break;
     }
@@ -569,4 +578,240 @@ void ObservablePattern::moveParamPoint(int pointId, float beat, int value)
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Time slices
+//
+// A slice holds every item in [start, end): the notes overlapping it (carried
+// whole, as the rubber band takes them), and the drum hits and automation points
+// lying in it. Automation is moved as points and nothing more: no points are
+// added at the edges to keep the curve outside the range as it was, so a slice
+// that starts or ends at a different value from its surroundings ramps into and
+// out of them, and the user patches the edges up as they see fit.
+
+namespace {
+
+// Same tolerance as Grid::kBeatEpsilon: far below any real subdivision, well
+// above the float noise of snapping to thirds and sevenths.
+constexpr float kSliceEps = 1e-4f;
+
+// Harmony pitch groups the editor will show: HarmonyLabels stops at ten.
+constexpr int kMaxPitchGroups = 10;
+
+bool rangesOverlap(float aStart, float aLen, float bStart, float bLen)
+{
+    return aStart + kSliceEps < bStart + bLen && bStart + kSliceEps < aStart + aLen;
+}
+
+bool inRange(float beat, float start, float end)
+{
+    return beat >= start - kSliceEps && beat < end - kSliceEps;
+}
+
+bool isNoteType(PatternType t) { return t == PatternType::HARMONY || t == PatternType::PIANOROLL; }
+
+// Insert keeping the lane sorted, after any point already on that beat, so two
+// points stacked on one beat keep the order they were copied in.
+void insertPoint(ParamLane& lane, int id, float beat, int value)
+{
+    auto it = std::upper_bound(lane.points.begin(), lane.points.end(), beat,
+        [](float b, const ParamPoint& p) { return b + kSliceEps < p.beat; });
+    lane.points.insert(it, {id, beat, std::clamp(value, 0, laneMaxValue(lane.type)), false});
+}
+
+ParamPoint* anchorOf(ParamLane& lane)
+{
+    for (auto& p : lane.points) if (p.anchor) return &p;
+    return nullptr;
+}
+
+} // namespace
+
+SliceClip ObservablePattern::captureRange(int patId, float start, float end) const
+{
+    SliceClip clip;
+    const Pattern* pat = song_->patternById(patId);
+    if (!pat || !(end > start)) return clip;
+
+    clip.type   = pat->type;
+    clip.length = end - start;
+    const int chordSize = chordDefForHash(pat->chordHash).size;
+
+    if (isNoteType(pat->type)) {
+        for (const Note& n : pat->notes) {
+            if (!rangesOverlap(start, clip.length, n.beat, n.length)) continue;
+            SliceNote s;
+            s.dBeat    = n.beat - start;
+            s.length   = n.length;
+            s.velocity = n.velocity;
+            if (pat->type == PatternType::PIANOROLL) s.row = n.row;
+            else {
+                if (n.bonus && n.bonusDegree < 0) continue;
+                decodeHarmonyNote(n, chordSize, s.pitchGroup, s.degree);
+            }
+            clip.notes.push_back(s);
+        }
+    }
+    else {
+        for (const DrumNote& d : pat->drumNotes)
+            if (inRange(d.beat, start, end))
+                clip.drums.push_back({d.note, d.beat - start, d.velocity});
+    }
+
+    // Every lane is carried, empty or not, so a paste elsewhere creates the
+    // lanes the slice covered even where it held no points.
+    for (const ParamLane& lane : pat->paramLanes) {
+        SliceLane s;
+        s.type = lane.type;
+        for (const ParamPoint& p : lane.points)
+            if (inRange(p.beat, start, end))
+                s.points.emplace_back(p.beat - start, p.value);
+        clip.lanes.push_back(std::move(s));
+    }
+    return clip;
+}
+
+// Shared by every slice edit, which each notify once at the end. The anchor at
+// beat 0 is never removed: every lane must keep one.
+static void clearRangeIn(Pattern& pat, float start, float end)
+{
+    const float len = end - start;
+    if (isNoteType(pat.type)) {
+        pat.notes.erase(std::remove_if(pat.notes.begin(), pat.notes.end(),
+            [&](const Note& n) { return rangesOverlap(start, len, n.beat, n.length); }),
+            pat.notes.end());
+    }
+    else {
+        pat.drumNotes.erase(std::remove_if(pat.drumNotes.begin(), pat.drumNotes.end(),
+            [&](const DrumNote& d) { return inRange(d.beat, start, end); }),
+            pat.drumNotes.end());
+    }
+    for (ParamLane& lane : pat.paramLanes)
+        lane.points.erase(std::remove_if(lane.points.begin(), lane.points.end(),
+            [&](const ParamPoint& p) { return !p.anchor && inRange(p.beat, start, end); }),
+            lane.points.end());
+}
+
+void ObservablePattern::clearRange(int patId, float start, float end)
+{
+    if (!(end > start)) return;
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patId) continue;
+        clearRangeIn(pat, start, end);
+        song_->notify();
+        return;
+    }
+}
+
+bool ObservablePattern::rangeFits(int patId, const SliceClip& clip, float at) const
+{
+    const Pattern* pat = song_->patternById(patId);
+    if (!pat || clip.type != pat->type || !(clip.length > 0.0f)) return false;
+    if (at < -kSliceEps || at + clip.length > pat->lengthBeats + kSliceEps) return false;
+
+    for (const SliceNote& n : clip.notes) {
+        const float b = at + n.dBeat;
+        if (b < -kSliceEps || b + n.length > pat->lengthBeats + kSliceEps) return false;
+        if (pat->type == PatternType::PIANOROLL) {
+            if (n.row < 0 || n.row > 127) return false;
+        } else if (n.pitchGroup < 0 || n.pitchGroup >= kMaxPitchGroups || n.degree < 0) {
+            return false;
+        }
+    }
+    for (const SliceDrum& d : clip.drums)
+        if (d.note < 0 || d.note > 127) return false;
+    return true;
+}
+
+// The body of a paste, on a pattern already known to take it (rangeFits).
+static void pasteRangeIn(Pattern& pat, const SliceClip& clip, float at, int& nextId)
+{
+    for (const SliceLane& sl : clip.lanes) {
+        bool have = std::any_of(pat.paramLanes.begin(), pat.paramLanes.end(),
+            [&](const ParamLane& l) { return l.type == sl.type; });
+        if (have) continue;
+        ParamLane lane;
+        lane.id   = nextId++;
+        lane.type = sl.type;
+        lane.points.push_back({nextId++, 0.0f, laneDefaultValue(sl.type), true});
+        pat.paramLanes.push_back(std::move(lane));
+    }
+
+    clearRangeIn(pat, at, at + clip.length);
+
+    if (isNoteType(pat.type)) {
+        const int chordSize = chordDefForHash(pat.chordHash).size;
+        std::vector<Note> placed;
+        placed.reserve(clip.notes.size());
+        for (const SliceNote& s : clip.notes) {
+            Note n{nextId++, s.row, at + s.dBeat, s.length, s.velocity};
+            if (pat.type == PatternType::HARMONY)
+                encodeHarmonyNote(n, s.pitchGroup, s.degree, chordSize);
+            placed.push_back(n);
+        }
+        // A note carried whole past either edge can still reach a note outside
+        // the range. The slice replaces what it lands on, so that note goes too.
+        auto sameRow = [](const Note& a, const Note& b) {
+            return a.row == b.row && a.bonus == b.bonus && (!a.bonus || a.bonusDegree == b.bonusDegree);
+        };
+        pat.notes.erase(std::remove_if(pat.notes.begin(), pat.notes.end(),
+            [&](const Note& old) {
+                return std::any_of(placed.begin(), placed.end(), [&](const Note& p) {
+                    return sameRow(old, p) && rangesOverlap(p.beat, p.length, old.beat, old.length);
+                });
+            }), pat.notes.end());
+        pat.notes.insert(pat.notes.end(), placed.begin(), placed.end());
+    }
+    else {
+        for (const SliceDrum& d : clip.drums)
+            pat.drumNotes.push_back({nextId++, d.note, at + d.dBeat, d.velocity});
+    }
+
+    for (const SliceLane& sl : clip.lanes) {
+        auto it = std::find_if(pat.paramLanes.begin(), pat.paramLanes.end(),
+            [&](const ParamLane& l) { return l.type == sl.type; });
+        if (it == pat.paramLanes.end()) continue;
+        ParamLane& lane = *it;
+        bool anchorTaken = false;
+        for (const auto& [dBeat, value] : sl.points) {
+            const float beat = at + dBeat;
+            // Beat 0 already has the anchor, which cannot go: the first point
+            // landing there becomes its value rather than a second point.
+            if (beat <= kSliceEps && !anchorTaken) {
+                if (ParamPoint* a = anchorOf(lane)) {
+                    a->value = std::clamp(value, 0, laneMaxValue(lane.type));
+                    anchorTaken = true;
+                    continue;
+                }
+            }
+            insertPoint(lane, nextId++, beat, value);
+        }
+    }
+}
+
+bool ObservablePattern::pasteRange(int patId, const SliceClip& clip, float at)
+{
+    if (!rangeFits(patId, clip, at)) return false;
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patId) continue;
+        pasteRangeIn(pat, clip, at, song_->nextId);
+        song_->notify();
+        return true;
+    }
+    return false;
+}
+
+bool ObservablePattern::moveRange(int patId, float start, float end, float to)
+{
+    SliceClip clip = captureRange(patId, start, end);
+    if (!rangeFits(patId, clip, to)) return false;
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patId) continue;
+        clearRangeIn(pat, start, end);
+        pasteRangeIn(pat, clip, to, song_->nextId);
+        song_->notify();
+        return true;
+    }
+    return false;
 }

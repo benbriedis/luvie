@@ -110,6 +110,8 @@ PianorollEditor::PianorollEditor(int x, int y, int visibleW, int numRows, int nu
     grid.position(x + scrollbarW + labelsW, y + rulerH);
     grid.size(visibleGridW, gridH);
     grid.setPlayhead(&playhead);
+    grid.setSliceController(&sliceCtl, &paramGrid);
+    sliceCtl.addView(&grid);
 
     gridPane.add(labels);
     gridPane.add(grid);

@@ -51,6 +51,30 @@ To create a lane right-click on the track in the left hand column and choose 'Ad
 You can add dots on the rubberbands by clicking on it. You can click and drag them around, and you can delete them
 either by hovering over them and pressing delete or by right-clicking on them and using the menu option.
 
+## Time slices
+
+Sometimes you want to move or copy a whole stretch of a pattern - the notes and the automation
+together. Hold Alt and drag across the grid (or the automation lanes) to select a time slice. It runs
+from the top of the grid to the bottom of the automation lanes.
+
+- Drag inside the slice to move it left or right.
+- Ctrl-C, Ctrl-X and Delete copy, cut and clear it. Right-clicking inside the slice gives the same menu.
+- Ctrl-V (or right-click → 'Paste selection') pastes the slice with its start at the cursor. It replaces whatever was there.
+
+As with the Shift-drag selection, a note that overlaps the edge of the slice is taken whole.
+
+A slice can also be pasted into another pattern of the same type. Pick the other pattern and paste as usual.
+Automation lanes the other pattern doesn't have yet are added. Harmony slices keep their chord degrees,
+so they can go into a pattern with a different chord. Degrees that chord doesn't have become bonus notes.
+
+A slice takes the automation dots inside it and nothing more, and no dots are added at its edges. If a
+pasted or moved slice starts or ends at a different value to its surroundings, the automation ramps
+between them. To make it jump instead, add dots at the edges yourself. Cutting a slice leaves a straight
+ramp across the gap.
+
+Note that some Linux window managers use Alt-drag to move windows. If Alt-drag moves the Luvie window,
+change the window manager's modifier key (often Super is an option).
+
 ## Control row
 
 The main controls of the pattern editors are found at the bottom of the UI.

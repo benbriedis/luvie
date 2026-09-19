@@ -6,6 +6,7 @@
 
 #include "itimelineobserver.hpp"
 #include "observableSong.hpp"
+#include "sliceClip.hpp"
 #include "timeline.hpp"
 #include <string>
 #include <utility>
@@ -88,6 +89,26 @@ public:
     int  addPatternParamPoint(int patId, int laneId, float beat, int value);
     void removeParamPoint(int pointId);
     void moveParamPoint(int pointId, float beat, int value);
+
+    // ── Time slices ──────────────────────────────────────────────────────────
+    // Whole vertical stretches of a pattern, [start, end) in beats: every note
+    // overlapping it (carried whole, as the rubber band takes them), and every
+    // drum hit and automation point inside it. Nothing is added at the edges to
+    // smooth the automation into or out of the range. Each call is one notify(),
+    // so one undo entry.
+    SliceClip captureRange(int patId, float start, float end) const;
+    // Empty the range. The automation ramps straight across it from the last
+    // point before to the first point after.
+    void clearRange(int patId, float start, float end);
+    // True if `clip` would fit in the pattern at `at` — the same pattern type,
+    // and nothing landing outside the pattern or the pitch range.
+    bool rangeFits(int patId, const SliceClip& clip, float at) const;
+    // Replace [at, at + clip.length) with the slice. All or nothing: false, and
+    // no change, when rangeFits() says no. Lanes the pattern lacks are created.
+    bool pasteRange(int patId, const SliceClip& clip, float at);
+    // Move [start, end) so it starts at `to`: a paste of the slice over its new
+    // home after emptying its old one, in a single edit.
+    bool moveRange(int patId, float start, float end, float to);
 
     // ITimelineObserver — forwards all song changes to pattern observers
     void onTimelineChanged() override;

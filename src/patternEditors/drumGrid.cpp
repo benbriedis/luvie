@@ -7,6 +7,7 @@
 #include "editor.hpp"
 #include "cursors.hpp"
 #include "noteColor.hpp"
+#include "sliceController.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -137,13 +138,22 @@ void DrumGrid::draw()
         fl_line(x0, y(), x0, y() + h());
     }
 
+    // While a time slice is being dragged, the hits it carries are previewed at
+    // the offset the drag has reached.
+    const float sliceShift = slice ? slice->dragOffset() : 0.0f;
+    const float sliceFrom  = slice ? slice->sliceStart() : 0.0f;
+    const float sliceTo    = slice ? slice->sliceEnd()   : 0.0f;
+
     // Draw drum notes as filled circles at the beat position (not cell center)
     const int dotR = std::max(2, rowHeight / 3);
     for (int i = 0; i < (int)notes.size(); i++) {
         const auto& n = notes[i];
         int vr = rowOffset + numRows - 1 - n.note;
         if (vr < 0 || vr >= numRows) continue;
-        int dotX = x() + padX + (int)((n.beat - colOffset) * colWidth);
+        float beat = n.beat;
+        if (sliceShift != 0.0f && beat >= sliceFrom - 1e-4f && beat < sliceTo - 1e-4f)
+            beat += sliceShift;
+        int dotX = x() + padX + (int)((beat - colOffset) * colWidth);
         int dotY = y() + vr * rowHeight + rowHeight / 2;
         if (dotX + dotR < x() || dotX - dotR > x() + w()) continue;
         fl_color(velocityFill(n.velocity));
@@ -159,6 +169,7 @@ void DrumGrid::draw()
         }
     }
 
+    if (slice) slice->draw(x() + padX - colOffset * colWidth, y(), h(), colWidth);
     // Rubber band, over the dots.
     drawSelectionBand(selection, x(), y());
 
@@ -180,6 +191,28 @@ int DrumGrid::handle(int evt)
         int idx = findNoteAtCursor();
 
         const int mods = Fl::event_state();
+        if (slice && Fl::event_button() == FL_LEFT_MOUSE) {
+            // The time slice goes first: Alt sweeps a new one wherever the press
+            // lands, and a press inside one drags it.
+            auto r = slice->press(beatAtX(Fl::event_x()), (mods & FL_ALT) != 0,
+                                  (mods & (FL_SHIFT | FL_COMMAND)) != 0);
+            if (r == SliceController::Press::Consumed) {
+                state = DrumStateIdle{};
+                creationForbidden = true;
+                if (slice->busy() && window()) window()->cursor(FL_CURSOR_HAND);
+                redraw();
+                return 1;
+            }
+        }
+        if (Fl::event_button() == FL_RIGHT_MOUSE && slice && selectionPopup &&
+            slice->contains(beatAtX(Fl::event_x()))) {
+            // Anywhere in a slice, hits included, the menu is the slice's.
+            selectionPopup->open(this,
+                [this]() { cutSelection(); redraw(); },
+                [this]() { copySelection(); },
+                [this]() { deleteSelectedItems(); redraw(); });
+            return 1;
+        }
         if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_SHIFT)) {
             selection.beginBand(Fl::event_x() - x(), Fl::event_y() - y());
             state = DrumStateBand{(mods & FL_COMMAND) != 0};
@@ -262,6 +295,10 @@ int DrumGrid::handle(int evt)
     }
 
     case FL_DRAG: {
+        if (slice && slice->busy()) {
+            slice->drag(beatAtX(Fl::event_x()));
+            return 1;
+        }
         if (std::holds_alternative<DrumStateBand>(state)) {
             selection.updateBand(Fl::event_x() - x(), Fl::event_y() - y());
             redraw();
@@ -302,6 +339,12 @@ int DrumGrid::handle(int evt)
     }
 
     case FL_RELEASE: {
+        if (slice && slice->busy()) {
+            slice->release();
+            creationForbidden = false;
+            if (window()) window()->cursor(FL_CURSOR_DEFAULT);
+            return 1;
+        }
         if (auto* b = std::get_if<DrumStateBand>(&state)) {
             bool additive = b->additive;
             state = DrumStateIdle{};
@@ -360,6 +403,9 @@ int DrumGrid::handle(int evt)
             state = DrumStateIdle{};
             if (window()) window()->cursor(FL_CURSOR_DEFAULT);
         }
+        // Over a slice, whatever is under the cursor, a press drags the slice.
+        if (slice && slice->contains(beatAtX(Fl::event_x())) && window())
+            window()->cursor(FL_CURSOR_HAND);
         return 0;
     }
 
@@ -411,11 +457,45 @@ void DrumGrid::selectAllNotes()
         selection.add(n.id);
 }
 
+void DrumGrid::clearSelection()
+{
+    if (slice) slice->clear();
+    if (!selection.empty()) { selection.clear(); redraw(); }
+}
+
+void DrumGrid::selectAllItems()
+{
+    if (slice) slice->clear();
+    selectAllNotes();
+    redraw();
+}
+
+void DrumGrid::setSliceController(SliceController* s, Fl_Widget* partnerWidget)
+{
+    slice   = s;
+    partner = partnerWidget;
+    slice->onSweepStart = [this]() { if (!selection.empty()) { selection.clear(); redraw(); } };
+}
+
+bool DrumGrid::hasSelection() const
+{
+    return !selection.empty() || (slice && slice->active());
+}
+
+bool DrumGrid::ownsWindowPoint(int wx, int wy) const
+{
+    auto inside = [wx, wy](const Fl_Widget* wd) {
+        return wx >= wd->x() && wx < wd->x() + wd->w() && wy >= wd->y() && wy < wd->y() + wd->h();
+    };
+    return inside(this) || (partner && partner->visible_r() && inside(partner));
+}
+
 // Delete arrives from AppWindow, which knows nothing of hover, so the state has
 // to be dropped here: it may name a note that no longer exists.
 void DrumGrid::deleteSelectedItems()
 {
-    deleteSelection();
+    if (slice && slice->active()) slice->deleteRange();
+    else                          deleteSelection();
     state = DrumStateIdle{};
     if (window()) window()->cursor(FL_CURSOR_DEFAULT);
 }
@@ -439,6 +519,7 @@ void DrumGrid::deleteSelection()
 
 void DrumGrid::copySelection()
 {
+    if (slice && slice->active()) { slice->copy(); return; }
     if (!pattern || patternId < 0 || selection.empty()) return;
     std::vector<ClipItem> items;
     for (const DrumNote& n : pattern->buildDrumPatternNotes(patternId))
@@ -449,14 +530,25 @@ void DrumGrid::copySelection()
 
 void DrumGrid::pasteClipboard(int wx, int wy)
 {
+    // A slice spans every row, so only the beat under the cursor matters.
+    if (slice && slice->canPaste()) {
+        if (slice->pasteAt(beatAtX(wx))) {
+            if (!selection.empty()) { selection.clear(); redraw(); }
+        }
+        else flashForbiddenCursor(window());
+        return;
+    }
     const Clipboard& cb = clipboard();
     if (!cb.holds(ClipKind::DrumNotes) || !pasteAt(cb.items, wx, wy))
         flashForbiddenCursor(window());
+    else if (slice)
+        slice->clear();   // the pasted hits are the selection now
 }
 
 bool DrumGrid::openPasteMenu()
 {
-    if (!pastePopup || !clipboard().holds(ClipKind::DrumNotes)) return false;
+    if (!pastePopup) return false;
+    if (!clipboard().holds(ClipKind::DrumNotes) && !(slice && slice->canPaste())) return false;
     // Capture where the right-click landed: that is the spot the user picked,
     // and by the time the menu item runs the event position is the click on the
     // item itself.

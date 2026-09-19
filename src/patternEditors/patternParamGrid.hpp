@@ -21,6 +21,7 @@ inline constexpr int kParamAreaH   = kMaxVisParams * kParamRowH;
 // ── Left column: type labels for each visible param lane ─────────────────────
 
 class MidiLearnMap;
+class SliceController;
 
 class PatternParamLabels : public Fl_Widget {
     ObservablePattern* pattern   = nullptr;
@@ -59,6 +60,11 @@ class PatternParamGrid : public Fl_Widget {
     float               snap_;
     int                 laneOffset = 0;
     ParamDotPopup*      dotPopup   = nullptr;
+    // The editor's time slice, which runs down through the lanes from the note
+    // grid above. The lanes sweep and drag it exactly as that grid does.
+    SliceController*    slice      = nullptr;
+    // Unsnapped beat at window x-coordinate `wx`.
+    float beatAtX(int wx) const { return (float)(wx - x() - padX_) / colWidth_ + colOffset_; }
 
     std::vector<ParamLaneLocal> localLanes;
     ParamState                  paramState;
@@ -84,6 +90,7 @@ public:
     void setPadX(int p)        { padX_      = p;   redraw(); }
     void setLaneOffset(int off){ laneOffset = off; rebuildLanes(); redraw(); }
     void setParamDotPopup(ParamDotPopup* p) { dotPopup = p; }
+    void setSliceController(SliceController* s) { slice = s; }
     void setSnap(float s)      { snap_ = s; }
     int  numLanes() const { return (int)localLanes.size(); }
 };
