@@ -13,6 +13,7 @@
 #include "observablePattern.hpp"
 #include "gridScrollPane.hpp"
 #include "sliceController.hpp"
+#include "liveNoteLights.hpp"
 #include <chrono>
 #include <functional>
 #include <map>
@@ -69,6 +70,8 @@ protected:
     // that renames the row under the current event; others leave it empty and
     // the context menu omits its "Rename" item.
     virtual std::function<void()> labelsRenameHandler() { return {}; }
+    // The label column's lights for notes arriving on the MIDI input.
+    virtual LiveNoteLights& labelsLiveNotes() = 0;
 
     // Instrument of the currently selected track's pattern (0 if none).
     int currentInstrumentId() const;
@@ -251,6 +254,9 @@ public:
     // held notes with the length they reached. Called when the editor stops being
     // the MIDI target and when the transport stops.
     void releaseMidiNotes();
+    // Unlights every label row lit by the MIDI input. For when the editor stops
+    // being the target, since the note-offs will then go elsewhere.
+    void clearLiveNotes() { labelsLiveNotes().clear(); }
     void setNoteLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamLabelsContextPopup(NoteLabelsContextPopup* popup);
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }

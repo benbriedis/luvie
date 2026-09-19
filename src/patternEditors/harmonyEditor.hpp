@@ -42,6 +42,7 @@ private:
     void labelsResize(int x, int y, int w, int h) override { harmonyLabels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { harmonyLabels.onRightClick = std::move(fn); }
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { harmonyLabels.onRowClicked = std::move(fn); }
+    LiveNoteLights& labelsLiveNotes() override { return harmonyLabels.liveNotes; }
 
     void setGridPattern(int patId) override;
 

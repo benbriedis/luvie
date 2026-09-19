@@ -122,6 +122,7 @@ void LuvieApp::updateMidiTarget()
         midiTarget->setRecordArmed(false);
         midiTarget->setGrowArmed(false);
         midiTarget->releaseMidiNotes();
+        midiTarget->clearLiveNotes();
     }
     if (patternPanel) patternPanel->stopRecording();
     midiTarget = next;

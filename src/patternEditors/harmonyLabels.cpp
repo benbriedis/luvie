@@ -145,7 +145,7 @@ void HarmonyLabels::draw() {
             fl_color(0xCCCCCC00);
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }
-        if (virtualPos == flashVPos) {
+        if (virtualPos == flashVPos || liveNotes.lit(midiForRow(r))) {
             fl_color(flashCol);
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }

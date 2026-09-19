@@ -61,7 +61,7 @@ void PianorollLabels::draw()
         int midiNote = rowOffset + numRows - 1 - r;
         if (midiNote < 0 || midiNote > 127) continue;
         int ry = y() + r * rowHeight;
-        if (midiNote == flashMidi) {
+        if (midiNote == flashMidi || liveNotes.lit(midiNote)) {
             fl_color(piFlashCol);
             fl_rectf(x(), ry, w() - 1, rowHeight);
         }

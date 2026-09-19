@@ -6,6 +6,7 @@
 
 #include <FL/Fl_Widget.H>
 #include <FL/Fl.H>
+#include "liveNoteLights.hpp"
 #include <functional>
 #include <string>
 #include <string_view>
@@ -37,6 +38,9 @@ class HarmonyLabels : public Fl_Widget {
 public:
     std::function<void()>    onRightClick;
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
+    // Notes arriving on the MIDI input, lit on every row that sounds that pitch.
+    // A pitch outside the chord has no row, so it is heard but not shown.
+    LiveNoteLights           liveNotes{this};
 
     HarmonyLabels(int x, int y, int w, int numRows, int rowHeight);
     ~HarmonyLabels();

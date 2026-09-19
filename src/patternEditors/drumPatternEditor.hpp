@@ -8,6 +8,7 @@
 #include "drumGrid.hpp"
 #include "noteContextPopup.hpp"
 #include "inlineInput.hpp"
+#include "liveNoteLights.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
 #include <map>
@@ -41,6 +42,8 @@ public:
 
     std::function<void()>    onRightClick;
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
+
+    LiveNoteLights liveNotes{this};          // notes arriving on the MIDI input
 };
 
 // ---------------------------------------------------------------------------
@@ -114,6 +117,7 @@ private:
     void labelsSetOnRightClick(std::function<void()> fn) override { drumLabels.onRightClick = std::move(fn); }
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { drumLabels.onRowClicked = std::move(fn); }
     std::function<void()> labelsRenameHandler() override;
+    LiveNoteLights& labelsLiveNotes() override { return drumLabels.liveNotes; }
 
     void setGridPattern(int patId) override;
 

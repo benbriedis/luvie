@@ -7,6 +7,7 @@
 #include "basePatternEditor.hpp"
 #include "pianorollGrid.hpp"
 #include "noteContextPopup.hpp"
+#include "liveNoteLights.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
 
@@ -25,6 +26,7 @@ class PianorollLabels : public Fl_Widget {
 public:
     std::function<void()>    onRightClick;
     std::function<void(int)> onRowClicked;   // visual row clicked → MIDI pitch
+    LiveNoteLights           liveNotes{this}; // notes arriving on the MIDI input
 
     PianorollLabels(int x, int y, int w, int numRows, int rowHeight);
     ~PianorollLabels();
@@ -62,6 +64,7 @@ private:
     void labelsResize(int x, int y, int w, int h) override { labels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { labels.onRightClick = std::move(fn); }
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { labels.onRowClicked = std::move(fn); }
+    LiveNoteLights& labelsLiveNotes() override { return labels.liveNotes; }
 
     void setGridPattern(int patId) override;
 

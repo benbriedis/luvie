@@ -131,6 +131,9 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
     // Always audible, armed or not: trying a note out is half of what a keyboard
     // is for, and it costs nothing when the transport is stopped.
     if (auditioner) auditioner->noteOn(currentInstrumentId(), pitch, velocity);
+    // And visible: the label column lights the row, which is how a pad is matched
+    // to its drum without playing a pattern first.
+    labelsLiveNotes().noteOn(pitch);
 
     float beat = 0.0f;
     if (!beginRecordedEvent(beat)) return;
@@ -346,6 +349,7 @@ void BasePatternEditor::recordedNoteSpan(float rawStart, float rawEnd,
 void BasePatternEditor::midiNoteOff(int pitch)
 {
     if (auditioner) auditioner->noteOff(currentInstrumentId(), pitch);
+    labelsLiveNotes().noteOff(pitch);
 
     for (int i = (int)recNotes_.size() - 1; i >= 0; i--) {
         if (recNotes_[i].pitch != pitch) continue;
