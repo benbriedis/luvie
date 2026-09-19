@@ -133,6 +133,10 @@ protected:
     float snapBeats_ = 0.0f;
     // `beat` rounded to the nearest division, or unchanged when Snap is off.
     float quantiseBeat(float beat) const;
+    // A note just committed at `startBeat` was already heard live. If rounding put
+    // it ahead of the playhead, playback would reach it moments later and sound it
+    // again; ask (onSkipNoteOnce) for that one firing to be dropped.
+    void skipLiveEcho(int pitch, float startBeat);
     // Turns the beats a key went down and came up at — both pattern-relative and
     // unrounded — into the note to write.
     //
@@ -246,6 +250,9 @@ public:
     // transport is rolling.
     void midiNoteOn(int pitch, int velocity);
     void midiNoteOff(int pitch);
+    // Whoever sequences playback: drop the one firing of (instrument, MIDI pitch)
+    // within `tolBars` of song bar `bar`. See skipLiveEcho().
+    std::function<void(int instrumentId, int pitch, double bar, double tolBars)> onSkipNoteOnce;
     // A bound MIDI-learn control moved. `value` is already in the lane's units.
     // Always sent through to the instrument; recorded into the pattern's lane of
     // that type when armed and rolling.

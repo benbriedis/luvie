@@ -61,6 +61,9 @@ public:
     void setPlayheadHasJackPorts(bool b)                     { playhead.setHasJackPorts(b); }
     void setPlayheadJackClockActive(bool b)                  { playhead.setJackClockActive(b); }
     void playheadPanicSoftNotes()                           { playhead.panicSoftNotes(); }
+    void playheadSkipNoteOnce(int instrumentId, int midi, float bar, float tol) {
+        playhead.skipNoteOnce(instrumentId, midi, bar, tol);
+    }
     void setPlayheadSongLoop(std::function<bool(float&,float&)> fn) {
         playhead.songLoopRange = std::move(fn);
     }

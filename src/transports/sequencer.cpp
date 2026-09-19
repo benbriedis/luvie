@@ -105,6 +105,49 @@ void Sequencer::retempoSnapshot(std::vector<timeSettings::TempoSegment> segs,
     }
 }
 
+void Sequencer::skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars)
+{
+    // Resolved here, off the RT thread, to the same port/channel the snapshot's
+    // instances carry. Unresolved leaves both as wildcards: matching the pitch and
+    // the bar alone is still specific enough.
+    SkipNote s;
+    s.live      = true;
+    s.midiPitch = midiPitch;
+    s.bar       = bar;
+    s.tol       = tolBars;
+    if (instrumentId != 0) {
+        auto it = instrumentMap_.find(instrumentId);
+        if (it != instrumentMap_.end()) {
+            std::strncpy(s.portName, it->second.portName.c_str(), sizeof(s.portName) - 1);
+            s.channel = it->second.midiChannel - 1;
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(snapMutex);
+    SkipNote* slot = nullptr;
+    for (auto& e : skipNotes)
+        if (!e.live) { slot = &e; break; }
+    if (!slot) {
+        slot = &skipNotes[0];
+        for (auto& e : skipNotes)
+            if (e.bar < slot->bar) slot = &e;
+    }
+    *slot = s;
+}
+
+bool Sequencer::consumeSkip(const std::string& port, int channel, int midiPitch, double onBar)
+{
+    for (auto& e : skipNotes) {
+        if (!e.live || e.midiPitch != midiPitch) continue;
+        if (e.channel >= 0 && e.channel != channel) continue;
+        if (e.portName[0] && std::strcmp(e.portName, port.c_str()) != 0) continue;
+        if (std::fabs(onBar - e.bar) > e.tol) continue;
+        e.live = false;
+        return true;
+    }
+    return false;
+}
+
 void Sequencer::onGlobalTempoChanged()
 {
     if (!timeline || rebuildsSuspended) return;
@@ -665,6 +708,9 @@ bool Sequencer::renderWindowLocked(bool nowPlaying, Reset reset,
             emit(an.portName, prevBars, msg, 3);
         }
         activeNotes.clear();
+        // The position moved, so a pending skip's bar no longer says which firing
+        // it meant. Losing one only lets that note be heard again.
+        for (auto& e : skipNotes) e.live = false;
     }
 
     if (reset == Reset::Hard) {
@@ -714,6 +760,11 @@ bool Sequencer::renderWindowLocked(bool nowPlaying, Reset reset,
 
 void Sequencer::fireNoteEvents(double prevBars, double curBars)
 {
+    // A skip the window has already gone past was never matched (the note was
+    // removed, or went somewhere else); left live it could catch a later pass.
+    for (auto& e : skipNotes)
+        if (e.live && e.bar + e.tol < prevBars) e.live = false;
+
     for (const TrackSnap& track : snap.tracks) {
         for (const InstanceSnap& inst : track.instances) {
             if (inst.patternBeats <= 0.0f) continue;
@@ -736,6 +787,9 @@ void Sequencer::fireNoteEvents(double prevBars, double curBars)
                               [&](double firstFire) {
                     double onBar = inst.startBar
                                  + (firstFire - inst.startOffset) / inst.beatsPerBar;
+                    // Already heard: the recorder played it live (skipNoteOnce).
+                    if (consumeSkip(inst.portName, inst.midiChannel, note.midiPitch, onBar))
+                        return;
                     uint8_t vel = static_cast<uint8_t>(
                         std::clamp(static_cast<int>(note.velocity * 127), 1, 127));
                     uint8_t onMsg[3] = {

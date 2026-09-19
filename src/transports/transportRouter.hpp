@@ -60,6 +60,9 @@ public:
         loopMode_ = false;
         if (active_) active_->endLoopMode(bars);
     }
+    void  skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars) override {
+        if (active_) active_->skipNoteOnce(instrumentId, midiPitch, bar, tolBars);
+    }
 };
 
 #endif

@@ -8,6 +8,7 @@
 #include "observableSong.hpp"
 #include "loopManager.hpp"
 #include "timeline.hpp"
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <map>
@@ -123,6 +124,13 @@ public:
     // Owner thread.
     void retempoSnapshot(std::vector<timeSettings::TempoSegment> segs,
                          double newSecsOffset);
+
+    // Drop the one firing of (instrument, pitch) within tolBars of musical bar `bar`
+    // — a recorded note that was already heard live and was quantised just ahead of
+    // the playhead (see ITransport::skipNoteOnce). An entry that is never matched
+    // expires once the window has passed it, and any reset clears them all. Owner
+    // thread; briefly blocks on snapMutex.
+    void skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars);
 
     // ITimelineObserver / ILoopObserver / IGlobalTempoObserver
     void onTimelineChanged()       override { rebuildSnapshot(); }
@@ -322,6 +330,21 @@ private:
         char  portName[64];      // self-contained copy: a note can outlive its port
     };
     std::vector<ActiveNote> activeNotes;
+
+    // Pending skipNoteOnce() entries. Fixed-size so the RT thread never allocates;
+    // with more in flight than this the oldest is overwritten, which only brings the
+    // echo back. Guarded by snapMutex.
+    struct SkipNote {
+        bool   live = false;
+        char   portName[64] = {};   // empty: any port
+        int    channel   = -1;      // 0-based; -1: any channel
+        int    midiPitch = 0;
+        double bar       = 0.0;
+        double tol       = 0.0;
+    };
+    std::array<SkipNote, 16> skipNotes{};
+    // Consume the entry matching this firing, if any. snapMutex must be held.
+    bool consumeSkip(const std::string& port, int channel, int midiPitch, double onBar);
 
     // Reused scratch (pre-reserved in ctor; no per-cycle allocation).
     struct PendingParam {

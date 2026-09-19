@@ -143,6 +143,7 @@ void BasePatternEditor::midiNoteOn(int pitch, int velocity)
         float start = 0.0f, len = 0.0f;
         recordedNoteSpan(beat, beat, start, len);
         commitRecordedNote(pitch, start, len, velocity);
+        skipLiveEcho(pitch, start);
         return;
     }
     recNotes_.push_back({pitch, beat, velocity});
@@ -322,6 +323,25 @@ float BasePatternEditor::quantiseBeat(float beat) const
     return std::round(beat / snapBeats_) * snapBeats_;
 }
 
+void BasePatternEditor::skipLiveEcho(int pitch, float startBeat)
+{
+    // Only rounding moves a note forwards: unquantised, it lands where the head was.
+    if (snapBeats_ <= 0.0f || !onSkipNoteOnce) return;
+    const float bars = playhead.transportBars();
+    const Playhead::PatternPos pp = playhead.patternPos(bars);
+    const float cur = playhead.patternBeat(bars);
+    if (!pp.running || pp.beatsPerBar <= 0.0f || cur < 0.0f) return;
+    // Rounding to the nearest division moves a start forwards by at most half of
+    // one; anything further ahead is not this note's echo.
+    const float ahead = startBeat - cur;
+    if (ahead <= 0.0f || ahead > snapBeats_) return;
+    // A quarter of a division either side: loose enough for the float position the
+    // head is read at, tight enough never to reach a neighbouring grid line.
+    onSkipNoteOnce(currentInstrumentId(), pitch,
+                   (double)bars + ahead / pp.beatsPerBar,
+                   0.25 * snapBeats_ / pp.beatsPerBar);
+}
+
 void BasePatternEditor::recordedNoteSpan(float rawStart, float rawEnd,
                                          float& startBeat, float& lenBeats) const
 {
@@ -361,6 +381,7 @@ void BasePatternEditor::midiNoteOff(int pitch)
             float start = 0.0f, len = 0.0f;
             recordedNoteSpan(n.startBeat, end, start, len);
             commitRecordedNote(n.pitch, start, len, n.velocity);
+            skipLiveEcho(n.pitch, start);
         }
         break;   // one note-off releases one note-on
     }

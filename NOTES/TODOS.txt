@@ -366,12 +366,6 @@ TODO In pattern editors some notes may sit at divisions not currently supported.
      Should have a consistent policy for how to deal with dragging in this case.
      Seems a bit ad hoc at the moment.
 
-Multi-select: probably prefer modifying the colour of the blocks.
-
-Manual: 
-   multi-select move, copy, delete descriptions.
-   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
-
 BUG: clicking a dragging two blocks in a collapsed track can be dragged into a single pattern lane.
      Reality bites when clicking on one of the dragged blocks and one blocks jumps up.
 
@@ -404,40 +398,17 @@ BUG: There's may be a sample or two off on looping when in song mode...
    (probably since fix to song looping)
 
 
-TO MAKE THIS A GREAT COMPOSITION TOOL STILL WANT 
-================================================
-1. Ability to record (1 MIDI input is fine for the moment)
-   DONE: one MIDI input (Jack/Native/Plugin + channel) in Instruments and I/O,
-   routed to the open pattern editor, with a Record toggle on the pianoroll and
-   drum control rows. Plays what arrives, and records it when armed and rolling.
-   Still open: parameter/automation recording, a replace mode (it only overdubs),
-   and recording into the harmony editor.
-2. Indefinite length patterns - autogrow when recording (or adding notes...
-    similar rule to Song Editor?). Will want zoom and location tools...
-	don't necessary ALWAYS need them.
-   DONE for recording: a 'Grow' toggle next to Record. The pattern loops as usual
-   until the take's first note, then gains a bar whenever the playhead nears the
-   end; the bars nothing was played into come off again when the take ends. In
-   song mode the pattern's block grows with it, stopping at the next block on the
-   lane or at 64 bars. The grid follows the playhead as it outgrows the viewport.
-   Still open: autogrow when adding notes with the mouse, and the location tools.
-3. Ability to copy and paste between patterns of like type.
-4. EXTRA: tool to move from pianoroll to harmony.
-5. EXTRA: scenes and triggers to move between them.
-6. EXTRA: metronome - visual and auditory.
+cf a metronome for recording - visual and auditory.
 
 overdub /replace toggle
 
 
 ----
 
-In Drums pattern - playing a note on MIDI out should highlight/flash the note being played
-
 Consider allowing notes to hang over into start of the pattern...
    recording and with mouse. How to support? 
    cf wrapping but not starting with a dark line on the LHS.
 
-Where is my multi-select in LV2... not seeing it
 Mention 'grow' option on website + docs (inc use case)
 
 Allow recording in song mode
@@ -456,6 +427,7 @@ TODO test plugin version of flexi when recording in song mode
 
 .........
 
+Allow other parametera to be added
 
 cf allowing copying from pianoroll into harmony as chromatic. Maybe not very useful though.
 
@@ -467,13 +439,15 @@ Probably want a tool really...
    
 - Loop Editor sets + being able to switch (cf intermediate mode going in or out? immediate?)
 
-- Drums and pianoroll - highlight note etc as it is being played
-
 Allow more parameters to be shown via click and drag.
 Allow some/all parameters to be hidden
 Allow parameter recording sensitivity to be set - record more or less parameters
 
 
 NB Alt-click-sweep may clash with WM. Probably need shortcut window.
-Document Alt-click-sweep slice selection and copying
+
+Manual: 
+   multi-select move, copy, delete descriptions.
+   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
+   + Alt-click-sweep slice selection and copying
 

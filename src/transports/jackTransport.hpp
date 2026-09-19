@@ -87,6 +87,9 @@ public:
     // No jack_transport_locate: the Sequencer shifts its bar offset and swaps to the
     // song snapshot on the same RT cycle, leaving the JACK timeline rolling.
     void  endLoopMode(float bars)    override { Sequencer::endLoopMode(bars); }
+    void  skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars) override {
+        Sequencer::skipNoteOnce(instrumentId, midiPitch, bar, tolBars);
+    }
 
     // True once a JACK client is open and live (so port registration / MIDI work).
     bool  isOpen() const { return client != nullptr && jackAlive.load(); }

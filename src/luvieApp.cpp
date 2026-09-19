@@ -640,6 +640,17 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         }
     });
 
+    // A recorded note quantised just ahead of the playhead has already been heard
+    // live; both sequencing paths drop that one firing. The RT engine plays Jack
+    // ports under the Jack clock, the song playhead everything else.
+    auto skipNoteOnce = [transport, og2](int instrumentId, int pitch, double bar, double tol) {
+        transport->skipNoteOnce(instrumentId, pitch, bar, tol);
+        og2->playheadSkipNoteOnce(instrumentId, pitch, (float)bar, (float)tol);
+    };
+    for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
+                                  (BasePatternEditor*)pianorollEd})
+        ed->onSkipNoteOnce = skipNoteOnce;
+
     // The Record toggle arms whichever editor is currently the target.
     patternPanel->onRecordChanged = [this](bool on) {
         if (midiTarget) midiTarget->setRecordArmed(on);

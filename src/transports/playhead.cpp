@@ -116,6 +116,12 @@ void Playhead::tick()
 			// sequencer wraps playback at the seam, and this keeps the drawn
 			// playhead and the soft-port sequencing below in step with it.
 			float curPos = livePosition();
+			// A skip the window has already gone past was never matched; a backward
+			// move (seek, loop wrap) makes every pending one meaningless.
+			if (curPos < lastPosition) softSkips.clear();
+			else std::erase_if(softSkips, [&](const SoftSkip& k) {
+				return k.bar + k.tol < lastPosition;
+			});
 			// Release expiring notes BEFORE emitting this window's note-ons, so a
 			// flush same-pitch note (note1 off == note2 on) gets off-then-on and
 			// re-attacks instead of being cancelled by the stale off.
@@ -156,6 +162,7 @@ void Playhead::tick()
 			float curPos = livePosition();
 			if (wasPlaying) {
 				allSoftNotesOff();   // stopped — release held notes
+				softSkips.clear();
 				// Stopping ends the stretch a Loop-Editor tempo was jammed for, so the
 				// register goes back to whatever the song's markers say where the
 				// playhead is parked — the same thing a user reposition does, and for
@@ -615,6 +622,14 @@ void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
 	if (r.portName.empty()) return;
 	Port* p = portReg->find(r.portName);
 	if (!p || !portNeedsSoftSeq(p)) return;
+	// Already heard: the recorder played it live (skipNoteOnce).
+	for (auto it = softSkips.begin(); it != softSkips.end(); ++it) {
+		if (it->pitch != midi) continue;
+		if (it->instrumentId != 0 && it->instrumentId != instrumentId) continue;
+		if (std::fabs(onBar - it->bar) > it->tol) continue;
+		softSkips.erase(it);
+		return;
+	}
 	int vel = (int)(velocity * 127.0f);
 	vel = std::clamp(vel, 1, 127);
 	p->noteOn(r.channel0, midi, vel);

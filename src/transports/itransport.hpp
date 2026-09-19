@@ -42,6 +42,14 @@ public:
 	// The default (seek then flip) is right for clocks whose seek is already
 	// glitch-free; JackTransport and the plugin override it.
 	virtual void endLoopMode(float bars) { seek(bars); setLoopMode(false); }
+
+	// Recording has already sounded this note live, and quantising put it just ahead
+	// of the playhead: drop the one firing of (instrument, pitch) within tolBars of
+	// song bar `bar`, so it is not heard again moments later. Later passes play it as
+	// normal. instrumentId 0 matches any instrument. The default ignores it (clocks
+	// that do not sequence, and the plugin, where the DSP owns playback).
+	virtual void skipNoteOnce(int /*instrumentId*/, int /*midiPitch*/,
+	                          double /*bar*/, double /*tolBars*/) {}
 };
 
 #endif

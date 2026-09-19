@@ -63,6 +63,9 @@ class Playhead : public ITimelineObserver {
 	std::function<MidiInstrRoute(int)>      instrRoute;  // instrument id → port/channel
 	struct SoftActiveNote { std::string portName; int channel; int pitch; float offBar; };
 	std::vector<SoftActiveNote> softNotes;
+	// Pending skipNoteOnce() entries for the soft output. See ITransport::skipNoteOnce.
+	struct SoftSkip { int instrumentId; int pitch; float bar; float tol; };
+	std::vector<SoftSkip> softSkips;
 
 	// A port must be soft-sequenced unless the Jack RT engine is driving it (which
 	// only happens for Jack ports while the Jack clock is active).
@@ -123,6 +126,11 @@ public:
 	// Release all held soft notes; call before the Port set is reconciled so notes
 	// don't hang when a port is destroyed or changes backend.
 	void panicSoftNotes() { allSoftNotesOff(); }
+	// Soft-output counterpart of ITransport::skipNoteOnce: drop the one firing of
+	// (instrument, pitch) within `tol` bars of `bar`. instrumentId 0 matches any.
+	void skipNoteOnce(int instrumentId, int midi, float bar, float tol) {
+		softSkips.push_back({instrumentId, midi, bar, tol});
+	}
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
 	bool isLoopActive() const { return loopActive; }
 	// Song view only: freeze the playhead greyed at `bar` (Song→Loop) instead of
