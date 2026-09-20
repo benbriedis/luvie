@@ -15,8 +15,11 @@ class ModernTabs : public Fl_Tabs {
 	static constexpr int      accentH      = 3;
 	static constexpr int      toggleW      = 70;
 
+	// What is currently *sounding*, which is what the label names — not the mode the
+	// user has asked for. Mid hand-off the two differ, and that is the whole point of
+	// the yellow: the button says "this is still playing, and it has not swapped yet".
 	bool     modeIsLoop   = false;
-	bool     transitioning = false;       // Loop→Song hand-off in progress (button yellow)
+	bool     transitioning = false;       // a hand-off is in progress (button yellow)
 	bool     toggleHovered = false;
 	int      leftReserve  = 0;
 	int      rightReserve = 0;            // space reserved for a right-docked widget
@@ -32,11 +35,15 @@ class ModernTabs : public Fl_Tabs {
 	void layoutRightWidget();
 
 public:
-	// The committed visual state of the mode toggle. Song and Loop are stable;
-	// Transitioning is the yellow "Loop"-labelled state during a Loop→Song hand-off.
-	// The button itself no longer commits a mode on click — it only *requests* one
-	// via onModeChanged; the controller drives the visual back through setModeVisual.
-	enum class ModeVisual { Song, Loop, Transitioning };
+	// The committed visual state of the mode toggle. The button itself no longer
+	// commits a mode on click — it only *requests* one via onModeChanged; the
+	// controller drives the visual back through setModeVisual.
+	//
+	// Song / Loop are the settled states. The two hand-offs are separate values
+	// because they read differently: leaving Loop, the loops are still sounding and
+	// the button says "Loop"; entering it, the song still is and it says "Song".
+	// Both draw yellow.
+	enum class ModeVisual { Song, Loop, LeavingLoop, EnteringLoop };
 
 	std::function<void(bool isLoop)> onModeChanged;
 

@@ -4,6 +4,7 @@
 #pragma once
 #include "timeline.hpp"
 #include "midiBackend.hpp"
+#include <array>
 #include <map>
 #include <string>
 #include <vector>
@@ -77,6 +78,24 @@ struct AppState {
     // active set is derived from the timeline by LoopManager::sync().
     bool             loopMode = false;
     std::vector<int> activeLoopPatterns;   // pattern IDs, ascending
+
+    // The Loop Editor's scenes. Scene S is not here: it is the song-linked scene, and
+    // the set it shows is already saved as activeLoopPatterns above. Scenes 1-4 are
+    // the user's own — the song never writes them — so each is its own pattern-id
+    // list, ascending. Like the fields above these are otherwise runtime-only state,
+    // and anchors are not saved here either, for the same reason.
+    // A project saved before scenes existed loads with four empty scenes and Scene S
+    // shown, which is exactly what those sessions were.
+    std::array<std::vector<int>, 4> scenes;
+    int currentScene = 0;   // 0 = Scene S, 1-4; the scene the Loop Editor shows
+
+    // Loop Mode's own time signature, set in the Loop Editor. It decides how long a
+    // Loop-Mode bar is — and so where a scene switch lands — independently of the
+    // song's markers. top < 0 means "follow the song", which is what a project saved
+    // before it existed loads as, so its Loop mode behaves exactly as before.
+    int loopSigTop    = -1;
+    int loopSigBottom = 4;
+    int loopSigBeat   = 0;   // timeSettings::BeatUnit index
 
     // Song-mode loop: the song editor's Start/End markers + the loop toggle. Like
     // the fields above these are otherwise runtime-only, but persisting them lets a

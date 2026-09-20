@@ -66,7 +66,7 @@ void Sequencer::setLoopMode(bool mode)
     if (mode == loopMode) return;
     // Entering a mode supersedes a hand-off out of one that has not landed yet — the
     // user clicked back into Loop Mode mid-transition.
-    cancelHandoff();
+    cancelPending();
     loopMode = mode;
     rebuildSnapshot();
 }
@@ -90,12 +90,20 @@ void Sequencer::retempoSnapshot(std::vector<timeSettings::TempoSegment> segs,
     std::vector<timeSettings::TempoSegment> displaced;
     {
         std::lock_guard<std::mutex> lock(snapMutex);
-        if (pendingHandoff) {
-            // The parked snapshot is what the switch will land on, so it takes the new
-            // map; the clock offset is endLoopMode()'s to compute at the seam, against
-            // that very map, so it is not touched here.
+        if (pendingKind == Pending::ToSong || pendingKind == Pending::ToLoop) {
+            // A mode hand-off: the parked snapshot is what the switch will land on and
+            // carries a *different* map from the live one, so only it takes the new
+            // segments. The clock offset is the seam's to compute, against that very
+            // map, so it is not touched here.
             pendingSnap.segs.swap(segs);
         } else {
+            if (pendingKind == Pending::Scene) {
+                // A scene change runs on the same map either side, so the parked
+                // snapshot needs the new segments too — and unlike a hand-off its seam
+                // recomputes no offset, so the offset is stored here as usual. Copied
+                // rather than moved: the live snapshot below takes the original.
+                pendingSnap.segs = segs;
+            }
             displaced.swap(snap.segs);
             snap.segs = std::move(segs);
             secsOffset.store(newSecsOffset, std::memory_order_relaxed);
@@ -170,14 +178,56 @@ void Sequencer::endLoopMode(float resumeBar)
     // same lock, so no cycle can see one without the other.
     std::lock_guard<std::mutex> lock(snapMutex);
     pendingSnap      = std::move(newSnap);
-    pendingHandoff   = true;
+    pendingKind      = Pending::ToSong;
     pendingResumeBar = resumeBar;
+    // An integer resume bar puts the landing on a bar line, which is what
+    // beginTransition() picks; a fractional one lands on the matching phase.
+    pendingAtPhase   = resumeBar - std::floor(resumeBar);
 }
 
-void Sequencer::cancelHandoff()
+void Sequencer::beginLoopMode(float atBar)
+{
+    if (loopMode) return;
+    cancelPending();
+    // The order here is load-bearing. The caller has already pinned the tempo map
+    // (ObservableSong::holdTempo), and loopMode has to flip *before* the build so
+    // activeTempoMap() hands back that held map rather than the song's — the parked
+    // snapshot must carry the map the loops will run on, exactly as endLoopMode()'s
+    // carries the song's.
+    loopMode = true;
+    Snapshot newSnap;
+    if (!buildSnapshot(newSnap)) return;
+
+    std::lock_guard<std::mutex> lock(snapMutex);
+    pendingSnap      = std::move(newSnap);
+    pendingKind      = Pending::ToLoop;
+    pendingResumeBar = atBar;
+    pendingAtPhase   = atBar - std::floor(atBar);
+}
+
+void Sequencer::cancelPending()
 {
     std::lock_guard<std::mutex> lock(snapMutex);
-    pendingHandoff = false;
+    pendingKind = Pending::None;
+}
+
+void Sequencer::armScene(float atBar)
+{
+    if (!loopMode || !loopMgr) return;
+    // Build the scene being switched to, not the one still sounding. Outside the
+    // lock, as every build is: the commit below is then a cheap move.
+    buildingPendingScene = true;
+    Snapshot newSnap;
+    const bool ok = buildSnapshot(newSnap);
+    buildingPendingScene = false;
+    if (!ok) return;
+
+    std::lock_guard<std::mutex> lock(snapMutex);
+    pendingSnap    = std::move(newSnap);
+    pendingKind    = Pending::Scene;
+    pendingAtPhase = 0.0f;   // a scene change always lands on a bar line
+    // Deliberately no pendingResumeBar: a scene change does not reposition anything.
+    // See the Pending enum — the clock runs straight through it.
 }
 
 void Sequencer::swapSnapshots()
@@ -203,13 +253,31 @@ void Sequencer::setSongLoop(bool enabled, float startBar, float endBar)
 void Sequencer::rebuildSnapshot()
 {
     if (rebuildsSuspended) return;
+
+    Pending kind;
+    {
+        std::lock_guard<std::mutex> lock(snapMutex);
+        kind = pendingKind;
+    }
+    // An edit arriving while a scene is armed belongs to the scene being switched to,
+    // so it has to be built from that one rather than the one still sounding. The
+    // LoopManager's own pending flag is the authority: once it has committed, the
+    // incoming scene *is* patterns() and its pending map has been emptied — building
+    // from that map then would park an empty snapshot.
+    buildingPendingScene = (kind == Pending::Scene) && loopMgr && loopMgr->scenePending();
+
     Snapshot newSnap;
-    if (!buildSnapshot(newSnap)) return;
+    const bool ok = buildSnapshot(newSnap);
+    buildingPendingScene = false;
+    if (!ok) return;
+
     std::lock_guard<std::mutex> lock(snapMutex);
-    // While a hand-off is armed the loops are still the thing playing, so an edit
-    // arriving in the meantime belongs to the snapshot the switch will land on.
-    if (pendingHandoff) pendingSnap = std::move(newSnap);
-    else                snap        = std::move(newSnap);
+    // While a switch is armed the old content is still the thing playing, so an edit
+    // arriving in the meantime belongs to the snapshot the switch will land on. If the
+    // RT thread landed it between the two locks above, this writes the incoming
+    // content to `snap` instead — which is what it should be by then.
+    if (pendingKind != Pending::None) pendingSnap = std::move(newSnap);
+    else                              snap        = std::move(newSnap);
 }
 
 // Returns false if there is nothing to publish, in which case the caller must leave
@@ -325,7 +393,10 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
 
     if (loopMode) {
         if (!loopMgr) return false;
-        const auto& actives = loopMgr->patterns();
+        // While a scene is armed this builds the snapshot the switch will land on, so
+        // it reads the scene being switched to rather than the one still sounding.
+        const auto& actives = buildingPendingScene ? loopMgr->pendingPatterns()
+                                                   : loopMgr->patterns();
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
@@ -474,7 +545,7 @@ bool Sequencer::handoffPoint(double prevBars, double curBars, double& at) const
 {
     // Bars are a uniform domain (1.0 == one bar whatever the time signature), so the
     // crossing is just the next position with the resume bar's fractional part.
-    const double ph   = (double)pendingResumeBar - std::floor((double)pendingResumeBar);
+    const double ph   = (double)pendingAtPhase;
     double       cand = std::floor(prevBars) + ph;
     if (cand < prevBars) cand += 1.0;
     if (cand >= curBars) return false;
@@ -534,11 +605,18 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
     // Non-zero only when a hand-off has already consumed the head of the cycle.
     double baseSegOff = 0.0;
 
-    // ── Loop -> Song hand-off ─────────────────────────────────────────────────
-    // Armed by endLoopMode(); this is where it lands. Waiting for the matching bar
-    // phase here rather than applying it on arrival is what keeps the switch on the
-    // beat however long the message took to reach us.
-    if (pendingHandoff) {
+    // ── Mode hand-off, either direction ───────────────────────────────────────
+    // Armed by endLoopMode() (Loop -> Song) or beginLoopMode() (Song -> Loop); this is
+    // where it lands. Waiting for the matching bar phase here rather than applying it
+    // on arrival is what keeps the switch on the beat however long the message took to
+    // reach us.
+    //
+    // One branch serves both directions because everything that differs between them
+    // travels *in the parked snapshot* — its content and its tempo map — so the seam
+    // arithmetic below is the same either way: play the outgoing content out to the
+    // seam, release what it still holds, adopt the incoming snapshot, and slide the
+    // incoming timeline so the resume bar falls exactly on the seam frame.
+    if (pendingKind == Pending::ToSong || pendingKind == Pending::ToLoop) {
         double at = 0.0;
         // Stopped or already jumping: there is no phase to align to, so take it now.
         const bool immediate = !nowPlaying || jumped;
@@ -546,7 +624,7 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
 
         if (immediate || handoffPoint(linPrev, linCur, at)) {
             if (!immediate) {
-                // Play the loops out to the seam first, from the live snapshot.
+                // Play the outgoing content out to the seam, from the live snapshot.
                 segCycleStartSecs = 0.0;
                 segMusicalStart   = linPrev;
                 renderWindowLocked(true, cycleReset, linPrev, at);
@@ -555,8 +633,9 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
                 if (baseSegOff < 0.0) baseSegOff = 0.0;
             }
 
-            // Release what the loops still hold, exactly at the seam. A musical break,
-            // so notes off and nothing else — unless the transport broke too.
+            // Release what the outgoing content still holds, exactly at the seam. A
+            // musical break, so notes off and nothing else — unless the transport
+            // broke too.
             const Reset seamReset = cycleReset == Reset::Hard ? Reset::Hard : Reset::Soft;
             segCycleStartSecs = baseSegOff;
             segMusicalStart   = at;
@@ -571,13 +650,50 @@ bool Sequencer::renderCycle(bool nowPlaying, bool jumped,
             // resume bar, so the beat lands exactly where the loops left it.
             const double seamSecs = cycleStartSecs + baseSegOff;
             swapSnapshots();
-            pendingHandoff  = false;
+            pendingKind     = Pending::None;
             curSecsOffset   = seamSecs - snapBarToSeconds((double)pendingResumeBar);
             secsOffset.store(curSecsOffset, std::memory_order_relaxed);
             loopCursorValid = false;
 
             linPrev = pendingResumeBar;
             linCur  = snapSecondsToBar(cycleEndSecs - curSecsOffset);
+        }
+    }
+
+    // ── Loop-mode scene change ────────────────────────────────────────────────
+    // Armed by armScene(); this is where it lands. Much cheaper than the hand-off
+    // above: the mode, the tempo map and the clock are all unchanged, so the only
+    // thing that happens at the seam is that a different set of patterns starts
+    // firing. In particular the clock offset is NOT recomputed — the loops run
+    // straight through a scene change, and sliding the timeline under them would
+    // jump the very phase the swap exists to preserve.
+    //
+    // No reset either. activeNotes is RT-thread state and survives swapSnapshots(),
+    // and each entry carries its own off bar, channel and port name — so a pattern in
+    // both scenes keeps sustaining across the seam untouched, and one that is leaving
+    // rings out to its already-scheduled note-off instead of being cut. A blanket
+    // Reset::Soft here would clip the kept patterns too, which is exactly what
+    // keeping their phase is meant to avoid.
+    if (pendingKind == Pending::Scene) {
+        double at = 0.0;
+        const bool immediate = !nowPlaying || jumped;
+        if (immediate) at = linPrev;
+
+        if (immediate || handoffPoint(linPrev, linCur, at)) {
+            if (!immediate) {
+                // Play the outgoing scene out to the seam, from the live snapshot.
+                segCycleStartSecs = 0.0;
+                segMusicalStart   = linPrev;
+                renderWindowLocked(true, cycleReset, linPrev, at);
+                cycleReset = Reset::None;
+                baseSegOff = snapBarToSeconds(at) - snapBarToSeconds(linPrev);
+                if (baseSegOff < 0.0) baseSegOff = 0.0;
+            }
+            // Both snapshots carry the same tempo map here, so baseSegOff — measured
+            // on the outgoing one above — stays valid across the swap.
+            swapSnapshots();
+            pendingKind = Pending::None;
+            linPrev     = at;
         }
     }
 

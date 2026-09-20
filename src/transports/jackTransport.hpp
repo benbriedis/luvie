@@ -87,6 +87,8 @@ public:
     // No jack_transport_locate: the Sequencer shifts its bar offset and swaps to the
     // song snapshot on the same RT cycle, leaving the JACK timeline rolling.
     void  endLoopMode(float bars)    override { Sequencer::endLoopMode(bars); }
+    void  armScene(float atBar)      override { Sequencer::armScene(atBar); }
+    void  beginLoopMode(float atBar) override { Sequencer::beginLoopMode(atBar); }
     void  skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars) override {
         Sequencer::skipNoteOnce(instrumentId, midiPitch, bar, tolBars);
     }

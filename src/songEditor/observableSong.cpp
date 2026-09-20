@@ -588,7 +588,9 @@ float ObservableSong::bpmAtBar(float bar) const
 
 float ObservableSong::cpmAt(int bar) const
 {
-    return bpmAt(bar) * (float)timeSettings::beatCrotchets(beatAt(bar));
+    // effectiveBeatAt, not beatAt: a BPM number counts the meter's beats, so Loop
+    // Mode's own beat unit changes what crotchets-per-minute it works out to.
+    return bpmAt(bar) * (float)timeSettings::beatCrotchets(effectiveBeatAt(bar));
 }
 
 void ObservableSong::setTimeSig(int bar, int top, int bottom, timeSettings::BeatUnit beat)
@@ -651,7 +653,7 @@ timeSettings::BeatUnit ObservableSong::beatAt(int bar) const
 double ObservableSong::secondsPerBarAt(int bar) const
 {
     int top, bottom;
-    timeSigAt(bar, top, bottom);
+    effectiveTimeSigAt(bar, top, bottom);
     return timeSettings::secondsPerBar(timeSettings::barCrotchets(top, bottom), cpmAt(bar));
 }
 
@@ -665,9 +667,10 @@ const Pattern* ObservableSong::patternById(int patternId) const
 float ObservableSong::patternBeatsPerBar(int bar, const Pattern& pat) const
 {
     int top, bottom;
-    timeSigAt(bar, top, bottom);
+    effectiveTimeSigAt(bar, top, bottom);
     return (float)timeSettings::patternBeatsPerBar(
-        timeSettings::barCrotchets(top, bottom), beatAt(bar), pat.timeSigBottom, pat.beat);
+        timeSettings::barCrotchets(top, bottom), effectiveBeatAt(bar),
+        pat.timeSigBottom, pat.beat);
 }
 
 float ObservableSong::patternBeatsPerBar(int bar, int patternId) const
@@ -675,7 +678,7 @@ float ObservableSong::patternBeatsPerBar(int bar, int patternId) const
     if (const Pattern* pat = patternById(patternId))
         return patternBeatsPerBar(bar, *pat);
     int top, bottom;
-    timeSigAt(bar, top, bottom);
+    effectiveTimeSigAt(bar, top, bottom);
     return (float)top;
 }
 
@@ -758,6 +761,32 @@ const std::vector<timeSettings::TempoSegment>& ObservableSong::tempoMap() const
         for (const auto& seg : full) {
             if (seg.bar > holdBar && !heldMapCache.empty()) break;
             heldMapCache.push_back(seg);
+        }
+        // Loop Mode's own meter, if the Loop Editor has set one. It is *split off* at
+        // the hold bar rather than written over the kept segment: rewriting in place
+        // would change bar<->seconds for the stretch between that segment's start and
+        // the hold bar as well — retroactively, moving a position the clock has
+        // already passed. Split, everything up to the hold bar keeps the song's meter
+        // and its cumulative seconds, so the clock is continuous across the entry and
+        // needs no re-anchor, exactly as the plain truncation above does.
+        if (loopTimeSigSet() && !heldMapCache.empty()) {
+            const auto& last  = heldMapCache.back();
+            const double secs = last.startSecs
+                              + ((double)holdBar - (double)last.bar)
+                                * timeSettings::secondsPerBar(last.barCrotchets, last.cpm);
+            // The BPM number keeps its value and changes meaning with the beat unit,
+            // the way it does everywhere else: it counts the meter's beats, so the
+            // crotchets-per-minute it works out to moves with the new beat.
+            const float cpm = globalBpmAt(holdBar)
+                            * (float)timeSettings::beatCrotchets(loopSigBeat);
+            const timeSettings::TempoSegment loopSeg{
+                holdBar, cpm, loopSigTop,
+                timeSettings::barCrotchets(loopSigTop, loopSigBottom), secs };
+            // A kept segment starting exactly on the hold bar is replaced rather than
+            // followed: two segments at the same bar would make the lookup ambiguous.
+            // Its startSecs is what loopSeg already carries, so nothing is lost.
+            if (last.bar >= holdBar - 1.0e-4f) heldMapCache.back() = loopSeg;
+            else                               heldMapCache.push_back(loopSeg);
         }
         heldMapDirty = false;
     }
@@ -903,6 +932,49 @@ void ObservableSong::releaseTempoHold()
     tempoHold = false;
 }
 
+void ObservableSong::setLoopTimeSig(int top, int bottom, timeSettings::BeatUnit beat)
+{
+    if (top == loopSigTop && bottom == loopSigBottom && beat == loopSigBeat) return;
+    // Re-anchoring, exactly as a tempo change is: a new meter changes how long a bar
+    // lasts, so a clock deriving its bar from a frame count would scrub every playhead
+    // if the position were not pinned across the change.
+    reanchoringTempo([&] {
+        loopSigTop    = top;
+        loopSigBottom = bottom;
+        loopSigBeat   = beat;
+    });
+    // The tempo channel, not notify(): this is a register, not song content, so it
+    // must not mark the project's timeline dirty or fire the editors' full redraw.
+    tempoFanout();
+}
+
+void ObservableSong::mirrorLoopTimeSig(int top, int bottom, int beatIdx)
+{
+    loopSigTop    = top;
+    loopSigBottom = bottom;
+    loopSigBeat   = timeSettings::beatUnitAt(beatIdx);
+    tempoMapDirty = true;
+    heldMapDirty  = true;
+}
+
+// The loop register applies only inside the held stretch — from the hold bar onward,
+// and only while Loop Mode holds the map. Anywhere else the song's markers rule.
+bool ObservableSong::loopSigCovers(int bar) const
+{
+    return tempoHold && loopTimeSigSet() && (float)bar >= holdBar - 1.0e-4f;
+}
+
+void ObservableSong::effectiveTimeSigAt(int bar, int& top, int& bottom) const
+{
+    if (loopSigCovers(bar)) { top = loopSigTop; bottom = loopSigBottom; return; }
+    timeSigAt(bar, top, bottom);
+}
+
+timeSettings::BeatUnit ObservableSong::effectiveBeatAt(int bar) const
+{
+    return loopSigCovers(bar) ? loopSigBeat : beatAt(bar);
+}
+
 double ObservableSong::barToSeconds(float targetBar) const
 {
     if (targetBar <= 0.0f) return 0.0;
@@ -925,7 +997,7 @@ void ObservableSong::secondsToBarBeat(double secs, int& bar, int& beat) const
     float barF   = secondsToBar(secs);
     int   barInt = (int)barF;
     int   top, bottom;
-    timeSigAt(barInt, top, bottom);
+    effectiveTimeSigAt(barInt, top, bottom);
     bar  = barInt + 1;
     beat = (int)((barF - (float)barInt) * top) + 1;
 }

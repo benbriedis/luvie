@@ -6,7 +6,12 @@
 
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
+#include <array>
+#include <functional>
 #include <vector>
+#include "controlBar.hpp"
+#include "sceneBank.hpp"
+#include "timeSigSection.hpp"
 #include "observableSong.hpp"
 #include "loopManager.hpp"
 #include "loopContextPopup.hpp"
@@ -16,28 +21,58 @@
 #include "modern/modernButton.hpp"
 #include "modern/modernSpinner.hpp"
 
-// Dark control bar at the bottom of the Loop Editor. BPM only: a loop is timed by
-// its pattern's own time signature and beat definition, so a song-level signature
-// here would change nothing about how the loops play. Both live in the pattern
-// editor's control bar; the song's own markers stay on the song editor's rulers.
-class LoopPanel : public Fl_Group, public ITimelineObserver,
+// Dark control bar at the bottom of the Loop Editor: Flip, BPM, Loop Mode's time
+// signature, then the scene buttons.
+//
+// The time signature here is Loop Mode's own, not the song's. A loop's *content* is
+// still timed by its pattern's signature and beat definition (that lives in the
+// pattern editor's control bar), and the song's markers stay on the song editor's
+// rulers. What this one sets is the length of a Loop-Mode bar — which is what a
+// scene switch lands on, so it wants to be the user's choice rather than whichever
+// marker the song happened to freeze under. See ObservableSong::setLoopTimeSig.
+//
+// Built on ControlBar like the song and pattern panels, so the row folds when the
+// window is too narrow for everything on it rather than running off the edge.
+class LoopPanel : public ControlBar, public ITimelineObserver,
                   public IGlobalTempoObserver {
     ObservableSong* timeline  = nullptr;
     ITransport*     transport = nullptr;
 
-    Fl_Box        bpmLabel;
-    ModernSpinner bpmInput;
+    // Widths of the items in the row; see buildLayout().
+    static constexpr int flipBtnW  = 55;
+    static constexpr int labelW    = 40;
+    static constexpr int bpmW      = 70;
+    static constexpr int sceneBtnW = 34;
+    // A wider gap before the first scene button, setting the run apart from the
+    // timing controls it follows.
+    static constexpr int sceneGap  = 14;
+
+    ModernButton   flipBtn;
+    Fl_Box         bpmLabel;
+    ModernSpinner  bpmInput;
+    TimeSigSection timeSigSec;
+    std::array<ModernButton*, SceneBank::kScenes> sceneBtns{};
 
     void  commitBpm();
+    void  commitTimeSig();
     float bpmBar() const;   // the bar whose tempo this panel shows and edits
 
+    std::vector<PanelRow> buildLayout(int availW) override;
     void draw() override;
 
 public:
-    void resize(int x, int y, int w, int h) override;
-
     LoopPanel(int x, int y, int w, int h);
     ~LoopPanel();
+
+    // The Flip button was clicked; the editor swaps its axes. The button lives here
+    // rather than in the editor so it takes part in the row's folding.
+    std::function<void()> onFlip;
+    // A scene button was clicked. 0 is Scene S; 1..4 the user's own.
+    std::function<void(int)> onSceneChosen;
+
+    // Repaint the scene buttons for this shown/playing pair. They differ only while a
+    // switch is armed, and the shown one draws amber for that window.
+    void setSceneVisual(int shown, int playing);
 
     void setTimeline(ObservableSong* tl);
     void setTransport(ITransport* t) { transport = t; syncBpm(); }
@@ -45,20 +80,21 @@ public:
     // editor's redraw tick, so the box follows the tempo in force wherever it was
     // set — a song-editor marker, a mode switch, or playback crossing a marker.
     void syncBpm();
+    // Re-read the time-signature boxes from the loop register. Public for the same
+    // reason syncBpm() is: a mode switch changes which bar they speak for and
+    // notifies nobody.
+    void syncTimeSig();
     void onTimelineChanged() override;
     // The tempo channel: the register changed under us (the song editor, a mode
     // switch, or this box's own commit). Cheaper and far quieter than riding on
     // onTimelineChanged, which fires for every note edit in the project.
-    void onGlobalTempoChanged() override { syncBpm(); }
+    void onGlobalTempoChanged() override { syncBpm(); syncTimeSig(); }
 };
 
 // 2D grid of pattern toggle buttons.
 // One axis = tracks/instruments, other axis = pattern slot index (lane index).
 // The "Flip" button swaps which axis is columns vs. rows.
 class LoopEditor : public Fl_Group, public ITimelineObserver, public ILoopObserver {
-public:
-    static constexpr int panelH = 50;
-
 private:
     static constexpr int cellW        = 150; // fixed pattern-block width
     static constexpr int cellH        = 64;  // fixed pattern-block height (80% of former 80)
@@ -70,18 +106,24 @@ private:
     static constexpr int trackHeaderW = 80;  // row label width for track names
     static constexpr int patLabelH    = 22;  // column header height for "P1", "P2"
     static constexpr int patLabelW    = 26;  // row label width for "P1", "P2"
-    static constexpr int toggleBtnW   = 55;
-    static constexpr int toggleBtnH   = 22;
+
+    // Height the control bar asks for. Not a constant: the bar folds to a second
+    // row when the window is too narrow for everything on it, and the grid above
+    // has to give up the space. Kept in step by layoutPanel().
+    int panelH = 32;
 
     ObservableSong*    timeline     = nullptr;
     ObservablePattern* patternObs   = nullptr;
+    SceneBank*         scenes       = nullptr;
     LoopManager*  loopMgr          = nullptr;
     LoopContextPopup*  contextPopup = nullptr;
     ITransport*        transport    = nullptr;
     LoopPanel*         panel        = nullptr;
-    ModernButton*      axisToggleBtn = nullptr;
     GridScrollPane*    hScroll      = nullptr;
     GridScrollPane*    vScroll      = nullptr;
+
+    // Guards layoutPanel() against the height callback it fires re-entering it.
+    bool layingOutPanel = false;
 
     bool tracksAsColumns = true;  // true: tracks=cols, lanes=rows; false: tracks=rows, lanes=cols
     int  hoveredCol      = -1;
@@ -137,6 +179,8 @@ private:
     int  leftStripW() const;
     int  topStripH()  const;
 
+    // Whether the grid draws this pattern's block as on, for the scene being shown.
+    bool  patternEnabled(int patId) const;
     float beatProgress(int trackIdx, int laneIdx) const;
     void  btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const;
     bool  cellAt(int mx, int my, int& trackIdx, int& laneIdx, int& col, int& row) const;
@@ -159,6 +203,8 @@ private:
     int   computeDropGap(int mx, int my) const;
     // Toggle a pattern cell's active state (deferred from press to release).
     void  togglePattern(int trackIdx, int laneIdx);
+    // Anchor that puts a pattern's beat 0 on the next bar line when switched on now.
+    float switchOnAnchor(int patId) const;
     // Select a pattern cell. The selection is the app-wide selected lane,
     // shared with the Song Editor rather than kept privately here.
     void  selectCell(int trackIdx, int laneIdx);
@@ -169,17 +215,33 @@ private:
     int  handle(int event) override;
     void resize(int x, int y, int w, int h) override;
 
-    void positionToggleBtn();
+    // Re-fit the control bar to the current width and give the grid what is left.
+    void layoutPanel();
+    // Swap which axis holds the tracks; wired to the panel's Flip button.
+    void flipAxes();
 
 public:
     LoopEditor(int x, int y, int w, int h);
     ~LoopEditor();
 
     std::function<void()> onToggleChanged;
+    // The user picked a scene. The editor does not land the switch itself: whether it
+    // takes effect now or on the next bar line depends on the mode and the transport,
+    // which the app owns. It has already been made the *shown* scene by the time this
+    // fires, so the grid is showing where we are going.
+    std::function<void(int)> onSceneChosen;
+    // A block was toggled on a user scene. The scene's stored set has already
+    // changed; the app decides whether that scene is the one sounding and so whether
+    // LoopManager needs to follow.
+    std::function<void(int patId)> onSceneEdited;
 
     void setTimeline(ObservableSong* tl);
     void setPattern(ObservablePattern* p) { patternObs = p; }
+    void setSceneBank(SceneBank* s);
     void setLoopManager(LoopManager* a);
+    // Repaint the scene buttons from the bank. Called by the app when the playing
+    // scene changes under us — an armed switch landing, or a mode change.
+    void refreshSceneVisual();
     void setTransport(ITransport* t);
     void setContextPopup(LoopContextPopup* popup);
     // Re-read the panel's BPM box. The Loop-Mode tempo freeze deliberately notifies

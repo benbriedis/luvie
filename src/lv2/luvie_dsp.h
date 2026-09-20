@@ -104,6 +104,28 @@ typedef struct {
     float    globalBpmBar;      /* bar it applies from: always a tempo marker or a
                                   ramp step of one, never a playhead position */
     float    globalBpmHoldBar; /* Loop Mode's frozen bar, where the held map ends */
+
+    /* --- appended after the fields above ---
+       This struct is NOT versioned, and applyLoopState() drops any message shorter
+       than the whole of it. That is safe rather than clever: the UI and the DSP ship
+       in one .lv2 bundle and are always built together, so a size mismatch means a
+       half-installed bundle, and dropping the message beats misparsing it. Entries
+       follow at sizeof(LuvieLoopState), so growing this struct moves them — which is
+       exactly why a mismatched sender cannot be read. */
+
+    uint32_t loopHandoff;      /* 1 = enter Loop Mode at loopHandoffBar (Song -> Loop,
+                                  the mirror of songHandoff). One-shot, like it. */
+    float    loopHandoffBar;
+
+    uint32_t sceneArm;         /* 1 = a Loop-Mode scene change is armed for
+                                  sceneArmBar; the entries below carry it with the
+                                  LUVIE_LOOP_PENDING flag. One-shot. */
+    float    sceneArmBar;
+
+    uint32_t loopSigOn;        /* 1 = Loop Mode has a time signature of its own */
+    int32_t  loopSigTop;
+    int32_t  loopSigBottom;
+    int32_t  loopSigBeat;      /* timeSettings::BeatUnit index */
 } LuvieLoopState;
 
 /* One pattern's loop state. A pattern appears here if it is active, manual, or
@@ -111,7 +133,11 @@ typedef struct {
 enum {
     LUVIE_LOOP_ACTIVE   = 1u << 0,  /* in LoopManager::patterns() */
     LUVIE_LOOP_MANUAL   = 1u << 1,  /* turned on by a Loop-Editor switch */
-    LUVIE_LOOP_DISABLED = 1u << 2   /* silenced by a Loop-Editor switch */
+    LUVIE_LOOP_DISABLED = 1u << 2,  /* silenced by a Loop-Editor switch */
+    /* In the scene an armed switch is heading for, rather than the one still
+       sounding. A pattern in both scenes carries ACTIVE|PENDING and one anchorBar:
+       an armed scene keeps a shared pattern's anchor, so the two never disagree. */
+    LUVIE_LOOP_PENDING  = 1u << 3
 };
 typedef struct {
     int32_t  patternId;

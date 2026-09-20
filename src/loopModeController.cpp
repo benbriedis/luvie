@@ -33,12 +33,22 @@ void LoopModeController::init(ITransport* t, ModernTabs* tb, Editor* se,
 
 void LoopModeController::requestMode(bool loop)
 {
-    // A click during the hand-off cancels it: back to a settled Loop, playhead frozen
-    // again where it was. The engine has an armed hand-off waiting for its bar line,
-    // so it has to be told — setLoopMode() (in applyMode) drops any pending one.
+    // A click during a hand-off cancels it and settles back where it came from. The
+    // engine has an armed hand-off waiting for its bar line, so it has to be told —
+    // setLoopMode() (in applyMode) drops any pending one.
     if (state == State::TransitionToSong) {
+        if (!loop) return;              // already going there
         stopPoll();
-        applyMode(true, true);   // re-freezes the head, dropping the hand-off display
+        applyMode(true, true);          // re-freezes the head, dropping the hand-off
+        return;
+    }
+    if (state == State::TransitionToLoop) {
+        if (loop) return;               // already going there
+        stopPoll();
+        // applyMode() releases the tempo hold enterLoop() put on at the arm: the song
+        // is staying, so it keeps its own map. The playhead needs nothing — it was
+        // never greyed on this path.
+        applyMode(false, true);
         return;
     }
 
@@ -75,16 +85,62 @@ void LoopModeController::applyMode(bool loop, bool tellTransport)
 
 void LoopModeController::enterLoop()
 {
-    // Remember where the song playhead was; freeze it there (greyed, non-interactive).
-    frozenSongBar = transport->position();
-    applyMode(true, true);
+    // Stopped: no bar to round out and no clock to wait on, so freeze the head where
+    // it stands and settle now.
+    if (!transport->isPlaying()) {
+        frozenSongBar = transport->position();
+        applyMode(true, true);
+        return;
+    }
+
+    // Playing: the song plays out the rest of its bar and the loops come in on the
+    // next downbeat — the mirror of beginTransition(). The playhead freezes on that
+    // bar line, so that is also the bar a later Loop -> Song resumes from.
+    const float pos = transport->position();
+    handoffAt     = std::ceil(pos - kBarEps);
+    frozenSongBar = handoffAt;
+    handoffOffset = 0.0f;
+
+    // The tempo freeze goes on before the arm, not with the settle: Loop Mode's clock
+    // runs on a map pinned at the frozen bar, and the engine builds the snapshot it
+    // parks from that map the moment it is armed. applyMode() below is told not to
+    // repeat it.
+    if (setTempoFreeze) setTempoFreeze(true, frozenSongBar);
+    transport->beginLoopMode(handoffAt);
+
+    state = State::TransitionToLoop;
+    tabs->setModeVisual(ModernTabs::ModeVisual::EnteringLoop);   // yellow, still "Song"
+    // The song playhead is deliberately left alone here — live, red and moving. It is
+    // still the thing driving playback until the seam, which is exactly what the other
+    // direction greys it to say it is *not*. It freezes at the bar line when the
+    // switch lands, in applyMode().
+
+    pollPrevPos   = pos;
+    pollTicksLeft = kMaxTransitionTicks;
+    startPoll();
+}
+
+void LoopModeController::finishToLoop()
+{
+    stopPoll();
+    // The engine has already switched. tellTransport is false for the same reason as
+    // finishToSong(): this is only the visuals catching up. setTempoFreeze has already
+    // run, at the arm.
+    applyMode(true, false);
 }
 
 void LoopModeController::setMode(bool loop)
 {
     stopPoll();
     if (loop) {
-        if (state != State::Loop) enterLoop();
+        if (state == State::Loop) return;
+        // Deliberately not enterLoop(): a project load has no bar in progress to round
+        // out, and arming a hand-off for one would leave the mode yellow and unsettled
+        // until a clock that may not even be running crossed it. Freeze where the
+        // loaded playhead is and settle, which is what this did before Song -> Loop
+        // learned to wait.
+        frozenSongBar = transport->position();
+        applyMode(true, true);
     } else if (state != State::Song) {
         applyMode(false, true);
     }
@@ -122,7 +178,7 @@ void LoopModeController::beginTransition()
     handoffOffset = resumeBar - handoffAt;
 
     state = State::TransitionToSong;
-    tabs->setModeVisual(ModernTabs::ModeVisual::Transitioning);   // yellow, still "Loop"
+    tabs->setModeVisual(ModernTabs::ModeVisual::LeavingLoop);   // yellow, still "Loop"
     // Unfreeze the song playhead — still greyed, since the loops are what is
     // sounding — displaced so it walks up to resumeBar and arrives there exactly as
     // the switch lands. What it has to cover is the time left on the clock, which is
@@ -145,6 +201,19 @@ void LoopModeController::finishToSong()
 
 void LoopModeController::poll()
 {
+    // Song -> Loop. Simpler to watch than the other direction: the loop clock picks up
+    // where the song left off rather than being dragged back to a resume bar, so the
+    // position never moves backwards and the crossing is the whole test.
+    if (state == State::TransitionToLoop) {
+        if (!transport->isPlaying()) { finishToLoop(); return; }
+        const float pos = transport->position();
+        if (pos >= handoffAt - kBarEps) { finishToLoop(); return; }
+        // Same safety net as below: a permanently yellow button that will not settle
+        // is the worse outcome if the switch never happened.
+        if (--pollTicksLeft <= 0) finishToLoop();
+        return;
+    }
+
     if (state != State::TransitionToSong) return;
     if (!transport->isPlaying()) { finishToSong(); return; }
 

@@ -10,6 +10,7 @@
 #include "editor.hpp"
 #include "itransport.hpp"
 #include "itimelineobserver.hpp"
+#include "sceneBank.hpp"
 #include "loopManager.hpp"
 #include "loopModeController.hpp"
 #include "noteAuditioner.hpp"
@@ -103,6 +104,36 @@ public:
 
     // Active pattern state — wire external consumers (e.g. JackTransport) to this after build().
     LoopManager loopMgr;
+
+    // The Loop Editor's scenes. A store of sets that feeds loopMgr; the engine never
+    // learns what a scene is. See sceneBank.hpp.
+    SceneBank   sceneBank;
+
+    // Show a scene in the Loop Editor and, if it is Loop mode's turn to sound, make
+    // loopMgr hold it. Silent in Song mode, where the song still drives playback.
+    void setScene(int scene);
+    // Push the shown scene into loopMgr. Called when a scene is chosen in Loop mode,
+    // and when the mode settles into Loop with a scene already showing.
+    void applyShownScene();
+    // The set a scene would sound, as loopMgr wants it.
+    const std::set<int>& sceneSet(int scene) const { return sceneBank.set(scene); }
+
+    // The persisted scene state — see AppState::scenes / currentScene. Scene S is not
+    // among them: it is a mirror of loopMgr, already saved as activeLoopPatterns.
+    std::array<std::vector<int>, SceneBank::kUserScenes> sceneSets() const {
+        return sceneBank.save();
+    }
+    int  shownScene() const { return sceneBank.shownScene(); }
+    // Restore from a loaded project, dropping any pattern that no longer exists. Not
+    // treated as an edit: the loaded values become the new baseline. Call after
+    // applyLoopState(), so the mode has settled before a scene is shown.
+    void applyScenes(const std::array<std::vector<int>, SceneBank::kUserScenes>& sets,
+                     int shown);
+
+    // Loop Mode's own time signature — see AppState::loopSigTop and
+    // ObservableSong::setLoopTimeSig. top < 0 means "follow the song".
+    void loopTimeSig(int& top, int& bottom, int& beatIdx) const;
+    void applyLoopTimeSig(int top, int bottom, int beatIdx);
 
     // Fires when the *persisted* part of the loop state changes: the Song/Loop mode,
     // or which patterns are switched on while in Loop mode. Deliberately narrower
@@ -217,19 +248,23 @@ private:
     // onLoopStateChanged only when the saved values actually differ.
     struct LoopStateWatch : ILoopObserver {
         LuvieApp* app = nullptr;
-        void onLoopsChanged() override { app->checkLoopStateChanged(); }
+        void onLoopsChanged() override { app->onLoopsChanged(); }
     };
     LoopStateWatch   loopStateWatch;
     bool             savedLoopMode = false;
     std::vector<int> savedActiveLoopPatterns;
+    std::array<std::vector<int>, SceneBank::kUserScenes> savedScenes;
+    int              savedShownScene   = 0;
     bool             applyingLoopState = false;   // suppresses reporting during a load
     void checkLoopStateChanged();
+    void onLoopsChanged();
 
     bool layingOutPatternTab = false;
 
     ObservableSong*      song_        = nullptr;
     ObservablePattern*   pattern_     = nullptr;
     ObservableInstrument* instruments_ = nullptr;
+    ITransport*          transport_   = nullptr;
 
     static void saveAsCb    (Fl_Widget*, void* data);
     static void importCb    (Fl_Widget*, void* data);

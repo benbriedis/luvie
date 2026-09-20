@@ -16,32 +16,32 @@
 #include <cstdlib>
 
 // ======================================================
-// LoopPanel layout
-// ======================================================
-
-// BPM is the only timing control here: a loop's tempo comes from the BPM plus the
-// pattern's OWN time signature and beat definition (see the pattern editor's
-// control bar), so a song-level signature would have no effect on how loops play.
-static constexpr int lpPad    = 10;
-static constexpr int lpCtrlH  = 24;
-static constexpr int lpLabelW = 40;
-static constexpr int lpBpmW   = 70;
-static constexpr int lpSmGap  = 4;
-
-static int lpCtrlY(int y, int h) { return y + (h - lpCtrlH) / 2; }
-static int lpBpmLabelX(int x)   { return x + lpPad; }
-static int lpBpmInputX(int x)   { return lpBpmLabelX(x) + lpLabelW + lpSmGap; }
-
-// ======================================================
 // LoopPanel
 // ======================================================
 
+// Scene button faces. The blue is the one the enabled pattern blocks use, so the
+// scene that is sounding is coloured like the blocks it has switched on; the amber is
+// ModernTabs::transitionColor, the project's existing "armed, not yet landed" colour.
+static constexpr Fl_Color sceneInactiveBg   = 0x37415100;
+static constexpr Fl_Color sceneActiveBg     = 0x3B82F600;
+static constexpr Fl_Color sceneTransitionBg = 0xF59E0B00;
+
 LoopPanel::LoopPanel(int x, int y, int w, int h)
-    : Fl_Group(x, y, w, h),
-      bpmLabel(lpBpmLabelX(x), lpCtrlY(y, h), lpLabelW, lpCtrlH, "BPM"),
-      bpmInput(lpBpmInputX(x), lpCtrlY(y, h), lpBpmW,   lpCtrlH)
+    : ControlBar(x, y, w, h),
+      flipBtn   (0, 0, flipBtnW, ctrlH, "Flip"),
+      bpmLabel  (0, 0, labelW,   ctrlH, "BPM"),
+      bpmInput  (0, 0, bpmW,     ctrlH),
+      timeSigSec(0, 0, ctrlH)
 {
-    box(FL_NO_BOX);
+    flipBtn.color(0x37415100);
+    flipBtn.labelcolor(panelText);
+    flipBtn.setBorderColor(panelCtrlBorder);
+    flipBtn.setBorderWidth(1);
+    flipBtn.tooltip("Swap the grid's axes");
+    flipBtn.callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<LoopPanel*>(d);
+        if (self->onFlip) self->onFlip();
+    }, this);
 
     bpmLabel.box(FL_NO_BOX);
     bpmLabel.labelcolor(panelText);
@@ -56,7 +56,113 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
         static_cast<LoopPanel*>(d)->commitBpm();
     }, this);
 
+    // Loop Mode's time signature. Wired like the pattern panel's copy of this
+    // section, but it writes a register rather than a marker — see setLoopTimeSig.
+    timeSigSec.timeSigLabel.box(FL_NO_BOX);
+    timeSigSec.timeSigLabel.labelcolor(panelText);
+    timeSigSec.timeSigLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    timeSigSec.timeSigNum.color(panelBg);
+    timeSigSec.timeSigNum.setBorderColor(panelCtrlBorder);
+    timeSigSec.timeSigNum.textcolor(panelText);
+    timeSigSec.timeSigNum.cursor_color(panelText);
+    timeSigSec.timeSigNum.labelcolor(panelText);
+    timeSigSec.timeSigNum.range(timeSettings::numeratorMin, timeSettings::numeratorMax);
+    timeSigSec.timeSigNum.step(1);
+    timeSigSec.timeSigNum.value(timeSettings::numeratorDefault);
+    timeSigSec.timeSigNum.when(FL_WHEN_RELEASE);
+    timeSigSec.timeSigNum.tooltip("Bar length in Loop mode");
+    timeSigSec.timeSigNum.callback([](Fl_Widget*, void* d) {
+        static_cast<LoopPanel*>(d)->commitTimeSig();
+    }, this);
+
+    timeSigSec.timeSigSlash.box(FL_NO_BOX);
+    timeSigSec.timeSigSlash.labelcolor(panelText);
+
+    timeSigSec.timeSigDen.color(panelBg);
+    timeSigSec.timeSigDen.labelcolor(panelText);
+    timeSigSec.timeSigDen.textcolor(panelText);
+    timeSigSec.timeSigDen.setBorderColor(panelCtrlBorder);
+    timeSigSec.timeSigDen.tooltip("Denominator / beat, in Loop mode");
+    timeSigSec.timeSigDen.value(timeSettings::denomBeatDefaultIndex);
+    timeSigSec.timeSigDen.callback([](Fl_Widget*, void* d) {
+        static_cast<LoopPanel*>(d)->commitTimeSig();
+    }, this);
+
+    // Scene buttons: "S" is the song-linked scene, 1..4 the user's own.
+    for (int i = 0; i < SceneBank::kScenes; i++) {
+        char lbl[4];
+        if (i == SceneBank::kSceneSong) std::snprintf(lbl, sizeof(lbl), "S");
+        else                            std::snprintf(lbl, sizeof(lbl), "%d", i);
+        auto* b = new ModernButton(0, 0, sceneBtnW, ctrlH);
+        b->copy_label(lbl);
+        b->labelcolor(panelText);
+        b->setBorderColor(panelCtrlBorder);
+        b->setBorderWidth(1);
+        b->tooltip(i == SceneBank::kSceneSong
+                   ? "Scene S: the song-linked scene"
+                   : "A scene of your own; the song never changes it");
+        // The index travels in user_data rather than a capture: Fl_Widget callbacks
+        // are plain function pointers.
+        b->callback([](Fl_Widget* w, void* d) {
+            auto* self = static_cast<LoopPanel*>(d);
+            for (int k = 0; k < SceneBank::kScenes; k++)
+                if (self->sceneBtns[k] == w) {
+                    if (self->onSceneChosen) self->onSceneChosen(k);
+                    return;
+                }
+        }, this);
+        sceneBtns[i] = b;
+    }
+    setSceneVisual(SceneBank::kSceneSong, SceneBank::kSceneSong);
+
     end();
+    relayout();
+}
+
+// Flip sits to the left of BPM: it belongs to the grid above rather than to the
+// timing controls, so it reads as a separate thing at the head of the row. The
+// scenes follow the timing controls, set apart by a wider gap.
+std::vector<PanelRow> LoopPanel::buildLayout(int availW)
+{
+    const std::vector<PanelItem> timing = {
+        {&flipBtn,    flipBtnW},
+        {&bpmLabel,   labelW},
+        {&bpmInput,   bpmW},
+        {&timeSigSec, TimeSigSection::kWidth},
+    };
+    std::vector<PanelItem> scenes;
+    for (int i = 0; i < SceneBank::kScenes; i++)
+        scenes.push_back({sceneBtns[i], sceneBtnW, i == 0 ? sceneGap : -1});
+
+    PanelRow single;
+    single.left = timing;
+    single.left.insert(single.left.end(), scenes.begin(), scenes.end());
+    if (rowWidth(single) <= availW) return { single };
+
+    // Too narrow: the scenes drop to their own row rather than off the edge.
+    PanelRow timingRow; timingRow.left = timing;
+    PanelRow sceneRow;  sceneRow.left  = scenes;
+    sceneRow.left[0].gapBefore = -1;   // no group gap when it heads its own row
+    return { timingRow, sceneRow };
+}
+
+void LoopPanel::setSceneVisual(int shown, int playing)
+{
+    for (int i = 0; i < SceneBank::kScenes; i++) {
+        // Amber for the scene that is armed but has not landed — the same colour the
+        // Song/Loop toggle uses mid-transition. Blue for the one actually sounding,
+        // matching the enabled pattern blocks above.
+        Fl_Color bg = sceneInactiveBg;
+        if (i == shown && shown != playing) bg = sceneTransitionBg;
+        else if (i == playing)              bg = sceneActiveBg;
+        if (sceneBtns[i]->color() == bg) continue;
+        sceneBtns[i]->color(bg);
+        // Damage only the button. The editor's animation tick deliberately leaves the
+        // control strip alone (see LoopEditor::timerCb), and repainting the whole
+        // panel here would drag the BPM box back into it.
+        sceneBtns[i]->redraw();
+    }
 }
 
 LoopPanel::~LoopPanel()
@@ -96,7 +202,11 @@ void LoopPanel::commitBpm()
 
 void LoopEditor::refreshPanel()
 {
-    if (panel) panel->syncBpm();
+    if (!panel) return;
+    panel->syncBpm();
+    // The mode switch moves the hold bar, which is the bar both of these speak for:
+    // with no loop meter set, the box shows the song's at that bar.
+    panel->syncTimeSig();
 }
 
 void LoopPanel::syncBpm()
@@ -111,21 +221,49 @@ void LoopPanel::syncBpm()
     redraw();
 }
 
+void LoopPanel::commitTimeSig()
+{
+    if (!timeline) return;
+    timeline->setLoopTimeSig((int)timeSigSec.timeSigNum.value(),
+                             timeSigSec.timeSigDen.denominator(),
+                             timeSigSec.timeSigDen.beatUnit());
+}
+
+// Follow the register, which a project load or the plugin's DSP mirror can change
+// under us. Never while the numerator is being typed in, for the same reason syncBpm
+// stands off the BPM box.
+void LoopPanel::syncTimeSig()
+{
+    if (!timeline) return;
+    if (timeSigSec.timeSigNum.contains(Fl::focus())) return;
+    int top, bottom;
+    timeSettings::BeatUnit beat;
+    timeline->loopTimeSigValue(top, bottom, beat);
+    // Unset means "follow the song": show the meter in force at the hold bar, so the
+    // box reads as what Loop mode is actually counting rather than going blank.
+    if (top <= 0) timeline->timeSigAt((int)timeline->tempoHoldBar(), top, bottom);
+    if ((int)timeSigSec.timeSigNum.value() != top)
+        timeSigSec.timeSigNum.value(top);
+    timeSigSec.timeSigDen.set(bottom, beat);
+}
+
 void LoopPanel::onTimelineChanged()
 {
     // syncBpm() redraws if and only if the displayed value actually moved. Nothing
     // else on this strip depends on the timeline, so an unconditional redraw here
     // would repaint the BPM box for every note edit in the project.
     syncBpm();
+    syncTimeSig();
 }
 
+// ControlBar::draw() paints the strip unconditionally; this adds the one guard the
+// BPM box needs. Only paint when the whole panel is damaged: a keystroke in the BPM
+// box damages just that box, and Fl_Input_ then repaints only the span of text that
+// changed (minimal_update) — so blanking the strip first left the field erased
+// everywhere except that span, which is what made the box appear to shrink and jump
+// about while typing.
 void LoopPanel::draw()
 {
-    // Only paint the strip when the whole panel is damaged. A keystroke in the BPM
-    // box damages just that box, and Fl_Input_ then repaints only the span of text
-    // that changed (minimal_update) — so blanking the strip first left the field
-    // erased everywhere except that span, which is what made the box appear to
-    // shrink and jump about while typing.
     if (damage() & ~FL_DAMAGE_CHILD) {
         fl_color(panelBorder);
         fl_rectf(x(), y(), w(), 1);
@@ -133,17 +271,6 @@ void LoopPanel::draw()
         fl_rectf(x(), y() + 1, w(), h() - 1);
     }
     draw_children();
-}
-
-void LoopPanel::resize(int x, int y, int w, int h)
-{
-    int dx = x - this->x(), dy = y - this->y();
-    Fl_Widget::resize(x, y, w, h);
-    if (dx || dy)
-        for (int i = 0; i < children(); i++) {
-            Fl_Widget* c = child(i);
-            c->position(c->x() + dx, c->y() + dy);
-        }
 }
 
 // ======================================================
@@ -184,20 +311,19 @@ LoopEditor::LoopEditor(int x, int y, int w, int h)
     nameInput.onUnfocus([this]() { commitInstrumentEdit(); });
 
     panel = new LoopPanel(x, y + h - panelH, w, panelH);
-
-    axisToggleBtn = new ModernButton(0, 0, toggleBtnW, toggleBtnH, "Flip");
-    axisToggleBtn->color(0x37415100);
-    axisToggleBtn->labelcolor(headerText);
-    axisToggleBtn->setBorderColor(btnBorder);
-    axisToggleBtn->setBorderWidth(1);
-    axisToggleBtn->callback([](Fl_Widget*, void* d) {
-        auto* self = static_cast<LoopEditor*>(d);
-        self->tracksAsColumns = !self->tracksAsColumns;
-        self->scrollX = self->scrollY = 0;
-        self->positionToggleBtn();
-        self->updateScrollbars();
-        self->redraw();
-    }, this);
+    panel->onFlip = [this] { flipAxes(); };
+    panel->onSceneChosen = [this](int scene) {
+        if (!scenes || scene == scenes->shownScene()) return;
+        // Show it at once — the grid is where you are going, the button colour says
+        // whether you have got there yet. Landing the switch is the app's call.
+        scenes->setShown(scene);
+        refreshSceneVisual();
+        redraw();
+        if (onSceneChosen) onSceneChosen(scene);
+    };
+    // The bar folds to a second row when the window is too narrow for everything
+    // on it; the grid above gives up the space.
+    panel->onHeightChanged = [this](int) { layoutPanel(); redraw(); };
 
     hScroll = new GridScrollPane(x, y, scrollW, scrollW, GridScrollPane::HORIZONTAL);
     hScroll->linesize(cellW + btnGap);
@@ -218,7 +344,7 @@ LoopEditor::LoopEditor(int x, int y, int w, int h)
     vScroll->hide();
 
     end();
-    positionToggleBtn();
+    layoutPanel();
 }
 
 LoopEditor::~LoopEditor()
@@ -233,6 +359,21 @@ void LoopEditor::setTimeline(ObservableSong* tl)
     swapObserver(timeline, tl, this);
     panel->setTimeline(tl);
     onTimelineChanged();
+}
+
+void LoopEditor::setSceneBank(SceneBank* s)
+{
+    scenes = s;
+    refreshSceneVisual();
+    redraw();
+}
+
+void LoopEditor::refreshSceneVisual()
+{
+    if (!panel) return;
+    const int shown   = scenes ? scenes->shownScene()   : SceneBank::kSceneSong;
+    const int playing = scenes ? scenes->playingScene() : SceneBank::kSceneSong;
+    panel->setSceneVisual(shown, playing);
 }
 
 void LoopEditor::setLoopManager(LoopManager* a)
@@ -598,6 +739,25 @@ void LoopEditor::selectCell(int trackIdx, int laneIdx)
     timeline->selectLane(trackIdx, laneId);
 }
 
+// The anchor to switch `patId` on at, so its beat 0 lands on the next bar line rather
+// than wherever the mouse happened to fall.
+float LoopEditor::switchOnAnchor(int patId) const
+{
+    float bar = transport ? transport->position() : 0.0f;
+    if (!transport || !transport->isPlaying() || !timeline) return bar;
+
+    const Pattern* pat = nullptr;
+    for (const auto& p : timeline->get().patterns)
+        if (p.id == patId) { pat = &p; break; }
+    if (!pat || pat->lengthBeats <= 0.0f) return bar;
+
+    float beatsPerBar = timeline->patternBeatsPerBar((int)std::max(0.0f, bar), *pat);
+    float beatsToNext = (std::floor(bar) + 1.0f - bar) * beatsPerBar;
+    float virtualBeat = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
+    if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
+    return bar - virtualBeat / beatsPerBar;
+}
+
 void LoopEditor::togglePattern(int trackIdx, int laneIdx)
 {
     if (!timeline || !loopMgr) return;
@@ -605,39 +765,43 @@ void LoopEditor::togglePattern(int trackIdx, int laneIdx)
     if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return;
     if (laneIdx < 0 || laneIdx >= (int)tracks[trackIdx].lanes.size()) return;
 
-    int   patId = tracks[trackIdx].lanes[laneIdx].patternId;
-    float bar   = transport ? transport->position() : 0.0f;
-    if (loopMgr->isPatternActive(patId)) {
+    const int patId = tracks[trackIdx].lanes[laneIdx].patternId;
+    const int shown = scenes ? scenes->shownScene() : SceneBank::kSceneSong;
+
+    if (SceneBank::isUserScene(shown)) {
+        // A user scene owns its set outright; the song never writes it. Editing a
+        // scene that is not the one sounding changes nothing audible — that is what
+        // makes a scene something you can set up quietly while the song plays.
+        scenes->toggle(shown, patId);
+        if (onSceneEdited) onSceneEdited(patId);
+    } else if (loopMgr->isPatternActive(patId)) {
         loopMgr->deactivate(patId);
     } else {
-        float anchorBar = bar;
-        if (transport && transport->isPlaying()) {
-            const Pattern* pat = nullptr;
-            for (const auto& p : timeline->get().patterns)
-                if (p.id == patId) { pat = &p; break; }
-            if (pat && pat->lengthBeats > 0.0f) {
-                float beatsPerBar = timeline->patternBeatsPerBar((int)std::max(0.0f, bar), *pat);
-                float beatsToNext = (std::floor(bar) + 1.0f - bar) * beatsPerBar;
-                float virtualBeat = std::fmod(pat->lengthBeats - beatsToNext, pat->lengthBeats);
-                if (virtualBeat < 0.0f) virtualBeat += pat->lengthBeats;
-                anchorBar = bar - virtualBeat / beatsPerBar;
-            }
-        }
-        loopMgr->activate(patId, anchorBar);
+        loopMgr->activate(patId, switchOnAnchor(patId));
     }
     redraw();
     if (onToggleChanged) onToggleChanged();
 }
 
-void LoopEditor::positionToggleBtn()
+void LoopEditor::flipAxes()
 {
-    if (!axisToggleBtn) return;
-    // Sit in the control bar at the bottom, on the right-hand side,
-    // vertically centred to line up with the BPM/time-signature controls.
-    int panelTop = y() + h() - panelH;
-    int ty = panelTop + (panelH - toggleBtnH) / 2;
-    int tx = x() + w() - lpPad - toggleBtnW;
-    axisToggleBtn->resize(tx, ty, toggleBtnW, toggleBtnH);
+    tracksAsColumns = !tracksAsColumns;
+    scrollX = scrollY = 0;
+    updateScrollbars();
+    redraw();
+}
+
+// Ask the bar how tall it wants to be at this width and hand it the bottom strip;
+// the grid keeps the rest. The guard stops the height callback the resize fires
+// from re-entering this.
+void LoopEditor::layoutPanel()
+{
+    if (!panel || layingOutPanel) return;
+    layingOutPanel = true;
+    panelH = panel->heightForWidth(w());
+    panel->resize(x(), y() + h() - panelH, w(), panelH);
+    updateScrollbars();
+    layingOutPanel = false;
 }
 
 // ======================================================
@@ -646,11 +810,30 @@ void LoopEditor::positionToggleBtn()
 
 bool LoopEditor::isEnabled(int trackIdx, int laneIdx) const
 {
-    if (!timeline || !loopMgr) return false;
+    if (!timeline) return false;
     const auto& tracks = timeline->get().tracks;
     if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return false;
     if (laneIdx < 0 || laneIdx >= (int)tracks[trackIdx].lanes.size()) return false;
-    return loopMgr->isPatternActive(tracks[trackIdx].lanes[laneIdx].patternId);
+    return patternEnabled(tracks[trackIdx].lanes[laneIdx].patternId);
+}
+
+// What the grid draws for a pattern block. On a user scene that is the scene's own
+// set, whether or not it is the one sounding — which is what lets a scene be set up
+// silently in Song mode, and what shows where an armed switch is heading. On Scene S
+// it is the live set, exactly as before scenes existed.
+bool LoopEditor::patternEnabled(int patId) const
+{
+    // A user scene, or Scene S while a switch to it is still waiting for its bar
+    // line: draw the scene's own set. That is what makes the grid show where you are
+    // going rather than what is still sounding — the amber button carries the "not
+    // yet" and the blocks carry the destination. For Scene S the set is its mirror,
+    // frozen at what it last looked like.
+    if (scenes && (SceneBank::isUserScene(scenes->shownScene())
+                   || scenes->switchPending()))
+        return scenes->isEnabled(patId);
+    // Settled on Scene S: the live set, exactly as before scenes existed, so the song
+    // lights and unlights the blocks as it plays.
+    return loopMgr && loopMgr->isPatternActive(patId);
 }
 
 float LoopEditor::beatProgress(int trackIdx, int laneIdx) const
@@ -693,7 +876,6 @@ void LoopEditor::setContextPopup(LoopContextPopup* popup)
 
 void LoopEditor::onTimelineChanged()
 {
-    positionToggleBtn();
     updateScrollbars();
     redraw();
 }
@@ -809,7 +991,7 @@ void LoopEditor::draw()
                     continue;
 
                 int patId    = tracks[ti].lanes[li].patternId;
-                bool isOn    = loopMgr && loopMgr->isPatternActive(patId);
+                bool isOn    = patternEnabled(patId);
                 bool isHov   = (col == hoveredCol && row == hoveredRow);
 
                 Fl_Color bg = isOn ? (isHov ? btnActiveHover : btnActiveBg)
@@ -1137,7 +1319,7 @@ int LoopEditor::handle(int event)
 void LoopEditor::resize(int x, int y, int w, int h)
 {
     Fl_Group::resize(x, y, w, h);
-    if (panel) panel->resize(x, y + h - panelH, w, panelH);
-    positionToggleBtn();
-    updateScrollbars();
+    // layoutPanel() re-asks the bar for its height: a narrower window may fold it
+    // onto a second row, which changes how much is left for the grid.
+    layoutPanel();
 }

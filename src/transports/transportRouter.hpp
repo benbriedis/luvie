@@ -60,6 +60,15 @@ public:
         loopMode_ = false;
         if (active_) active_->endLoopMode(bars);
     }
+    void  armScene(float atBar) override {
+        if (active_) active_->armScene(atBar);
+    }
+    void  beginLoopMode(float atBar) override {
+        // The cached flag has to move with the arm, as endLoopMode()'s does: callers
+        // read it back to decide what mode they are in.
+        loopMode_ = true;
+        if (active_) active_->beginLoopMode(atBar);
+    }
     void  skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars) override {
         if (active_) active_->skipNoteOnce(instrumentId, midiPitch, bar, tolBars);
     }

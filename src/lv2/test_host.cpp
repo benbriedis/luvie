@@ -190,6 +190,13 @@ int main(int argc, char** argv) {
     bool     restate       = false;
     bool     songLoop      = false;
     float    songLoopStart = 0.0f, songLoopEnd = 0.0f;
+    // --scene <pattern> <atBar> <cycle>: arm a Loop-Mode scene change. The pattern
+    // --loop switched on keeps sounding until atBar, where the engine's RT thread
+    // swaps to this one. The whole point is that the swap lands on the bar line
+    // rather than on the cycle the message arrived in, so the three are separate.
+    int      scenePattern  = -1;
+    float    sceneBar      = 0.0f;
+    int      sceneCycle    = -1;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--pos-every-cycle")) posEveryCycle = true;
         else if (!strcmp(argv[i], "--chunk") && i + 1 < argc) chunkBytes = (uint32_t)atoi(argv[++i]);
@@ -206,6 +213,11 @@ int main(int argc, char** argv) {
                 midiInRaw[midiInRawLen++] = (uint8_t)strtol(argv[++i], nullptr, 16);
         }
         else if (!strcmp(argv[i], "--nframes") && i + 1 < argc) ++i;   // read above
+        else if (!strcmp(argv[i], "--scene") && i + 3 < argc) {
+            scenePattern = atoi(argv[++i]);
+            sceneBar     = (float)atof(argv[++i]);
+            sceneCycle   = atoi(argv[++i]);
+        }
         else if (!strcmp(argv[i], "--song-loop") && i + 2 < argc) {
             songLoopStart = (float)atof(argv[++i]);
             songLoopEnd   = (float)atof(argv[++i]);
@@ -288,6 +300,23 @@ int main(int argc, char** argv) {
             printf("cycle 1: sent luvie_loop (%s, pattern %d, songLoop=%d [%.2f,%.2f))\n",
                    inLoop ? "loop mode on" : "song mode", loopPattern,
                    (int)songLoop, songLoopStart, songLoopEnd);
+        }
+        if (c == sceneCycle && scenePattern >= 0) {
+            // An armed scene change: the live pattern carries ACTIVE, the incoming one
+            // PENDING, and sceneArm/sceneArmBar say when to swap. The DSP parks a
+            // snapshot built from the PENDING set and its RT thread takes the seam.
+            LuvieLoopState ls{ 1u, 2u, songLoop ? 1u : 0u, songLoopStart, songLoopEnd,
+                               0u, 0.0f, 0u, 0.0f, 0.0f, 0.0f,
+                               0u, 0.0f,              /* no Song -> Loop hand-off */
+                               1u, sceneBar,          /* the scene arm */
+                               0u, 0, 4, 0 };
+            LuvieLoopEntry le[2] = {
+                { loopPattern,  0.0f, LUVIE_LOOP_ACTIVE | LUVIE_LOOP_MANUAL },
+                { scenePattern, sceneBar, LUVIE_LOOP_PENDING },
+            };
+            forgeLoopAtom(&forge, uLoop, ls, le, 2);
+            printf("cycle %d: sent luvie_loop (scene arm -> pattern %d at bar %.2f)\n",
+                   c, scenePattern, sceneBar);
         }
         if (c == unloopCycle) {
             // Loop -> Song hand-off: mode off, resume bar carried in the same atom so

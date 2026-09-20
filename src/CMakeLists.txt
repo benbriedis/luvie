@@ -12,7 +12,8 @@ add_library(luvie_core STATIC
     songEditor/markerRuler.cpp songEditor/loopRuler.cpp songEditor/loopRulerContextPopup.cpp
     songEditor/observableSong.cpp songEditor/observablePattern.cpp
     songEditor/patternNames.cpp
-    outputs/observableInstrument.cpp loopManager.cpp loopModeController.cpp patternEditors/patternPanel.cpp
+    outputs/observableInstrument.cpp loopManager.cpp loopModeController.cpp sceneBank.cpp
+    patternEditors/patternPanel.cpp
     modern/inlineEditDispatch.cpp patternEditors/harmonyLabels.cpp songEditor/trackContextPopup.cpp
     patternEditors/drumGrid.cpp patternEditors/drumPatternEditor.cpp
     patternEditors/pianorollGrid.cpp patternEditors/pianorollEditor.cpp

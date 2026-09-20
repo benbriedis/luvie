@@ -49,8 +49,10 @@ int ModernTabs::tabBarH() const {
 
 void ModernTabs::setModeVisual(ModeVisual v)
 {
-	modeIsLoop    = (v != ModeVisual::Song);   // Loop and Transitioning both read as "loop"
-	transitioning = (v == ModeVisual::Transitioning);
+	// modeIsLoop tracks what is sounding, so a hand-off keeps the outgoing mode's
+	// label until it lands: leaving Loop still reads "Loop", entering it still "Song".
+	modeIsLoop    = (v == ModeVisual::Loop || v == ModeVisual::LeavingLoop);
+	transitioning = (v == ModeVisual::LeavingLoop || v == ModeVisual::EnteringLoop);
 	redraw();
 }
 
@@ -65,8 +67,9 @@ void ModernTabs::drawModeToggle(int tbH)
 
 	fl_font(FL_HELVETICA_BOLD, labelsize());
 	fl_color(FL_WHITE);
-	// Keep the "Loop" label through the transition; only a settled Song state reads "Song".
-	fl_draw((transitioning || modeIsLoop) ? "Loop" : "Song", x(), y(), toggleW, tbH, FL_ALIGN_CENTER);
+	// The label names what is sounding, so it does not change until the hand-off
+	// lands — see modeIsLoop.
+	fl_draw(modeIsLoop ? "Loop" : "Song", x(), y(), toggleW, tbH, FL_ALIGN_CENTER);
 
 	// Separator
 	fl_color(separator);

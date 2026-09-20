@@ -7,6 +7,7 @@
 #include "observablePattern.hpp"
 #include "inlineInput.hpp"
 #include "controlBar.hpp"
+#include "timeSigSection.hpp"   // TimeSigSection: shared with the Loop Editor's bar
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Flex.H>
@@ -55,22 +56,6 @@ struct ChordSection : Fl_Flex {
     ToggleButton     chordScaleBtn;   // toggles the choice between chords and scales
     AccidentalChoice chordChoice;     // names carry accidentals: "7(b9)", "maj7(#11)"
     ChordSection(int x, int y, int h);
-};
-
-// Time signature. The denominator dropdown also carries the beat definition (a
-// plain denominator counts in crotchets; the dotted variants show a note glyph).
-struct TimeSigSection : Fl_Flex {
-    static constexpr int kGap    = 3;
-    static constexpr int kLabelW = 28;
-    static constexpr int kNumW   = 26;
-    static constexpr int kSlashW = 12;
-    static constexpr int kDenW   = 54;   // hugs DenomBeatChoice::naturalWidth()
-    static constexpr int kWidth  = kLabelW + kGap + kNumW + kGap + kSlashW + kGap + kDenW;
-    Fl_Box           timeSigLabel;
-    ModernValueInput timeSigNum;
-    Fl_Box           timeSigSlash;
-    DenomBeatChoice  timeSigDen;
-    TimeSigSection(int x, int y, int h);
 };
 
 struct BarsSection : Fl_Flex {

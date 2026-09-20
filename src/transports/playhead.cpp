@@ -126,6 +126,15 @@ void Playhead::tick()
 			// flush same-pitch note (note1 off == note2 on) gets off-then-on and
 			// re-attacks instead of being cancelled by the stale off.
 			if (loopActive) {
+				// An armed scene change has reached its bar line. This watches for a
+				// switch the engine has already landed sample-accurately rather than
+				// timing one — the same role LoopModeController::poll() plays — and it
+				// is what lands the change for the soft (Native/Debug) path, which
+				// reads LoopManager directly. It rides the tick that is already here;
+				// no new timer.
+				if (loopMgr && loopMgr->scenePending()
+				    && curPos >= loopMgr->sceneAtBar() - 1.0e-4f)
+					loopMgr->commitScene();
 				if (curPos >= lastPosition) {
 					flushSoftNoteOffs(curPos);
 					if (runChecks && obsTl) checkLoopVerboseNotes(lastPosition, curPos);
@@ -173,6 +182,11 @@ void Playhead::tick()
 				if (obsTl) obsTl->readTempoFromMap(curPos);
 			}
 			if (loopMgr && obsTl && !loopActive) loopMgr->sync(*obsTl, curPos);
+			// Stopped with a scene change still armed: there is no bar line coming, so
+			// it lands now. The engine does the same (its seam test takes a pending
+			// switch immediately when the transport is not rolling), and without this
+			// the UI would sit showing a switch that had already happened.
+			if (loopMgr && loopMgr->scenePending()) loopMgr->commitScene();
 			lastPosition = curPos;
 		}
 		wasPlaying = playing;

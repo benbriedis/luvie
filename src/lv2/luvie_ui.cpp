@@ -73,6 +73,13 @@ public:
        hiccup this path exists to avoid. The resume bar travels to the DSP in the loop
        atom instead, and the DSP moves its own musical position. */
     void setOnEndLoopMode(std::function<void(float)> f) { onEndLoopMode = std::move(f); }
+    /* Song -> Loop hand-off, and a Loop-Mode scene change. Both travel the same way
+       and for the same reason as the hand-off above: the bar goes to the DSP in the
+       loop atom and its RT thread picks the frame, because the trip UI -> host ->
+       worker takes tens of milliseconds and applying either on arrival would land it
+       that far off the beat. Neither ever asks the host to seek. */
+    void setOnBeginLoopMode(std::function<void(float)> f) { onBeginLoopMode = std::move(f); }
+    void setOnArmScene(std::function<void(float)> f) { onArmScene = std::move(f); }
 
     void  play()           override { if (command) command->play(); }
     void  pause()          override { if (command) command->pause(); }
@@ -83,6 +90,14 @@ public:
     void  setLoopMode(bool m) override {
         if (command) command->setLoopMode(m);
         if (onLoopMode) onLoopMode(m);
+    }
+    void  beginLoopMode(float atBar) override {
+        if (command) command->setLoopMode(true);    // mode only — never a host seek
+        if (onBeginLoopMode) onBeginLoopMode(atBar);
+        else if (onLoopMode) onLoopMode(true);
+    }
+    void  armScene(float atBar) override {
+        if (onArmScene) onArmScene(atBar);
     }
     void  endLoopMode(float bars) override {
         if (command) command->setLoopMode(false);   // mode only — never a host seek
@@ -95,6 +110,8 @@ private:
     ITransport* command = nullptr;
     std::function<void(bool)>  onLoopMode;
     std::function<void(float)> onEndLoopMode;
+    std::function<void(float)> onBeginLoopMode;
+    std::function<void(float)> onArmScene;
 };
 
 /* -----------------------------------------------------------------------
@@ -179,6 +196,13 @@ struct LuvieUI {
        does not re-arm the hand-off. */
     bool  songHandoff    = false;
     float songHandoffBar = 0.0f;
+    /* The mirrors of the pair above, for the other two armed switches. All one-shot:
+       cleared by the message that carries them, or a later unrelated loop message
+       would re-arm one. */
+    bool  loopHandoff    = false;
+    float loopHandoffBar = 0.0f;
+    bool  sceneArm       = false;
+    float sceneArmBar    = 0.0f;
     struct LoopBridge : ILoopObserver {
         LuvieUI* ui = nullptr;
         void onLoopsChanged() override { sendLoopState(ui); }
@@ -267,6 +291,9 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
        the same patterns switched on. */
     state.loopMode           = ui->app.isLoopMode();
     state.activeLoopPatterns = ui->app.activeLoopPatterns();
+    state.scenes             = ui->app.sceneSets();
+    state.currentScene       = ui->app.shownScene();
+    ui->app.loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     ui->app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
     state.midiLearn = ui->app.midiLearn.bindings();
     return true;
@@ -375,6 +402,14 @@ static void sendLoopState(LuvieUI* ui)
     }
     for (int patId : lm.manualPatterns())   entryFor(patId).flags |= LUVIE_LOOP_MANUAL;
     for (int patId : lm.disabledPatterns()) entryFor(patId).flags |= LUVIE_LOOP_DISABLED;
+    /* The scene an armed switch is heading for. The DSP builds the snapshot it parks
+       from these, so they have to travel with the arm rather than after it. */
+    if (lm.scenePending())
+        for (const auto& [patId, anchor] : lm.pendingPatterns()) {
+            LuvieLoopEntry& e = entryFor(patId);
+            e.anchorBar = anchor;   // shared with ACTIVE when in both; see the flag
+            e.flags |= LUVIE_LOOP_PENDING;
+        }
 
     std::vector<LuvieLoopEntry> entries;
     entries.reserve(merged.size());
@@ -407,7 +442,20 @@ static void sendLoopState(LuvieUI* ui)
                            tells the DSP whether to hold it. */
                         ui->song->globalBpmSet() ? 1u : 0u,
                         ui->song->globalBpmValue(), ui->song->globalBpmFromBar(),
-                        ui->song->tempoHoldBar() };
+                        ui->song->tempoHoldBar(),
+                        ui->loopHandoff ? 1u : 0u, ui->loopHandoffBar,
+                        ui->sceneArm ? 1u : 0u, ui->sceneArmBar,
+                        0u, 0, 4, 0 };
+    {
+        /* Loop Mode's own meter. Runtime state like the tempo beside it, so it rides
+           this live atom rather than waiting for the saved state to be re-serialized. */
+        int top, bottom; timeSettings::BeatUnit beat;
+        ui->song->loopTimeSigValue(top, bottom, beat);
+        hdr.loopSigOn     = (top > 0) ? 1u : 0u;
+        hdr.loopSigTop    = top;
+        hdr.loopSigBottom = bottom;
+        hdr.loopSigBeat   = (int32_t)beat;
+    }
     std::memcpy(p, &hdr, sizeof(hdr));
     p += sizeof(hdr);
 
@@ -418,7 +466,11 @@ static void sendLoopState(LuvieUI* ui)
 
     if (buf == ui->lastLoopMsg) return;   // nothing the DSP would act on has changed
     ui->lastLoopMsg = buf;
-    ui->songHandoff = false;              // one-shot: consumed by this message
+    /* One-shot: consumed by this message. Left set, a later loop message sent for
+       something unrelated (a tempo edit, the song-loop region) would re-arm them. */
+    ui->songHandoff = false;
+    ui->loopHandoff = false;
+    ui->sceneArm    = false;
 
     ui->writeFunc(ui->controller, PORT_CONTROL_IN,
                   static_cast<uint32_t>(buf.size()),
@@ -476,6 +528,8 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
        loadTimeline() above has just fired the sync that would otherwise refill the
        active set from the song. */
     ui->app.applyLoopState(state.loopMode, state.activeLoopPatterns);
+    ui->app.applyLoopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
+    ui->app.applyScenes(state.scenes, state.currentScene);
     ui->loopMode = state.loopMode;
     ui->app.midiLearn.setBindings(state.midiLearn);
     /* Song-loop region: applySongLoop() sets the ruler + toggle and pushes through
@@ -676,6 +730,20 @@ static LV2UI_Handle instantiate(
         ui->songHandoff    = true;
         ui->songHandoffBar = bars;
         ui->loopMode       = false;
+        sendLoopState(ui);
+    });
+
+    /* Song -> Loop, and a scene change: the mirror of the hand-off above. The bar
+       goes over and the DSP's RT thread lands it on that bar line. */
+    ui->hostTransport->setOnBeginLoopMode([ui](float bars) {
+        ui->loopHandoff    = true;
+        ui->loopHandoffBar = bars;
+        ui->loopMode       = true;
+        sendLoopState(ui);
+    });
+    ui->hostTransport->setOnArmScene([ui](float bars) {
+        ui->sceneArm    = true;
+        ui->sceneArmBar = bars;
         sendLoopState(ui);
     });
 

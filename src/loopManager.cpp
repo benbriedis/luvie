@@ -122,6 +122,72 @@ void LoopManager::restore(const std::vector<int>& patterns, float anchorBar)
 	if (changed) notify();
 }
 
+void LoopManager::applySet(const std::set<int>& patterns, float anchorBarForNew)
+{
+	std::unordered_map<int, float> next;
+	for (int patId : patterns) {
+		// A pattern already sounding keeps its anchor, and so its phase: switching
+		// scenes must not restart a loop that is in both of them. Only a newly
+		// enabled one is phased, onto anchorBarForNew.
+		auto it = activePats.find(patId);
+		next[patId] = (it != activePats.end()) ? it->second : anchorBarForNew;
+	}
+
+	bool changed = next != activePats || !manualActive.empty() || !manuallyDisabled.empty();
+	activePats = std::move(next);
+	// A scene is a set, not a set of overrides. Clearing these is what stops scene
+	// state outliving a switch back to Song mode, where the Sequencer reads both when
+	// deciding whether to play a song block (see sequencer.cpp, buildSnapshot).
+	manualActive.clear();
+	manuallyDisabled.clear();
+	songOriginated.clear();
+	if (changed) notify();
+}
+
+void LoopManager::armScene(const std::set<int>& next, float atBar)
+{
+	pendingActives.clear();
+	for (int patId : next) {
+		auto it = activePats.find(patId);
+		pendingActives[patId] = (it != activePats.end()) ? it->second : atBar;
+	}
+	pendingScene = true;
+	pendingAtBar = atBar;
+	notify();
+}
+
+void LoopManager::commitScene()
+{
+	if (!pendingScene) return;
+	pendingScene = false;
+	activePats = std::move(pendingActives);
+	pendingActives.clear();
+	// Same reasoning as applySet(): a scene is a set, not a set of overrides.
+	manualActive.clear();
+	manuallyDisabled.clear();
+	songOriginated.clear();
+	// Always notifies, even when the two scenes held the same patterns: observers
+	// track the armed/landed distinction as well as the set, and a switch that
+	// changed no pattern still has to clear the pending state they are showing.
+	notify();
+}
+
+void LoopManager::cancelScene()
+{
+	if (!pendingScene) return;
+	pendingScene = false;
+	pendingActives.clear();
+	notify();
+}
+
+void LoopManager::mirrorArmedScene(const std::unordered_map<int, float>& pending,
+                                   float atBar)
+{
+	pendingActives = pending;
+	pendingScene   = true;
+	pendingAtBar   = atBar;
+}
+
 void LoopManager::reanchor(int patId, float anchorBar)
 {
 	auto it = activePats.find(patId);
@@ -143,8 +209,13 @@ void LoopManager::mirror(const std::unordered_map<int, float>& actives,
                          const std::unordered_set<int>& manual,
                          const std::unordered_set<int>& disabled)
 {
-	if (actives == activePats && manual == manualActive && disabled == manuallyDisabled)
+	if (actives == activePats && manual == manualActive && disabled == manuallyDisabled
+	    && !pendingScene)
 		return;
+	// An authoritative full replacement, so any armed scene goes with it: left set, a
+	// stale pending map would later commit over the state just mirrored.
+	pendingScene = false;
+	pendingActives.clear();
 	activePats      = actives;
 	manualActive    = manual;
 	manuallyDisabled = disabled;

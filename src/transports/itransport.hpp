@@ -43,6 +43,21 @@ public:
 	// glitch-free; JackTransport and the plugin override it.
 	virtual void endLoopMode(float bars) { seek(bars); setLoopMode(false); }
 
+	// Song -> Loop hand-off, the mirror of endLoopMode(): the song plays out to the
+	// bar line at `atBar` and the loops come in there, as a *continuous* move.
+	// Backends must not relocate the host clock and must not reset controllers. The
+	// default is the old instant flip, which is right for a clock that does not
+	// sequence and so has nothing to hand over.
+	virtual void beginLoopMode(float /*atBar*/) { setLoopMode(true); }
+
+	// Land a Loop-mode scene change on the bar line at `atBar`. The engine keeps
+	// sounding the set it has until then, and swaps to LoopManager::pendingPatterns()
+	// there. Backends must not relocate the clock, must not change the tempo map and
+	// must not reset controllers: nothing moves but which patterns fire. The default
+	// ignores it — a clock that does not sequence has no content to swap, and the
+	// soft playback path lands the change from Playhead::tick instead.
+	virtual void armScene(float /*atBar*/) {}
+
 	// Recording has already sounded this note live, and quantising put it just ahead
 	// of the playhead: drop the one firing of (instrument, pitch) within tolBars of
 	// song bar `bar`, so it is not heard again moments later. Later passes play it as

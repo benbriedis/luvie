@@ -152,7 +152,7 @@ void JackTransport::pause() { if (client && jackAlive.load()) jack_transport_sto
 void JackTransport::rewind(){
     if (!client || !jackAlive.load()) return;
     setSecsOffset(0.0);
-    cancelHandoff();
+    cancelPending();
     jack_transport_locate(client, 0);
 }
 
@@ -162,7 +162,7 @@ void JackTransport::seek(float bars)
     // An explicit seek re-establishes the identity frame<->bar mapping: drop any
     // accumulated tempo re-anchor offset and locate straight to the target bar.
     setSecsOffset(0.0);
-    cancelHandoff();
+    cancelPending();
     double secs  = timeline->barToSeconds(std::max(0.0f, bars));
     auto   frame = static_cast<jack_nframes_t>(secs * sampleRate);
     jack_transport_locate(client, frame);

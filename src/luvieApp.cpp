@@ -169,6 +169,8 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     app->song_->loadTimeline(state.timeline);
     if (app->onApplyOutputs) app->onApplyOutputs(state);
     app->applyLoopState(state.loopMode, state.activeLoopPatterns);
+    app->applyLoopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
+    app->applyScenes(state.scenes, state.currentScene);
     app->midiLearn.setBindings(state.midiLearn);
 }
 
@@ -194,6 +196,9 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     if (app->onCollectOutputs) app->onCollectOutputs(state);
     state.loopMode           = app->isLoopMode();
     state.activeLoopPatterns = app->activeLoopPatterns();
+    state.scenes             = app->sceneSets();
+    state.currentScene       = app->shownScene();
+    app->loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     state.midiLearn          = app->midiLearn.bindings();
     saveAppState(state, path);
 }
@@ -210,6 +215,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     song_         = song;
     pattern_      = pattern;
     instruments_  = instruments;
+    transport_    = transport;
 
     window->onUndo = [song]() { song->undo(); };
     window->onRedo = [song]() { song->redo(); };
@@ -527,8 +533,17 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Wire up loop editor ----
     loopEd->setTimeline(song);
     loopEd->setPattern(pattern);
+    loopEd->setSceneBank(&sceneBank);
     loopEd->setTransport(transport);
     loopEd->setContextPopup(loopCtxPop);
+    loopEd->onSceneChosen = [this](int scene) { setScene(scene); };
+    loopEd->onSceneEdited = [this](int) {
+        // The scene's own set has already changed. It only has to reach the engine
+        // when that scene is the one sounding.
+        if (isLoopMode() && sceneBank.playingScene() == sceneBank.shownScene())
+            applyShownScene();
+        checkLoopStateChanged();
+    };
     loopCtxPop->onOpenPattern     = openPatternTab;
     loopCtxPop->onShowInstruments = [this]() {
         if (outputsOverlay) outputsOverlay->show();
@@ -557,10 +572,32 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         // thing that has to follow it, since it now speaks for the frozen bar.
         loopEd->refreshPanel();
     };
-    modeController.onModeSettled = [this]() { checkLoopStateChanged(); };
+    modeController.onModeSettled = [this]() {
+        // Entering Loop mode is when a user scene starts to matter. This runs after
+        // setEditorsLoopMode() has gated sync() off — push any earlier and the song
+        // would overwrite the scene on its next tick.
+        //
+        // Scene S is deliberately exempt. It is the song-linked scene, and the mode
+        // toggle has always kept the currently-sounding loops alive across a switch
+        // rather than reloading them; applying it here would clear the manual
+        // overrides and re-anchor everything, which is the behaviour that predates
+        // scenes and is not ours to change.
+        if (isLoopMode() && SceneBank::isUserScene(sceneBank.shownScene()))
+            applyShownScene();
+        else
+            sceneBank.setPlaying(sceneBank.shownScene());
+        if (loopEd) loopEd->refreshSceneVisual();
+        checkLoopStateChanged();
+    };
     loopStateWatch.app = this;
     loopMgr.addObserver(&loopStateWatch);
     tabs->onModeChanged = [this](bool isLoop) {
+        // A mode switch supersedes an armed scene change. The engine has one pending
+        // slot and requestMode() is about to claim it, so the scene arm has to be
+        // dropped here too or the UI would keep waiting for a switch the engine has
+        // forgotten. The scene stays *shown*; onModeSettled applies it if the new
+        // mode calls for it.
+        loopMgr.cancelScene();
         modeController.requestMode(isLoop);
         // The transport loop toggle only applies in Song mode; grey it (but keep it
         // clickable) while in Loop mode.
@@ -973,14 +1010,123 @@ void LuvieApp::applySongLoop(bool enabled, int startCol, int endCol) {
     pushSongLoopState();
 }
 
+// LoopManager changed. Scene S is a mirror of it, so it follows — but only while
+// Scene S is the scene on screen (SceneBank::mirrorSceneS enforces that), which is
+// what freezes the mirror while another scene is showing.
+void LuvieApp::onLoopsChanged() {
+    sceneBank.mirrorSceneS(loopMgr.patterns());
+    // An armed scene change has landed: the scene on screen is now the one sounding,
+    // so the button stops being amber. Watching the manager for this keeps the UI
+    // right whichever side landed it — the engine's seam or Playhead's crossing.
+    if (!loopMgr.scenePending() && sceneBank.switchPending()) {
+        sceneBank.setPlaying(sceneBank.shownScene());
+        if (loopEd) loopEd->refreshSceneVisual();
+    }
+    checkLoopStateChanged();
+}
+
 void LuvieApp::checkLoopStateChanged() {
     if (applyingLoopState) return;
     bool             mode    = isLoopMode();
     std::vector<int> actives = activeLoopPatterns();
-    if (mode == savedLoopMode && actives == savedActiveLoopPatterns) return;
+    auto             scenes  = sceneBank.save();
+    int              shown   = sceneBank.shownScene();
+    // Deliberately not Scene S's mirror: sync() churns it several times a bar in Song
+    // mode, and comparing it here would mark the project dirty — and in plugin mode
+    // re-send the whole JSON blob — on every bar of song playback.
+    if (mode == savedLoopMode && actives == savedActiveLoopPatterns
+        && scenes == savedScenes && shown == savedShownScene) return;
     savedLoopMode           = mode;
     savedActiveLoopPatterns = std::move(actives);
+    savedScenes             = std::move(scenes);
+    savedShownScene         = shown;
     if (onLoopStateChanged) onLoopStateChanged();
+}
+
+void LuvieApp::applyScenes(
+        const std::array<std::vector<int>, SceneBank::kUserScenes>& sets, int shown) {
+    applyingLoopState = true;
+    sceneBank.load(sets, shown);
+    // A scene saved against a pattern that has since been deleted would otherwise
+    // keep switching on a block that is no longer there.
+    if (song_) {
+        std::set<int> live;
+        for (const auto& p : song_->get().patterns) live.insert(p.id);
+        sceneBank.prunePatterns(live);
+    }
+    // Loop mode with a user scene showing means that scene is what sounds. Scene S is
+    // exempt: applyLoopState() has just restored the saved active set, and applying
+    // the mirror over it would only re-anchor what is already right.
+    if (isLoopMode() && SceneBank::isUserScene(sceneBank.shownScene()))
+        applyShownScene();
+    else
+        sceneBank.setPlaying(sceneBank.shownScene());
+    if (loopEd) { loopEd->refreshSceneVisual(); loopEd->redraw(); }
+    applyingLoopState = false;
+
+    // A load is not an edit — adopt the loaded values as the baseline.
+    savedScenes     = sceneBank.save();
+    savedShownScene = sceneBank.shownScene();
+}
+
+void LuvieApp::loopTimeSig(int& top, int& bottom, int& beatIdx) const {
+    if (!song_) { top = -1; bottom = 4; beatIdx = 0; return; }
+    timeSettings::BeatUnit beat;
+    song_->loopTimeSigValue(top, bottom, beat);
+    beatIdx = (int)beat;
+}
+
+void LuvieApp::applyLoopTimeSig(int top, int bottom, int beatIdx) {
+    if (!song_) return;
+    // mirrorLoopTimeSig, not setLoopTimeSig: a load must not re-anchor the transport
+    // or fan out a tempo change — it is establishing the starting state, not editing.
+    song_->mirrorLoopTimeSig(top, bottom, beatIdx);
+    if (loopEd) loopEd->refreshPanel();
+}
+
+void LuvieApp::setScene(int scene) {
+    // The editor has already made it the shown scene — the grid shows where we are
+    // going. What is left is whether it sounds, which only Loop mode answers yes to.
+    if (!isLoopMode()) {
+        // Nothing is waiting on a bar line, so there is no pending state to show.
+        sceneBank.setPlaying(scene);
+        if (loopEd) loopEd->refreshSceneVisual();
+        checkLoopStateChanged();
+        return;
+    }
+    // Mid mode-switch the engine's one pending slot already holds the hand-off, and
+    // arming a scene over it would drop that. The scene is shown now and applied when
+    // the mode settles, which onModeSettled does.
+    if (modeController.isTransitioning()) {
+        if (loopEd) loopEd->refreshSceneVisual();
+        checkLoopStateChanged();
+        return;
+    }
+    applyShownScene();
+    checkLoopStateChanged();
+}
+
+void LuvieApp::applyShownScene() {
+    const int   scene = sceneBank.shownScene();
+    const float pos   = transport_ ? std::max(0.0f, transport_->position()) : 0.0f;
+
+    if (!transport_ || !transport_->isPlaying()) {
+        // Stopped: there is no bar line to wait for, so it lands now.
+        loopMgr.applySet(sceneBank.set(scene), pos);
+        sceneBank.setPlaying(scene);
+        if (loopEd) loopEd->refreshSceneVisual();
+        return;
+    }
+
+    // Playing: the switch waits for the bar line so the change is musical. The engine
+    // picks the frame — arming here and landing there is what keeps it beat-exact
+    // however long the message takes to arrive (tens of ms in plugin mode). Until it
+    // lands, the old scene keeps sounding while the grid already shows the new one,
+    // and the scene button reads amber because shown != playing.
+    const float atBar = std::ceil(pos - 1.0e-4f);
+    loopMgr.armScene(sceneBank.set(scene), atBar);
+    if (transport_) transport_->armScene(atBar);
+    if (loopEd) loopEd->refreshSceneVisual();
 }
 
 void LuvieApp::applyLoopState(bool loopMode, const std::vector<int>& activePatterns) {

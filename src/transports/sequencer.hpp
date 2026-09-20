@@ -94,10 +94,30 @@ public:
     // thread.
     void endLoopMode(float resumeBar);
 
-    // Drop a hand-off that is armed but has not landed yet — the user clicked back
-    // into Loop mode, or seeked. setLoopMode() calls it, so entering a mode always
-    // supersedes a pending exit. Owner thread; briefly blocks on snapMutex.
-    void cancelHandoff();
+    // Arm a Loop-mode scene change: build the scene LoopManager::pendingPatterns()
+    // describes now, and let the RT thread swap it in at the next bar line. Same
+    // reason as endLoopMode() for choosing the moment there rather than here — the
+    // message may take tens of milliseconds to arrive — but far cheaper: the mode,
+    // the tempo map and the clock offset are all untouched, and nothing is reset, so
+    // patterns in both scenes sustain across the seam with their phase intact.
+    // No-op outside Loop mode. Owner thread.
+    void armScene(float atBar);
+
+    // Arm the Song -> Loop hand-off, the mirror of endLoopMode(): the song plays out
+    // to the bar line at `atBar` and the loops come in there, so entering Loop mode
+    // mid-bar no longer cuts the song off under the mouse.
+    //
+    // Precondition: the caller has already applied ObservableSong::holdTempo(atBar).
+    // This flips loopMode before building so the parked snapshot carries the held map
+    // the loops will run on — get that order wrong and it parks the song's map. The
+    // backend clock is never relocated. No-op if already in Loop mode. Owner thread.
+    void beginLoopMode(float atBar);
+
+    // Drop a switch that is armed but has not landed yet — the user clicked back
+    // into Loop mode, seeked, or chose a different scene. setLoopMode(), endLoopMode()
+    // and armScene() all call it, so arming anything supersedes whatever was pending.
+    // Owner thread; briefly blocks on snapMutex.
+    void cancelPending();
 
     // Suspend snapshot rebuilds while a multi-step change is applied (the mode and
     // the active loop set together), so the RT thread sees one commit rather than an
@@ -279,11 +299,11 @@ private:
     // (renderCycle) must already hold snapMutex. Always returns true.
     bool renderWindowLocked(bool nowPlaying, Reset reset, double prevBars, double curBars);
 
-    // Where in the musical window [prevBars, curBars) an armed hand-off should land:
-    // the first position whose intra-bar phase matches pendingResumeBar's, so the
-    // switch is a whole number of bars and the beat never moves. False if this cycle
-    // does not contain one (the hand-off simply waits — at most one bar). snapMutex
-    // must be held.
+    // Where in the musical window [prevBars, curBars) an armed switch should land:
+    // the first position whose intra-bar phase matches pendingAtPhase, so the switch
+    // is a whole number of bars and the beat never moves. False if this cycle does
+    // not contain one (the switch simply waits — at most one bar). snapMutex must be
+    // held.
     bool handoffPoint(double prevBars, double curBars, double& at) const;
 
     // Fill `out` with the current timeline + mode. Owner thread, no lock held: all
@@ -296,6 +316,9 @@ private:
     LoopManager*                loopMgr       = nullptr;
     bool                             loopMode  = false;
     bool                        rebuildsSuspended = false;
+    // Set while armScene() builds, so buildSnapshot() reads the scene being switched
+    // to rather than the one still sounding. Owner thread only.
+    bool                        buildingPendingScene = false;
     std::map<int, InstrumentRouting> instrumentMap_;
 
     double sampleRateHz = 48000.0;
@@ -303,11 +326,30 @@ private:
     // Continuous reposition offset (see setSecsOffset).
     std::atomic<double> secsOffset{0.0};
 
-    // Loop -> Song hand-off, armed by endLoopMode() under snapMutex together with
-    // pendingSnap and applied by the RT thread at the next matching bar phase.
-    // Guarded by snapMutex, so the RT thread can never adopt one half of the switch.
-    bool  pendingHandoff   = false;
-    float pendingResumeBar = 0.0f;
+    // An armed switch: pendingSnap is built and parked, and the RT thread adopts it
+    // at the next frame whose intra-bar phase matches pendingAtPhase. All three are
+    // armed under snapMutex together with pendingSnap, so the RT thread can never
+    // adopt one half of a switch.
+    //
+    // There is one slot, and that is deliberate. Every arm comes from a user action
+    // and a second one supersedes rather than queues — there is no musical meaning to
+    // "scene 3 next bar, then scene 4 two bars later" — and more slots would mean
+    // several full Snapshot copies held under the lock for nothing.
+    //
+    //   ToSong  the Loop -> Song hand-off: new tempo map, clock slid onto it
+    //   ToLoop  the Song -> Loop hand-off: its mirror
+    //   Scene   a Loop-mode scene change: content only. It must NOT touch the tempo
+    //           map or secsOffset — the clock runs straight through a scene change,
+    //           and sliding it would jump the loops.
+    enum class Pending : uint8_t { None, ToSong, ToLoop, Scene };
+    Pending pendingKind      = Pending::None;
+    // The intra-bar phase the switch lands on. ToSong takes it from the resume bar
+    // (an integer one gives 0, i.e. a bar line); the others are always bar lines.
+    float   pendingAtPhase   = 0.0f;
+    // ToSong only: the bar the song picks up at. Kept apart from the phase above
+    // because a scene swap has no resume bar at all — overloading one field to mean
+    // both "where to land" and "where to resume" is how this gets confusing later.
+    float   pendingResumeBar = 0.0f;
 
     // Song-loop region + published wrapped position (see setSongLoop / renderCycle).
     std::atomic<bool>  songLoopOn{false};

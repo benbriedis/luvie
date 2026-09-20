@@ -14,10 +14,12 @@ class Editor;
 // switch. The mode toggle only *requests* a mode; this controller decides how and
 // when to commit it:
 //
-//   Song → Loop  : instant. Freeze the song playhead at its current bar (greyed,
-//                  fixed) and flip the transport to loop mode. The LoopManager's
-//                  active set is NOT cleared, so whatever was sounding keeps
-//                  looping (sync() is gated off while the playhead is loop-active).
+//   Song → Loop  : the song plays out the rest of the bar it is in (button yellow,
+//                  reading "Song") and the loops come in on the next downbeat. The
+//                  song playhead freezes on that bar line, greyed. Stopped, there is
+//                  no bar to round out and it settles at once. The LoopManager's
+//                  active set is NOT cleared, so whatever was sounding keeps looping
+//                  (sync() is gated off while the playhead is loop-active).
 //   Loop → Song  : the looper keeps running (button yellow, "Loop") until the next
 //                  bar line, then the song comes in on that downbeat — at the bar
 //                  line at or after the frozen bar, so the loops play out the rest of
@@ -25,7 +27,11 @@ class Editor;
 //                  click and walks the run-up, greyed, reaching the resume bar as the
 //                  switch lands; there it turns red and the mode settles.
 //
-// The hand-off is *armed* on the click and landed by the engine, not by this class.
+// Both directions therefore round out the bar they are in, and both are armed the
+// same way — see below.
+//
+// A hand-off, either way, is *armed* on the click and landed by the engine, not by
+// this class.
 // Two reasons. A seek would relocate the clock — dipping JACK through
 // JackTransportStarting (and the host, in plugin mode), silencing notes and resetting
 // controllers. And the moment matters as much as the manner: in plugin mode the switch
@@ -67,22 +73,34 @@ public:
     // having to poll or duplicate the transition rules.
     std::function<void()> onModeSettled;
 
-    // True while settled in Song mode (not Loop, not mid-transition-to-Song).
-    bool isSongMode() const { return state == State::Song; }
-    // True in Loop mode, including while handing back to Song: the loops are still
-    // the thing playing until the hand-off completes.
-    bool isLoopMode() const { return state != State::Song; }
+    // These two answer "what is sounding right now", not "what has the user asked
+    // for", and so they are always exact opposites — including mid hand-off, where
+    // the outgoing mode is still the one playing until the engine reaches the seam.
+    // Callers that need to know a switch is in flight ask isTransitioning().
+    bool isSongMode() const {
+        return state == State::Song || state == State::TransitionToLoop;
+    }
+    bool isLoopMode() const {
+        return state == State::Loop || state == State::TransitionToSong;
+    }
+    // True while a mode switch is armed and has not landed. The engine has one
+    // pending-switch slot, so nothing else may arm one meanwhile — a scene chosen now
+    // is shown but not armed, and takes effect when the mode settles.
+    bool isTransitioning() const {
+        return state == State::TransitionToSong || state == State::TransitionToLoop;
+    }
 
 private:
-    enum class State { Song, Loop, TransitionToSong };
+    enum class State { Song, Loop, TransitionToSong, TransitionToLoop };
 
     // The settle itself: transport, editors, visuals. tellTransport is false only on
     // the Loop → Song path, where beginTransition() already armed the engine and this
     // is just the visuals catching up with a switch that has happened.
     void applyMode(bool loop, bool tellTransport);
-    void enterLoop();        // Song → Loop
+    void enterLoop();        // Song → Loop: arm the hand-off, then watch for it
     void beginTransition();  // Loop → Song: arm the hand-off, then watch for it
     void finishToSong();     // the switch has landed (or cannot): settle the visuals
+    void finishToLoop();     // the same, the other way
     void poll();             // transition tick: watch for the engine's switch
     void startPoll();
     void stopPoll();

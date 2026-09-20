@@ -359,6 +359,11 @@ std::string appStateToJsonString(const AppState& state) {
         {"jackInstruments", jinstrs},
         {"loopMode",           state.loopMode},
         {"activeLoopPatterns", state.activeLoopPatterns},
+        {"scenes",             state.scenes},
+        {"currentScene",       state.currentScene},
+        {"loopSigTop",         state.loopSigTop},
+        {"loopSigBottom",      state.loopSigBottom},
+        {"loopSigBeat",        state.loopSigBeat},
         {"songLoopEnabled",    state.songLoopEnabled},
         {"songLoopStartCol",   state.songLoopStartCol},
         {"songLoopEndCol",     state.songLoopEndCol},
@@ -380,6 +385,21 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     state.loopMode = j.value("loopMode", false);
     for (const auto& jp : j.value("activeLoopPatterns", json::array()))
         state.activeLoopPatterns.push_back(jp.get<int>());
+    // Absent in projects saved before scenes existed: four empty scenes with Scene S
+    // shown, which is what the Loop Editor was before it had any.
+    state.currentScene = std::clamp(j.value("currentScene", 0), 0, 4);
+    // Absent before Loop mode had its own meter: -1, "follow the song".
+    state.loopSigTop    = j.value("loopSigTop",    -1);
+    state.loopSigBottom = j.value("loopSigBottom",  4);
+    state.loopSigBeat   = j.value("loopSigBeat",    0);
+    {
+        int si = 0;
+        for (const auto& js : j.value("scenes", json::array())) {
+            if (si >= (int)state.scenes.size()) break;
+            for (const auto& jp : js) state.scenes[si].push_back(jp.get<int>());
+            ++si;
+        }
+    }
     state.songLoopEnabled  = j.value("songLoopEnabled",  false);
     state.songLoopStartCol = j.value("songLoopStartCol", 0);
     state.songLoopEndCol   = j.value("songLoopEndCol",   -1);

@@ -330,6 +330,11 @@ static void applyState(Plugin* p, const std::string& json, bool restoreLoopState
        rather than playing the song arrangement. Anchor at bar 0: anchors are not
        saved (see AppState). Mode before the set, matching the atom path. */
     if (restoreLoopState) {
+        /* Loop Mode's own meter before the mode flip, so the held map the mode
+           rebuilds against already carries it. Scenes themselves are deliberately not
+           restored here: the DSP never learns what a scene is — the UI resolves the
+           shown scene to an active set and ships that. */
+        p->song->mirrorLoopTimeSig(st.loopSigTop, st.loopSigBottom, st.loopSigBeat);
         p->engine->setLoopMode(st.loopMode);
         std::unordered_map<int, float> actives;
         if (st.loopMode)
@@ -368,7 +373,7 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
     uint32_t avail = (size - (uint32_t)sizeof(LuvieLoopState)) / (uint32_t)sizeof(LuvieLoopEntry);
     uint32_t count = hdr.count < avail ? hdr.count : avail;
 
-    std::unordered_map<int, float> actives;
+    std::unordered_map<int, float> actives, pending;
     std::unordered_set<int>        manual, disabled;
     const char* rec = (const char*)body + sizeof(LuvieLoopState);
     for (uint32_t i = 0; i < count; i++, rec += sizeof(LuvieLoopEntry)) {
@@ -377,7 +382,13 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
         if (e.flags & LUVIE_LOOP_ACTIVE)   actives[e.patternId] = e.anchorBar;
         if (e.flags & LUVIE_LOOP_MANUAL)   manual.insert(e.patternId);
         if (e.flags & LUVIE_LOOP_DISABLED) disabled.insert(e.patternId);
+        if (e.flags & LUVIE_LOOP_PENDING)  pending[e.patternId] = e.anchorBar;
     }
+
+    /* Loop Mode's own meter, before anything rebuilds against it. Runtime state like
+       the tempo, mirrored rather than set: the DSP has no transport to re-anchor. */
+    p->song->mirrorLoopTimeSig(hdr.loopSigOn ? hdr.loopSigTop : -1,
+                               hdr.loopSigBottom, hdr.loopSigBeat);
 
     if (luvieDebug())
         fprintf(stderr, "[luvie] applyLoopState: loopMode=%u, %u entries (%zu active), "
@@ -405,6 +416,39 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
         return;
     }
 
+    if (hdr.loopHandoff) {
+        /* Song -> Loop hand-off, the mirror of the branch above. The tempo freeze has
+           to go on *before* beginLoopMode() builds, or the snapshot it parks would
+           carry the song's map rather than the held one the loops will run on —
+           beginLoopMode() flips the mode itself for exactly that reason. */
+        p->engine->suspendRebuilds(true);
+        p->song->mirrorGlobalBpm(hdr.globalBpmOn != 0, hdr.globalBpm, hdr.globalBpmBar,
+                                 /*held=*/true, hdr.globalBpmHoldBar);
+        p->loopMgr.mirror(actives, manual, disabled);
+        p->engine->suspendRebuilds(false);
+        p->engine->beginLoopMode(hdr.loopHandoffBar);
+        return;
+    }
+
+    if (hdr.sceneArm) {
+        /* An armed Loop-Mode scene change. The live set is mirrored first so a rebuild
+           arriving before the arm publishes what is still sounding; then the incoming
+           scene is parked and the engine told to swap at the bar line.
+           commitScene() immediately afterwards is deliberate: nothing on this side
+           reads the LoopManager for live playback (only buildSnapshot does), so moving
+           it on at once is harmless — and it means a rebuild landing after the RT
+           thread has taken the seam builds the new scene rather than reverting to the
+           old one. The engine still holds the swap until its bar line. */
+        p->song->mirrorGlobalBpm(hdr.globalBpmOn != 0, hdr.globalBpm, hdr.globalBpmBar,
+                                 /*held=*/true, hdr.globalBpmHoldBar);
+        p->engine->setLoopMode(true);
+        p->loopMgr.mirror(actives, manual, disabled);
+        p->loopMgr.mirrorArmedScene(pending, hdr.sceneArmBar);
+        p->engine->armScene(hdr.sceneArmBar);
+        p->loopMgr.commitScene();
+        return;
+    }
+
     /* A tempo change moves every bar boundary ahead of the clock, so on its own it
        would make the same host frame read as a different bar and playback would scrub.
        Standalone avoids that through ObservableSong::reanchoringTempo pinning the
@@ -413,10 +457,18 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
        slide the clock offset until that same bar lands on that same frame. curFrame is
        a cycle or so stale on this thread, which keeps the error under one buffer. */
     const bool loopNow = hdr.loopMode != 0;
+    /* The meter counts here as much as the tempo does: it moves every bar boundary
+       ahead of the clock just the same, so leaving it out would let a meter-only
+       change through without the re-anchor below and playback would scrub. */
+    int curSigTop, curSigBottom; timeSettings::BeatUnit curSigBeat;
+    p->song->loopTimeSigValue(curSigTop, curSigBottom, curSigBeat);
     const bool tempoChanged = p->song->globalBpmSet()     != (hdr.globalBpmOn != 0)
                            || p->song->globalBpmValue()   != hdr.globalBpm
                            || p->song->globalBpmFromBar() != hdr.globalBpmBar
-                           || p->song->tempoHoldBar()     != hdr.globalBpmHoldBar;
+                           || p->song->tempoHoldBar()     != hdr.globalBpmHoldBar
+                           || curSigTop    != (hdr.loopSigOn ? hdr.loopSigTop : -1)
+                           || curSigBottom != hdr.loopSigBottom
+                           || (int)curSigBeat != hdr.loopSigBeat;
     double nowSecs = 0.0, curBar = 0.0;
     if (tempoChanged) {
         nowSecs = (double)p->curFrame / p->engine->sampleRateHz();

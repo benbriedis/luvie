@@ -375,6 +375,9 @@ int main(int argc, char **argv) {
         collectOutputs(state);
         state.loopMode           = app.isLoopMode();
         state.activeLoopPatterns = app.activeLoopPatterns();
+        state.scenes             = app.sceneSets();
+        state.currentScene       = app.shownScene();
+        app.loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
         app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         state.midiLearn = app.midiLearn.bindings();
         return state;
@@ -392,6 +395,11 @@ int main(int argc, char **argv) {
         // After the timeline: restoring the mode gates sync() off, and loadTimeline
         // above fires the sync that would otherwise repopulate the active set.
         app.applyLoopState(state.loopMode, state.activeLoopPatterns);
+        // Before the scenes: the meter decides how long a Loop-Mode bar is, and a
+        // scene applied on entry anchors against it.
+        app.applyLoopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
+        // After the mode has settled: a scene only sounds once Loop mode is in force.
+        app.applyScenes(state.scenes, state.currentScene);
         app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         app.midiLearn.setBindings(state.midiLearn);
     };

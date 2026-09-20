@@ -5,6 +5,7 @@
 #define LOOP_MANAGER_HPP
 
 #include "iLoopObserver.hpp"
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -36,6 +37,33 @@ public:
 	// project should not carry hidden overrides that outlive a switch back to
 	// Song mode. Notifies if anything changed.
 	void restore(const std::vector<int>& patterns, float anchorBar);
+
+	// Make `patterns` exactly the active set — a Loop-Editor scene being applied. A
+	// pattern already active keeps its anchor, and so its phase; a newly enabled one
+	// is anchored at anchorBarForNew. Manual and disabled state is cleared, as
+	// restore() does and for the same reason: a scene must not leave overrides behind
+	// that outlive a switch back to Song mode. Notifies if anything changed.
+	void applySet(const std::set<int>& patterns, float anchorBarForNew);
+
+	// ── Armed scene change ────────────────────────────────────────────────────
+	// A scene switched while the transport rolls does not land under the mouse: it
+	// waits for the bar line, so the change is musical. The live set keeps sounding
+	// meanwhile and `pendingActives` is what the engine swaps to at `atBar` — the
+	// same split applySet() makes, with a pattern already active keeping its anchor
+	// (and so its phase) and a newly enabled one anchored at atBar.
+	//
+	// The wait itself is the engine's, not ours: the RT thread picks the frame (see
+	// Sequencer's Pending::Scene). commitScene() is the UI catching up with a switch
+	// that has already happened, which is also what lands it for the soft playback
+	// path. Both notify.
+	void armScene(const std::set<int>& next, float atBar);
+	void commitScene();
+	void cancelScene();
+
+	bool  scenePending() const { return pendingScene; }
+	float sceneAtBar()   const { return pendingAtBar; }
+	// What the engine builds its parked snapshot from while a scene is armed.
+	const std::unordered_map<int, float>& pendingPatterns() const { return pendingActives; }
 
 	// Move one active pattern's anchor, leaving the manual and disabled sets alone.
 	// activate() cannot serve: it also marks the pattern manually active, and the
@@ -74,6 +102,13 @@ public:
 	            const std::unordered_set<int>& manual,
 	            const std::unordered_set<int>& disabled);
 
+	// The armed-scene counterpart of mirror(), for the same passive-mirror role: take
+	// the pending map exactly as the UI computed it rather than deriving anchors here,
+	// so both processes park the identical scene. Does not notify — the caller arms the
+	// engine and commits in one step, and an intermediate fan-out would only publish a
+	// snapshot that is about to be replaced.
+	void mirrorArmedScene(const std::unordered_map<int, float>& pending, float atBar);
+
 	void addObserver(ILoopObserver* o);
 	void removeObserver(ILoopObserver* o);
 
@@ -82,6 +117,10 @@ private:
 	std::unordered_set<int>        manualActive;
 	std::unordered_set<int>        manuallyDisabled;
 	std::unordered_set<int>        songOriginated;
+	// The armed scene: what activePats becomes at pendingAtBar. See armScene().
+	std::unordered_map<int, float> pendingActives;
+	bool                           pendingScene = false;
+	float                          pendingAtBar = 0.0f;
 	std::vector<ILoopObserver*> observers;
 
 	void notify();

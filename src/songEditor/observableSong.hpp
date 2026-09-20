@@ -179,6 +179,35 @@ public:
     // boundary (the LV2 UI ships these to the DSP in the loop atom). The setter is
     // deliberately not the re-anchoring one: the DSP has no ITransport to pin, and
     // its clock is the host's frame.
+    // ── Loop Mode's own time signature ────────────────────────────────────────
+    // The Loop Editor can give Loop Mode a meter of its own, so the bar a scene
+    // switch lands on is one the user defined rather than whichever time-signature
+    // marker the song happened to freeze under. Like the global tempo it is a
+    // *register*, not a marker: it writes nothing into the song and applies only
+    // from the hold bar onward, inside tempoMap(). songTempoMap() never sees it, so
+    // it cannot leak into song playback, and it goes inert on its own when the hold
+    // is released (keeping its value, so re-entering Loop Mode remembers it).
+    // top < 0 means "follow the song", which is what a project without one loads as.
+    void  setLoopTimeSig(int top, int bottom, timeSettings::BeatUnit beat);
+    bool  loopTimeSigSet() const { return loopSigTop > 0; }
+    void  loopTimeSigValue(int& top, int& bottom, timeSettings::BeatUnit& beat) const {
+        top = loopSigTop; bottom = loopSigBottom; beat = loopSigBeat;
+    }
+    // Mirror across the process boundary, as mirrorGlobalBpm() does.
+    void  mirrorLoopTimeSig(int top, int bottom, int beatIdx);
+
+    // The meter actually in force at `bar` — the loop register where it applies,
+    // the song's markers otherwise. Everything that scales musical time by the bar
+    // must use these rather than timeSigAt()/beatAt(), or the clock would count the
+    // loop's meter while the patterns stayed scaled to the song's and every loop
+    // would play at the wrong rate. buildTempoMap() is the deliberate exception: it
+    // builds the *song* map, which the register may never touch.
+    void  effectiveTimeSigAt(int bar, int& top, int& bottom) const;
+    timeSettings::BeatUnit effectiveBeatAt(int bar) const;
+    // Whether the loop register governs `bar` at all: Loop Mode holding the map, a
+    // meter set, and the bar at or past the hold.
+    bool  loopSigCovers(int bar) const;
+
     bool  globalBpmSet()     const { return globalBpmOn; }
     float globalBpmValue()   const { return globalBpm; }
     float globalBpmFromBar() const { return globalBpmBar; }
@@ -363,6 +392,10 @@ private:
     float globalBpmBar = 0.0f;
     bool  tempoHold    = false;   // Loop Mode: unbounded, and the meter pinned too
     float holdBar      = 0.0f;    // the bar Loop Mode froze on; where the held map ends
+    // Loop Mode's own meter; see setLoopTimeSig(). Unset (top < 0) follows the song.
+    int   loopSigTop    = -1;
+    int   loopSigBottom = 4;
+    timeSettings::BeatUnit loopSigBeat = timeSettings::BeatUnit::Crotchet;
     mutable std::vector<timeSettings::TempoSegment> heldMapCache;
     mutable bool heldMapDirty = true;
     // Stand-in for "no marker ahead": a bar count no song will reach.
