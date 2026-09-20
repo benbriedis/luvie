@@ -73,9 +73,6 @@ protected:
     // The label column's lights for notes arriving on the MIDI input.
     virtual LiveNoteLights& labelsLiveNotes() = 0;
 
-    // Instrument of the currently selected track's pattern (0 if none).
-    int currentInstrumentId() const;
-
     // ── Recording ────────────────────────────────────────────────────────────
     bool recArmed_ = false;
     // One undo entry for a whole take rather than one per note: UndoGroup keeps
@@ -257,6 +254,10 @@ public:
     // Always sent through to the instrument; recorded into the pattern's lane of
     // that type when armed and rolling.
     void midiParam(const std::string& type, int value);
+    // Instrument of the currently selected track's pattern (0 if none). Public
+    // because the MIDI input routes unbound controls to the same instrument this
+    // editor would sound, without going through the editor itself.
+    int currentInstrumentId() const;
     // Releases everything still sounding and closes the open take, committing any
     // held notes with the length they reached. Called when the editor stops being
     // the MIDI target and when the transport stops.

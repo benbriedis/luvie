@@ -272,6 +272,11 @@ int main(int argc, char **argv) {
         updateJackWanted();
         updateAlerts();
     };
+    // Whichever backend is open, its events are queued lock-free on a thread we do
+    // not own and drained here, on the FLTK main thread. Set once, unconditionally:
+    // the RtMidi backend has a thread of its own and needs this whether or not a
+    // JACK server ever appears, so it cannot live in activateJack() below.
+    app.midiIn.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
     app.onRecordArmChanged = [&]() { updateAlerts(); };
 
     // Reconcile the Port set with the overlay, then refresh JACK want/warning state
@@ -409,9 +414,7 @@ int main(int argc, char **argv) {
         // observer to drop back to polling. onShutdown fires from a JACK-internal
         // thread, so marshal it to the FLTK main thread via Fl::awake.
         jackTransport.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
-        // Same marshalling for MIDI input: the events are queued lock-free on the
-        // JACK (or RtMidi) thread and drained here, on the FLTK main thread.
-        app.midiIn.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
+        // app.midiIn.awakeFn is deliberately not set here — see syncMidiInput above.
         jackTransport.onShutdown = [&]() {
             jackUp = false;
             jackObserver.serverLost();

@@ -45,6 +45,13 @@ public:
     // ccForType(); otherwise a CC with value 0-127.
     void param(int instrumentId, int ccNumber, int value);
 
+    // A message from the MIDI input forwarded verbatim to the instrument's port,
+    // with only its channel rewritten to the route's. This is what controls Luvie
+    // has no binding for take: unlike param(), the CC number is not remapped
+    // through ccForType(), so the synth sees what the controller actually sent and
+    // its own MIDI learn can bind it. len is 1..3.
+    void passThrough(int instrumentId, const uint8_t* msg, int len);
+
 private:
     struct Pending { NoteAuditioner* self; std::string portName; int channel; int pitch; };
     static void offCb(void* data);

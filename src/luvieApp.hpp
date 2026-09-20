@@ -190,6 +190,10 @@ public:
     // Call after anything that can change which editor is visible — a tab switch,
     // or a selection change that swaps one pattern editor for another.
     void updateMidiTarget();
+    // The instrument incoming MIDI sounds on: the visible pattern editor's, or the
+    // selected track's when the Song or Loop tab is showing, so a control behaves
+    // the same from every tab. -1 when there is neither.
+    int midiInInstrument() const;
     // Releases held notes and closes any open take. Called when the transport
     // stops, so a key held across the stop does not hang or keep recording.
     void stopMidiRecording();

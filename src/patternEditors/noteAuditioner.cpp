@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "noteAuditioner.hpp"
+#include "luvieDebug.hpp"
 #include "port.hpp"
 #include "portRegistry.hpp"
 #include <FL/Fl.H>
 #include <algorithm>
+#include <cstdio>
 
 void NoteAuditioner::sendNote(const std::string& portName, int ch, int midi, int velocity, bool on)
 {
@@ -110,6 +112,42 @@ void NoteAuditioner::param(int instrumentId, int ccNumber, int value)
     if (!port) return;
     if (ccNumber < 0) port->pitchBend(ch, std::clamp(value, 0, 16383));
     else              port->cc(ch, ccNumber, std::clamp(value, 0, 127));
+}
+
+void NoteAuditioner::passThrough(int instrumentId, const uint8_t* msg, int len)
+{
+    if (!instrRoute || len < 1 || len > 3) {
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] passthru: dropped (%s)\n",
+                    instrRoute ? "bad length" : "no instrument routing");
+        return;
+    }
+    MidiInstrRoute r = instrRoute(instrumentId);
+
+    uint8_t m[3] = {};
+    for (int i = 0; i < len; i++) m[i] = msg[i];
+    // The status byte's channel is the one thing that is not passed through: the
+    // controller's channel is whatever it happens to be set to, and the instrument's
+    // is where this has to land, exactly as param() and sendNote() do.
+    m[0] = static_cast<uint8_t>((msg[0] & 0xF0) | (r.channel0 & 0x0F));
+
+    if (luvieDebug())
+        fprintf(stderr, "[luvie] passthru: %02X %02X %02X -> instrument %d, "
+                        "port \"%s\" ch %d (%s)\n",
+                m[0], len > 1 ? m[1] : 0, len > 2 ? m[2] : 0, instrumentId,
+                r.portName.c_str(), r.channel0 + 1,
+                midiSink ? "plugin sink" : "port registry");
+
+    if (midiSink) { midiSink(r.portName, m, len); return; }
+    if (!portReg || r.portName.empty()) return;
+    Port* port = portReg->find(r.portName);
+    if (!port) {
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] passthru: no open port named \"%s\"\n",
+                    r.portName.c_str());
+        return;
+    }
+    port->raw(m, len);
 }
 
 void NoteAuditioner::offCb(void* data)

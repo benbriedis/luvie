@@ -128,6 +128,16 @@ void LuvieApp::updateMidiTarget()
     midiTarget = next;
 }
 
+int LuvieApp::midiInInstrument() const
+{
+    if (midiTarget) return midiTarget->currentInstrumentId();
+    if (!song_) return -1;
+    const auto& tl  = song_->get();
+    const int   sel = tl.selectedTrackIndex;
+    if (sel < 0 || sel >= (int)tl.tracks.size()) return -1;
+    return tl.tracks[sel].instrumentId;
+}
+
 void LuvieApp::stopMidiRecording()
 {
     if (midiTarget) midiTarget->releaseMidiNotes();
@@ -596,8 +606,10 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     // ---- MIDI input ----
     // Everything arriving on the input lands here, on the UI thread, already
-    // filtered to the configured channel. It goes to whichever pattern editor is
-    // showing; with none showing (Song or Loop tab) it is simply dropped.
+    // filtered to the configured channel. Notes go to whichever pattern editor is
+    // showing, and are dropped when none is (the Song or Loop tab). Controllers are
+    // never dropped: bound to a param lane they drive it, and unbound they are
+    // forwarded to the instrument untouched, so the synth can learn them itself.
     midiIn.setSink([this](const uint8_t* data, int len) {
         // Recompute first. Every path that changes the visible editor is supposed
         // to call this, but a missed one would silently swallow MIDI rather than
@@ -612,20 +624,37 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
         // Controllers: MIDI learn decides what they are. Checked before the target,
         // because learning and the labels' live values work from any tab.
-        if (status == 0xB0 || status == 0xD0 || status == 0xE0) {
+        const bool learnable = status == 0xB0 || status == 0xD0 || status == 0xE0;
+        if (learnable) {
             std::string type;
             int         value = 0;
-            if (!midiLearn.handle(data, len, type, value)) return;
-            if (midiTarget) {
-                midiTarget->midiParam(type, value);
-            } else if (song_) {
-                // No pattern editor showing: still heard, on the selected track's
-                // instrument, so the control behaves the same from the Song tab.
-                const auto& tl  = song_->get();
-                const int   sel = tl.selectedTrackIndex;
-                if (sel >= 0 && sel < (int)tl.tracks.size())
-                    auditioner.param(tl.tracks[sel].instrumentId, ccForType(type), value);
+            if (midiLearn.handle(data, len, type, value)) {
+                if (midiTarget) {
+                    midiTarget->midiParam(type, value);
+                } else {
+                    // No pattern editor showing: still heard, on the selected track's
+                    // instrument, so the control behaves the same from the Song tab.
+                    const int instr = midiInInstrument();
+                    if (instr >= 0) auditioner.param(instr, ccForType(type), value);
+                }
+                return;
             }
+        }
+        // Anything Luvie has no meaning for is passed to the instrument rather than
+        // dropped: an unbound controller, and program change and poly aftertouch,
+        // which have never had a lane here. Nothing records these and nothing
+        // replays them, so unlike a note there is no live echo to suppress. The CC
+        // number survives too — param() above remaps it through ccForType() — so
+        // the synth sees what the controller sent and its MIDI learn can bind it.
+        if (learnable || status == 0xA0 || status == 0xC0) {
+            const int instr = midiInInstrument();
+            if (instr < 0) {
+                if (luvieDebug())
+                    fprintf(stderr, "[luvie] passthru: no instrument (no editor "
+                                    "showing and no track selected)\n");
+                return;
+            }
+            auditioner.passThrough(instr, data, len);
             return;
         }
         if (!midiTarget) return;

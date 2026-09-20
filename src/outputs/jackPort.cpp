@@ -57,3 +57,11 @@ void JackPort::programChange(int ch, int bankMsb, int bankLsb, int program)
 {
     if (jack_) jack_->sendProgramChange(name_, ch, bankMsb, bankLsb, program);
 }
+
+void JackPort::raw(const uint8_t* msg, int len)
+{
+    // Queued for the next RT cycle like any other one-shot. A program change goes
+    // straight out rather than through sendProgramChange(): pass-through is not the
+    // place to synthesise the bank-select pair the instrument settings send.
+    if (jack_ && len > 0) jack_->enqueue(name_, msg, len);
+}

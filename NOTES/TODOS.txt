@@ -453,4 +453,10 @@ Manual:
    Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
    + Alt-click-sweep slice selection and copying
 
+cf Option of disabling MIDI through Luvie? Or even removing it entirely when recording. 
+     Useful for setting things up though it think...
 
+USE IN CARLA - re parameters etc...	 
+  click Luvie's Edit button (wrench), go to the Edit tab → Settings group, and tick "Send Control Changes". While
+  you're there, tick Send Channel Pressure, Send Pitchbend and Send Program Changes too — the pass-through I added handles all of them,
+  but Carla withholds each one independently.  + there's one or two other checkboxes...

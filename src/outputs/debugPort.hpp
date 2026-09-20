@@ -22,4 +22,5 @@ public:
     void cc     (int ch, int num, int val)   override;
     void pitchBend(int ch, int value14)      override;
     void programChange(int ch, int bankMsb, int bankLsb, int program) override;
+    void raw(const uint8_t* msg, int len)    override;
 };

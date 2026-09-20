@@ -182,6 +182,11 @@ int main(int argc, char** argv) {
     // --midi-in: pitch played into the plugin on cycle 1. It arrives on control_in,
     // which is where a host puts the performer's keyboard (see luvie_dsp.ttl).
     int      midiInNote    = -1;
+    // --midi-in-raw: up to three hex bytes ("B0 4A 40") sent on cycle 1 instead of a
+    // note. The relay is supposed to be message-agnostic, so a controller has to be
+    // testable here and not only a key.
+    uint8_t  midiInRaw[3]  = {};
+    int      midiInRawLen  = 0;
     bool     restate       = false;
     bool     songLoop      = false;
     float    songLoopStart = 0.0f, songLoopEnd = 0.0f;
@@ -196,6 +201,10 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--restate")) restate = true;
         else if (!strcmp(argv[i], "--cycles") && i + 1 < argc) cycles = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--midi-in") && i + 1 < argc) midiInNote = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--midi-in-raw")) {
+            while (midiInRawLen < 3 && i + 1 < argc && argv[i + 1][0] != '-')
+                midiInRaw[midiInRawLen++] = (uint8_t)strtol(argv[++i], nullptr, 16);
+        }
         else if (!strcmp(argv[i], "--nframes") && i + 1 < argc) ++i;   // read above
         else if (!strcmp(argv[i], "--song-loop") && i + 2 < argc) {
             songLoopStart = (float)atof(argv[++i]);
@@ -306,7 +315,11 @@ int main(int argc, char** argv) {
             lv2_atom_forge_float(&forge, 1.0f);
             lv2_atom_forge_pop(&forge, &objF);
         }
-        if (midiInNote >= 0 && c == 1) {
+        if (midiInRawLen > 0 && c == 1) {
+            lv2_atom_forge_frame_time(&forge, 0);
+            lv2_atom_forge_atom(&forge, (uint32_t)midiInRawLen, uMidi);
+            lv2_atom_forge_write(&forge, midiInRaw, (uint32_t)midiInRawLen);
+        } else if (midiInNote >= 0 && c == 1) {
             const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
             lv2_atom_forge_frame_time(&forge, 0);
             lv2_atom_forge_atom(&forge, 3, uMidi);
@@ -390,7 +403,7 @@ int main(int argc, char** argv) {
     }
 
     printf("TOTAL MIDI events emitted: %d\n", totalEmitted);
-    if (midiInNote >= 0)
+    if (midiInNote >= 0 || midiInRawLen > 0)
         printf("TOTAL MIDI-IN atoms relayed to the UI: %d\n", totalMidiInRelayed);
     printf("Reset All Controllers / All Notes Off messages: %d\n", totalResets);
     for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)

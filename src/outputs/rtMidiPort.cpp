@@ -51,6 +51,15 @@ void RtMidiPort::pitchBend(int ch, int value14)
     send3(0xE0 | (ch & 0x0F), v & 0x7F, (v >> 7) & 0x7F);
 }
 
+void RtMidiPort::raw(const uint8_t* msg, int len)
+{
+    // Sent as given, unlike programChange() above, which also emits bank select:
+    // pass-through forwards what arrived and nothing more.
+    if (!out_ || len <= 0) return;
+    try { out_->sendMessage(msg, (size_t)len); }
+    catch (const RtMidiError&) {}
+}
+
 void RtMidiPort::programChange(int ch, int bankMsb, int bankLsb, int program)
 {
     if (bankMsb >= 0) cc(ch, 0,  bankMsb);
