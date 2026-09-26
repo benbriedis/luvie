@@ -138,6 +138,19 @@ int LuvieApp::midiInInstrument() const
     return tl.tracks[sel].instrumentId;
 }
 
+bool LuvieApp::midiInAccepted(int slot, uint8_t status) const
+{
+    if (!outputsOverlay) return true;
+    std::string inputName;
+    int         channel = 0;
+    if (!outputsOverlay->instrumentInput(midiInInstrument(), inputName, channel))
+        return true;
+    if (midiIn.slotForName(inputName) != slot) return false;
+    if (channel == 0) return true;                       // "Any"
+    if (status < 0x80 || status >= 0xF0) return true;    // not a channel message
+    return (status & 0x0F) == channel - 1;
+}
+
 void LuvieApp::stopMidiRecording()
 {
     if (midiTarget) midiTarget->releaseMidiNotes();
@@ -642,20 +655,24 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     pianorollEd->setAuditioner(&auditioner);
 
     // ---- MIDI input ----
-    // Everything arriving on the input lands here, on the UI thread, already
-    // filtered to the configured channel. Notes go to whichever pattern editor is
+    // Everything arriving on any input lands here, on the UI thread, and anything
+    // not from where the current instrument is played from is dropped straight
+    // away — notes, controllers and MIDI learn alike. Notes go to whichever pattern editor is
     // showing, and are dropped when none is (the Song or Loop tab). Controllers are
     // never dropped: bound to a param lane they drive it, and unbound they are
     // forwarded to the instrument untouched, so the synth can learn them itself.
-    midiIn.setSink([this](const uint8_t* data, int len) {
+    midiIn.setSink([this](int slot, const uint8_t* data, int len) {
         // Recompute first. Every path that changes the visible editor is supposed
         // to call this, but a missed one would silently swallow MIDI rather than
         // fail visibly, so the cheap pointer compare is worth doing here too.
         updateMidiTarget();
+        const bool accepted = midiInAccepted(slot, data[0]);
         if (luvieDebug())
-            fprintf(stderr, "[luvie] midi in: %02X %02X%s target=%s\n",
+            fprintf(stderr, "[luvie] midi in %d: %02X %02X%s target=%s%s\n", slot,
                     data[0], len > 1 ? data[1] : 0,
-                    len > 2 ? " .." : "", midiTarget ? "yes" : "NONE");
+                    len > 2 ? " .." : "", midiTarget ? "yes" : "NONE",
+                    accepted ? "" : " (not this instrument's input)");
+        if (!accepted) return;
         if (len < 2) return;
         const int status = data[0] & 0xF0;
 

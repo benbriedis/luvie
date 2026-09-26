@@ -47,3 +47,30 @@ inline int pluginPortIndex(const std::vector<JackOutput>& outs, const std::strin
     }
     return 0;   // unmapped port (or unknown name): the original single output
 }
+
+/*
+ * The same scheme for input. The plugin declares kMaxPluginInputs MIDI inputs:
+ * input 0 is control_in (the one every host feeds — see luvie_dsp.ttl), the rest
+ * are midi_in_2..N, appended after the outputs. The Nth input whose backend is
+ * Plugin listens on LV2 input N; overflow shares the last.
+ */
+inline constexpr int kMaxPluginInputs = 4;
+
+// Must match the lv2:name of the extra inputs in luvie_dsp.ttl.
+inline std::string pluginInputName(int idx)
+{
+    return "MIDI In " + std::to_string(idx + 1);
+}
+
+// LV2 MIDI input index (0-based) for input `name`; -1 if it is not a Plugin input.
+inline int pluginInputIndex(const std::vector<MidiInputPort>& ins, const std::string& name)
+{
+    int idx = 0;
+    for (const auto& in : ins) {
+        if (in.backend != MidiBackend::Plugin) continue;
+        if (in.name == name)
+            return idx < kMaxPluginInputs ? idx : kMaxPluginInputs - 1;
+        idx++;
+    }
+    return -1;
+}

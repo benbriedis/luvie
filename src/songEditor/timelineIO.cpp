@@ -336,8 +336,12 @@ std::string appStateToJsonString(const AppState& state) {
                            {"isDrum", c.isDrum}, {"fallbackNoteNames", c.fallbackNoteNames},
                            {"programNumber", c.programNumber},
                            {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
-                           {"gm1Instrument", c.gm1Instrument}});
+                           {"gm1Instrument", c.gm1Instrument},
+                           {"inputName", c.inputName}, {"inputChannel", c.inputChannel}});
     }
+    json jins = json::array();
+    for (const auto& in : state.midiInputs)
+        jins.push_back({{"name", in.name}, {"backend", backendToString(in.backend)}});
     json jlearn = json::object();
     for (const auto& [type, src] : state.midiLearn) {
         switch (src.kind) {
@@ -353,8 +357,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"defaultPortBackend", backendToString(state.defaultPortBackend)},
         {"timeline",        timelineToJson(state.timeline)},
         {"jackOutputs",     jconns},
-        {"midiInput",       {{"backend", backendToString(state.midiInput.backend)},
-                             {"channel", state.midiInput.channel}}},
+        {"midiInputs",      jins},
         {"midiLearn",       jlearn},
         {"jackInstruments", jinstrs},
         {"loopMode",           state.loopMode},
@@ -408,12 +411,23 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     for (const auto& jc : j.value("jackOutputs", json::array()))
         state.jackOutputs.push_back({jc.value("portName", ""),
                                      backendFromString(jc.value("backend", "jack"))});
-    // Absent in projects saved before Luvie had a MIDI input: they load with the
-    // defaults (Jack, any channel), which is what those sessions ran as anyway.
-    if (j.contains("midiInput")) {
-        const auto& mi = j.at("midiInput");
-        state.midiInput.backend = backendFromString(mi.value("backend", "jack"));
-        state.midiInput.channel = mi.value("channel", 0);
+    for (const auto& ji : j.value("midiInputs", json::array())) {
+        const std::string name = ji.value("name", "");
+        if (!name.empty())
+            state.midiInputs.push_back({name, backendFromString(ji.value("backend", "jack"))});
+    }
+    // A project saved when Luvie had a single MIDI input carries "midiInput"
+    // instead (and one saved before that, nothing): it becomes that one input,
+    // and every instrument listens to it on the channel it used to filter to.
+    int legacyChannel = 0;
+    if (state.midiInputs.empty()) {
+        MidiBackend backend = MidiBackend::Jack;
+        if (j.contains("midiInput")) {
+            const auto& mi = j.at("midiInput");
+            backend       = backendFromString(mi.value("backend", "jack"));
+            legacyChannel = std::clamp(mi.value("channel", 0), 0, 16);
+        }
+        state.midiInputs.push_back({kDefaultMidiInputName, backend});
     }
     // Absent in projects saved before MIDI learn: they keep the defaults AppState
     // starts with. Present but empty means the user cleared them all, so it is
@@ -447,6 +461,8 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         ch.bankMsb           = jc.value("bankMsb",           -1);
         ch.bankLsb           = jc.value("bankLsb",           -1);
         ch.gm1Instrument     = jc.value("gm1Instrument",     -1);
+        ch.inputName         = jc.value("inputName", state.midiInputs[0].name);
+        ch.inputChannel      = std::clamp(jc.value("inputChannel", legacyChannel), 0, 16);
         state.jackInstruments.push_back(std::move(ch));
     }
     return true;

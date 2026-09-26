@@ -8,6 +8,7 @@
 #include "modernButton.hpp"
 #include "modernChoice.hpp"
 #include "gridScrollPane.hpp"
+#include "collapsiblePane.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Input.H>
@@ -18,7 +19,6 @@
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 static constexpr int headerH  = OverlayWindow::headerH;
-static constexpr int titlePad = OverlayWindow::titlePad;
 static constexpr int colH     = 22;
 static constexpr int defaultTypeRowH = 34;  // "Default port type" row height
 static constexpr int defaultLabelW   = 110; // label preceding the default-type dropdown
@@ -32,13 +32,20 @@ static constexpr int delBtnSz = 26;
 static constexpr int backendW = 90;   // per-port Jack/Native/Debug dropdown
 static constexpr int backendGap = 8;
 
-static constexpr int chanSecH    = 44;
 static constexpr int chanColH2   = 22;
 static constexpr int chanGap     = 6;
 static constexpr int chanMidiW   = 70;
 static constexpr int typeLabelW  = 62;
 
 static constexpr int progRowH          = 28;
+// The sub-rows under an instrument's name. "MIDI input" and "MIDI output" are
+// indented a little from the type label, and the rest of the output settings
+// (bank, program, the drum map) a little further again, so they read as
+// belonging to "MIDI output" without being pushed out past it.
+static constexpr int subRowX           = pad + 40;        // "MIDI input" / "MIDI output"
+static constexpr int subChildX         = subRowX + 44;    // bank, program, drum map
+static constexpr int subLabelW         = 76;
+static constexpr int subPortW          = 220;   // input / output port dropdowns
 static constexpr int progBtnH          = 20;
 
 static constexpr int drumRowH          = 32;
@@ -53,10 +60,6 @@ static constexpr int drumFallbackChoiceW = 90;
 static constexpr int drumBtnGap        = 8;
 static constexpr int scrollbarW        = OverlayWindow::scrollbarW;
 
-// MIDI Input section: a heading strip then one row of two dropdowns.
-static constexpr int midiInSecH     = 44;   // heading strip, as chanSecH is for Instruments
-static constexpr int midiInTypeW    = 90;   // matches backendW, so the columns line up
-static constexpr int midiInChanW    = 90;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
@@ -200,13 +203,52 @@ static void fillInputChanChoice(ModernChoice* c)
         c->add(std::to_string(i).c_str());
 }
 
+static void styleChoice(ModernChoice* c)
+{
+    c->color(inputBgCol);
+    c->labelcolor(textCol);
+    c->textsize(12);
+    c->setBorderColor(borderCol);
+    c->setArrowColor(subTextCol);
+    c->setHoverColor(0xF3F4F600);
+}
+
+static ModernButton* makeDeleteBtn(int x, int y)
+{
+    auto* del = new ModernButton(x, y, delBtnSz, delBtnSz, "\xc3\x97");
+    del->labelsize(14);
+    del->labelcolor(delRedCol);
+    del->color(bgCol);
+    del->setBorderWidth(0);
+    return del;
+}
+
 OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
     : OverlayWindow(x, y, w, h, "Instruments and I/O"),
       pluginMode_(pluginMode),
       defaultBackend_(defaultBackendFor(pluginMode))
 {
     begin();
+    auto makePane = [this](const char* title) {
+        // Inset by the border, so the panes' backgrounds leave it showing.
+        auto* p = new CollapsiblePane(1, headerH, this->w() - scrollbarW - 1, title);
+        p->setColors(bgCol, textCol, subTextCol, dividerCol);
+        p->setExpanded(false);   // everything starts folded away
+        p->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<OutputsOverlay*>(d);
+            self->relayoutPanes();
+            self->redraw();
+        }, this);
+        return p;
+    };
+    // Inputs first: they are what most sessions start by setting up.
+    inPane_    = makePane("MIDI Input Ports");
+    portsPane_ = makePane("MIDI Output Ports");
+    instrPane_ = makePane("Instruments");
+    end();
+    buildPaneBodies();
 
+    portsPane_->begin();
     auto* dtc = new ModernChoice(0, 0, backendW, inputH);
     dtc->color(inputBgCol);
     dtc->labelcolor(textCol);
@@ -233,6 +275,9 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
         if (self->onPortAdded) self->onPortAdded(name);
     }, this);
 
+    portsPane_->end();
+
+    instrPane_->begin();
     addInstrBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Instrument");
     addInstrBtn->labelsize(12);
     addInstrBtn->labelcolor(textCol);
@@ -246,6 +291,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
         const std::string name = self->nextDefaultInstrName(false);
         int id = self->instrObs_ ? self->instrObs_->add(name, false) : 0;
         self->instruments_.push_back({id, name, portName, 1, {}, false});
+        self->instruments_.back().inputName = self->inputs_[0].name;
         self->rebuildInstrumentRows();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
@@ -263,41 +309,35 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
         const std::string name = self->nextDefaultInstrName(true);
         int id = self->instrObs_ ? self->instrObs_->add(name, true) : 0;
         self->instruments_.push_back({id, name, portName, 10, {}, true});
+        self->instruments_.back().inputName = self->inputs_[0].name;
         self->rebuildInstrumentRows();
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
     }, this);
 
-    // ── MIDI Input ────────────────────────────────────────────────────────────
-    // Built once: there is exactly one input, so this row never rebuilds.
-    midiInBackend_ = defaultBackendFor(pluginMode_);
+    instrPane_->end();
 
-    auto styleChoice = [this](ModernChoice* c) {
-        c->color(inputBgCol);
-        c->labelcolor(textCol);
-        c->textsize(12);
-        c->setBorderColor(borderCol);
-        c->setArrowColor(subTextCol);
-        c->setHoverColor(0xF3F4F600);
-    };
+    inPane_->begin();
+    addInputBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Input");
+    addInputBtn->labelsize(12);
+    addInputBtn->labelcolor(textCol);
+    addInputBtn->color(addBtnBg);
+    addInputBtn->setBorderWidth(1);
+    addInputBtn->setBorderColor(borderCol);
+    addInputBtn->callback([](Fl_Widget*, void* d) {
+        auto* self = static_cast<OutputsOverlay*>(d);
+        if ((int)self->inputs_.size() >= kMaxMidiInputs) return;
+        self->syncFromInputs();
+        self->inputs_.push_back({self->uniqueInputName(kDefaultMidiInputName),
+                                 defaultBackendFor(self->pluginMode_)});
+        self->rebuildInputRows();
+        if (self->onMidiInputsChanged) self->onMidiInputsChanged();
+    }, this);
 
-    auto* mit = new ModernChoice(0, 0, midiInTypeW, inputH);
-    styleChoice(mit);
-    fillInputTypeChoice(mit, pluginMode_);
-    mit->value(std::max(0, inputBackendToIndex(midiInBackend_)));
-    mit->callback(midiInTypeCb, this);
-    midiInTypeChoice = mit;
-
-    auto* mic = new ModernChoice(0, 0, midiInChanW, inputH);
-    styleChoice(mic);
-    fillInputChanChoice(mic);
-    mic->value(midiInChannel_);
-    mic->callback(midiInChanCb, this);
-    midiInChanChoice = mic;
-
-    end();
+    inPane_->end();
 
     addDefaultOutputs();
-    rebuildRows();
+    inputs_ = { {kDefaultMidiInputName, defaultBackendFor(pluginMode_)} };
+    rebuildAll();
     hide();
 }
 
@@ -350,7 +390,7 @@ void OutputsOverlay::hide() {
 }
 
 void OutputsOverlay::onResized() {
-    rebuildRows();
+    rebuildAll();
 }
 
 void OutputsOverlay::setOutputs(const std::vector<std::string>& portNames) {
@@ -372,19 +412,24 @@ void OutputsOverlay::setOutputs(const std::vector<JackOutput>& ports) {
 }
 
 // Loading a project. Like setDefaultBackend(), a stored type this mode cannot
-// drive falls back to the one it can, so the input is never left dead — but the
-// greyed item stays in the list so it is clear what the project asked for.
-void OutputsOverlay::setMidiInput(const MidiInput& in) {
-    midiInBackend_ = backendSupported(in.backend, pluginMode_)
-                       ? in.backend : defaultBackendFor(pluginMode_);
-    midiInChannel_ = (in.channel >= 0 && in.channel <= 16) ? in.channel : 0;
-    if (midiInTypeChoice)
-        midiInTypeChoice->value(std::max(0, inputBackendToIndex(midiInBackend_)));
-    if (midiInChanChoice) midiInChanChoice->value(midiInChannel_);
+// drive falls back to the one it can, so no input is left dead — but the greyed
+// item stays in the list so it is clear what such an input could be.
+void OutputsOverlay::setMidiInputs(const std::vector<MidiInputPort>& ins) {
+    inputs_.clear();
+    for (const auto& in : ins) {
+        if (in.name.empty() || (int)inputs_.size() >= kMaxMidiInputs) continue;
+        inputs_.push_back({in.name, backendSupported(in.backend, pluginMode_)
+                                        ? in.backend : defaultBackendFor(pluginMode_)});
+    }
+    if (inputs_.empty())
+        inputs_.push_back({kDefaultMidiInputName, defaultBackendFor(pluginMode_)});
+    rebuildInputRows();
 }
 
-MidiInput OutputsOverlay::getMidiInput() const {
-    return { midiInBackend_, midiInChannel_ };
+void OutputsOverlay::setAllInputBackends(MidiBackend b) {
+    syncFromInputs();
+    for (auto& in : inputs_) in.backend = b;
+    rebuildInputRows();
 }
 
 std::vector<std::string> OutputsOverlay::getOutputs() const {
@@ -413,8 +458,7 @@ void OutputsOverlay::setDefaultBackend(MidiBackend backend) {
 void OutputsOverlay::setJackWarning(bool show) {
     if (jackWarning_ == show) return;
     jackWarning_ = show;
-    rebuildRows();  // warning toggling shifts the default-type row + ports down/up
-    redraw();
+    updateSummaries();
 }
 
 void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
@@ -422,7 +466,9 @@ void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
     for (const auto& ci : instrs)
         instruments_.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                 ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
-                                ci.gm1Instrument});
+                                ci.gm1Instrument,
+                                ci.inputName.empty() ? inputs_[0].name : ci.inputName,
+                                std::clamp(ci.inputChannel, 0, 16)});
     rebuildInstrumentRows();
 }
 
@@ -436,8 +482,19 @@ std::vector<OutputsOverlay::InstrumentInfo> OutputsOverlay::getInstruments() con
     for (const auto& instr : instruments_)
         result.push_back({instr.id, instr.name, instr.portName, instr.midiChannel, instr.drumMap,
                           instr.isDrum, instr.fallbackNoteNames, instr.programNumber, instr.bankMsb, instr.bankLsb,
-                          instr.gm1Instrument});
+                          instr.gm1Instrument, instr.inputName, instr.inputChannel});
     return result;
+}
+
+bool OutputsOverlay::instrumentInput(int instrId, std::string& inputName, int& channel) const
+{
+    for (const auto& instr : instruments_) {
+        if (instr.id != instrId) continue;
+        inputName = instr.inputName;
+        channel   = instr.inputChannel;
+        return true;
+    }
+    return false;
 }
 
 void OutputsOverlay::updateInstrumentDrumMap(int instrId, int midiNote, const std::string& label)
@@ -464,9 +521,7 @@ void OutputsOverlay::addDefaultOutputs() {
 // "inst1", "inst2", ... — the lowest number not already taken by a port.
 std::string OutputsOverlay::nextDefaultPortName() const {
     auto inUse = [&](const std::string& name) {
-        for (const auto& o : outputs_)
-            if (o.portName == name) return true;
-        return false;
+        return portOrInputNameTaken(name, -1, -1);
     };
     for (int n = 1; ; n++) {
         std::string name = "inst" + std::to_string(n);
@@ -474,13 +529,32 @@ std::string OutputsOverlay::nextDefaultPortName() const {
     }
 }
 
+bool OutputsOverlay::portOrInputNameTaken(const std::string& name,
+                                          int excludeOut, int excludeIn) const {
+    for (int i = 0; i < (int)outputs_.size(); i++)
+        if (i != excludeOut && outputs_[i].portName == name) return true;
+    for (int i = 0; i < (int)inputs_.size(); i++)
+        if (i != excludeIn && inputs_[i].name == name) return true;
+    return false;
+}
+
+std::string OutputsOverlay::uniqueInputName(const std::string& base, int excludeIdx) const {
+    if (!portOrInputNameTaken(base, -1, excludeIdx)) return base;
+    for (int n = 2; ; n++) {
+        std::string c = base + "_" + std::to_string(n);
+        if (!portOrInputNameTaken(c, -1, excludeIdx)) return c;
+    }
+}
+
+bool OutputsOverlay::inputReferenced(const std::string& name) const {
+    for (const auto& instr : instruments_)
+        if (instr.inputName == name) return true;
+    return false;
+}
+
 std::string OutputsOverlay::uniquePortName(const std::string& base, int excludeIdx) const {
     auto isUnique = [&](const std::string& name) {
-        for (int i = 0; i < (int)outputs_.size(); i++) {
-            if (i == excludeIdx) continue;
-            if (outputs_[i].portName == name) return false;
-        }
-        return true;
+        return !portOrInputNameTaken(name, excludeIdx, -1);
     };
     if (isUnique(base)) return base;
     for (int n = 2; ; n++) {
@@ -528,6 +602,13 @@ std::string OutputsOverlay::nextDefaultInstrName(bool isDrum) const {
     }
 }
 
+std::string OutputsOverlay::displayInputName(int i) const {
+    if (!pluginMode_ || inputs_[i].backend != MidiBackend::Plugin)
+        return inputs_[i].name;
+    const int idx = pluginInputIndex(inputs_, inputs_[i].name);
+    return pluginInputName(idx < 0 ? 0 : idx);
+}
+
 std::string OutputsOverlay::displayPortName(int i) const {
     if (!pluginMode_ || outputs_[i].backend != MidiBackend::Plugin)
         return outputs_[i].portName;
@@ -546,38 +627,113 @@ void OutputsOverlay::syncFromInputs() {
         // so reading it back would overwrite the real name with the LV2 output's.
         if (rows_[i].input && rows_[i].input->active())
             outputs_[i].portName = rows_[i].input->value();
+    // An input's rename has to reach the instruments and the live port, so an
+    // uncommitted edit goes through the same path as Enter would have taken it.
+    for (int i = 0; i < (int)inRows_.size() && i < (int)inputs_.size(); i++) {
+        Fl_Input* in = inRows_[i].input;
+        if (in && in->active() && inRows_[i].committedName != in->value())
+            inputNameCb(in, this);
+    }
 }
 
-int OutputsOverlay::defaultTypeRowY() const {
-    // Sits just under the title, dropping below the JACK warning when it shows.
-    return headerH + (jackWarning_ ? 48 : 30);
+// Removes a row widget from whichever pane holds it and deletes it.
+static void discard(Fl_Widget* w)
+{
+    if (!w) return;
+    if (w->parent()) w->parent()->remove(w);
+    Fl::delete_widget(w);
 }
 
-int OutputsOverlay::portsColY() const {
-    return defaultTypeRowY() + defaultTypeRowH;
+static std::string countOf(int n, const char* one, const char* many)
+{
+    return std::to_string(n) + " " + (n == 1 ? one : many);
 }
 
-int OutputsOverlay::portsRowsTopY() const {
-    return portsColY() + colH;
+void OutputsOverlay::rebuildAll() {
+    rebuildInputRows();
+    rebuildRows();
+    rebuildInstrumentRows();
+}
+
+void OutputsOverlay::updateSummaries() {
+    inPane_->setSummary(countOf((int)inputs_.size(), "input", "inputs"));
+    // The warning goes on the heading, so it is seen with the section folded too.
+    if (jackWarning_) portsPane_->setSummary("JACK server not running", delRedCol);
+    else              portsPane_->setSummary(countOf((int)outputs_.size(), "port", "ports"));
+    instrPane_->setSummary(countOf((int)instruments_.size(), "instrument", "instruments"));
+}
+
+void OutputsOverlay::relayoutPanes() {
+    CollapsiblePane* const panes[] = { inPane_, portsPane_, instrPane_ };
+    // Size the extent first: updateScrollbar() may clamp scrollY_, and the panes
+    // have to be placed with the clamped value.
+    int total = 0;
+    for (auto* p : panes) total += p->h();
+    totalContentH_ = total + addBtnPad;
+    updateScrollbar();
+
+    int y = headerH - scrollY_;
+    for (auto* p : panes) {
+        p->resize(1, y, w() - scrollbarW - 1, p->h());   // carries the body with it
+        y += p->h();
+    }
+    updateSummaries();
+    redraw();
+}
+
+void OutputsOverlay::buildPaneBodies() {
+    auto colHeading = [](const char* text, int x, int y, int w) {
+        fl_font(FL_HELVETICA, 10);
+        fl_color(subTextCol);
+        fl_draw(text, x, y, w, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    };
+    auto rule = [this](int y) {
+        fl_color(dividerCol);
+        fl_line_style(FL_SOLID, 1);
+        fl_line(pad, y, w() - scrollbarW - pad, y);
+        fl_line_style(0);
+    };
+
+    inPane_->drawBody = [=]() {
+        const int top = inPane_->bodyY();
+        colHeading("PORT NAME", pad, top, w() - 2*pad);
+        rule(top + chanColH2);
+    };
+    portsPane_->drawBody = [=]() {
+        const int top = portsPane_->bodyY();
+        fl_font(FL_HELVETICA, 11);
+        fl_color(subTextCol);
+        fl_draw("Default port type", pad, top, defaultLabelW, inputH,
+                FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        colHeading("PORT NAME", pad, top + defaultTypeRowH, w() - 2*pad);
+        rule(top + defaultTypeRowH + colH);
+    };
+    instrPane_->drawBody = [=]() {
+        const int top   = instrPane_->bodyY();
+        const int nameX = pad + typeLabelW + chanGap;
+        colHeading("TYPE", pad,   top, typeLabelW);
+        colHeading("NAME", nameX, top, instrNameW_);
+        rule(top + chanColH2);
+    };
 }
 
 void OutputsOverlay::rebuildRows() {
     for (auto& row : rows_) {
-        if (row.input)         { remove(row.input);         Fl::delete_widget(row.input); }
-        if (row.backendChoice) { remove(row.backendChoice); Fl::delete_widget(row.backendChoice); }
-        if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
+        if (row.input)         discard(row.input);
+        if (row.backendChoice) discard(row.backendChoice);
+        if (row.deleteBtn)     discard(row.deleteBtn);
     }
     rows_.clear();
 
-    defaultTypeChoice->position(pad + defaultLabelW + backendGap,
-                                defaultTypeRowY() - scrollY_);
+    const int top = portsPane_->bodyY();
+    defaultTypeChoice->position(pad + defaultLabelW + backendGap, top);
 
     const int inputW = w() - scrollbarW - 2*pad - delBtnSz - 8 - backendW - backendGap;
-    int y = portsRowsTopY();
+    int y = top + defaultTypeRowH + colH;
 
-    begin();
+    portsPane_->begin();
     for (int i = 0; i < (int)outputs_.size(); i++) {
-        const int iy = y + (rowH - inputH) / 2 - scrollY_;
+        const int iy = y + (rowH - inputH) / 2;
 
         auto* inp = new NameInput(pad, iy, inputW, inputH);
         inp->color(inputBgCol);
@@ -604,7 +760,7 @@ void OutputsOverlay::rebuildRows() {
         be->callback(backendChoiceCb, this);
 
         auto* del = new ModernButton(
-            w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2 - scrollY_,
+            w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2,
             delBtnSz, delBtnSz, "\xc3\x97");
         del->labelsize(14);
         del->labelcolor(delRedCol);
@@ -620,53 +776,59 @@ void OutputsOverlay::rebuildRows() {
         rows_.push_back({inp, be, del, outputs_[i].portName});
         y += rowH;
     }
-    end();
+    portsPane_->end();
 
-    addBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad - scrollY_);
+    addBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad);
     y += addBtnPad + addBtnH + addBtnPad;
 
-    instrSectionTopY_ = y;
-    instrRowsTopY_    = y + chanSecH + chanColH2;
-
-    rebuildInstrumentRows();
+    portsPane_->setBodyHeight(y - top);
+    // The instruments' port dropdowns list these ports, so they follow.
+    rebuildPortChoices();
+    relayoutPanes();
 }
 
 void OutputsOverlay::rebuildInstrumentRows() {
     for (auto& row : instrRows_) {
-        if (row.typeLabel)     { remove(row.typeLabel);     Fl::delete_widget(row.typeLabel); }
-        if (row.nameInput)     { remove(row.nameInput);     Fl::delete_widget(row.nameInput); }
-        if (row.portChoice)    { remove(row.portChoice);    Fl::delete_widget(row.portChoice); }
-        if (row.midiChanChoice){ remove(row.midiChanChoice);Fl::delete_widget(row.midiChanChoice); }
-        if (row.deleteBtn)     { remove(row.deleteBtn);     Fl::delete_widget(row.deleteBtn); }
-        if (row.importBtn)      { remove(row.importBtn);      Fl::delete_widget(row.importBtn); }
-        if (row.gmBtn)          { remove(row.gmBtn);          Fl::delete_widget(row.gmBtn); }
-        if (row.gsBtn)          { remove(row.gsBtn);          Fl::delete_widget(row.gsBtn); }
-        if (row.exportBtn)      { remove(row.exportBtn);      Fl::delete_widget(row.exportBtn); }
-        if (row.clearBtn)       { remove(row.clearBtn);       Fl::delete_widget(row.clearBtn); }
-        if (row.fallbackLabel)   { remove(row.fallbackLabel);   Fl::delete_widget(row.fallbackLabel); }
-        if (row.fallbackChoice)  { remove(row.fallbackChoice);  Fl::delete_widget(row.fallbackChoice); }
-        if (row.programInput)    { remove(row.programInput);    Fl::delete_widget(row.programInput); }
-        if (row.programDropdown) { remove(row.programDropdown); Fl::delete_widget(row.programDropdown); }
-        if (row.bankMsbInput)    { remove(row.bankMsbInput);    Fl::delete_widget(row.bankMsbInput); }
-        if (row.bankLsbInput)    { remove(row.bankLsbInput);    Fl::delete_widget(row.bankLsbInput); }
-        if (row.bankLabel)       { remove(row.bankLabel);       Fl::delete_widget(row.bankLabel); }
-        if (row.msbLabel)        { remove(row.msbLabel);        Fl::delete_widget(row.msbLabel); }
-        if (row.lsbLabel)        { remove(row.lsbLabel);        Fl::delete_widget(row.lsbLabel); }
-        if (row.progLabel)       { remove(row.progLabel);       Fl::delete_widget(row.progLabel); }
-        if (row.gm1Label)        { remove(row.gm1Label);        Fl::delete_widget(row.gm1Label); }
+        if (row.typeLabel)     discard(row.typeLabel);
+        if (row.nameInput)     discard(row.nameInput);
+        if (row.portChoice)    discard(row.portChoice);
+        if (row.midiChanChoice)discard(row.midiChanChoice);
+        if (row.deleteBtn)     discard(row.deleteBtn);
+        if (row.importBtn)      discard(row.importBtn);
+        if (row.gmBtn)          discard(row.gmBtn);
+        if (row.gsBtn)          discard(row.gsBtn);
+        if (row.exportBtn)      discard(row.exportBtn);
+        if (row.clearBtn)       discard(row.clearBtn);
+        if (row.fallbackLabel)   discard(row.fallbackLabel);
+        if (row.fallbackChoice)  discard(row.fallbackChoice);
+        if (row.programInput)    discard(row.programInput);
+        if (row.programDropdown) discard(row.programDropdown);
+        if (row.bankMsbInput)    discard(row.bankMsbInput);
+        if (row.bankLsbInput)    discard(row.bankLsbInput);
+        if (row.bankLabel)       discard(row.bankLabel);
+        if (row.msbLabel)        discard(row.msbLabel);
+        if (row.lsbLabel)        discard(row.lsbLabel);
+        if (row.progLabel)       discard(row.progLabel);
+        if (row.gm1Label)        discard(row.gm1Label);
+        if (row.inputLabel)      discard(row.inputLabel);
+        if (row.inputChoice)     discard(row.inputChoice);
+        if (row.inChanLabel)     discard(row.inChanLabel);
+        if (row.inChanChoice)    discard(row.inChanChoice);
+        if (row.outputLabel)     discard(row.outputLabel);
+        if (row.outChanLabel)    discard(row.outChanLabel);
     }
     instrRows_.clear();
 
-    const int usableW  = w() - scrollbarW - 2*pad - delBtnSz - 8 - 2*chanGap;
-    const int remaining = usableW - chanMidiW - typeLabelW - chanGap;
-    instrNameW_ = remaining * 45 / 100;
-    instrPortW_ = remaining - instrNameW_;
+    // The name has the main row to itself; everything else is on the labelled
+    // sub-rows below it, input settings first, then output.
+    instrNameW_ = w() - scrollbarW - 2*pad - delBtnSz - 8 - typeLabelW - chanGap;
 
-    int y = instrRowsTopY_;
+    const int top = instrPane_->bodyY();
+    int y = top + chanColH2;
 
-    begin();
+    instrPane_->begin();
     for (int i = 0; i < (int)instruments_.size(); i++) {
-        const int iy    = y + (rowH - inputH) / 2 - scrollY_;
+        const int iy    = y + (rowH - inputH) / 2;
         const bool drum = instruments_[i].isDrum;
 
         // Type label
@@ -675,6 +837,9 @@ void OutputsOverlay::rebuildInstrumentRows() {
         typeLbl->box(FL_NO_BOX);
         typeLbl->labelcolor(subTextCol);
         typeLbl->labelsize(10);
+        // Flush with the TYPE heading: centred, a short word like "Drum" would
+        // look indented next to "Standard".
+        typeLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
         const int nameX = pad + typeLabelW + chanGap;
         auto* nameInp = new NameInput(nameX, iy, instrNameW_, inputH);
@@ -684,37 +849,8 @@ void OutputsOverlay::rebuildInstrumentRows() {
         nameInp->value(instruments_[i].name.c_str());
         nameInp->callback(instrNameCb, this);
 
-        const int portX = nameX + instrNameW_ + chanGap;
-        auto* portCh = new ModernChoice(portX, iy, instrPortW_, inputH);
-        portCh->color(inputBgCol);
-        portCh->labelcolor(textCol);
-        portCh->textsize(12);
-        portCh->setBorderColor(borderCol);
-        portCh->setArrowColor(subTextCol);
-        portCh->setHoverColor(0xF3F4F600);
-        int selPort = 0;
-        for (int j = 0; j < (int)outputs_.size(); j++) {
-            portCh->add(outputs_[j].portName.c_str());
-            if (outputs_[j].portName == instruments_[i].portName) selPort = j;
-        }
-        portCh->value(selPort);
-        portCh->callback(portChoiceCb, this);
-
-        const int midiX = portX + instrPortW_ + chanGap;
-        auto* midiCh = new ModernChoice(midiX, iy, chanMidiW, inputH);
-        midiCh->color(inputBgCol);
-        midiCh->labelcolor(textCol);
-        midiCh->textsize(12);
-        midiCh->setBorderColor(borderCol);
-        midiCh->setArrowColor(subTextCol);
-        midiCh->setHoverColor(0xF3F4F600);
-        for (int ch = 1; ch <= 16; ch++)
-            midiCh->add(std::to_string(ch).c_str());
-        midiCh->value(instruments_[i].midiChannel - 1);
-        midiCh->callback(midiChanChoiceCb, this);
-
         auto* del = new ModernButton(
-            w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2 - scrollY_,
+            w() - scrollbarW - pad - delBtnSz, y + (rowH - delBtnSz) / 2,
             delBtnSz, delBtnSz, "\xc3\x97");
         del->labelsize(14);
         del->labelcolor(delRedCol);
@@ -729,7 +865,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
             if (typeCount <= 1 || inUse) del->deactivate();
         }
 
-        // Drum mappings sub-row — only for drum channels
+        // Drum mappings sub-row — only for drum kits, and last, under program
         ModernButton* imp  = nullptr;
         ModernButton* gm   = nullptr;
         ModernButton* gs   = nullptr;
@@ -738,9 +874,9 @@ void OutputsOverlay::rebuildInstrumentRows() {
         Fl_Box*       fbLbl = nullptr;
         Fl_Choice*    fbCh  = nullptr;
         if (drum) {
-            const int drumBtnY = y + rowH + (drumRowH - drumBtnH) / 2 - scrollY_;
+            const int drumBtnY = y + rowH + 4 * progRowH + (drumRowH - drumBtnH) / 2;
 
-            const int drumStartX = pad + typeLabelW + chanGap;
+            const int drumStartX = subChildX;
             imp = new ModernButton(drumStartX, drumBtnY, drumImportW, drumBtnH, "Import drum map");
             imp->labelsize(11);
             imp->labelcolor(textCol);
@@ -807,17 +943,88 @@ void OutputsOverlay::rebuildInstrumentRows() {
             fbCh = fbMc;
         }
 
-        // Bank sub-row — above program row, all channels
-        const int bankSubY = y + rowH + (drum ? drumRowH : 0);
-        const int bankWidY = bankSubY + (progRowH - progBtnH) / 2 - scrollY_;
+        // MIDI input sub-row — where the instrument is played from, all channels
+        const int inSubY = y + rowH;
+        const int inWidY = inSubY + (progRowH - progBtnH) / 2;
 
-        int bx = pad + chanGap;
-        auto* bankLbl = new Fl_Box(bx, bankWidY, 90, progBtnH, "Bank:");
+        int ix = subRowX;
+        auto* inLbl = new Fl_Box(ix, inWidY, subLabelW, progBtnH, "MIDI input");
+        inLbl->box(FL_NO_BOX);
+        inLbl->labelcolor(subTextCol);
+        inLbl->labelsize(11);
+        inLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        ix += subLabelW;
+
+        auto* inCh = new ModernChoice(ix, inWidY, subPortW, progBtnH);
+        styleChoice(inCh);
+        inCh->textsize(11);
+        inCh->callback(instrInputCb, this);   // filled by rebuildInputChoices()
+        ix += subPortW + 12;
+
+        auto* inChanLbl = new Fl_Box(ix, inWidY, 50, progBtnH, "Channel");
+        inChanLbl->box(FL_NO_BOX);
+        inChanLbl->labelcolor(subTextCol);
+        inChanLbl->labelsize(11);
+        inChanLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+        ix += 50 + 4;
+
+        auto* inChanCh = new ModernChoice(ix, inWidY, chanMidiW, progBtnH);
+        styleChoice(inChanCh);
+        inChanCh->textsize(11);
+        fillInputChanChoice(inChanCh);
+        inChanCh->value(instruments_[i].inputChannel);
+        inChanCh->callback(instrInChanCb, this);
+
+        // MIDI output sub-row — where the instrument sends, laid out to match
+        const int outSubY = inSubY + progRowH;
+        const int outWidY = outSubY + (progRowH - progBtnH) / 2;
+
+        int ox = subRowX;
+        auto* outLbl = new Fl_Box(ox, outWidY, subLabelW, progBtnH, "MIDI output");
+        outLbl->box(FL_NO_BOX);
+        outLbl->labelcolor(subTextCol);
+        outLbl->labelsize(11);
+        outLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        ox += subLabelW;
+
+        auto* portCh = new ModernChoice(ox, outWidY, subPortW, progBtnH);
+        styleChoice(portCh);
+        portCh->textsize(11);
+        int selPort = 0;
+        for (int j = 0; j < (int)outputs_.size(); j++) {
+            portCh->add(displayPortName(j).c_str());
+            if (outputs_[j].portName == instruments_[i].portName) selPort = j;
+        }
+        portCh->value(selPort);
+        portCh->callback(portChoiceCb, this);
+        ox += subPortW + 12;
+
+        auto* outChanLbl = new Fl_Box(ox, outWidY, 50, progBtnH, "Channel");
+        outChanLbl->box(FL_NO_BOX);
+        outChanLbl->labelcolor(subTextCol);
+        outChanLbl->labelsize(11);
+        outChanLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+        ox += 50 + 4;
+
+        auto* midiCh = new ModernChoice(ox, outWidY, chanMidiW, progBtnH);
+        styleChoice(midiCh);
+        midiCh->textsize(11);
+        for (int ch = 1; ch <= 16; ch++)
+            midiCh->add(std::to_string(ch).c_str());
+        midiCh->value(instruments_[i].midiChannel - 1);
+        midiCh->callback(midiChanChoiceCb, this);
+
+        // Bank sub-row — above program row, all channels
+        const int bankSubY = outSubY + progRowH;
+        const int bankWidY = bankSubY + (progRowH - progBtnH) / 2;
+
+        int bx = subChildX;
+        auto* bankLbl = new Fl_Box(bx, bankWidY, 40, progBtnH, "Bank:");
         bankLbl->box(FL_NO_BOX);
         bankLbl->labelcolor(subTextCol);
         bankLbl->labelsize(11);
-        bankLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-        bx += 90 + 4;
+        bankLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        bx += 40;
 
         auto* msbLbl = new Fl_Box(bx, bankWidY, 28, progBtnH, "MSB");
         msbLbl->box(FL_NO_BOX);
@@ -852,15 +1059,15 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         // Program / instrument sub-row — all channels
         const int progSubY = bankSubY + progRowH;
-        const int progWidY = progSubY + (progRowH - progBtnH) / 2 - scrollY_;
+        const int progWidY = progSubY + (progRowH - progBtnH) / 2;
 
-        int px = pad + typeLabelW + chanGap;
-        auto* progLbl = new Fl_Box(px, progWidY, 90, progBtnH, "Program number");
+        int px = subChildX;
+        auto* progLbl = new Fl_Box(px, progWidY, 100, progBtnH, "Program number");
         progLbl->box(FL_NO_BOX);
         progLbl->labelcolor(subTextCol);
         progLbl->labelsize(11);
-        progLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-        px += 90 + 4;
+        progLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        px += 100;
 
         auto* progInp = new NameInput(px, progWidY, 40, progBtnH);
         progInp->color(inputBgCol);
@@ -896,58 +1103,106 @@ void OutputsOverlay::rebuildInstrumentRows() {
         instrRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh,
                               progInp, progDrop, msbInp, lsbInp,
                               bankLbl, msbLbl, lsbLbl, progLbl, gm1Lbl,
+                              inLbl, inCh, inChanLbl, inChanCh, outLbl, outChanLbl,
                               instruments_[i].name});
-        y += rowH + (drum ? drumRowH : 0) + 2 * progRowH;
+        y += rowH + 4 * progRowH + (drum ? drumRowH : 0);
     }
-    end();
+    instrPane_->end();
 
-    addInstrBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad - scrollY_);
-    addDrumInstrBtn->position(w() - scrollbarW - pad - 2*addBtnW - chanGap, y + addBtnPad - scrollY_);
+    addInstrBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad);
+    addDrumInstrBtn->position(w() - scrollbarW - pad - 2*addBtnW - chanGap, y + addBtnPad);
 
     y += addBtnPad + addBtnH + addBtnPad;
 
-    // The MIDI Input section sits below everything else, and its bottom is what
-    // the scroll extent has to reach — so lay it out before sizing the content.
-    y = layoutMidiInputRow(y);
+    instrPane_->setBodyHeight(y - top);
+    // Labels the port dropdowns as the port rows show them, and re-checks which
+    // ports are now referenced and so cannot be deleted; likewise the inputs.
+    rebuildPortChoices();
+    rebuildInputChoices();
+    relayoutPanes();
+}
 
-    totalContentH_ = y - headerH;
-    updateScrollbar();
+void OutputsOverlay::rebuildInputRows() {
+    for (auto& row : inRows_) {
+        if (row.input)      discard(row.input);
+        if (row.typeChoice) discard(row.typeChoice);
+        if (row.deleteBtn)  discard(row.deleteBtn);
+    }
+    inRows_.clear();
+
+    const int inputW = w() - scrollbarW - 2*pad - delBtnSz - 8 - backendW - backendGap;
+    const int top = inPane_->bodyY();
+    int y = top + chanColH2;
+
+    inPane_->begin();
+    for (int i = 0; i < (int)inputs_.size(); i++) {
+        const int iy = y + (rowH - inputH) / 2;
+
+        auto* inp = new NameInput(pad, iy, inputW, inputH);
+        inp->color(inputBgCol);
+        inp->textcolor(textCol);
+        inp->textsize(12);
+        inp->value(displayInputName(i).c_str());
+        inp->callback(inputNameCb, this);
+        // As for the ports: hosted, a Plugin input's name is the LV2 input it
+        // listens on, shown rather than entered.
+        if (pluginMode_ && inputs_[i].backend == MidiBackend::Plugin)
+            inp->deactivate();
+
+        auto* tc = new ModernChoice(pad + inputW + backendGap, iy, backendW, inputH);
+        styleChoice(tc);
+        fillInputTypeChoice(tc, pluginMode_);
+        tc->value(std::max(0, inputBackendToIndex(inputs_[i].backend)));
+        tc->callback(inputTypeCb, this);
+
+        auto* del = makeDeleteBtn(w() - scrollbarW - pad - delBtnSz,
+                                  y + (rowH - delBtnSz) / 2);
+        del->callback(inputDeleteCb, this);
+        if (inputReferenced(inputs_[i].name)) del->deactivate();
+
+        inRows_.push_back({inp, tc, del, inputs_[i].name});
+        y += rowH;
+    }
+    inPane_->end();
+
+    addInputBtn->position(w() - scrollbarW - pad - addBtnW, y + addBtnPad);
+    if ((int)inputs_.size() >= kMaxMidiInputs) addInputBtn->deactivate();
+    else                                       addInputBtn->activate();
+    y += addBtnPad + addBtnH + addBtnPad;
+
+    inPane_->setBodyHeight(y - top);
+    // The instruments' input dropdowns list these inputs, so they follow.
+    rebuildInputChoices();
+    relayoutPanes();
+}
+
+void OutputsOverlay::rebuildInputChoices() {
+    for (int i = 0; i < (int)instrRows_.size() && i < (int)instruments_.size(); i++) {
+        auto* ch = instrRows_[i].inputChoice;
+        if (!ch) continue;
+        ch->clear();
+        int sel = 0;
+        for (int j = 0; j < (int)inputs_.size(); j++) {
+            ch->add(displayInputName(j).c_str());
+            if (inputs_[j].name == instruments_[i].inputName) sel = j;
+        }
+        if (!inputs_.empty()) {
+            ch->value(sel);
+            instruments_[i].inputName = inputs_[sel].name;
+        }
+    }
+    for (int i = 0; i < (int)inRows_.size() && i < (int)inputs_.size(); i++) {
+        if (!inRows_[i].deleteBtn) continue;
+        if (inputReferenced(inputs_[i].name)) inRows_[i].deleteBtn->deactivate();
+        else                                  inRows_[i].deleteBtn->activate();
+    }
     redraw();
 }
 
-// One fixed row of two dropdowns under a heading. Returns the Y just past it.
-int OutputsOverlay::layoutMidiInputRow(int y)
-{
-    midiInSectionTopY_ = y;
-    const int rowTop = y + midiInSecH + chanColH2;
-    const int iy     = rowTop + (rowH - inputH) / 2 - scrollY_;
-
-    if (midiInTypeChoice) midiInTypeChoice->position(pad, iy);
-    if (midiInChanChoice)
-        midiInChanChoice->position(pad + midiInTypeW + chanGap, iy);
-
-    return rowTop + rowH + addBtnPad;
-}
-
 void OutputsOverlay::onScroll(int delta) {
-    auto mv = [&](Fl_Widget* wp) { if (wp) wp->position(wp->x(), wp->y() + delta); };
-
-    mv(defaultTypeChoice);
-    for (auto& row : rows_) { mv(row.input); mv(row.backendChoice); mv(row.deleteBtn); }
-    mv(addBtn);
-
-    for (auto& row : instrRows_) {
-        mv(row.typeLabel);      mv(row.nameInput);      mv(row.portChoice);
-        mv(row.midiChanChoice); mv(row.deleteBtn);      mv(row.importBtn);
-        mv(row.gmBtn);          mv(row.gsBtn);           mv(row.exportBtn);
-        mv(row.clearBtn);       mv(row.fallbackLabel);  mv(row.fallbackChoice);
-        mv(row.programInput);   mv(row.programDropdown);
-        mv(row.bankMsbInput);   mv(row.bankLsbInput);
-        mv(row.bankLabel);      mv(row.msbLabel);        mv(row.lsbLabel);
-        mv(row.progLabel);      mv(row.gm1Label);
-    }
-    mv(addInstrBtn); mv(addDrumInstrBtn);
-    mv(midiInTypeChoice); mv(midiInChanChoice);
+    // Each pane carries its own widgets with it.
+    for (auto* p : { inPane_, portsPane_, instrPane_ })
+        p->position(p->x(), p->y() + delta);
 }
 
 void OutputsOverlay::rebuildPortChoices() {
@@ -1024,21 +1279,85 @@ void OutputsOverlay::defaultTypeChoiceCb(Fl_Widget* w, void* d) {
     self->defaultBackend_ = static_cast<MidiBackend>(idx);
 }
 
-void OutputsOverlay::midiInTypeCb(Fl_Widget* w, void* d) {
+// ── Input callbacks ──────────────────────────────────────────────────────────
+
+void OutputsOverlay::inputNameCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<OutputsOverlay*>(d);
-    int idx = static_cast<Fl_Choice*>(w)->value();
-    if (idx < 0) return;
-    // Item index is not the enum value here: Debug is missing from this list.
-    self->midiInBackend_ = inputBackendFromIndex(idx);
-    if (self->onMidiInputChanged) self->onMidiInputChanged();
+    for (int i = 0; i < (int)self->inRows_.size(); i++) {
+        if (w != self->inRows_[i].input) continue;
+        std::string newName = static_cast<Fl_Input*>(w)->value();
+        const std::string oldName = self->inRows_[i].committedName;
+        if (newName.empty()) {
+            static_cast<Fl_Input*>(w)->value(oldName.c_str());
+            return;
+        }
+        if (newName == oldName) return;
+        newName = self->uniqueInputName(newName, i);
+        static_cast<Fl_Input*>(w)->value(newName.c_str());
+        self->inRows_[i].committedName = newName;
+        self->inputs_[i].name = newName;
+        for (auto& instr : self->instruments_)
+            if (instr.inputName == oldName) instr.inputName = newName;
+        if (self->onMidiInputRenamed) self->onMidiInputRenamed(oldName, newName);
+        self->rebuildInputChoices();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
+        return;
+    }
 }
 
-void OutputsOverlay::midiInChanCb(Fl_Widget* w, void* d) {
+void OutputsOverlay::inputTypeCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<OutputsOverlay*>(d);
-    int idx = static_cast<Fl_Choice*>(w)->value();
-    if (idx < 0) return;
-    self->midiInChannel_ = idx;   // item 0 is "Any", items 1-16 are the channel
-    if (self->onMidiInputChanged) self->onMidiInputChanged();
+    for (int i = 0; i < (int)self->inRows_.size(); i++) {
+        if (w != self->inRows_[i].typeChoice) continue;
+        int idx = static_cast<Fl_Choice*>(w)->value();
+        if (idx < 0) return;
+        self->syncFromInputs();
+        // Item index is not the enum value here: Debug is missing from this list.
+        self->inputs_[i].backend = inputBackendFromIndex(idx);
+        // To or from Plugin changes what the input is shown as, here and in the
+        // instruments' dropdowns, so both are rebuilt.
+        self->rebuildInputRows();
+        if (self->onMidiInputsChanged) self->onMidiInputsChanged();
+        return;
+    }
+}
+
+void OutputsOverlay::inputDeleteCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->inRows_.size(); i++) {
+        if (w != self->inRows_[i].deleteBtn) continue;
+        if (self->inputReferenced(self->inputs_[i].name)) return;
+        self->syncFromInputs();
+        self->inputs_.erase(self->inputs_.begin() + i);
+        self->rebuildInputRows();
+        if (self->onMidiInputsChanged) self->onMidiInputsChanged();
+        return;
+    }
+}
+
+void OutputsOverlay::instrInputCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].inputChoice) continue;
+        int idx = static_cast<Fl_Choice*>(w)->value();
+        if (idx >= 0 && idx < (int)self->inputs_.size())
+            self->instruments_[i].inputName = self->inputs_[idx].name;
+        self->rebuildInputChoices();
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
+        return;
+    }
+}
+
+void OutputsOverlay::instrInChanCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].inChanChoice) continue;
+        int idx = static_cast<Fl_Choice*>(w)->value();
+        if (idx < 0) return;
+        self->instruments_[i].inputChannel = idx;   // item 0 is "Any", items 1-16 the channel
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
+        return;
+    }
 }
 
 void OutputsOverlay::deleteCb(Fl_Widget* w, void* d) {
@@ -1266,23 +1585,29 @@ void OutputsOverlay::bankLsbInputCb(Fl_Widget* w, void* d) {
 
 std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
     std::vector<Fl_Widget*> order;
-    if (defaultTypeChoice && defaultTypeChoice->active()) order.push_back(defaultTypeChoice);
-    for (const auto& row : rows_) {
-        if (row.input && row.input->active())         order.push_back(row.input);
-        if (row.backendChoice && row.backendChoice->active()) order.push_back(row.backendChoice);
-        if (row.deleteBtn && row.deleteBtn->active()) order.push_back(row.deleteBtn);
-    }
-    order.push_back(addBtn);
+    auto add = [&](Fl_Widget* w) { if (w && w->visible() && w->active()) order.push_back(w); };
+
+    // Each heading is a stop of its own (Space toggles it); its rows follow only
+    // while it is open, since hidden widgets fail visible().
+    add(inPane_);
+    for (const auto& row : inRows_) { add(row.input); add(row.typeChoice); add(row.deleteBtn); }
+    add(addInputBtn);
+
+    add(portsPane_);
+    add(defaultTypeChoice);
+    for (const auto& row : rows_) { add(row.input); add(row.backendChoice); add(row.deleteBtn); }
+    add(addBtn);
+
+    add(instrPane_);
     for (const auto& row : instrRows_) {
-        if (row.nameInput && row.nameInput->active())       order.push_back(row.nameInput);
-        if (row.portChoice && row.portChoice->active())     order.push_back(row.portChoice);
-        if (row.midiChanChoice && row.midiChanChoice->active()) order.push_back(row.midiChanChoice);
-        if (row.deleteBtn && row.deleteBtn->active())       order.push_back(row.deleteBtn);
+        add(row.nameInput); add(row.deleteBtn);
+        add(row.inputChoice); add(row.inChanChoice);
+        add(row.portChoice);  add(row.midiChanChoice);
     }
-    order.push_back(addInstrBtn);
-    if (midiInTypeChoice && midiInTypeChoice->active()) order.push_back(midiInTypeChoice);
-    if (midiInChanChoice && midiInChanChoice->active()) order.push_back(midiInChanChoice);
-    order.push_back(closeBtn_);
+    add(addDrumInstrBtn);
+    add(addInstrBtn);
+
+    add(closeBtn_);
     return order;
 }
 
@@ -1312,91 +1637,4 @@ int OutputsOverlay::handle(int event) {
         }
     }
     return OverlayWindow::handle(event);
-}
-
-// ── Drawing ───────────────────────────────────────────────────────────────────
-
-void OutputsOverlay::drawStaticContent(int sy, int sbW) {
-    fl_font(FL_HELVETICA_BOLD, 13);
-    fl_color(textCol);
-    fl_draw("MIDI Output Ports", titlePad, headerH + 10 - sy,
-            w() - 2*titlePad, 16, FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
-
-    if (jackWarning_) {
-        fl_font(FL_HELVETICA, 11);
-        fl_color(delRedCol);
-        fl_draw("JACK server not running", titlePad, headerH + 28 - sy,
-                w() - 2*titlePad, 14, FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_INSIDE);
-    }
-
-    fl_font(FL_HELVETICA, 11);
-    fl_color(subTextCol);
-    fl_draw("Default port type", pad, defaultTypeRowY() - sy, defaultLabelW, inputH,
-            FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-    const int colY = portsColY();
-    fl_font(FL_HELVETICA, 10);
-    fl_color(subTextCol);
-    fl_draw("PORT NAME", pad, colY - sy,
-            w() - 2*pad, colH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-    const int rowsTopY = portsRowsTopY();
-    fl_color(dividerCol);
-    fl_line_style(FL_SOLID, 1);
-    fl_line(pad, rowsTopY - sy, w() - sbW - pad, rowsTopY - sy);
-    fl_line_style(0);
-
-    // ── Instrument section ───────────────────────────────────────────────
-    if (instrSectionTopY_ > 0) {
-        fl_color(dividerCol);
-        fl_line_style(FL_SOLID, 1);
-        fl_line(0, instrSectionTopY_ - sy, w() - sbW, instrSectionTopY_ - sy);
-        fl_line_style(0);
-
-        fl_font(FL_HELVETICA_BOLD, 13);
-        fl_color(textCol);
-        fl_draw("Instruments", titlePad, instrSectionTopY_ + 12 - sy,
-                w() - 2*titlePad, chanSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-        const int chanColY = instrRowsTopY_ - chanColH2;
-        const int nameX    = pad + typeLabelW + chanGap;
-        const int portX    = nameX + instrNameW_ + chanGap;
-        const int midiX    = portX + instrPortW_ + chanGap;
-        fl_font(FL_HELVETICA, 10);
-        fl_color(subTextCol);
-        fl_draw("TYPE",             pad,   chanColY - sy, typeLabelW,  chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-        fl_draw("NAME",             nameX, chanColY - sy, instrNameW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-        fl_draw("MIDI OUTPUT PORT", portX, chanColY - sy, instrPortW_, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-        fl_draw("MIDI CH",          midiX, chanColY - sy, chanMidiW,   chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-        fl_color(dividerCol);
-        fl_line_style(FL_SOLID, 1);
-        fl_line(pad, instrRowsTopY_ - sy, w() - sbW - pad, instrRowsTopY_ - sy);
-        fl_line_style(0);
-    }
-
-    // ── MIDI input section ───────────────────────────────────────────────
-    if (midiInSectionTopY_ > 0) {
-        fl_color(dividerCol);
-        fl_line_style(FL_SOLID, 1);
-        fl_line(0, midiInSectionTopY_ - sy, w() - sbW, midiInSectionTopY_ - sy);
-        fl_line_style(0);
-
-        fl_font(FL_HELVETICA_BOLD, 13);
-        fl_color(textCol);
-        fl_draw("MIDI Input", titlePad, midiInSectionTopY_ + 12 - sy,
-                w() - 2*titlePad, midiInSecH - 12, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-        const int colY  = midiInSectionTopY_ + midiInSecH;
-        const int chanX = pad + midiInTypeW + chanGap;
-        fl_font(FL_HELVETICA, 10);
-        fl_color(subTextCol);
-        fl_draw("TYPE",         pad,   colY - sy, midiInTypeW, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-        fl_draw("MIDI CHANNEL", chanX, colY - sy, midiInChanW, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
-
-        fl_color(dividerCol);
-        fl_line_style(FL_SOLID, 1);
-        fl_line(pad, colY + chanColH2 - sy, w() - sbW - pad, colY + chanColH2 - sy);
-        fl_line_style(0);
-    }
 }

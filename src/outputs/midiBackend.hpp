@@ -52,6 +52,11 @@ inline MidiBackend backendFromString(const std::string& s) {
 // so every read and write of the input Fl_Choice must go through the two helpers
 // below rather than casting the index. backendSupported() above still applies
 // unchanged: standalone drives Jack and Native, hosted drives Plugin.
+// The most MIDI inputs a project can have open at once. Fixed so the per-input
+// receive rings, and JACK's table of input ports, are allocated once up front and
+// the RT thread never has to allocate or resize anything to reach them.
+inline constexpr int kMaxMidiInputs = 16;
+
 inline constexpr MidiBackend kInputBackends[] = {
     MidiBackend::Jack, MidiBackend::Native, MidiBackend::Plugin };
 inline constexpr int kNumInputBackends = 3;

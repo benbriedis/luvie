@@ -3,7 +3,12 @@
 [← Getting started](02-basics.md) · [Contents](README.md) · [The song editor →](04-song-editor.md)
 
 The gear icon at the top right of the window opens the **Instruments and I/O**
-dialog, where everything in this chapter is set up:
+dialog, where everything in this chapter is set up. It has three sections: MIDI
+Input Ports, MIDI Output Ports and Instruments. Each starts folded
+away to its heading; click a heading to open or close it. With the keyboard, Tab
+to a heading and press Space. A folded heading still shows how many entries the
+section has, and the MIDI Output Ports heading shows *JACK server not running*
+in red whenever that applies:
 
 <img src="images/settings.png" alt="The Instruments and I/O dialog" width="800">
 
@@ -77,33 +82,52 @@ instance — and for those, none of this needs touching.
 TODO: naming drum instruments and reusing a kit across patterns.
 Cross-reference [The drum pattern editor](08-drum-pattern-editor.md).
 
-## MIDI input
+## MIDI input ports
 
-At the bottom of the window is the MIDI input. There is exactly one, and it has
-two settings:
+The first section holds the MIDI input ports: the ports your keyboards and
+pads are connected to. Add one with **+ Add Input**. A port can only be deleted
+once no instrument is played from it. Each input has a name and a type:
+
+**Name** — what the port is called to the outside world, and what you connect a
+keyboard to: `midi_in` in a JACK patchbay, or `luvie:midi_in` in an ALSA one. A
+new project starts with a single input called `midi_in`. Input and output names
+share one JACK client, so an input cannot have the same name as an output port.
 
 **Type** — where the input comes from, on the same terms as the output ports, so
 only the ones this mode can actually use are offered:
 
 - **Standalone**: Jack and Native. Plugin is greyed out.
 - **As an LV2 plugin**: Plugin only. Jack and Native are greyed out — the host
-  owns the connection. The plugin has one MIDI input, shown by the host as
-  *Control In* (or *events-in* in Carla); connect your keyboard to that and the
-  notes arrive.
+  owns the connections. The plugin has four MIDI inputs. The first is shown by
+  the host as *Control In* (or *events-in* in Carla), and the others as
+  *MIDI In 2*, *MIDI In 3* and *MIDI In 4*. As with the outputs, the Nth input
+  set to Plugin listens on the plugin's Nth MIDI input, and the dialog shows it
+  under that name. Some hosts, such as Carla, only feed the first input, so put
+  the keyboard you use most there.
 
 There is no Debug type here: Debug is a place to send MIDI to, not somewhere it
-can come from. As with the output ports the setting is kept even when this mode
-cannot use it, so moving a project between the standalone app and a host does
-not lose it.
+can come from. A project loaded in a mode that cannot use an input's type
+switches that input to one it can.
 
-**MIDI channel** — which channel to listen on. The default, **Any**, accepts
+## Playing an instrument from a MIDI input
+
+Each instrument's settings run from its name, to where it is played from, to
+where it sends: a **MIDI input** row, then a **MIDI output** row (the output port
+and channel it plays on), then its bank and program. The **MIDI input** row says
+where it is played from:
+
+**MIDI input** — which of the input ports above it listens to.
+
+**Channel** — which channel to listen on. The default, **Any**, accepts
 everything, which is what you want for a single keyboard. Set it to 1-16 to
-ignore everything else, which is useful when a controller sends on several
-channels at once, or when something else is sharing the port.
+ignore everything else. This is useful when a controller sends on several
+channels at once, or when two keyboards share one port on different channels.
 
-The Jack and Native inputs both appear to the outside world as a port named
-`midi_in`, which is what you connect your keyboard to — `midi_in` in a JACK
-patchbay, or `luvie:midi_in` in an ALSA one.
+While you are editing one of an instrument's patterns — or, from the Song and
+Loop tabs, while its track is selected — only MIDI from its input and channel is
+heard. Everything else is ignored: notes, bound controls and pass-through alike.
+So a drum kit can be played from a pad controller and a piano from a keyboard,
+each picking up only its own.
 
 Incoming notes go to whichever pattern editor is open, and are played on that
 pattern's instrument so you hear what you are playing. Recording them is

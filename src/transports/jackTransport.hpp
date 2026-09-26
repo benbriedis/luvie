@@ -6,6 +6,7 @@
 
 #include "itransport.hpp"
 #include "sequencer.hpp"
+#include "midiBackend.hpp"   // kMaxMidiInputs
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <atomic>
@@ -56,11 +57,13 @@ public:
     bool removeMidiPort(const std::string& name);
     bool renameMidiPort(const std::string& oldName, const std::string& newName);
 
-    // The single MIDI input port. Events read in process() are handed to the sink
-    // on the RT thread, which queues them lock-free for the UI thread — see
-    // MidiInputManager. Null sink means the input is simply not read.
-    bool addMidiInPort(const std::string& name);
-    bool removeMidiInPort();
+    // MIDI input ports, one per MidiInputManager slot that is backed by Jack.
+    // Events read in process() are handed to the sink on the RT thread, tagged
+    // with the slot, which queues them lock-free for the UI thread — see
+    // MidiInputManager. Null sink means no input is read at all.
+    bool addMidiInPort(int slot, const std::string& name);
+    bool removeMidiInPort(int slot);
+    bool renameMidiInPort(int slot, const std::string& newName);
     void setMidiInSink(MidiInputManager* s);
 
     std::function<void()> onTransportEvent;
@@ -110,7 +113,7 @@ private:
 
     std::mutex                           portsMutex;
     std::map<std::string, jack_port_t*>  midiPorts_;
-    jack_port_t*                         midiInPort_ = nullptr;   // guarded by portsMutex
+    jack_port_t*                         midiInPorts_[kMaxMidiInputs] = {};   // by slot; guarded by portsMutex
     std::atomic<MidiInputManager*>       midiInSink_{nullptr};
 
     struct PendingMsg { std::string portName; uint8_t data[3]; int len; };

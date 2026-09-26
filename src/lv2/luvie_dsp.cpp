@@ -70,6 +70,7 @@
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
 #define LUVIE_MIDI_IN_URI "https://github.com/benbriedis/luvie#MidiIn"
 #define LUVIE_MIDI_BYTES_URI "https://github.com/benbriedis/luvie#midiBytes"
+#define LUVIE_MIDI_INPUT_URI "https://github.com/benbriedis/luvie#midiInput"
 #define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
 
 /* -----------------------------------------------------------------------
@@ -87,6 +88,8 @@
    ----------------------------------------------------------------------- */
 static_assert(kMaxPluginOutputs == LUVIE_NUM_MIDI_OUTS,
               "pluginPorts.hpp and the TTL must declare the same output count");
+static_assert(kMaxPluginInputs == LUVIE_NUM_MIDI_INS,
+              "pluginPorts.hpp and the TTL must declare the same input count");
 
 class Lv2Engine : public Sequencer {
 public:
@@ -233,6 +236,8 @@ struct Plugin {
     URIs           uris{};
 
     const LV2_Atom_Sequence* controlIn = nullptr;
+    /* MIDI inputs 2..N (input 1 is controlIn). May be left unconnected. */
+    const LV2_Atom_Sequence* midiIn[LUVIE_NUM_MIDI_INS - 1] = {};
     /* Atom outputs, indexed as in pluginPorts.hpp. All carry MIDI events (host ->
        instrument); out[0] additionally carries our own time:Position (UI playhead)
        and state:StateChanged (host dirty flag). A host need not connect them all,
@@ -583,6 +588,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->luvie_midi         = map->map(map->handle, LUVIE_MIDI_URI);
     uris->luvie_midi_in      = map->map(map->handle, LUVIE_MIDI_IN_URI);
     uris->luvie_midi_bytes   = map->map(map->handle, LUVIE_MIDI_BYTES_URI);
+    uris->luvie_midi_input   = map->map(map->handle, LUVIE_MIDI_INPUT_URI);
     uris->luvie_loop         = map->map(map->handle, LUVIE_LOOP_URI);
     uris->state_StateChanged = map->map(map->handle, LV2_STATE__StateChanged);
 }
@@ -634,6 +640,8 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
         p->controlIn = (const LV2_Atom_Sequence*)data;
     else if (port >= (uint32_t)PORT_OUT && port <= (uint32_t)PORT_OUT_LAST)
         p->out[port - (uint32_t)PORT_OUT] = (LV2_Atom_Sequence*)data;
+    else if (port >= (uint32_t)PORT_IN_EXTRA && port <= (uint32_t)PORT_IN_LAST)
+        p->midiIn[port - (uint32_t)PORT_IN_EXTRA] = (const LV2_Atom_Sequence*)data;
 }
 
 static void activate(LV2_Handle instance)   { (void)instance; }
@@ -682,15 +690,17 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     constexpr int kMaxMidiIn = 64;
     uint8_t midiInBuf[kMaxMidiIn][3];
     int     midiInLen[kMaxMidiIn];
+    int     midiInPort[kMaxMidiIn];   /* 0 = control_in, 1.. = midi_in_2.. */
     int     midiInCount = 0;
-    auto takeMidiIn = [&](const LV2_Atom_Event* ev) {
+    auto takeMidiIn = [&](const LV2_Atom_Event* ev, int port) {
         if (midiInCount >= kMaxMidiIn) return;
         const uint8_t* msg = (const uint8_t*)LV2_ATOM_BODY_CONST(&ev->body);
         int len = (int)ev->body.size;
         if (len < 1) return;
         if (len > 3) len = 3;            /* channel-voice messages only */
         for (int i = 0; i < len; i++) midiInBuf[midiInCount][i] = msg[i];
-        midiInLen[midiInCount] = len;
+        midiInLen[midiInCount]  = len;
+        midiInPort[midiInCount] = port;
         midiInCount++;
     };
 
@@ -724,13 +734,19 @@ static void run(LV2_Handle instance, uint32_t sample_count)
             } else if (ev->body.type == uris->midi_MidiEvent) {
                 /* The player's keyboard. control_in declares atom:supports
                    midi:MidiEvent for exactly this. */
-                takeMidiIn(ev);
+                takeMidiIn(ev, 0);
             } else if (ev->body.type == uris->atom_Object || ev->body.type == uris->atom_Blank) {
                 const LV2_Atom_Object* obj = (const LV2_Atom_Object*)&ev->body;
                 if (obj->body.otype == uris->time_Position)
                     lastPos = obj;
             }
         }
+    }
+    /* The extra inputs carry nothing but the player's MIDI. */
+    for (int i = 0; i < LUVIE_NUM_MIDI_INS - 1; i++) {
+        if (!p->midiIn[i]) continue;
+        LV2_ATOM_SEQUENCE_FOREACH(p->midiIn[i], ev)
+            if (ev->body.type == uris->midi_MidiEvent) takeMidiIn(ev, i + 1);
     }
     if (lastPos) {
         const LV2_Atom* frameAtom = nullptr;
@@ -845,6 +861,8 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                 lv2_atom_forge_key(&p->forge, uris->luvie_midi_bytes);
                 lv2_atom_forge_atom(&p->forge, midiInLen[i], uris->atom_Chunk);
                 lv2_atom_forge_write(&p->forge, midiInBuf[i], midiInLen[i]);
+                lv2_atom_forge_key(&p->forge, uris->luvie_midi_input);
+                lv2_atom_forge_int(&p->forge, midiInPort[i]);
                 lv2_atom_forge_pop(&p->forge, &mf);
             }
         }

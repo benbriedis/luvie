@@ -224,7 +224,10 @@ int main(int argc, char **argv) {
     };
 
     auto midiInIsJack = [&]() {
-        return connOverlay && connOverlay->getMidiInput().backend == MidiBackend::Jack;
+        if (!connOverlay) return false;
+        for (const auto& in : connOverlay->getMidiInputs())
+            if (in.backend == MidiBackend::Jack) return true;
+        return false;
     };
 
     // JACK is "wanted" (observer running) if the clock is Jack, any port outputs to
@@ -263,12 +266,12 @@ int main(int argc, char **argv) {
         updateAlerts();
     };
 
-    // Open (or reopen) the MIDI input to match the overlay. Separate from
-    // syncPorts() because the input is not part of the Port set: it has its own
-    // resource and its own backend, and a change to one does not affect the other.
+    // Open (or reopen) the MIDI inputs to match the overlay. Separate from
+    // syncPorts() because the inputs are not part of the Port set: they have their
+    // own resources and backends, and a change to one does not affect the other.
     auto syncMidiInput = [&]() {
         if (!connOverlay) return;
-        app.midiIn.apply(connOverlay->getMidiInput(), &jackTransport);
+        app.midiIn.apply(connOverlay->getMidiInputs(), &jackTransport);
         updateJackWanted();
         updateAlerts();
     };
@@ -316,7 +319,11 @@ int main(int argc, char **argv) {
         connOverlay->onPortAdded         = [&](const std::string&) { syncPorts(); };
         connOverlay->onPortRemoved       = [&](const std::string&) { syncPorts(); };
         connOverlay->onPortBackendChanged = [&]() { syncPorts(); };
-        connOverlay->onMidiInputChanged   = [&]() { syncMidiInput(); };
+        connOverlay->onMidiInputsChanged  = [&]() { syncMidiInput(); };
+        connOverlay->onMidiInputRenamed   = [&](const std::string& oldName,
+                                                const std::string& newName) {
+            app.midiIn.rename(oldName, newName);
+        };
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             portReg.rename(oldName, newName);
             if (app.onInstrumentsChanged) app.onInstrumentsChanged();
@@ -334,13 +341,15 @@ int main(int argc, char **argv) {
         if (!connOverlay) return;
         connOverlay->setDefaultBackend(state.defaultPortBackend);
         connOverlay->setOutputs(state.jackOutputs);
+        // Inputs before instruments: an instrument naming an input that is not
+        // there yet would be moved onto the first one.
+        connOverlay->setMidiInputs(state.midiInputs);
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
             instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
-                              c.gm1Instrument});
+                              c.gm1Instrument, c.inputName, c.inputChannel});
         connOverlay->setInstruments(instrs);
-        connOverlay->setMidiInput(state.midiInput);
         app.pushInstruments();
         syncPorts();
         syncMidiInput();
@@ -353,13 +362,13 @@ int main(int argc, char **argv) {
         if (!connOverlay) return;
         state.defaultPortBackend = connOverlay->getDefaultBackend();
         state.jackOutputs = connOverlay->getOutputsFull();
-        state.midiInput   = connOverlay->getMidiInput();
+        state.midiInputs  = connOverlay->getMidiInputs();
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
             state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                              ci.isDrum, ci.fallbackNoteNames,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
-                                             ci.gm1Instrument});
+                                             ci.gm1Instrument, ci.inputName, ci.inputChannel});
     };
 
     // Let the menu's Import/Export include the outputs section.
@@ -428,7 +437,7 @@ int main(int argc, char **argv) {
             jackObserver.serverLost();
         };
         portReg.reregisterJack();   // (re)register Jack ports on the fresh client
-        app.midiIn.reregisterJack(); // and the input port, which is registered the same way
+        app.midiIn.reregisterJack(); // and the input ports, which are registered the same way
         if (app.onInstrumentsChanged) app.onInstrumentsChanged();
         sendAllProgramChanges();
     };
@@ -514,7 +523,7 @@ int main(int argc, char **argv) {
     // The smoke test runs headless with no JACK server and no one to play into
     // it, so it opens no input — Plugin is the one backend that opens nothing.
     if (testMode) {
-        if (connOverlay) connOverlay->setMidiInput({MidiBackend::Plugin, 0});
+        if (connOverlay) connOverlay->setAllInputBackends(MidiBackend::Plugin);
     } else {
         syncMidiInput();
     }
@@ -537,9 +546,7 @@ int main(int argc, char **argv) {
         };
         app.startupOverlay->onMidiInputBackendChanged = [&](MidiBackend backend) {
             if (!connOverlay) return;
-            MidiInput in = connOverlay->getMidiInput();
-            in.backend = backend;
-            connOverlay->setMidiInput(in);
+            connOverlay->setAllInputBackends(backend);
             syncMidiInput();
         };
     }
@@ -551,7 +558,8 @@ int main(int argc, char **argv) {
         app.startupOverlay->setSelections(
             app.transportOverlay ? app.transportOverlay->selection() : 2,
             connOverlay ? connOverlay->getDefaultBackend() : MidiBackend::Jack,
-            connOverlay ? connOverlay->getMidiInput().backend : MidiBackend::Jack);
+            connOverlay && !connOverlay->getMidiInputs().empty()
+                ? connOverlay->getMidiInputs()[0].backend : MidiBackend::Jack);
         app.startupOverlay->show();
     };
 

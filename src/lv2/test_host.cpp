@@ -187,6 +187,9 @@ int main(int argc, char** argv) {
     // testable here and not only a key.
     uint8_t  midiInRaw[3]  = {};
     int      midiInRawLen  = 0;
+    // --midi-in-port N: which of the plugin's MIDI inputs the above arrive on,
+    // 1-based. 1 is control_in; 2.. are the extra midi_in_N ports.
+    int      midiInPortNum = 1;
     bool     restate       = false;
     bool     songLoop      = false;
     float    songLoopStart = 0.0f, songLoopEnd = 0.0f;
@@ -208,6 +211,13 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--restate")) restate = true;
         else if (!strcmp(argv[i], "--cycles") && i + 1 < argc) cycles = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--midi-in") && i + 1 < argc) midiInNote = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--midi-in-port") && i + 1 < argc) {
+            midiInPortNum = atoi(argv[++i]);
+            if (midiInPortNum < 1 || midiInPortNum > LUVIE_NUM_MIDI_INS) {
+                fprintf(stderr, "--midi-in-port must be 1..%d\n", LUVIE_NUM_MIDI_INS);
+                return 1;
+            }
+        }
         else if (!strcmp(argv[i], "--midi-in-raw")) {
             while (midiInRawLen < 3 && i + 1 < argc && argv[i + 1][0] != '-')
                 midiInRaw[midiInRawLen++] = (uint8_t)strtol(argv[++i], nullptr, 16);
@@ -238,6 +248,12 @@ int main(int argc, char** argv) {
     d->connect_port(inst, 0, ctrlBuf.data());
     for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
         d->connect_port(inst, (uint32_t)(PORT_OUT + o), midiBuf[o].data());
+    // The extra MIDI inputs (2..N): empty sequences, except the one --midi-in-port
+    // names, which gets the --midi-in note on cycle 1.
+    std::vector<std::vector<uint8_t>> midiInBuf(LUVIE_NUM_MIDI_INS - 1,
+                                                std::vector<uint8_t>(1024));
+    for (int i = 0; i < LUVIE_NUM_MIDI_INS - 1; i++)
+        d->connect_port(inst, (uint32_t)(PORT_IN_EXTRA + i), midiInBuf[i].data());
 
     if (d->activate) d->activate(inst);
 
@@ -254,6 +270,8 @@ int main(int argc, char** argv) {
     LV2_URID uMidi  = map_uri(nullptr, LV2_MIDI__MidiEvent);
     LV2_URID uMidiIn = map_uri(nullptr, "https://github.com/benbriedis/luvie#MidiIn");
     LV2_URID uMidiBytes = map_uri(nullptr, "https://github.com/benbriedis/luvie#midiBytes");
+    LV2_URID uMidiInput = map_uri(nullptr, "https://github.com/benbriedis/luvie#midiInput");
+    LV2_URID uInt       = map_uri(nullptr, LV2_ATOM__Int);
     LV2_URID uState = map_uri(nullptr, LUVIE_STATE_URI);
     LV2_URID uLoop  = map_uri(nullptr, LUVIE_LOOP_URI);
 
@@ -344,17 +362,30 @@ int main(int argc, char** argv) {
             lv2_atom_forge_float(&forge, 1.0f);
             lv2_atom_forge_pop(&forge, &objF);
         }
-        if (midiInRawLen > 0 && c == 1) {
-            lv2_atom_forge_frame_time(&forge, 0);
-            lv2_atom_forge_atom(&forge, (uint32_t)midiInRawLen, uMidi);
-            lv2_atom_forge_write(&forge, midiInRaw, (uint32_t)midiInRawLen);
-        } else if (midiInNote >= 0 && c == 1) {
-            const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
-            lv2_atom_forge_frame_time(&forge, 0);
-            lv2_atom_forge_atom(&forge, 3, uMidi);
-            lv2_atom_forge_write(&forge, note, 3);
-        }
+        auto forgeMidiIn = [&](LV2_Atom_Forge* f) {
+            if (midiInRawLen > 0 && c == 1) {
+                lv2_atom_forge_frame_time(f, 0);
+                lv2_atom_forge_atom(f, (uint32_t)midiInRawLen, uMidi);
+                lv2_atom_forge_write(f, midiInRaw, (uint32_t)midiInRawLen);
+            } else if (midiInNote >= 0 && c == 1) {
+                const uint8_t note[3] = { 0x90, (uint8_t)(midiInNote & 0x7F), 100 };
+                lv2_atom_forge_frame_time(f, 0);
+                lv2_atom_forge_atom(f, 3, uMidi);
+                lv2_atom_forge_write(f, note, 3);
+            }
+        };
+        if (midiInPortNum == 1) forgeMidiIn(&forge);
         lv2_atom_forge_pop(&forge, &seqF);
+
+        for (int i = 0; i < LUVIE_NUM_MIDI_INS - 1; i++) {
+            LV2_Atom_Forge inForge;
+            lv2_atom_forge_init(&inForge, &map);
+            lv2_atom_forge_set_buffer(&inForge, midiInBuf[i].data(), midiInBuf[i].size());
+            LV2_Atom_Forge_Frame inF;
+            lv2_atom_forge_sequence_head(&inForge, &inF, 0);
+            if (midiInPortNum == i + 2) forgeMidiIn(&inForge);
+            lv2_atom_forge_pop(&inForge, &inF);
+        }
 
         // Output ports: host sets capacity in atom.size before run().
         for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++) {
@@ -396,9 +427,12 @@ int main(int argc, char** argv) {
                     /* The relay: an Object carrying the bytes as a chunk. */
                     const LV2_Atom_Object* mo = (const LV2_Atom_Object*)&ev->body;
                     const LV2_Atom* bytes = nullptr;
-                    lv2_atom_object_get(mo, uMidiBytes, &bytes, 0);
-                    printf("cycle %d frame %ld @%ld out%d: MIDI-IN relay ",
-                           c, (long)frame, (long)ev->time.frames, o + 1);
+                    const LV2_Atom* input = nullptr;
+                    lv2_atom_object_get(mo, uMidiBytes, &bytes, uMidiInput, &input, 0);
+                    const int inNum = (input && input->type == uInt)
+                        ? ((const LV2_Atom_Int*)input)->body + 1 : 1;
+                    printf("cycle %d frame %ld @%ld out%d: MIDI-IN relay (input %d) ",
+                           c, (long)frame, (long)ev->time.frames, o + 1, inNum);
                     if (bytes) {
                         const uint8_t* m = (const uint8_t*)LV2_ATOM_BODY_CONST(bytes);
                         for (uint32_t i = 0; i < bytes->size; i++) printf("%02X ", m[i]);

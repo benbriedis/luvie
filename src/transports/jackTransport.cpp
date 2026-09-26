@@ -105,6 +105,7 @@ void JackTransport::close()
     {
         std::lock_guard<std::mutex> lk(portsMutex);
         midiPorts_.clear();
+        for (auto& p : midiInPorts_) p = nullptr;
     }
     jackAlive.store(false);
 
@@ -233,21 +234,25 @@ int JackTransport::process(jack_nframes_t nframes)
     // one wakeup for the whole cycle. jack_midi_event_get() does not allocate and
     // the ring push is a store plus one atomic, so nothing here is RT-unsafe; the
     // single Fl::awake pipe write is what claimWakeup() bounds.
+    // The lock is held across the reads (try_lock, so never waited on) so that a
+    // port cannot be unregistered from under us mid-cycle.
     if (MidiInputManager* inSink = midiInSink_.load(std::memory_order_acquire)) {
-        jack_port_t* inPort = nullptr;
         if (portsMutex.try_lock()) {
-            inPort = midiInPort_;
-            portsMutex.unlock();
-        }
-        if (inPort) {
-            void* inBuf = jack_port_get_buffer(inPort, nframes);
-            const jack_nframes_t nIn = jack_midi_get_event_count(inBuf);
-            for (jack_nframes_t i = 0; i < nIn; i++) {
-                jack_midi_event_t ev;
-                if (jack_midi_event_get(&ev, inBuf, i) != 0) continue;
-                inSink->pushFromRt(ev.buffer, static_cast<int>(ev.size));
+            bool any = false;
+            for (int slot = 0; slot < kMaxMidiInputs; slot++) {
+                jack_port_t* inPort = midiInPorts_[slot];
+                if (!inPort) continue;
+                void* inBuf = jack_port_get_buffer(inPort, nframes);
+                const jack_nframes_t nIn = jack_midi_get_event_count(inBuf);
+                for (jack_nframes_t i = 0; i < nIn; i++) {
+                    jack_midi_event_t ev;
+                    if (jack_midi_event_get(&ev, inBuf, i) != 0) continue;
+                    inSink->pushFromRt(slot, ev.buffer, static_cast<int>(ev.size));
+                    any = true;
+                }
             }
-            if (nIn > 0 && inSink->claimWakeup()) inSink->postWakeup();
+            portsMutex.unlock();
+            if (any && inSink->claimWakeup()) inSink->postWakeup();
         }
     }
 
@@ -362,8 +367,9 @@ void JackTransport::setMidiInSink(MidiInputManager* s) {
     midiInSink_.store(s, std::memory_order_release);
 }
 
-bool JackTransport::addMidiInPort(const std::string& name) {
+bool JackTransport::addMidiInPort(int slot, const std::string& name) {
     if (!client || !midiEnabled || name.empty()) return false;
+    if (slot < 0 || slot >= kMaxMidiInputs) return false;
     // Registers unconditionally and overwrites, as PortRegistry::reregisterJack()
     // does for the outputs: after a server restart `client` is a new one and any
     // handle we are still holding is stale, so keeping the old one would leave the
@@ -375,20 +381,33 @@ bool JackTransport::addMidiInPort(const std::string& name) {
         return false;
     }
     std::lock_guard<std::mutex> lk(portsMutex);
-    midiInPort_ = p;
+    midiInPorts_[slot] = p;
     return true;
 }
 
-bool JackTransport::removeMidiInPort() {
-    if (!client) return false;
+bool JackTransport::removeMidiInPort(int slot) {
+    if (!client || slot < 0 || slot >= kMaxMidiInputs) return false;
     jack_port_t* p = nullptr;
     {
         std::lock_guard<std::mutex> lk(portsMutex);
-        if (!midiInPort_) return false;
-        p = midiInPort_;
-        midiInPort_ = nullptr;
+        if (!midiInPorts_[slot]) return false;
+        p = midiInPorts_[slot];
+        midiInPorts_[slot] = nullptr;
     }
     jack_port_unregister(client, p);
+    return true;
+}
+
+bool JackTransport::renameMidiInPort(int slot, const std::string& newName) {
+    if (!client || newName.empty() || slot < 0 || slot >= kMaxMidiInputs) return false;
+    std::lock_guard<std::mutex> lk(portsMutex);
+    jack_port_t* p = midiInPorts_[slot];
+    if (!p) return false;
+    if (jack_port_rename(client, p, newName.c_str()) != 0) {
+        fprintf(stderr, "JackTransport: could not rename input port -> '%s'\n",
+                newName.c_str());
+        return false;
+    }
     return true;
 }
 

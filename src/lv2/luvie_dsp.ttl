@@ -103,6 +103,33 @@
         lv2:index 8 ;
         lv2:symbol "midi_out_8" ;
         lv2:name "MIDI Out 8"
+    ] , [
+        # Extra MIDI input (see luvie_dsp.h). Input 1 is control_in, above. Kept
+        # after the outputs: nothing may be inserted ahead of midi_out.
+        a lv2:InputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 9 ;
+        lv2:symbol "midi_in_2" ;
+        lv2:name "MIDI In 2"
+    ] , [
+        # Extra MIDI input (see luvie_dsp.h). Input 1 is control_in, above. Kept
+        # after the outputs: nothing may be inserted ahead of midi_out.
+        a lv2:InputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 10 ;
+        lv2:symbol "midi_in_3" ;
+        lv2:name "MIDI In 3"
+    ] , [
+        # Extra MIDI input (see luvie_dsp.h). Input 1 is control_in, above. Kept
+        # after the outputs: nothing may be inserted ahead of midi_out.
+        a lv2:InputPort, atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        atom:supports midi:MidiEvent ;
+        lv2:index 11 ;
+        lv2:symbol "midi_in_4" ;
+        lv2:name "MIDI In 4"
     ] ;
 
     ui:ui <https://github.com/benbriedis/luvie/luvie_ui> .

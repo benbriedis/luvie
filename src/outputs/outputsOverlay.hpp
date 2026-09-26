@@ -13,6 +13,7 @@
 class ObservableInstrument;
 
 class ModernButton;
+class CollapsiblePane;
 class Fl_Box;
 class Fl_Input;
 class Fl_Choice;
@@ -22,11 +23,13 @@ class OutputsOverlay : public OverlayWindow {
     ModernButton* addInstrBtn     = nullptr;
     ModernButton* addDrumInstrBtn = nullptr;
     Fl_Choice*    defaultTypeChoice = nullptr;  // "Default port type" for new ports
-    // The MIDI Input section. One input for now, so unlike the port and instrument
-    // sections this is a fixed single row: the widgets are built once in the ctor
-    // and only repositioned afterwards, never torn down and rebuilt.
-    Fl_Choice*    midiInTypeChoice  = nullptr;
-    Fl_Choice*    midiInChanChoice  = nullptr;
+    ModernButton* addInputBtn     = nullptr;
+
+    // The three sections, top to bottom in this order. Each owns its section's
+    // widgets; all start collapsed.
+    CollapsiblePane* inPane_    = nullptr;   // MIDI Input Ports
+    CollapsiblePane* portsPane_ = nullptr;   // MIDI Output Ports
+    CollapsiblePane* instrPane_ = nullptr;   // Instruments
 
     int nextPortId_ = 1;
     // True when hosted as an LV2 plugin. Decides which backends the port dropdowns
@@ -34,8 +37,6 @@ class OutputsOverlay : public OverlayWindow {
     // moved between standalone and plugin still shows what it was set to.
     bool pluginMode_ = false;
     MidiBackend defaultBackend_ = MidiBackend::Jack;  // type assigned to newly added ports
-    MidiBackend midiInBackend_  = MidiBackend::Jack;  // the MIDI input's type
-    int         midiInChannel_  = 0;                  // 0 = Any; 1-16 = that channel
     ObservableInstrument* instrObs_ = nullptr;
 
     // ── Port data ──────────────────────────────────────────────────────────────
@@ -64,6 +65,8 @@ class OutputsOverlay : public OverlayWindow {
         int  bankMsb           = -1;
         int  bankLsb           = -1;
         int  gm1Instrument     = -1;
+        std::string inputName;               // the MIDI input it is played from
+        int  inputChannel      = 0;          // 0 = Any; 1-16
     };
     struct InstrumentRow {
         Fl_Box*       typeLabel      = nullptr;
@@ -87,6 +90,21 @@ class OutputsOverlay : public OverlayWindow {
         Fl_Box*       lsbLabel        = nullptr;
         Fl_Box*       progLabel       = nullptr;
         Fl_Box*       gm1Label        = nullptr;
+        Fl_Box*       inputLabel      = nullptr;
+        Fl_Choice*    inputChoice     = nullptr;
+        Fl_Box*       inChanLabel     = nullptr;
+        Fl_Choice*    inChanChoice    = nullptr;
+        Fl_Box*       outputLabel     = nullptr;
+        Fl_Box*       outChanLabel    = nullptr;
+        std::string   committedName;
+    };
+
+    // ── MIDI input data ────────────────────────────────────────────────────────
+    // Held directly as the AppState structs: an input has nothing the UI adds.
+    struct InputRow {
+        Fl_Input*     input      = nullptr;
+        Fl_Choice*    typeChoice = nullptr;
+        ModernButton* deleteBtn  = nullptr;
         std::string   committedName;
     };
 
@@ -94,22 +112,28 @@ class OutputsOverlay : public OverlayWindow {
     std::vector<RowWidgets>  rows_;
     std::vector<Instrument>    instruments_;
     std::vector<InstrumentRow> instrRows_;
+    std::vector<MidiInputPort>  inputs_;
+    std::vector<InputRow>       inRows_;
 
-    bool jackWarning_ = false;  // draw the red "JACK server not running" line
+    bool jackWarning_ = false;  // show "JACK server not running" on the ports heading
 
-    // Layout state (recomputed by rebuildRows / rebuildInstrumentRows)
-    int instrSectionTopY_ = 0;
-    int instrRowsTopY_    = 0;
+    // Column widths (recomputed by the rebuilds, read by the column headings)
     int instrNameW_       = 0;
-    int instrPortW_       = 0;
-    int midiInSectionTopY_ = 0;
 
-    void rebuildRows();
+    // Each rebuild recreates one section's rows inside its pane, then restacks
+    // the panes; none of them touches another section's widgets.
+    void rebuildAll();
+    void rebuildRows();              // MIDI Output Ports
     void rebuildInstrumentRows();
     void rebuildPortChoices();
-    // Places the MIDI Input row under the instrument section and returns the Y
-    // just past it, so the caller can size the scroll extent to include it.
-    int  layoutMidiInputRow(int y);
+    void rebuildInputRows();
+    // Stacks the panes under the title, sizes the scroll extent to fit them, and
+    // refreshes the counts on their headings.
+    void relayoutPanes();
+    void updateSummaries();
+    void buildPaneBodies();          // column headings for each pane
+    // Refills each instrument's input dropdown and the inputs' delete buttons.
+    void rebuildInputChoices();
     void syncFromInputs();
 
     // What a port is shown as. Hosted, a Plugin-backed port is displayed as the LV2
@@ -118,11 +142,9 @@ class OutputsOverlay : public OverlayWindow {
     // user's to choose there. Display only: outputs_[i].portName stays the routing
     // key and keeps its meaning when the project goes back to the standalone app.
     std::string displayPortName(int i) const;
+    // The same for input i: hosted, a Plugin input shows the LV2 input it listens on.
+    std::string displayInputName(int i) const;
 
-    // Vertical layout of the ports section (depends on whether the JACK warning shows).
-    int defaultTypeRowY() const;  // top Y of the "Default port type" row
-    int portsColY()       const;  // top Y of the "PORT NAME" column header
-    int portsRowsTopY()   const;  // top Y of the first port row / divider
 
     std::vector<Fl_Widget*> getFocusOrder() const;
     void advanceFocusBy(int dir);
@@ -134,12 +156,20 @@ class OutputsOverlay : public OverlayWindow {
     std::string uniquePortName(const std::string& base, int excludeIdx = -1) const;
     std::string uniqueInstrName(const std::string& base, int excludeIdx = -1) const;
     std::string nextDefaultInstrName(bool isDrum) const;
+    // Input and output ports share one JACK client, so a name must be unique
+    // across both lists, not just its own.
+    bool        portOrInputNameTaken(const std::string& name, int excludeOut, int excludeIn) const;
+    std::string uniqueInputName(const std::string& base, int excludeIdx = -1) const;
+    bool        inputReferenced(const std::string& name) const;
 
     static void inputCb            (Fl_Widget*, void*);
     static void backendChoiceCb    (Fl_Widget*, void*);
     static void defaultTypeChoiceCb(Fl_Widget*, void*);
-    static void midiInTypeCb    (Fl_Widget*, void*);
-    static void midiInChanCb    (Fl_Widget*, void*);
+    static void inputNameCb     (Fl_Widget*, void*);
+    static void inputTypeCb     (Fl_Widget*, void*);
+    static void inputDeleteCb   (Fl_Widget*, void*);
+    static void instrInputCb    (Fl_Widget*, void*);
+    static void instrInChanCb   (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
     static void instrNameCb     (Fl_Widget*, void*);
     static void instrDeleteCb   (Fl_Widget*, void*);
@@ -158,7 +188,6 @@ class OutputsOverlay : public OverlayWindow {
 
     void onResized() override;
     void onScroll(int delta) override;
-    void drawStaticContent(int scrollY, int sbW) override;
     int  handle(int event) override;
 
 public:
@@ -179,9 +208,13 @@ public:
     // Show/hide the red "JACK server not running" warning under the title.
     void setJackWarning(bool show);
 
-    // MIDI input API (the single input at the bottom of the window).
-    void      setMidiInput(const MidiInput& in);
-    MidiInput getMidiInput() const;
+    // MIDI input API. Loading carries an input on a backend this mode cannot
+    // drive over to one it can, as the single input always did, so a project moved
+    // between standalone and plugin never arrives with its inputs dead.
+    void setMidiInputs(const std::vector<MidiInputPort>& ins);
+    const std::vector<MidiInputPort>& getMidiInputs() const { return inputs_; }
+    // Retypes every input — the startup dialog's MIDI input choice.
+    void setAllInputBackends(MidiBackend b);
 
     // Instrument API
     struct InstrumentInfo {
@@ -196,9 +229,14 @@ public:
         int         bankMsb           = -1;
         int         bankLsb           = -1;
         int         gm1Instrument     = -1;
+        std::string inputName;           // empty = the first input
+        int         inputChannel      = 0;
     };
     void setInstruments(const std::vector<InstrumentInfo>& instrs);
     std::vector<InstrumentInfo> getInstruments() const;
+    // The input and channel instrument `instrId` is played from. False if there is
+    // no such instrument. Cheap: for the MIDI input path, which runs per event.
+    bool instrumentInput(int instrId, std::string& inputName, int& channel) const;
     void updateInstrumentDrumMap(int instrId, int midiNote, const std::string& label);
     void setObservableInstrument(ObservableInstrument* instr);
 
@@ -207,9 +245,11 @@ public:
     std::function<void(const std::string& oldName, const std::string& newName)> onPortRenamed;
     // Fired when any port's backend (Jack/Native/Debug) changes; main re-syncs the port set.
     std::function<void()>                                                       onPortBackendChanged;
-    // Fired when the MIDI input's type or channel changes; the owner reopens the
-    // underlying port to match.
-    std::function<void()>                                                       onMidiInputChanged;
+    // Fired when an input is added or removed or its type changes; the owner
+    // reopens the underlying ports to match.
+    std::function<void()>                                                       onMidiInputsChanged;
+    // Renamed in place, so the owner can keep the port (and its connections).
+    std::function<void(const std::string& oldName, const std::string& newName)> onMidiInputRenamed;
 
     // Fired whenever the instruments list or any instrument's fields change.
     std::function<void()> onInstrumentsChanged;
@@ -219,4 +259,5 @@ public:
     // Optional: return true if the instrument ID is currently used by a pattern.
     std::function<bool(int instrId)> isInstrumentInUse;
     void refreshInstrumentButtons();
+
 };

@@ -14,17 +14,22 @@ struct JackOutput {
     MidiBackend backend = MidiBackend::Jack;  // where the port sends (Jack/Native/Debug)
 };
 
-// The project's single MIDI input. A struct rather than loose AppState fields so
-// that allowing a second one later is a vector change, not a rename of everything
-// that touches it. Jack/Native/Plugin only — Debug is an output-only sink.
-struct MidiInput {
+// One MIDI input port. Jack/Native/Plugin only — Debug is an output-only sink.
+// The name is what the Jack and Native ports register under, and what instruments
+// refer to it by; hosted, a Plugin input is shown as the LV2 input it maps to
+// (see pluginPorts.hpp) and the name only decides the order.
+struct MidiInputPort {
+    std::string name;
     MidiBackend backend = MidiBackend::Jack;
-    int         channel = 0;   // 0 = Any; 1-16 = listen on that channel alone
 };
 
-// A hardware control, as MIDI learn identifies it. Always read on the input's
-// configured channel, so the channel is not part of it. num is the CC number and
-// is unused for the other kinds.
+// The input a project starts with, and what a project saved when Luvie had a
+// single MIDI input migrates to.
+inline constexpr const char* kDefaultMidiInputName = "midi_in";
+
+// A hardware control, as MIDI learn identifies it. Only ever read from the MIDI
+// input the current instrument listens to, so the input and channel are not part
+// of it. num is the CC number and is unused for the other kinds.
 enum class MidiSrcKind { None, CC, PitchBend, Pressure };
 struct MidiSrc {
     MidiSrcKind kind = MidiSrcKind::None;
@@ -56,6 +61,10 @@ struct JackInstrument {
     int         bankMsb           = -1;  // -1 = not set; 0-127 = CC#0 value
     int         bankLsb           = -1;  // -1 = not set; 0-127 = CC#32 value
     int         gm1Instrument     = -1;  // last GM1 instrument selected from the dropdown
+    // Where the instrument is played from: MIDI arriving anywhere else is ignored
+    // while one of its patterns is being edited (or its track is selected).
+    std::string inputName;               // MidiInputPort::name
+    int         inputChannel      = 0;   // 0 = Any; 1-16 = that channel alone
 };
 
 // App-level state that gets persisted to / loaded from disk.
@@ -65,7 +74,10 @@ struct AppState {
     MidiBackend defaultPortBackend = MidiBackend::Jack;  // type assigned to newly added ports
     std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;
-    MidiInput midiInput;
+    // Empty until loaded: appStateFromJsonString() fills in the default (and
+    // migrates the old single "midiInput"), so a loaded state always has at least
+    // one input.
+    std::vector<MidiInputPort>  midiInputs;
     // Starts at the defaults so a project saved before MIDI learn existed, which
     // has no "midiLearn" key, loads with them rather than with nothing bound.
     MidiLearnBindings midiLearn = defaultMidiLearnBindings();

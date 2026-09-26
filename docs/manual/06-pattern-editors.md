@@ -124,6 +124,10 @@ Set the MIDI input up first — see
 connected, playing it sounds the open pattern's instrument whether or not you are
 recording, so you can try things out before committing to them.
 
+Only MIDI from the input and channel the pattern's instrument is played from is
+heard and recorded; see
+[Playing an instrument from a MIDI input](03-outputs.md#playing-an-instrument-from-a-midi-input).
+
 Notes are written only when **Record is armed *and* the transport is running**.
 Nothing is recorded while playback is stopped, so you can arm the toggle, find
 your place, and start when you are ready.

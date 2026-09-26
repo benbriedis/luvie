@@ -31,10 +31,18 @@
    MIDI routing. The rest are plain MIDI. */
 #define LUVIE_NUM_MIDI_OUTS 8
 
+/* LUVIE_NUM_MIDI_INS MIDI inputs. The first is control_in itself (see the TTL for
+   why it has to be); the rest are plain MIDI inputs appended after the outputs —
+   appended, because nothing may sit ahead of midi_out. A project's own inputs are
+   mapped onto them by pluginPorts.hpp, as its outputs are. */
+#define LUVIE_NUM_MIDI_INS 4
+
 enum {
     PORT_CONTROL_IN = 0,
     PORT_OUT        = 1,   /* .. PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1 */
-    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1
+    PORT_OUT_LAST   = PORT_OUT + LUVIE_NUM_MIDI_OUTS - 1,
+    PORT_IN_EXTRA   = PORT_OUT_LAST + 1,   /* MIDI input 2 .. LUVIE_NUM_MIDI_INS */
+    PORT_IN_LAST    = PORT_IN_EXTRA + LUVIE_NUM_MIDI_INS - 2
 };
 
 /* The UI sends the project JSON to control_in as one or more `luvie_state` atoms.
@@ -165,7 +173,8 @@ typedef struct {
     LV2_URID luvie_state;         /* full JSON state blob */
     LV2_URID luvie_midi;          /* one-shot audition MIDI (raw bytes), UI -> DSP */
     LV2_URID luvie_midi_in;       /* otype of the DSP -> UI "host sent us MIDI" object */
-    LV2_URID luvie_midi_bytes;    /* its one property: the raw MIDI bytes */
+    LV2_URID luvie_midi_bytes;    /* its property: the raw MIDI bytes */
+    LV2_URID luvie_midi_input;    /* and which MIDI input they came in on (Int; absent = 0) */
     LV2_URID luvie_loop;          /* loop mode + active loop set, UI -> DSP */
     LV2_URID state_StateChanged;  /* notify host that state is dirty */
 } URIs;

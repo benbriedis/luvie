@@ -182,8 +182,8 @@ public:
     // tab is showing. Owned by the tab group, not by us.
     BasePatternEditor* midiTarget = nullptr;
 
-    // The project's single MIDI input. Lives here rather than in main.cpp because
-    // the plugin UI needs it too: hosted, nothing is opened and the LV2 port_event
+    // The project's MIDI inputs. Lives here rather than in main.cpp because the
+    // plugin UI needs it too: hosted, nothing is opened and the LV2 port_event
     // feeds it directly, but the sink and the routing below are the same either way.
     MidiInputManager midiIn;
 
@@ -225,6 +225,10 @@ public:
     // selected track's when the Song or Loop tab is showing, so a control behaves
     // the same from every tab. -1 when there is neither.
     int midiInInstrument() const;
+    // Whether a message arriving on input `slot` is from where midiInInstrument()
+    // is played from — its input, on its channel. Anything else is ignored, notes,
+    // controllers and MIDI learn alike. True when there is no such instrument.
+    bool midiInAccepted(int slot, uint8_t status) const;
     // Releases held notes and closes any open take. Called when the transport
     // stops, so a key held across the stop does not hang or keep recording.
     void stopMidiRecording();
