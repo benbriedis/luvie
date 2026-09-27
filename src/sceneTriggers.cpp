@@ -3,6 +3,7 @@
 
 #include "sceneTriggers.hpp"
 #include "luvieDebug.hpp"
+#include <algorithm>
 #include <cstdio>
 
 namespace {
@@ -13,8 +14,9 @@ namespace {
 //
 // Every CC value is a press. Plenty of controller buttons are toggles, sending 127
 // on one press and 0 on the next, and counting only the 127 would make every other
-// press do nothing. A momentary button's release just picks the same scene again,
-// which is a no-op.
+// press do nothing. For a scene's own trigger a momentary button's release just
+// picks the same scene again, which is a no-op; handle() keeps the navigation
+// slots, where it would not be, to the value they learned.
 MidiTrigger triggerOf(const std::string& input, const uint8_t* d, int len, bool& press)
 {
     MidiTrigger t;
@@ -42,12 +44,6 @@ bool isBankSelect(const MidiTrigger& t)
     return t.kind == MidiTriggerKind::CC && (t.num == 0 || t.num == 32);
 }
 
-const char* sceneName(int scene)
-{
-    static const char* names[SceneBank::kScenes] = {"S", "1", "2", "3", "4"};
-    return scene >= 0 && scene < SceneBank::kScenes ? names[scene] : "?";
-}
-
 } // namespace
 
 void SceneTriggerMap::setTriggers(const Triggers& t)
@@ -57,12 +53,12 @@ void SceneTriggerMap::setTriggers(const Triggers& t)
     displayChanged();
 }
 
-void SceneTriggerMap::startLearn(int scene)
+void SceneTriggerMap::startLearn(int slot)
 {
-    if (scene < 0 || scene >= SceneBank::kScenes) return;
-    if (luvieDebug()) fprintf(stderr, "[luvie] scene learn: waiting for a trigger for scene %s\n",
-                              sceneName(scene));
-    learning_ = scene;
+    if (slot < 0 || slot >= kSlots) return;
+    if (luvieDebug()) fprintf(stderr, "[luvie] slot learn: waiting for a trigger for %s\n",
+                              slotName(slot).c_str());
+    learning_ = slot;
     if (onLearnStarted) onLearnStarted();
     displayChanged();
 }
@@ -70,26 +66,26 @@ void SceneTriggerMap::startLearn(int scene)
 void SceneTriggerMap::cancelLearn()
 {
     if (learning_ < 0) return;
-    if (luvieDebug()) fprintf(stderr, "[luvie] scene learn: cancelled for scene %s\n",
-                              sceneName(learning_));
+    if (luvieDebug()) fprintf(stderr, "[luvie] scene learn: cancelled for %s\n",
+                              slotName(learning_).c_str());
     learning_ = -1;
     displayChanged();
 }
 
-void SceneTriggerMap::clear(int scene)
+void SceneTriggerMap::clear(int slot)
 {
-    if (scene < 0 || scene >= SceneBank::kScenes) return;
-    if (isLearning(scene)) learning_ = -1;
-    const bool had = triggers_[scene].kind != MidiTriggerKind::None;
-    triggers_[scene] = {};
+    if (slot < 0 || slot >= kSlots) return;
+    if (isLearning(slot)) learning_ = -1;
+    const bool had = triggers_[slot].kind != MidiTriggerKind::None;
+    triggers_[slot] = {};
     if (had && onEdited) onEdited();
     displayChanged();
 }
 
-const MidiTrigger* SceneTriggerMap::bindingFor(int scene) const
+const MidiTrigger* SceneTriggerMap::bindingFor(int slot) const
 {
-    if (scene < 0 || scene >= SceneBank::kScenes) return nullptr;
-    const MidiTrigger& t = triggers_[scene];
+    if (slot < 0 || slot >= kSlots) return nullptr;
+    const MidiTrigger& t = triggers_[slot];
     return t.kind == MidiTriggerKind::None ? nullptr : &t;
 }
 
@@ -118,15 +114,15 @@ int SceneTriggerMap::handle(const std::string& input, const uint8_t* data, int l
     }
 
     if (learning_ >= 0 && press) {
-        // One button switches to one scene: taking it for this scene takes it away
-        // from whichever scene had it. A CC trigger saved without a value stands for
+        // One button does one thing: taking it for this slot takes it away from
+        // whichever slot had it. A CC trigger saved without a value stands for
         // every value, so it goes too.
         for (auto& other : triggers_)
             if (other == t || (other.sameControl(t) && other.value < 0)) other = {};
         triggers_[learning_] = t;
         if (luvieDebug())
-            fprintf(stderr, "[luvie] scene learn: scene %s -> %s\n",
-                    sceneName(learning_), describe(t).c_str());
+            fprintf(stderr, "[luvie] scene learn: %s -> %s\n",
+                    slotName(learning_).c_str(), describe(t).c_str());
         learning_ = -1;
         consumed  = true;
         if (onEdited) onEdited();
@@ -138,13 +134,18 @@ int SceneTriggerMap::handle(const std::string& input, const uint8_t* data, int l
     // whatever the value, so a toggle button's other value and a momentary button's
     // release still count. A control shared by several scenes, told apart by value,
     // fires only on the values they were learned with.
+    //
+    // The navigation slots only ever match exactly. Firing Next on a momentary
+    // button's release would step twice per press; the price is that a toggle
+    // button steps on every other press.
     int exact = -1, any = -1, sharing = 0;
-    for (int s = 0; s < SceneBank::kScenes; s++) {
+    for (int s = 0; s < kSlots; s++) {
         if (!triggers_[s].sameControl(t)) continue;
         consumed = true;
+        if (triggers_[s].value == t.value) exact = s;
+        if (isNavSlot(s)) continue;
         any = s;
         sharing++;
-        if (triggers_[s].value == t.value) exact = s;
     }
     if (!press) return -1;
     if (exact >= 0)   return exact;
@@ -182,9 +183,31 @@ std::string SceneTriggerMap::describe(const MidiTrigger& t, bool withInput)
     return s;
 }
 
-std::string SceneTriggerMap::learnMenuLabel(int scene) const
+std::string SceneTriggerMap::slotName(int slot)
 {
-    if (isLearning(scene)) return "Cancel MIDI learn";
-    const MidiTrigger* t = bindingFor(scene);
-    return t ? "MIDI learn (" + describe(*t, false) + ")" : "MIDI learn";
+    switch (slot) {
+    case kNextScene:  return "Next scene";
+    case kPrevScene:  return "Previous scene";
+    case kFirstScene: return "First scene";
+    case SceneBank::kSceneSong: return "Scene S";
+    default: return "Scene " + std::to_string(slot);
+    }
+}
+
+std::string SceneTriggerMap::learnMenuLabel(int slot) const
+{
+    const std::string what = isNavSlot(slot) ? "MIDI learn " + slotName(slot) : "MIDI learn";
+    if (isLearning(slot)) return "Cancel " + what;
+    const MidiTrigger* t = bindingFor(slot);
+    return t ? what + " (" + describe(*t, false) + ")" : what;
+}
+
+int SceneTriggerMap::targetScene(int slot, int shown)
+{
+    switch (slot) {
+    case kNextScene:  return std::min(shown + 1, SceneBank::kScenes - 1);
+    case kPrevScene:  return std::max(shown - 1, 0);
+    case kFirstScene: return 1;
+    default:          return slot;
+    }
 }

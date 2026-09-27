@@ -77,7 +77,8 @@ public:
     // Repaint the scene buttons for this shown/playing pair. They differ only while a
     // switch is armed, and the shown one draws amber for that window.
     void setSceneVisual(int shown, int playing);
-    // Show each scene's MIDI trigger in its tooltip, and outline the one learning.
+    // Show each scene's MIDI trigger in its tooltip, and outline the one learning —
+    // or all of them, while a Next/Previous/First scene trigger is learning.
     void setSceneTriggerVisual(const SceneTriggerMap* triggers);
 
     void setTimeline(ObservableSong* tl);

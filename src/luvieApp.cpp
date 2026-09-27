@@ -698,9 +698,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
         // Scene triggers first: a button bound to a scene means nothing else, and its
         // release is swallowed with it. They work from any tab, like the buttons.
+        // Next and Previous step from the scene shown, so pressing Next twice before
+        // the first switch lands still moves two scenes on.
         bool      consumed = false;
-        const int scene    = sceneTriggers.handle(midiIn.nameForSlot(slot), data, len, consumed);
-        if (scene >= 0 && loopEd) loopEd->chooseScene(scene);
+        const int fired    = sceneTriggers.handle(midiIn.nameForSlot(slot), data, len, consumed);
+        if (fired >= 0 && loopEd)
+            loopEd->chooseScene(SceneTriggerMap::targetScene(fired, sceneBank.shownScene()));
         if (consumed) return;
 
         // Controllers: MIDI learn decides what they are. Checked before the target,

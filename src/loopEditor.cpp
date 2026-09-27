@@ -178,13 +178,17 @@ void LoopPanel::setSceneTriggerVisual(const SceneTriggerMap* triggers)
 {
     for (int i = 0; i < SceneBank::kScenes; i++) {
         ModernButton* b = sceneBtns[i];
-        const bool learning = triggers && triggers->isLearning(i);
+        // A navigation learn belongs to every scene, so it outlines them all.
+        const int  slot     = triggers ? triggers->learningSlot() : -1;
+        const bool learning = slot == i || SceneTriggerMap::isNavSlot(slot);
         b->setBorderColor(learning ? sceneLearningBorder : panelCtrlBorder);
         b->setBorderWidth(learning ? 2 : 1);
 
         std::string tip = sceneTooltip(i);
         if (learning)
-            tip += "\nMIDI learn: waiting for a note, CC or program change";
+            tip += "\nMIDI learn" + (slot == i ? std::string()
+                                                : " " + SceneTriggerMap::slotName(slot))
+                 + ": waiting for a note, CC or program change";
         else if (const MidiTrigger* t = triggers ? triggers->bindingFor(i) : nullptr)
             tip += "\nMIDI: " + SceneTriggerMap::describe(*t);
         b->copy_tooltip(tip.c_str());

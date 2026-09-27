@@ -10,6 +10,12 @@
 
 using json = nlohmann::json;
 
+// AppState::sceneTriggers: the scenes' own triggers, saved as the "sceneTriggers"
+// array, then the navigation ones, saved by name under "sceneNavTriggers" in the
+// order SceneTriggerMap keeps them.
+static constexpr int   kSceneTriggerCount = 5;
+static const char*     kSceneNavNames[3]  = {"next", "previous", "first"};
+
 // ── Note ─────────────────────────────────────────────────────────────────────
 
 static json noteToJson(const Note& n) {
@@ -351,8 +357,7 @@ std::string appStateToJsonString(const AppState& state) {
         case MidiSrcKind::None:      break;
         }
     }
-    json jtrig = json::array();
-    for (const auto& t : state.sceneTriggers) {
+    auto triggerToJson = [](const MidiTrigger& t) -> json {
         const char* kind = nullptr;
         switch (t.kind) {
         case MidiTriggerKind::Note:    kind = "note";    break;
@@ -360,12 +365,20 @@ std::string appStateToJsonString(const AppState& state) {
         case MidiTriggerKind::Program: kind = "program"; break;
         case MidiTriggerKind::None:    break;
         }
-        if (!kind) { jtrig.push_back(nullptr); continue; }
+        if (!kind) return nullptr;
         json jt = {{"kind", kind}, {"num", t.num}, {"channel", t.channel},
                    {"input", t.input}};
         if (t.value >= 0) jt["value"] = t.value;
-        jtrig.push_back(jt);
-    }
+        return jt;
+    };
+    // The scenes' own triggers, then the shared navigation ones by name.
+    json jtrig = json::array();
+    for (int i = 0; i < kSceneTriggerCount; i++)
+        jtrig.push_back(triggerToJson(state.sceneTriggers[i]));
+    json jnav = json::object();
+    for (int i = 0; i < 3; i++)
+        if (state.sceneTriggers[kSceneTriggerCount + i].kind != MidiTriggerKind::None)
+            jnav[kSceneNavNames[i]] = triggerToJson(state.sceneTriggers[kSceneTriggerCount + i]);
     json j = {
         {"version",         1},
         {"transport",       state.transport},
@@ -380,6 +393,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"scenes",             state.scenes},
         {"currentScene",       state.currentScene},
         {"sceneTriggers",      jtrig},
+        {"sceneNavTriggers",   jnav},
         {"loopSigTop",         state.loopSigTop},
         {"loopSigBottom",      state.loopSigBottom},
         {"loopSigBeat",        state.loopSigBeat},
@@ -407,25 +421,32 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     // Absent in projects saved before scenes existed: four empty scenes with Scene S
     // shown, which is what the Loop Editor was before it had any.
     state.currentScene = std::clamp(j.value("currentScene", 0), 0, 4);
-    // Absent in projects saved before scene triggers existed: no scene has one.
+    // Absent in projects saved before scene triggers existed: no scene has one. The
+    // navigation triggers came later still, and are absent from those too.
     {
-        int si = 0;
-        for (const auto& jt : j.value("sceneTriggers", json::array())) {
-            if (si >= (int)state.sceneTriggers.size()) break;
-            MidiTrigger& t = state.sceneTriggers[si++];
-            if (!jt.is_object()) continue;
+        auto triggerFromJson = [](const json& jt, MidiTrigger& t) {
+            if (!jt.is_object()) return;
             const std::string kind = jt.value("kind", "");
             if      (kind == "note")    t.kind = MidiTriggerKind::Note;
             else if (kind == "cc")      t.kind = MidiTriggerKind::CC;
             else if (kind == "program") t.kind = MidiTriggerKind::Program;
-            else continue;
+            else return;
             t.num     = std::clamp(jt.value("num", 0), 0, 127);
             t.channel = std::clamp(jt.value("channel", 0), 0, 15);
             t.input   = jt.value("input", "");
             // Absent from triggers saved before CC values were kept: any value.
             if (t.kind == MidiTriggerKind::CC && jt.contains("value"))
                 t.value = std::clamp(jt.value("value", 0), 0, 127);
+        };
+        int si = 0;
+        for (const auto& jt : j.value("sceneTriggers", json::array())) {
+            if (si >= kSceneTriggerCount) break;
+            triggerFromJson(jt, state.sceneTriggers[si++]);
         }
+        const json jnav = j.value("sceneNavTriggers", json::object());
+        for (int i = 0; i < 3; i++)
+            if (jnav.contains(kSceneNavNames[i]))
+                triggerFromJson(jnav.at(kSceneNavNames[i]), state.sceneTriggers[kSceneTriggerCount + i]);
     }
     // Absent before Loop mode had its own meter: -1, "follow the song".
     state.loopSigTop    = j.value("loopSigTop",    -1);

@@ -125,9 +125,11 @@ struct AppState {
     // shown, which is exactly what those sessions were.
     std::array<std::vector<int>, 4> scenes;
     int currentScene = 0;   // 0 = Scene S, 1-4; the scene the Loop Editor shows
-    // The MIDI trigger that switches to each scene, Scene S first. Kind None where
-    // there is none, which is every scene in a project saved before triggers existed.
-    std::array<MidiTrigger, 5> sceneTriggers;
+    // The MIDI triggers for the scenes: the one that switches to each scene, Scene S
+    // first, then the Next, Previous and First scene triggers the scenes share (see
+    // SceneTriggerMap). Kind None where there is none, which is every slot in a
+    // project saved before triggers existed.
+    std::array<MidiTrigger, 8> sceneTriggers;
 
     // Loop Mode's own time signature, set in the Loop Editor. It decides how long a
     // Loop-Mode bar is — and so where a scene switch lands — independently of the
