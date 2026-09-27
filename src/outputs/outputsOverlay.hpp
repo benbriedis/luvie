@@ -5,6 +5,7 @@
 #include "overlayWindow.hpp"
 #include "midiBackend.hpp"
 #include "timelineIO.hpp"
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
@@ -67,6 +68,8 @@ class OutputsOverlay : public OverlayWindow {
         int  gm1Instrument     = -1;
         std::string inputName;               // the MIDI input it is played from
         int  inputChannel      = 0;          // 0 = Any; 1-16
+        KeySplit split         = KeySplit::None;
+        int  splitNote         = 60;
     };
     struct InstrumentRow {
         Fl_Box*       typeLabel      = nullptr;
@@ -94,6 +97,10 @@ class OutputsOverlay : public OverlayWindow {
         Fl_Choice*    inputChoice     = nullptr;
         Fl_Box*       inChanLabel     = nullptr;
         Fl_Choice*    inChanChoice    = nullptr;
+        Fl_Box*       splitLabel      = nullptr;
+        Fl_Choice*    splitChoice     = nullptr;
+        Fl_Box*       splitNoteLabel  = nullptr;
+        ModernButton* splitLearnBtn   = nullptr;
         Fl_Box*       outputLabel     = nullptr;
         Fl_Box*       outChanLabel    = nullptr;
         std::string   committedName;
@@ -115,6 +122,14 @@ class OutputsOverlay : public OverlayWindow {
     std::vector<MidiInputPort>  inputs_;
     std::vector<InputRow>       inRows_;
 
+    // The instrument whose split point is waiting for a key, or -1. By id, so it
+    // survives the rows being rebuilt.
+    int splitLearnId_ = -1;
+    // The key that completed a split learn, on its input: its release is swallowed
+    // too, so the key sounds nowhere. -1 when there is none.
+    int         splitSwallowNote_ = -1;
+    std::string splitSwallowInput_;
+
     bool jackWarning_ = false;  // show "JACK server not running" on the ports heading
 
     // Column widths (recomputed by the rebuilds, read by the column headings)
@@ -135,6 +150,8 @@ class OutputsOverlay : public OverlayWindow {
     // Refills each instrument's input dropdown and the inputs' delete buttons.
     void rebuildInputChoices();
     void syncFromInputs();
+    // Shows instrument i's split — the note, and whether it is learning — on its row.
+    void updateSplitRow(int i);
 
     // What a port is shown as. Hosted, a Plugin-backed port is displayed as the LV2
     // output it actually drives ("MIDI Out 2") rather than its own name, and its
@@ -170,6 +187,8 @@ class OutputsOverlay : public OverlayWindow {
     static void inputDeleteCb   (Fl_Widget*, void*);
     static void instrInputCb    (Fl_Widget*, void*);
     static void instrInChanCb   (Fl_Widget*, void*);
+    static void splitChoiceCb   (Fl_Widget*, void*);
+    static void splitLearnCb    (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
     static void instrNameCb     (Fl_Widget*, void*);
     static void instrDeleteCb   (Fl_Widget*, void*);
@@ -231,12 +250,26 @@ public:
         int         gm1Instrument     = -1;
         std::string inputName;           // empty = the first input
         int         inputChannel      = 0;
+        KeySplit    split             = KeySplit::None;
+        int         splitNote         = 60;
     };
     void setInstruments(const std::vector<InstrumentInfo>& instrs);
     std::vector<InstrumentInfo> getInstruments() const;
-    // The input and channel instrument `instrId` is played from. False if there is
-    // no such instrument. Cheap: for the MIDI input path, which runs per event.
-    bool instrumentInput(int instrId, std::string& inputName, int& channel) const;
+    // The input, channel and split instrument `instrId` is played from. False if
+    // there is no such instrument. Cheap: for the MIDI input path, which runs per event.
+    bool instrumentInput(int instrId, std::string& inputName, int& channel,
+                         KeySplit& split, int& splitNote) const;
+
+    // Split learn: an instrument's MIDI Learn button waits for a key on that
+    // instrument's input (and channel), which becomes its split point. Feed every
+    // incoming message from input `inputName` here before anything else sees it.
+    // True when the message was the learned key — its press or its release — and
+    // so should go nowhere else.
+    bool handleSplitLearn(const std::string& inputName, const uint8_t* data, int len);
+    void cancelSplitLearn();
+    // A split learn began. The app cancels any other MIDI learn, so one key never
+    // completes two.
+    std::function<void()> onSplitLearnStarted;
     void updateInstrumentDrumMap(int instrId, int midiNote, const std::string& label);
     void setObservableInstrument(ObservableInstrument* instr);
 

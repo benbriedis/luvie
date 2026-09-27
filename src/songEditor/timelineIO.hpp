@@ -74,6 +74,22 @@ struct MidiTrigger {
     bool operator!=(const MidiTrigger& o) const { return !(*this == o); }
 };
 
+// Keyboard split: which part of the keyboard an instrument is played from. Each
+// instrument takes one side; the other side is a second instrument, set up on the
+// same input with the opposite split and the same split point (plus or minus one).
+enum class KeySplit { None, Upper, Lower };
+
+// Whether `note` is on an instrument's side of its split. Upper takes splitNote
+// and everything above it; Lower splitNote and everything below.
+inline bool keySplitAccepts(KeySplit split, int splitNote, int note)
+{
+    switch (split) {
+        case KeySplit::Upper: return note >= splitNote;
+        case KeySplit::Lower: return note <= splitNote;
+        default:              return true;
+    }
+}
+
 struct JackInstrument {
     int         id                = 0;   // timeline Instrument ID (0 if unset)
     std::string name;
@@ -90,6 +106,8 @@ struct JackInstrument {
     // while one of its patterns is being edited (or its track is selected).
     std::string inputName;               // MidiInputPort::name
     int         inputChannel      = 0;   // 0 = Any; 1-16 = that channel alone
+    KeySplit    split             = KeySplit::None;
+    int         splitNote         = 60;  // lowest note (Upper) or highest (Lower)
 };
 
 // App-level state that gets persisted to / loaded from disk.

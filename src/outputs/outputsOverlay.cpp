@@ -47,6 +47,11 @@ static constexpr int subChildX         = subRowX + 44;    // bank, program, drum
 static constexpr int subLabelW         = 76;
 static constexpr int subPortW          = 220;   // input / output port dropdowns
 static constexpr int progBtnH          = 20;
+// The split controls, on the "MIDI input" sub-row after its channel.
+static constexpr int splitLabelW       = 36;
+static constexpr int splitChoiceW      = 70;
+static constexpr int splitNoteW        = 60;
+static constexpr int splitLearnW       = 90;
 
 static constexpr int drumRowH          = 32;
 static constexpr int drumBtnH          = 22;
@@ -71,6 +76,7 @@ static constexpr Fl_Color subTextCol = OverlayWindow::subTextCol;
 static constexpr Fl_Color inputBgCol = 0xF9FAFB00;
 static constexpr Fl_Color delRedCol  = 0xEF444400;
 static constexpr Fl_Color addBtnBg   = 0xF3F4F600;
+static constexpr Fl_Color learningBorderCol = 0xF59E0B00;   // as the scene buttons' learn
 
 // ── GM1 instrument list ───────────────────────────────────────────────────────
 
@@ -124,6 +130,13 @@ static constexpr const char* kGm1Names[128] = {
     "Bird Tweet",           "Telephone Ring",         "Helicopter",
     "Applause",             "Gunshot",
 };
+
+// 60 -> "C4"
+static std::string splitNoteName(int midi)
+{
+    static const char* names[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+    return std::string(names[midi % 12]) + std::to_string(midi / 12 - 1);
+}
 
 static int parseOptionalInt(const char* v, int lo, int hi) {
     if (!v || !v[0]) return -1;
@@ -362,6 +375,7 @@ void OutputsOverlay::show() {
 }
 
 void OutputsOverlay::hide() {
+    cancelSplitLearn();
     syncFromInputs();
     // Port rename safety net (for inputs that didn't fire unfocus before hide)
     for (int i = 0; i < (int)rows_.size() && i < (int)outputs_.size(); i++) {
@@ -468,7 +482,8 @@ void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
                                 ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
                                 ci.gm1Instrument,
                                 ci.inputName.empty() ? inputs_[0].name : ci.inputName,
-                                std::clamp(ci.inputChannel, 0, 16)});
+                                std::clamp(ci.inputChannel, 0, 16),
+                                ci.split, std::clamp(ci.splitNote, 0, 127)});
     rebuildInstrumentRows();
 }
 
@@ -482,19 +497,97 @@ std::vector<OutputsOverlay::InstrumentInfo> OutputsOverlay::getInstruments() con
     for (const auto& instr : instruments_)
         result.push_back({instr.id, instr.name, instr.portName, instr.midiChannel, instr.drumMap,
                           instr.isDrum, instr.fallbackNoteNames, instr.programNumber, instr.bankMsb, instr.bankLsb,
-                          instr.gm1Instrument, instr.inputName, instr.inputChannel});
+                          instr.gm1Instrument, instr.inputName, instr.inputChannel,
+                          instr.split, instr.splitNote});
     return result;
 }
 
-bool OutputsOverlay::instrumentInput(int instrId, std::string& inputName, int& channel) const
+bool OutputsOverlay::instrumentInput(int instrId, std::string& inputName, int& channel,
+                                     KeySplit& split, int& splitNote) const
 {
     for (const auto& instr : instruments_) {
         if (instr.id != instrId) continue;
         inputName = instr.inputName;
         channel   = instr.inputChannel;
+        split     = instr.split;
+        splitNote = instr.splitNote;
         return true;
     }
     return false;
+}
+
+bool OutputsOverlay::handleSplitLearn(const std::string& inputName, const uint8_t* data, int len)
+{
+    if (len < 2) return false;
+    const int  status = data[0] & 0xF0;
+    const int  note   = data[1] & 0x7F;
+    const bool noteOn = status == 0x90 && len >= 3 && (data[2] & 0x7F) > 0;
+    const bool noteOff = status == 0x80 || (status == 0x90 && !noteOn);
+
+    if (noteOff) {
+        if (note != splitSwallowNote_ || inputName != splitSwallowInput_) return false;
+        splitSwallowNote_ = -1;
+        return true;
+    }
+    if (!noteOn || splitLearnId_ < 0) return false;
+
+    for (int i = 0; i < (int)instruments_.size(); i++) {
+        Instrument& instr = instruments_[i];
+        if (instr.id != splitLearnId_) continue;
+        if (instr.inputName != inputName) return false;
+        if (instr.inputChannel != 0 && (data[0] & 0x0F) != instr.inputChannel - 1) return false;
+        instr.splitNote    = note;
+        splitLearnId_      = -1;
+        splitSwallowNote_  = note;
+        splitSwallowInput_ = inputName;
+        updateSplitRow(i);
+        if (onInstrumentsChanged) onInstrumentsChanged();
+        return true;
+    }
+    splitLearnId_ = -1;   // its instrument has gone
+    return false;
+}
+
+void OutputsOverlay::cancelSplitLearn()
+{
+    if (splitLearnId_ < 0) return;
+    const int id  = splitLearnId_;
+    splitLearnId_ = -1;
+    for (int i = 0; i < (int)instruments_.size(); i++)
+        if (instruments_[i].id == id) updateSplitRow(i);
+}
+
+void OutputsOverlay::updateSplitRow(int i)
+{
+    if (i < 0 || i >= (int)instrRows_.size() || i >= (int)instruments_.size()) return;
+    const Instrument& instr = instruments_[i];
+    InstrumentRow&    row   = instrRows_[i];
+    if (!row.splitChoice) return;
+
+    const bool split    = instr.split != KeySplit::None;
+    const bool learning = split && instr.id == splitLearnId_;
+    row.splitChoice->value(static_cast<int>(instr.split));
+
+    // "C4 and up" / "C4 and down" would crowd the row; the arrows say the same.
+    std::string noteText;
+    if (split)
+        noteText = splitNoteName(instr.splitNote)
+                 + (instr.split == KeySplit::Upper ? " \xe2\x86\x91" : " \xe2\x86\x93");
+    row.splitNoteLabel->copy_label(noteText.c_str());
+    row.splitNoteLabel->copy_tooltip(!split ? ""
+        : instr.split == KeySplit::Upper
+            ? ("Plays " + splitNoteName(instr.splitNote) + " and the keys above it").c_str()
+            : ("Plays " + splitNoteName(instr.splitNote) + " and the keys below it").c_str());
+
+    row.splitLearnBtn->label(learning ? "Press a key..." : "MIDI Learn");
+    row.splitLearnBtn->setBorderColor(learning ? learningBorderCol : borderCol);
+    row.splitLearnBtn->setBorderWidth(learning ? 2 : 1);
+    row.splitLearnBtn->tooltip(instr.split == KeySplit::Lower
+        ? "Sets the highest key this instrument plays: press it on the instrument's MIDI input"
+        : "Sets the lowest key this instrument plays: press it on the instrument's MIDI input");
+    if (split) row.splitLearnBtn->activate();
+    else       row.splitLearnBtn->deactivate();
+    redraw();
 }
 
 void OutputsOverlay::updateInstrumentDrumMap(int instrId, int midiNote, const std::string& label)
@@ -814,6 +907,10 @@ void OutputsOverlay::rebuildInstrumentRows() {
         if (row.inputChoice)     discard(row.inputChoice);
         if (row.inChanLabel)     discard(row.inChanLabel);
         if (row.inChanChoice)    discard(row.inChanChoice);
+        if (row.splitLabel)      discard(row.splitLabel);
+        if (row.splitChoice)     discard(row.splitChoice);
+        if (row.splitNoteLabel)  discard(row.splitNoteLabel);
+        if (row.splitLearnBtn)   discard(row.splitLearnBtn);
         if (row.outputLabel)     discard(row.outputLabel);
         if (row.outChanLabel)    discard(row.outChanLabel);
     }
@@ -974,6 +1071,40 @@ void OutputsOverlay::rebuildInstrumentRows() {
         fillInputChanChoice(inChanCh);
         inChanCh->value(instruments_[i].inputChannel);
         inChanCh->callback(instrInChanCb, this);
+        ix += chanMidiW + 12;
+
+        // Keyboard split: which side of the split point this instrument plays.
+        auto* splitLbl = new Fl_Box(ix, inWidY, splitLabelW, progBtnH, "Split");
+        splitLbl->box(FL_NO_BOX);
+        splitLbl->labelcolor(subTextCol);
+        splitLbl->labelsize(11);
+        splitLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+        ix += splitLabelW + 4;
+
+        // Item order must match the KeySplit enum: the index is the value.
+        auto* splitCh = new ModernChoice(ix, inWidY, splitChoiceW, progBtnH);
+        styleChoice(splitCh);
+        splitCh->textsize(11);
+        splitCh->add("None");
+        splitCh->add("Upper");
+        splitCh->add("Lower");
+        splitCh->callback(splitChoiceCb, this);
+        ix += splitChoiceW + 6;
+
+        auto* splitNoteLbl = new Fl_Box(ix, inWidY, splitNoteW, progBtnH);
+        splitNoteLbl->box(FL_NO_BOX);
+        splitNoteLbl->labelcolor(textCol);
+        splitNoteLbl->labelsize(11);
+        splitNoteLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        ix += splitNoteW + 4;
+
+        auto* splitLearn = new ModernButton(ix, inWidY, splitLearnW, progBtnH, "MIDI Learn");
+        splitLearn->labelsize(11);
+        splitLearn->labelcolor(textCol);
+        splitLearn->color(addBtnBg);
+        splitLearn->setBorderWidth(1);
+        splitLearn->setBorderColor(borderCol);
+        splitLearn->callback(splitLearnCb, this);
 
         // MIDI output sub-row — where the instrument sends, laid out to match
         const int outSubY = inSubY + progRowH;
@@ -1103,8 +1234,10 @@ void OutputsOverlay::rebuildInstrumentRows() {
         instrRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh,
                               progInp, progDrop, msbInp, lsbInp,
                               bankLbl, msbLbl, lsbLbl, progLbl, gm1Lbl,
-                              inLbl, inCh, inChanLbl, inChanCh, outLbl, outChanLbl,
-                              instruments_[i].name});
+                              inLbl, inCh, inChanLbl, inChanCh,
+                              splitLbl, splitCh, splitNoteLbl, splitLearn,
+                              outLbl, outChanLbl, instruments_[i].name});
+        updateSplitRow(i);
         y += rowH + 4 * progRowH + (drum ? drumRowH : 0);
     }
     instrPane_->end();
@@ -1360,6 +1493,41 @@ void OutputsOverlay::instrInChanCb(Fl_Widget* w, void* d) {
     }
 }
 
+void OutputsOverlay::splitChoiceCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].splitChoice) continue;
+        int idx = static_cast<Fl_Choice*>(w)->value();
+        if (idx < 0) return;
+        self->instruments_[i].split = static_cast<KeySplit>(idx);
+        // Unsplit, there is no point to learn.
+        if (self->instruments_[i].split == KeySplit::None
+            && self->splitLearnId_ == self->instruments_[i].id)
+            self->splitLearnId_ = -1;
+        self->updateSplitRow(i);
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
+        return;
+    }
+}
+
+void OutputsOverlay::splitLearnCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].splitLearnBtn) continue;
+        const int id = self->instruments_[i].id;
+        // A second press cancels; otherwise this learn replaces any other.
+        if (self->splitLearnId_ == id) {
+            self->cancelSplitLearn();
+            return;
+        }
+        self->cancelSplitLearn();
+        self->splitLearnId_ = id;
+        self->updateSplitRow(i);
+        if (self->onSplitLearnStarted) self->onSplitLearnStarted();
+        return;
+    }
+}
+
 void OutputsOverlay::deleteCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<OutputsOverlay*>(d);
     for (int i = 0; i < (int)self->rows_.size(); i++) {
@@ -1602,6 +1770,7 @@ std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
     for (const auto& row : instrRows_) {
         add(row.nameInput); add(row.deleteBtn);
         add(row.inputChoice); add(row.inChanChoice);
+        add(row.splitChoice); add(row.splitLearnBtn);
         add(row.portChoice);  add(row.midiChanChoice);
     }
     add(addDrumInstrBtn);

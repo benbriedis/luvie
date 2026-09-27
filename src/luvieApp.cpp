@@ -139,17 +139,25 @@ int LuvieApp::midiInInstrument() const
     return tl.tracks[sel].instrumentId;
 }
 
-bool LuvieApp::midiInAccepted(int slot, uint8_t status) const
+bool LuvieApp::midiInAccepted(int slot, const uint8_t* data, int len) const
 {
     if (!outputsOverlay) return true;
     std::string inputName;
-    int         channel = 0;
-    if (!outputsOverlay->instrumentInput(midiInInstrument(), inputName, channel))
+    int         channel   = 0;
+    KeySplit    split     = KeySplit::None;
+    int         splitNote = 0;
+    if (!outputsOverlay->instrumentInput(midiInInstrument(), inputName, channel,
+                                         split, splitNote))
         return true;
     if (midiIn.slotForName(inputName) != slot) return false;
-    if (channel == 0) return true;                       // "Any"
+    const uint8_t status = data[0];
     if (status < 0x80 || status >= 0xF0) return true;    // not a channel message
-    return (status & 0x0F) == channel - 1;
+    if (channel != 0 && (status & 0x0F) != channel - 1) return false;   // 0 = "Any"
+    // Notes and poly aftertouch carry a key, which has to be on this side of the split.
+    const int kind = status & 0xF0;
+    if ((kind == 0x80 || kind == 0x90 || kind == 0xA0) && len >= 2)
+        return keySplitAccepts(split, splitNote, data[1] & 0x7F);
+    return true;
 }
 
 void LuvieApp::midiInputRenamed(const std::string& oldName, const std::string& newName)
@@ -660,8 +668,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     loopEd->setSceneTriggers(&sceneTriggers);
     sceneTriggers.onDisplayChanged = [this]() { loopEd->refreshSceneTriggers(); };
     sceneTriggers.onEdited         = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
-    sceneTriggers.onLearnStarted   = [this]() { midiLearn.cancelLearn(); };
-    midiLearn.onLearnStarted       = [this]() { sceneTriggers.cancelLearn(); };
+    sceneTriggers.onLearnStarted   = [this]() {
+        midiLearn.cancelLearn();
+        if (outputsOverlay) outputsOverlay->cancelSplitLearn();
+    };
+    midiLearn.onLearnStarted       = [this]() {
+        sceneTriggers.cancelLearn();
+        if (outputsOverlay) outputsOverlay->cancelSplitLearn();
+    };
 
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
@@ -687,13 +701,17 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         // to call this, but a missed one would silently swallow MIDI rather than
         // fail visibly, so the cheap pointer compare is worth doing here too.
         updateMidiTarget();
-        const bool accepted = midiInAccepted(slot, data[0]);
+        const bool accepted = midiInAccepted(slot, data, len);
         if (luvieDebug())
             fprintf(stderr, "[luvie] midi in %d: %02X %02X%s target=%s%s\n", slot,
                     data[0], len > 1 ? data[1] : 0,
                     len > 2 ? " .." : "", midiTarget ? "yes" : "NONE",
-                    accepted ? "" : " (not this instrument's input)");
+                    accepted ? "" : " (not this instrument's input or split)");
         if (len < 2) return;
+
+        // A split point being learned takes the key before anything else can.
+        if (outputsOverlay && outputsOverlay->handleSplitLearn(midiIn.nameForSlot(slot), data, len))
+            return;
         const int status = data[0] & 0xF0;
 
         // Scene triggers first: a button bound to a scene means nothing else, and its
@@ -871,6 +889,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         outputsOverlay->onInstrumentsChanged = [this]() {
             pushInstruments();
             if (onInstrumentsChanged) onInstrumentsChanged();
+        };
+        // Likewise a keyboard split's learn: one learn in flight at a time.
+        outputsOverlay->onSplitLearnStarted = [this]() {
+            midiLearn.cancelLearn();
+            sceneTriggers.cancelLearn();
         };
         outputsOverlay->setObservableInstrument(instruments_);
         if (drumEd) {

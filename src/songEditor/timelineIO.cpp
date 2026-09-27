@@ -326,6 +326,21 @@ static Timeline timelineFromJson(const json& j) {
     return tl;
 }
 
+static const char* keySplitToString(KeySplit s) {
+    switch (s) {
+        case KeySplit::Upper: return "upper";
+        case KeySplit::Lower: return "lower";
+        default:              return "none";
+    }
+}
+
+// Anything unrecognised, including a project saved before splits, is unsplit.
+static KeySplit keySplitFromString(const std::string& s) {
+    if (s == "upper") return KeySplit::Upper;
+    if (s == "lower") return KeySplit::Lower;
+    return KeySplit::None;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 std::string appStateToJsonString(const AppState& state) {
@@ -343,7 +358,8 @@ std::string appStateToJsonString(const AppState& state) {
                            {"programNumber", c.programNumber},
                            {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
                            {"gm1Instrument", c.gm1Instrument},
-                           {"inputName", c.inputName}, {"inputChannel", c.inputChannel}});
+                           {"inputName", c.inputName}, {"inputChannel", c.inputChannel},
+                           {"split", keySplitToString(c.split)}, {"splitNote", c.splitNote}});
     }
     json jins = json::array();
     for (const auto& in : state.midiInputs)
@@ -520,6 +536,8 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         ch.gm1Instrument     = jc.value("gm1Instrument",     -1);
         ch.inputName         = jc.value("inputName", state.midiInputs[0].name);
         ch.inputChannel      = std::clamp(jc.value("inputChannel", legacyChannel), 0, 16);
+        ch.split             = keySplitFromString(jc.value("split", ""));
+        ch.splitNote         = std::clamp(jc.value("splitNote", 60), 0, 127);
         state.jackInstruments.push_back(std::move(ch));
     }
     return true;

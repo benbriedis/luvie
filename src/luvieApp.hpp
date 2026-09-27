@@ -234,10 +234,11 @@ public:
     // the same from every tab. -1 when there is neither.
     int midiInInstrument() const;
     // Whether a message arriving on input `slot` is from where midiInInstrument()
-    // is played from — its input, on its channel. Anything else is ignored — notes and
-    // unbound controllers alike — except by MIDI learn and the scene triggers, which
-    // listen to every input. True when there is no such instrument.
-    bool midiInAccepted(int slot, uint8_t status) const;
+    // is played from — its input, on its channel, and for a note on its side of the
+    // keyboard split. Anything else is ignored — notes and unbound controllers
+    // alike — except by MIDI learn and the scene triggers, which listen to every
+    // input. True when there is no such instrument.
+    bool midiInAccepted(int slot, const uint8_t* data, int len) const;
     // Releases held notes and closes any open take. Called when the transport
     // stops, so a key held across the stop does not hang or keep recording.
     void stopMidiRecording();

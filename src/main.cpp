@@ -348,7 +348,8 @@ int main(int argc, char **argv) {
         for (const auto& c : state.jackInstruments)
             instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
-                              c.gm1Instrument, c.inputName, c.inputChannel});
+                              c.gm1Instrument, c.inputName, c.inputChannel,
+                              c.split, c.splitNote});
         connOverlay->setInstruments(instrs);
         app.pushInstruments();
         syncPorts();
@@ -368,7 +369,8 @@ int main(int argc, char **argv) {
             state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                              ci.isDrum, ci.fallbackNoteNames,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
-                                             ci.gm1Instrument, ci.inputName, ci.inputChannel});
+                                             ci.gm1Instrument, ci.inputName, ci.inputChannel,
+                                             ci.split, ci.splitNote});
     };
 
     // Let the menu's Import/Export include the outputs section.
