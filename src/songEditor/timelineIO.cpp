@@ -410,6 +410,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"currentScene",       state.currentScene},
         {"sceneTriggers",      jtrig},
         {"sceneNavTriggers",   jnav},
+        {"harmonyRootTrigger", state.harmonyRootTrigger},
         {"loopSigTop",         state.loopSigTop},
         {"loopSigBottom",      state.loopSigBottom},
         {"loopSigBeat",        state.loopSigBeat},
@@ -464,6 +465,7 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
             if (jnav.contains(kSceneNavNames[i]))
                 triggerFromJson(jnav.at(kSceneNavNames[i]), state.sceneTriggers[kSceneTriggerCount + i]);
     }
+    state.harmonyRootTrigger = j.value("harmonyRootTrigger", -1);
     // Absent before Loop mode had its own meter: -1, "follow the song".
     state.loopSigTop    = j.value("loopSigTop",    -1);
     state.loopSigBottom = j.value("loopSigBottom",  4);

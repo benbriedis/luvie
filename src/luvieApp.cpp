@@ -30,6 +30,7 @@
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
 #include "sceneContextPopup.hpp"
+#include "rootTriggerPopup.hpp"
 #include "loopRulerContextPopup.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
@@ -142,13 +143,25 @@ int LuvieApp::midiInInstrument() const
 bool LuvieApp::midiInAccepted(int slot, const uint8_t* data, int len) const
 {
     if (!outputsOverlay) return true;
+    const int instr = midiInInstrument();
     std::string inputName;
     int         channel   = 0;
     KeySplit    split     = KeySplit::None;
     int         splitNote = 0;
-    if (!outputsOverlay->instrumentInput(midiInInstrument(), inputName, channel,
-                                         split, splitNote))
+    if (!outputsOverlay->instrumentInput(instr, inputName, channel, split, splitNote))
         return true;
+    return instrumentHears(instr, slot, data, len);
+}
+
+bool LuvieApp::instrumentHears(int instrId, int slot, const uint8_t* data, int len) const
+{
+    if (!outputsOverlay) return false;
+    std::string inputName;
+    int         channel   = 0;
+    KeySplit    split     = KeySplit::None;
+    int         splitNote = 0;
+    if (!outputsOverlay->instrumentInput(instrId, inputName, channel, split, splitNote))
+        return false;
     if (midiIn.slotForName(inputName) != slot) return false;
     const uint8_t status = data[0];
     if (status < 0x80 || status >= 0xF0) return true;    // not a channel message
@@ -158,6 +171,13 @@ bool LuvieApp::midiInAccepted(int slot, const uint8_t* data, int len) const
     if ((kind == 0x80 || kind == 0x90 || kind == 0xA0) && len >= 2)
         return keySplitAccepts(split, splitNote, data[1] & 0x7F);
     return true;
+}
+
+void LuvieApp::setHarmonyRootTrigger(int instrId, bool edited)
+{
+    harmonyRootTrigger_ = instrId;
+    if (patternPanel) patternPanel->setRootTrigger(instrId);
+    if (edited && onMidiLearnChanged) onMidiLearnChanged();
 }
 
 void LuvieApp::midiInputRenamed(const std::string& oldName, const std::string& newName)
@@ -201,6 +221,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     app->applyScenes(state.scenes, state.currentScene);
     app->midiLearn.setBindings(state.midiLearn);
     app->sceneTriggers.setTriggers(state.sceneTriggers);
+    app->setHarmonyRootTrigger(state.harmonyRootTrigger);
 }
 
 void LuvieApp::exportCb(Fl_Widget*, void* data) {
@@ -230,6 +251,7 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     app->loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     state.midiLearn          = app->midiLearn.bindings();
     state.sceneTriggers      = app->sceneTriggers.triggers();
+    state.harmonyRootTrigger = app->harmonyRootTrigger();
     saveAppState(state, path);
 }
 
@@ -321,6 +343,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* ctxPop    = new TrackContextPopup;
     auto* loopCtxPop = new LoopContextPopup;
     auto* sceneCtxPop = new SceneContextPopup;
+    auto* rootTrigPop = new RootTriggerPopup;
     auto* loopRulerPop = new LoopRulerContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
@@ -672,6 +695,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         midiLearn.cancelLearn();
         if (outputsOverlay) outputsOverlay->cancelSplitLearn();
     };
+    // The base note's MIDI trigger: right-click the base note to pick an instrument.
+    patternPanel->onRootContextMenu = [this, rootTrigPop](int wx, int wy) {
+        if (!song_) return;
+        rootTrigPop->open(song_->get().instruments, harmonyRootTrigger_, wx, wy);
+    };
+    rootTrigPop->onSelect = [this](int instrId) { setHarmonyRootTrigger(instrId, true); };
+    patternPanel->setRootTrigger(harmonyRootTrigger_);
     midiLearn.onLearnStarted       = [this]() {
         sceneTriggers.cancelLearn();
         if (outputsOverlay) outputsOverlay->cancelSplitLearn();
@@ -723,6 +753,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (fired >= 0 && loopEd)
             loopEd->chooseScene(SceneTriggerMap::targetScene(fired, sceneBank.shownScene()));
         if (consumed) return;
+
+        // The Harmony Editor's base note follows its trigger instrument's keys —
+        // only those on that instrument's input, channel and side of its split. Not
+        // consumed: the key is still heard wherever else it would be, so it is the
+        // splits, not this, that keep it out of the instrument being played.
+        if (harmonyRootTrigger_ >= 0 && status == 0x90 && len >= 3 && (data[2] & 0x7F) > 0
+            && patternPanel && instrumentHears(harmonyRootTrigger_, slot, data, len))
+            patternPanel->setRootFromMidi(data[1] & 0x7F);
 
         // Controllers: MIDI learn decides what they are. Checked before the target,
         // because learning and the labels' live values work from any tab.
@@ -863,6 +901,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);
     window->add(sceneCtxPop); window->registerPopup(sceneCtxPop);
+    window->add(rootTrigPop); window->registerPopup(rootTrigPop);
     window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);

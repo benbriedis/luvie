@@ -4,8 +4,10 @@
 #ifndef MODERN_CHOICE_HPP
 #define MODERN_CHOICE_HPP
 
+#include <FL/Fl.H>
 #include <FL/Fl_Choice.H>
 #include <FL/fl_draw.H>
+#include <functional>
 
 class ModernChoice : public Fl_Choice {
     bool     hovered   = false;
@@ -14,6 +16,10 @@ class ModernChoice : public Fl_Choice {
     Fl_Color hoverCol  = 0;  // 0 = auto (lighten bg)
 
 public:
+    // A right-click, which then never opens the dropdown. Unset, a right-click
+    // opens it like any other.
+    std::function<void()> onRightClick;
+
     // Layout metrics shared with subclasses that size themselves to their content
     // (see DenomBeatChoice::naturalWidth). The value sits in x+kInset .. w-kValuePad,
     // clearing the chevron on the right.
@@ -52,6 +58,11 @@ private:
     int handle(int event) override {
         if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
+        if ((event == FL_PUSH || event == FL_RELEASE) && onRightClick
+            && Fl::event_button() == FL_RIGHT_MOUSE) {
+            if (event == FL_PUSH) onRightClick();
+            return 1;
+        }
         return Fl_Choice::handle(event);
     }
 

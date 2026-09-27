@@ -367,6 +367,10 @@ void PatternPanel::initHarmonyControls()
     ks.rootChoice.color(HarmonyControls::kBg);
     ks.rootChoice.setBorderColor(panelCtrlBorder);
     ks.rootChoice.callback(paramsCb, this);
+    ks.rootChoice.onRightClick = [this]() {
+        if (onRootContextMenu) onRootContextMenu(Fl::event_x(), Fl::event_y());
+    };
+    refreshRootTooltip();
 
     cs.chordScaleBtn.color(HarmonyControls::kBg);
     cs.chordScaleBtn.labelcolor(panelText);
@@ -842,6 +846,40 @@ void PatternPanel::refreshHarmony()
     }
 }
 
+void PatternPanel::setRootTrigger(int instrId)
+{
+    rootTriggerId_ = instrId;
+    refreshRootTooltip();
+}
+
+void PatternPanel::refreshRootTooltip()
+{
+    std::string tip = "Base note";
+    if (pattern && rootTriggerId_ >= 0)
+        for (const auto& in : pattern->get().instruments)
+            if (in.id == rootTriggerId_) { tip += "\nMIDI: set by " + in.name; break; }
+    tip += "\nRight-click to set it from an instrument";
+    harmonyControls.keySec.rootChoice.copy_tooltip(tip.c_str());
+}
+
+void PatternPanel::setRootFromMidi(int midiNote)
+{
+    const int patId = selectedPatternId();
+    if (patId == 0 || !pattern) return;
+    for (const auto& p : pattern->get().patterns) {
+        if (p.id != patId) continue;
+        if (p.type != PatternType::HARMONY) return;
+        // The choice lists A first, so A (MIDI 69, or 9 mod 12) is index 0.
+        const int root = (midiNote + 3) % 12;
+        if (p.rootPitch == root) return;   // repeating the key is not an edit
+        auto& rc = harmonyControls.keySec.rootChoice;
+        rc.value(root);
+        rc.redraw();
+        commitHarmony();
+        return;
+    }
+}
+
 void PatternPanel::refreshDivisions()
 {
     if (!pattern) return;
@@ -970,6 +1008,7 @@ void PatternPanel::onTimelineChanged()
     refreshTimeSig();
     refreshBars();
     refreshHarmony();
+    refreshRootTooltip();   // the trigger instrument may have been renamed
     refreshDivisions();
     refreshZoom();
     // Push the freshly-loaded pattern's harmony/divisions/zoom to the editors so

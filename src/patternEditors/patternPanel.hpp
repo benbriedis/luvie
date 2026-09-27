@@ -163,6 +163,9 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     // Only the harmony bar folds; the drum and pianoroll bars carry less and
     // stay on one row whatever the width.
     bool                canFold       = true;
+    // The instrument whose notes set the base note, or -1. Shown in the base note's
+    // tooltip; the routing itself is the owner's.
+    int                 rootTriggerId_ = -1;
 
     InlineInput     input;           // direct child of PatternPanel for overlay
     RecenterButton  recentreBtn;
@@ -217,6 +220,7 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     void refreshTimeSig();
     void refreshBars();
     void refreshHarmony();
+    void refreshRootTooltip();
     void refreshDivisions();
     void refreshZoom();
     void commitHarmony();
@@ -238,6 +242,16 @@ public:
     std::function<void(bool)>  onRecordChanged;
     // Flexible bars on/off from the toggle, likewise.
     std::function<void(bool)>  onGrowChanged;
+    // Right-click on the base note, at window coordinates: the owner opens the
+    // menu that picks the base note's MIDI trigger instrument.
+    std::function<void(int wx, int wy)> onRootContextMenu;
+
+    // The instrument whose notes set the base note, or -1 for none.
+    void setRootTrigger(int instrId);
+    // A note from that instrument: the selected pattern, if it is a harmony
+    // pattern, takes its pitch class as the base note. The octave is dropped — the
+    // base note has none.
+    void setRootFromMidi(int midiNote);
 
     void commitEdit();
 

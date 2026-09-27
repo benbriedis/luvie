@@ -392,6 +392,7 @@ int main(int argc, char **argv) {
         app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         state.midiLearn = app.midiLearn.bindings();
         state.sceneTriggers = app.sceneTriggers.triggers();
+        state.harmonyRootTrigger = app.harmonyRootTrigger();
         return state;
     };
 
@@ -415,6 +416,7 @@ int main(int argc, char **argv) {
         app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         app.midiLearn.setBindings(state.midiLearn);
         app.sceneTriggers.setTriggers(state.sceneTriggers);
+        app.setHarmonyRootTrigger(state.harmonyRootTrigger);
     };
 
     // --- Transport selection ----------------------------------------------

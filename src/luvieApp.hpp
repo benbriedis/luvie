@@ -195,6 +195,13 @@ public:
     // The MIDI triggers that switch the Loop Editor's scenes. Saved with the project
     // (AppState::sceneTriggers), and like midiLearn kept out of the timeline.
     SceneTriggerMap sceneTriggers;
+    // The instrument whose notes set the Harmony Editor's base note, or -1. Chosen
+    // from the base note's right-click menu and saved with the project
+    // (AppState::harmonyRootTrigger); like the triggers above, kept out of the timeline.
+    int  harmonyRootTrigger() const { return harmonyRootTrigger_; }
+    // From a loaded project, or the menu. Only the menu is an edit: `edited` fires
+    // onMidiLearnChanged.
+    void setHarmonyRootTrigger(int instrId, bool edited = false);
     // The user bound or cleared a control or a scene trigger: the project needs
     // saving (standalone), or the state re-sending to the DSP (plugin). Loading
     // bindings does not fire it.
@@ -239,6 +246,10 @@ public:
     // alike — except by MIDI learn and the scene triggers, which listen to every
     // input. True when there is no such instrument.
     bool midiInAccepted(int slot, const uint8_t* data, int len) const;
+    // The same test for any instrument: whether a message arriving on `slot` is on
+    // instrument `instrId`'s input, channel and side of its split. False when there
+    // is no such instrument.
+    bool instrumentHears(int instrId, int slot, const uint8_t* data, int len) const;
     // Releases held notes and closes any open take. Called when the transport
     // stops, so a key held across the stop does not hang or keep recording.
     void stopMidiRecording();
@@ -274,6 +285,7 @@ private:
     void onLoopsChanged();
 
     bool layingOutPatternTab = false;
+    int  harmonyRootTrigger_ = -1;
 
     ObservableSong*      song_        = nullptr;
     ObservablePattern*   pattern_     = nullptr;
