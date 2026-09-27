@@ -21,6 +21,7 @@
 #include "modern/accidentalChoice.hpp"
 #include "modern/denomBeatChoice.hpp"
 #include "modern/sharpFlatButton.hpp"
+#include "modern/recordButton.hpp"
 #include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
 #include "chords.hpp"
@@ -182,7 +183,7 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     ModernButton    growBtn;
     // Record arm, on the right of the bar. Pianoroll and drum only — the harmony
     // editor cannot record, so it hides this (and disarms it) like it does Rapid.
-    ModernButton    recordBtn;
+    RecordButton    recordBtn;
 
     float computeSnapBeats() const;
     int   computeDivisions() const;

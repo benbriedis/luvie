@@ -32,7 +32,7 @@ static constexpr int rapidBtnW     = 52;
 static constexpr int rapidFoldedGap = 20;   // sets Rapid apart from the Out dropdown
 static constexpr int colouredRowIndent = 6;  // left inset of the folded coloured row
 static constexpr Fl_Color kRapidActiveColor = 0x3B82F600;
-static constexpr int      recordBtnW        = 64;
+static constexpr int      recordBtnW        = 32;
 static constexpr Fl_Color kRecordActiveColor = 0xDC262600;   // red while armed
 static constexpr int      growBtnW          = 52;
 // Amber: next to Record's red without reading as a second record button, and clear
@@ -238,7 +238,7 @@ PatternPanel::PatternPanel(int x, int y, int w, int h)
       timeControls   (0, 0, ctrlH),
       rapidBtn       (0, 0, rapidBtnW,   ctrlH, "Rapid"),
       growBtn        (0, 0, growBtnW,    ctrlH, "Grow"),
-      recordBtn      (0, 0, recordBtnW,  ctrlH, "Record")
+      recordBtn      (0, 0, recordBtnW,  ctrlH)
 {
     initControls();
     initPatternName();
@@ -602,7 +602,7 @@ void PatternPanel::initRecordBtn()
     recordBtn.labelcolor(panelText);
     recordBtn.setBorderWidth(1);
     recordBtn.setBorderColor(panelCtrlBorder);
-    recordBtn.tooltip("Record incoming MIDI into this pattern while the transport runs");
+    recordBtn.tooltip("Record: capture incoming MIDI into this pattern while the transport runs");
     recordBtn.hide();   // shown only for the pattern types that can record
     recordBtn.callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<PatternPanel*>(d);

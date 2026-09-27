@@ -38,13 +38,27 @@ void ControlBar::applyLayout(const std::vector<PanelRow>& rows)
             lx   += it.width;
             first = false;
         }
-        int rx = x() + w() - pad;
-        for (auto it = row.right.rbegin(); it != row.right.rend(); ++it) {
-            if (!it->widget->visible()) continue;
-            rx -= it->width;
-            it->widget->resize(std::max(rx, lx + (first ? 0 : gapFor(*it, itemGap))),
-                               ry, it->width, rowH);
-            rx -= gapFor(*it, itemGap);
+        // The right run is placed as one block: packed against the right edge
+        // when there is room, otherwise pushed along to follow the left run and
+        // left to run off the end. Clamping each item on its own would stack
+        // them on top of one another, hiding all but the last.
+        int runW = 0;
+        bool runFirst = true;
+        for (const auto& it : row.right) {
+            if (!it.widget->visible()) continue;
+            if (!runFirst) runW += gapFor(it, itemGap);
+            runW    += it.width;
+            runFirst = false;
+        }
+        int rx = x() + w() - pad - runW;
+        runFirst = true;
+        for (const auto& it : row.right) {
+            if (!it.widget->visible()) continue;
+            if (runFirst) rx = std::max(rx, lx + (first ? 0 : gapFor(it, itemGap)));
+            else          rx += gapFor(it, itemGap);
+            it.widget->resize(rx, ry, it.width, rowH);
+            rx      += it.width;
+            runFirst = false;
         }
         ry += rowH + rowGap;
     }
