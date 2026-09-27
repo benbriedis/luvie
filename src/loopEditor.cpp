@@ -1181,10 +1181,15 @@ int LoopEditor::handle(int event)
         bool overCell = cellAt(mx, my, ti, li, newCol, newRow);
         int axisIdx = -1;
         bool overLabel = instrLabelAt(mx, my, axisIdx);
+        // A child with a right-click menu of its own (a scene button) has put up the
+        // context cursor already; defaulting it here would take it straight down.
+        auto* btn = dynamic_cast<ModernButton*>(Fl::belowmouse());
+        const bool overMenuChild = btn && btn->onRightClick;
         if (window()) {
             // Labels and cells both get the context cursor; the move cursor is
             // shown only while actually dragging an instrument (see FL_DRAG).
-            if (overLabel || overCell) window()->cursor(contextMenuCursorImage(), 0, 0);
+            if (overLabel || overCell || overMenuChild)
+                window()->cursor(contextMenuCursorImage(), 0, 0);
             else                       window()->cursor(FL_CURSOR_DEFAULT);
         }
         if (newCol != hoveredCol || newRow != hoveredRow) {

@@ -7,6 +7,7 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Choice.H>
 #include <FL/fl_draw.H>
+#include "cursors.hpp"
 #include <functional>
 
 class ModernChoice : public Fl_Choice {
@@ -17,7 +18,8 @@ class ModernChoice : public Fl_Choice {
 
 public:
     // A right-click, which then never opens the dropdown. Unset, a right-click
-    // opens it like any other.
+    // opens it like any other. Set, hovering shows the context-menu cursor, as
+    // everything else with a right-click menu does.
     std::function<void()> onRightClick;
 
     // Layout metrics shared with subclasses that size themselves to their content
@@ -56,8 +58,23 @@ private:
     }
 
     int handle(int event) override {
-        if (event == FL_ENTER) { hovered = true;  redraw(); return 1; }
-        if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
+        if (event == FL_ENTER) {
+            hovered = true;
+            redraw();
+            if (onRightClick && window()) window()->cursor(contextMenuCursorImage(), 0, 0);
+            return 1;
+        }
+        if (event == FL_LEAVE) {
+            hovered = false;
+            redraw();
+            if (onRightClick && window()) window()->cursor(FL_CURSOR_DEFAULT);
+            return 1;
+        }
+        if (event == FL_HIDE) {
+            // Hidden under the pointer gets no FL_LEAVE, so the cursor is put back here.
+            if (hovered && onRightClick && window()) window()->cursor(FL_CURSOR_DEFAULT);
+            hovered = false;
+        }
         if ((event == FL_PUSH || event == FL_RELEASE) && onRightClick
             && Fl::event_button() == FL_RIGHT_MOUSE) {
             if (event == FL_PUSH) onRightClick();
