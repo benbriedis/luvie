@@ -322,7 +322,7 @@ int main(int argc, char **argv) {
         connOverlay->onMidiInputsChanged  = [&]() { syncMidiInput(); };
         connOverlay->onMidiInputRenamed   = [&](const std::string& oldName,
                                                 const std::string& newName) {
-            app.midiIn.rename(oldName, newName);
+            app.midiInputRenamed(oldName, newName);
         };
         connOverlay->onPortRenamed = [&](const std::string& oldName, const std::string& newName) {
             portReg.rename(oldName, newName);
@@ -389,6 +389,7 @@ int main(int argc, char **argv) {
         app.loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
         app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         state.midiLearn = app.midiLearn.bindings();
+        state.sceneTriggers = app.sceneTriggers.triggers();
         return state;
     };
 
@@ -411,6 +412,7 @@ int main(int argc, char **argv) {
         app.applyScenes(state.scenes, state.currentScene);
         app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         app.midiLearn.setBindings(state.midiLearn);
+        app.sceneTriggers.setTriggers(state.sceneTriggers);
     };
 
     // --- Transport selection ----------------------------------------------

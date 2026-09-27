@@ -29,6 +29,7 @@
 #include "songPanel.hpp"
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
+#include "sceneContextPopup.hpp"
 #include "loopRulerContextPopup.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
@@ -151,6 +152,12 @@ bool LuvieApp::midiInAccepted(int slot, uint8_t status) const
     return (status & 0x0F) == channel - 1;
 }
 
+void LuvieApp::midiInputRenamed(const std::string& oldName, const std::string& newName)
+{
+    midiIn.rename(oldName, newName);
+    sceneTriggers.renameInput(oldName, newName);
+}
+
 void LuvieApp::stopMidiRecording()
 {
     if (midiTarget) midiTarget->releaseMidiNotes();
@@ -185,6 +192,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     app->applyLoopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     app->applyScenes(state.scenes, state.currentScene);
     app->midiLearn.setBindings(state.midiLearn);
+    app->sceneTriggers.setTriggers(state.sceneTriggers);
 }
 
 void LuvieApp::exportCb(Fl_Widget*, void* data) {
@@ -213,6 +221,7 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     state.currentScene       = app->shownScene();
     app->loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     state.midiLearn          = app->midiLearn.bindings();
+    state.sceneTriggers      = app->sceneTriggers.triggers();
     saveAppState(state, path);
 }
 
@@ -303,6 +312,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* tsPop   = new MarkerPopup(MarkerPopup::TIME_SIG);
     auto* ctxPop    = new TrackContextPopup;
     auto* loopCtxPop = new LoopContextPopup;
+    auto* sceneCtxPop = new SceneContextPopup;
     auto* loopRulerPop = new LoopRulerContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
@@ -643,6 +653,16 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
     midiLearn.onEdited = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
 
+    // Scene triggers: right-click a scene button to learn one. Only one learn is in
+    // flight at a time, param lane or scene, so one control never completes two.
+    sceneCtxPop->triggers = &sceneTriggers;
+    loopEd->setSceneContextPopup(sceneCtxPop);
+    loopEd->setSceneTriggers(&sceneTriggers);
+    sceneTriggers.onDisplayChanged = [this]() { loopEd->refreshSceneTriggers(); };
+    sceneTriggers.onEdited         = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
+    sceneTriggers.onLearnStarted   = [this]() { midiLearn.cancelLearn(); };
+    midiLearn.onLearnStarted       = [this]() { sceneTriggers.cancelLearn(); };
+
     harmonyEd->setParamDotPopup(pdPop);
     drumEd->setParamDotPopup(pdPop);
     pianorollEd->setParamDotPopup(pdPop);
@@ -655,12 +675,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     pianorollEd->setAuditioner(&auditioner);
 
     // ---- MIDI input ----
-    // Everything arriving on any input lands here, on the UI thread, and anything
-    // not from where the current instrument is played from is dropped straight
-    // away — notes, controllers and MIDI learn alike. Notes go to whichever pattern editor is
-    // showing, and are dropped when none is (the Song or Loop tab). Controllers are
-    // never dropped: bound to a param lane they drive it, and unbound they are
-    // forwarded to the instrument untouched, so the synth can learn them itself.
+    // Everything arriving on any input lands here, on the UI thread. Scene triggers
+    // and MIDI-learned controls are heard from every input — a pad controller or a
+    // fader box beside the keyboard is the usual home for them. Anything else not
+    // from where the current instrument is played from is dropped. Notes go to
+    // whichever pattern editor is showing, and are dropped when none is (the Song or
+    // Loop tab). Unbound controllers are forwarded to the instrument untouched, so
+    // the synth can learn them itself.
     midiIn.setSink([this](int slot, const uint8_t* data, int len) {
         // Recompute first. Every path that changes the visible editor is supposed
         // to call this, but a missed one would silently swallow MIDI rather than
@@ -672,9 +693,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
                     data[0], len > 1 ? data[1] : 0,
                     len > 2 ? " .." : "", midiTarget ? "yes" : "NONE",
                     accepted ? "" : " (not this instrument's input)");
-        if (!accepted) return;
         if (len < 2) return;
         const int status = data[0] & 0xF0;
+
+        // Scene triggers first: a button bound to a scene means nothing else, and its
+        // release is swallowed with it. They work from any tab, like the buttons.
+        bool      consumed = false;
+        const int scene    = sceneTriggers.handle(midiIn.nameForSlot(slot), data, len, consumed);
+        if (scene >= 0 && loopEd) loopEd->chooseScene(scene);
+        if (consumed) return;
 
         // Controllers: MIDI learn decides what they are. Checked before the target,
         // because learning and the labels' live values work from any tab.
@@ -694,6 +721,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
                 return;
             }
         }
+        if (!accepted) return;
         // Anything Luvie has no meaning for is passed to the instrument rather than
         // dropped: an unbound controller, and program change and poly aftertouch,
         // which have never had a lane here. Nothing records these and nothing
@@ -813,6 +841,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);
+    window->add(sceneCtxPop); window->registerPopup(sceneCtxPop);
     window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);

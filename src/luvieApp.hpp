@@ -16,6 +16,7 @@
 #include "noteAuditioner.hpp"
 #include "midiInPort.hpp"
 #include "midiLearn.hpp"
+#include "sceneTriggers.hpp"
 
 struct AppState;
 class ObservableSong;
@@ -191,9 +192,16 @@ public:
     // the Song Editor. Saved with the project (AppState::midiLearn) but kept out of
     // the timeline, so undo never changes a binding.
     MidiLearnMap midiLearn;
-    // The user bound or cleared a control: the project needs saving (standalone), or
-    // the state re-sending to the DSP (plugin). Loading bindings does not fire it.
+    // The MIDI triggers that switch the Loop Editor's scenes. Saved with the project
+    // (AppState::sceneTriggers), and like midiLearn kept out of the timeline.
+    SceneTriggerMap sceneTriggers;
+    // The user bound or cleared a control or a scene trigger: the project needs
+    // saving (standalone), or the state re-sending to the DSP (plugin). Loading
+    // bindings does not fire it.
     std::function<void()> onMidiLearnChanged;
+    // A MIDI input was renamed. The input manager follows it, and so do the scene
+    // triggers learned on it.
+    void midiInputRenamed(const std::string& oldName, const std::string& newName);
 
     // Widgets — valid after build()
     SettingsButton*    settingsButton = nullptr;
@@ -226,8 +234,9 @@ public:
     // the same from every tab. -1 when there is neither.
     int midiInInstrument() const;
     // Whether a message arriving on input `slot` is from where midiInInstrument()
-    // is played from — its input, on its channel. Anything else is ignored, notes,
-    // controllers and MIDI learn alike. True when there is no such instrument.
+    // is played from — its input, on its channel. Anything else is ignored — notes and
+    // unbound controllers alike — except by MIDI learn and the scene triggers, which
+    // listen to every input. True when there is no such instrument.
     bool midiInAccepted(int slot, uint8_t status) const;
     // Releases held notes and closes any open take. Called when the transport
     // stops, so a key held across the stop does not hang or keep recording.

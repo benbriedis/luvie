@@ -25,6 +25,16 @@
 static constexpr Fl_Color sceneInactiveBg   = 0x37415100;
 static constexpr Fl_Color sceneActiveBg     = 0x3B82F600;
 static constexpr Fl_Color sceneTransitionBg = 0xF59E0B00;
+// Outline of a scene button waiting for its MIDI trigger: the amber param labels
+// use for "Learning…".
+static constexpr Fl_Color sceneLearningBorder = 0xF59E0B00;
+
+static const char* sceneTooltip(int scene)
+{
+    return scene == SceneBank::kSceneSong
+        ? "Scene S: the song-linked scene"
+        : "A scene of your own; the song never changes it";
+}
 
 LoopPanel::LoopPanel(int x, int y, int w, int h)
     : ControlBar(x, y, w, h),
@@ -99,9 +109,8 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
         b->labelcolor(panelText);
         b->setBorderColor(panelCtrlBorder);
         b->setBorderWidth(1);
-        b->tooltip(i == SceneBank::kSceneSong
-                   ? "Scene S: the song-linked scene"
-                   : "A scene of your own; the song never changes it");
+        b->tooltip(sceneTooltip(i));
+        b->onRightClick = [this, i]() { if (onSceneContext) onSceneContext(i); };
         // The index travels in user_data rather than a capture: Fl_Widget callbacks
         // are plain function pointers.
         b->callback([](Fl_Widget* w, void* d) {
@@ -162,6 +171,24 @@ void LoopPanel::setSceneVisual(int shown, int playing)
         // control strip alone (see LoopEditor::timerCb), and repainting the whole
         // panel here would drag the BPM box back into it.
         sceneBtns[i]->redraw();
+    }
+}
+
+void LoopPanel::setSceneTriggerVisual(const SceneTriggerMap* triggers)
+{
+    for (int i = 0; i < SceneBank::kScenes; i++) {
+        ModernButton* b = sceneBtns[i];
+        const bool learning = triggers && triggers->isLearning(i);
+        b->setBorderColor(learning ? sceneLearningBorder : panelCtrlBorder);
+        b->setBorderWidth(learning ? 2 : 1);
+
+        std::string tip = sceneTooltip(i);
+        if (learning)
+            tip += "\nMIDI learn: waiting for a note, CC or program change";
+        else if (const MidiTrigger* t = triggers ? triggers->bindingFor(i) : nullptr)
+            tip += "\nMIDI: " + SceneTriggerMap::describe(*t);
+        b->copy_tooltip(tip.c_str());
+        b->redraw();
     }
 }
 
@@ -321,6 +348,9 @@ LoopEditor::LoopEditor(int x, int y, int w, int h)
         redraw();
         if (onSceneChosen) onSceneChosen(scene);
     };
+    panel->onSceneContext = [this](int scene) {
+        if (sceneContextPopup) sceneContextPopup->open(scene, Fl::event_x(), Fl::event_y());
+    };
     // The bar folds to a second row when the window is too narrow for everything
     // on it; the grid above gives up the space.
     panel->onHeightChanged = [this](int) { layoutPanel(); redraw(); };
@@ -374,6 +404,16 @@ void LoopEditor::refreshSceneVisual()
     const int shown   = scenes ? scenes->shownScene()   : SceneBank::kSceneSong;
     const int playing = scenes ? scenes->playingScene() : SceneBank::kSceneSong;
     panel->setSceneVisual(shown, playing);
+}
+
+void LoopEditor::chooseScene(int scene)
+{
+    if (panel && panel->onSceneChosen) panel->onSceneChosen(scene);
+}
+
+void LoopEditor::refreshSceneTriggers()
+{
+    if (panel) panel->setSceneTriggerVisual(sceneTriggers);
 }
 
 void LoopEditor::setLoopManager(LoopManager* a)

@@ -300,6 +300,7 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
     ui->app.loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     ui->app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
     state.midiLearn = ui->app.midiLearn.bindings();
+    state.sceneTriggers = ui->app.sceneTriggers.triggers();
     return true;
 }
 
@@ -536,6 +537,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->app.applyScenes(state.scenes, state.currentScene);
     ui->loopMode = state.loopMode;
     ui->app.midiLearn.setBindings(state.midiLearn);
+    ui->app.sceneTriggers.setTriggers(state.sceneTriggers);
     /* Song-loop region: applySongLoop() sets the ruler + toggle and pushes through
        onSongLoopChanged, which updates ui->songLoop* below. Done while
        restoringState is still true so the push's sendLoopState() is deferred to the
@@ -820,7 +822,7 @@ static LV2UI_Handle instantiate(
             if (!ui->restoringState) sendState(ui);
         };
         overlay->onMidiInputRenamed = [ui](const std::string& oldName, const std::string& newName) {
-            ui->app.midiIn.rename(oldName, newName);
+            ui->app.midiInputRenamed(oldName, newName);
             if (!ui->restoringState) sendState(ui);
         };
         overlay->onPortAdded   = [ui](const std::string&) { if (!ui->restoringState) sendState(ui); };

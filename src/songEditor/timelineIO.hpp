@@ -27,9 +27,10 @@ struct MidiInputPort {
 // single MIDI input migrates to.
 inline constexpr const char* kDefaultMidiInputName = "midi_in";
 
-// A hardware control, as MIDI learn identifies it. Only ever read from the MIDI
-// input the current instrument listens to, so the input and channel are not part
-// of it. num is the CC number and is unused for the other kinds.
+// A hardware control, as MIDI learn identifies it. Learned from, and read from,
+// any of the project's MIDI inputs, and the input and channel are not part of it:
+// a bound control drives its lane from whichever device sends it. num is the CC
+// number and is unused for the other kinds.
 enum class MidiSrcKind { None, CC, PitchBend, Pressure };
 struct MidiSrc {
     MidiSrcKind kind = MidiSrcKind::None;
@@ -48,6 +49,30 @@ inline MidiLearnBindings defaultMidiLearnBindings() {
     return { {"Pitch",      {MidiSrcKind::PitchBend, 0}},
              {"Modulation", {MidiSrcKind::CC,        1}} };
 }
+
+// A button on a controller that switches the Loop Editor to a scene: a note, a CC
+// or a program change. Unlike MidiSrc the input and channel are part of it. A
+// trigger is often a note, and a pad bound on one device must not take that note
+// away from a keyboard playing on another.
+//
+// A CC trigger also keeps the value it was learned with. Controllers often give a
+// row of buttons one CC and tell them apart by value, and without it every button
+// in the row would be the same trigger. See SceneTriggerMap::handle() for when the
+// value is matched.
+enum class MidiTriggerKind { None, Note, CC, Program };
+struct MidiTrigger {
+    MidiTriggerKind kind    = MidiTriggerKind::None;
+    int             num     = 0;   // note, CC or program number
+    int             channel = 0;   // 0-15
+    std::string     input;         // MidiInputPort::name
+    int             value   = -1;  // CC only: the value learned; -1 otherwise
+    // The same key, pad or controller, whatever the value.
+    bool sameControl(const MidiTrigger& o) const {
+        return kind == o.kind && num == o.num && channel == o.channel && input == o.input;
+    }
+    bool operator==(const MidiTrigger& o) const { return sameControl(o) && value == o.value; }
+    bool operator!=(const MidiTrigger& o) const { return !(*this == o); }
+};
 
 struct JackInstrument {
     int         id                = 0;   // timeline Instrument ID (0 if unset)
@@ -100,6 +125,9 @@ struct AppState {
     // shown, which is exactly what those sessions were.
     std::array<std::vector<int>, 4> scenes;
     int currentScene = 0;   // 0 = Scene S, 1-4; the scene the Loop Editor shows
+    // The MIDI trigger that switches to each scene, Scene S first. Kind None where
+    // there is none, which is every scene in a project saved before triggers existed.
+    std::array<MidiTrigger, 5> sceneTriggers;
 
     // Loop Mode's own time signature, set in the Loop Editor. It decides how long a
     // Loop-Mode bar is — and so where a scene switch lands — independently of the

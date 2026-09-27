@@ -11,6 +11,8 @@
 #include <vector>
 #include "controlBar.hpp"
 #include "sceneBank.hpp"
+#include "sceneTriggers.hpp"
+#include "sceneContextPopup.hpp"
 #include "timeSigSection.hpp"
 #include "observableSong.hpp"
 #include "loopManager.hpp"
@@ -69,10 +71,14 @@ public:
     std::function<void()> onFlip;
     // A scene button was clicked. 0 is Scene S; 1..4 the user's own.
     std::function<void(int)> onSceneChosen;
+    // A scene button was right-clicked.
+    std::function<void(int)> onSceneContext;
 
     // Repaint the scene buttons for this shown/playing pair. They differ only while a
     // switch is armed, and the shown one draws amber for that window.
     void setSceneVisual(int shown, int playing);
+    // Show each scene's MIDI trigger in its tooltip, and outline the one learning.
+    void setSceneTriggerVisual(const SceneTriggerMap* triggers);
 
     void setTimeline(ObservableSong* tl);
     void setTransport(ITransport* t) { transport = t; syncBpm(); }
@@ -117,6 +123,8 @@ private:
     SceneBank*         scenes       = nullptr;
     LoopManager*  loopMgr          = nullptr;
     LoopContextPopup*  contextPopup = nullptr;
+    SceneContextPopup* sceneContextPopup = nullptr;
+    const SceneTriggerMap* sceneTriggers = nullptr;
     ITransport*        transport    = nullptr;
     LoopPanel*         panel        = nullptr;
     GridScrollPane*    hScroll      = nullptr;
@@ -242,6 +250,14 @@ public:
     // Repaint the scene buttons from the bank. Called by the app when the playing
     // scene changes under us — an armed switch landing, or a mode change.
     void refreshSceneVisual();
+    // Switch to a scene as if its button had been clicked. How a MIDI trigger lands.
+    void chooseScene(int scene);
+    // The scene buttons' right-click menu, and the triggers it edits.
+    void setSceneContextPopup(SceneContextPopup* popup) { sceneContextPopup = popup; }
+    void setSceneTriggers(const SceneTriggerMap* t) { sceneTriggers = t; refreshSceneTriggers(); }
+    // Repaint the scene buttons' trigger state. Called when a trigger or the learn
+    // state changes.
+    void refreshSceneTriggers();
     void setTransport(ITransport* t);
     void setContextPopup(LoopContextPopup* popup);
     // Re-read the panel's BPM box. The Loop-Mode tempo freeze deliberately notifies

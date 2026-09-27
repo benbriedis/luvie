@@ -104,6 +104,13 @@ int MidiInputManager::slotForName(const std::string& name) const
     return -1;
 }
 
+const std::string& MidiInputManager::nameForSlot(int slot) const
+{
+    static const std::string none;
+    if (slot < 0 || slot >= kMaxMidiInputs || !slots_[slot].used) return none;
+    return slots_[slot].name;
+}
+
 // ── Backend lifecycle (UI thread) ─────────────────────────────────────────────
 
 void MidiInputManager::apply(const std::vector<MidiInputPort>& ins, JackTransport* jack)

@@ -16,6 +16,9 @@ MidiSrc sourceOf(const uint8_t* d, int len, int& raw)
     switch (d[0] & 0xF0) {
     case 0xB0:
         if (len < 3) return {};
+        // Bank select (MSB, LSB) is the preamble to a program change, not a control
+        // anyone turns, and learning it would bind whichever button sent one.
+        if ((d[1] & 0x7F) == 0 || (d[1] & 0x7F) == 32) return {};
         raw = d[2] & 0x7F;
         return {MidiSrcKind::CC, d[1] & 0x7F};
     case 0xD0:
@@ -56,6 +59,7 @@ void MidiLearnMap::startLearn(const std::string& type)
 {
     if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: waiting for a control for %s\n", type.c_str());
     learning_ = type;
+    if (onLearnStarted) onLearnStarted();
     displayChanged();
 }
 

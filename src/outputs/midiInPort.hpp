@@ -65,6 +65,8 @@ public:
 
     // The slot holding input `name`, or -1.
     int slotForName(const std::string& name) const;
+    // The name of the input in `slot`, or empty.
+    const std::string& nameForSlot(int slot) const;
 
     // Feeds the sink directly, bypassing the rings. For LV2 plugin mode, where the
     // event arrives on the UI thread already (LuvieUI::port_event) and there is no

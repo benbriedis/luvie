@@ -351,6 +351,21 @@ std::string appStateToJsonString(const AppState& state) {
         case MidiSrcKind::None:      break;
         }
     }
+    json jtrig = json::array();
+    for (const auto& t : state.sceneTriggers) {
+        const char* kind = nullptr;
+        switch (t.kind) {
+        case MidiTriggerKind::Note:    kind = "note";    break;
+        case MidiTriggerKind::CC:      kind = "cc";      break;
+        case MidiTriggerKind::Program: kind = "program"; break;
+        case MidiTriggerKind::None:    break;
+        }
+        if (!kind) { jtrig.push_back(nullptr); continue; }
+        json jt = {{"kind", kind}, {"num", t.num}, {"channel", t.channel},
+                   {"input", t.input}};
+        if (t.value >= 0) jt["value"] = t.value;
+        jtrig.push_back(jt);
+    }
     json j = {
         {"version",         1},
         {"transport",       state.transport},
@@ -364,6 +379,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"activeLoopPatterns", state.activeLoopPatterns},
         {"scenes",             state.scenes},
         {"currentScene",       state.currentScene},
+        {"sceneTriggers",      jtrig},
         {"loopSigTop",         state.loopSigTop},
         {"loopSigBottom",      state.loopSigBottom},
         {"loopSigBeat",        state.loopSigBeat},
@@ -391,6 +407,26 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     // Absent in projects saved before scenes existed: four empty scenes with Scene S
     // shown, which is what the Loop Editor was before it had any.
     state.currentScene = std::clamp(j.value("currentScene", 0), 0, 4);
+    // Absent in projects saved before scene triggers existed: no scene has one.
+    {
+        int si = 0;
+        for (const auto& jt : j.value("sceneTriggers", json::array())) {
+            if (si >= (int)state.sceneTriggers.size()) break;
+            MidiTrigger& t = state.sceneTriggers[si++];
+            if (!jt.is_object()) continue;
+            const std::string kind = jt.value("kind", "");
+            if      (kind == "note")    t.kind = MidiTriggerKind::Note;
+            else if (kind == "cc")      t.kind = MidiTriggerKind::CC;
+            else if (kind == "program") t.kind = MidiTriggerKind::Program;
+            else continue;
+            t.num     = std::clamp(jt.value("num", 0), 0, 127);
+            t.channel = std::clamp(jt.value("channel", 0), 0, 15);
+            t.input   = jt.value("input", "");
+            // Absent from triggers saved before CC values were kept: any value.
+            if (t.kind == MidiTriggerKind::CC && jt.contains("value"))
+                t.value = std::clamp(jt.value("value", 0), 0, 127);
+        }
+    }
     // Absent before Loop mode had its own meter: -1, "follow the song".
     state.loopSigTop    = j.value("loopSigTop",    -1);
     state.loopSigBottom = j.value("loopSigBottom",  4);

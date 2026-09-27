@@ -20,6 +20,9 @@ class ModernButton : public Fl_Button {
 
 public:
     std::function<void()> onEnter;
+    // A right-click, which then never reaches the callback. Unset, a right-click
+    // presses the button like any other.
+    std::function<void()> onRightClick;
 
 private:
 
@@ -50,6 +53,11 @@ private:
         if (event == FL_ENTER) { hovered = true;  redraw(); if (onEnter) onEnter(); return 1; }
         if (event == FL_LEAVE) { hovered = false; redraw(); return 1; }
         if (event == FL_HIDE)  { hovered = false; return 0; }
+        if ((event == FL_PUSH || event == FL_RELEASE) && onRightClick
+            && Fl::event_button() == FL_RIGHT_MOUSE) {
+            if (event == FL_PUSH) onRightClick();
+            return 1;
+        }
         if (event == FL_KEYBOARD) {
             int k = Fl::event_key();
             if (k == FL_Enter || k == FL_KP_Enter) { do_callback(); return 1; }

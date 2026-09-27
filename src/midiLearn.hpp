@@ -25,6 +25,9 @@ public:
     std::function<void()> onEdited;
     // Anything a label shows changed (a binding, the learn state, a value).
     std::function<void()> onDisplayChanged;
+    // A learn began. The app cancels any scene-trigger learn, so one control never
+    // completes two learns at once.
+    std::function<void()> onLearnStarted;
 
     const MidiLearnBindings& bindings() const { return bindings_; }
     // From a loaded project. Not an edit, so onEdited does not fire.
