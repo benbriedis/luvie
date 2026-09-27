@@ -455,3 +455,72 @@ Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smoo
    Also allow editting (maybe not saving)
   
 If I tag it I might be able to start writing some music with it...
+
+------
+
+
+cf Intermediate mode 
+cf Putting a time signature in the Loop Editor, or # of beats per bar.
+Have song editor play to end of bar.
+
+
+Allow more scenes to be added in time
+
+Weird that I cant use that other control for Volume...
+
+Sync the time signature and/or BPM with the Song editor? Maybe optionally?
+
+-------
+   
+- Show 'Record' icon in Song editor LHS column. Allow to be alarmed and disarmed.
+   cf MAY be able to remove 'Pianoroll' and 'Harmony' label.
+   cf placing it on the RHS, LHS, underneath?
+- Show 'Record' icon in Loop editor - probably in patterns, but the instrument label cells might be an option. 
+   Allow to be alarmed and disarmed.
+   cf MAY be able to remove 'Pianoroll' and 'Harmony' label.
+   cf placing it on the RHS, LHS, underneath?  
+
+Probably allow the base note to span multiple octaves (and/or set the drop back point)
+   - A keyboard could eg map 2 octaves instead of one to the base note
+   - cf Option of listing multi octaves (maybe 2 octaves?) in the base dropdown
+   - cf Option of allowing user to choose the number or octaves to show
+   - cf Option of allowing user to choose the bottom-most base note
+   - ALT: reintroduce an octave offset control (not sure it works so well with triggers)
+   - Triggers could cause a +1 or whatever to be shown and displayed...
+
+cf being able to save triggers outside project? As defaults? Not so keen on that...
+   Probably not worth having a small export facility (yet anyway)
+   
+
+Add more scenes
+
+cf being able to map notes (or buttons) to loops - allows us to preset  different scales etc
+   OR better just to use scenes?
+
+Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
+
+To document:
+  - Scene triggers
+  - Using a split instrument to select base notes for arpeggiators.
+  
+Is there an 'aconnectgui' equivalent that works across Windows and Mac?
+
+TODO test split keyboard properly
+
+TODO scene buttons should show context cursors
+
+Closing instruments window - seem to need to be scrolled up
+
+  
+  'luviedrums1' and 'luvieinst1' not ideal native MIDI output names 
+  
+There's some missing icon sitting next to MIDI learn in the Instrument's MIDI input
+
+cf slice selection - allow deletion of a blank selected portion. 
+     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
+
+Recording - cf disable snap by default? enable grow by default?
+  Maybe store grow and snap in project and copy when cloning a pattern?
+  Maybe disable snap by default for everything?
+  
+  
