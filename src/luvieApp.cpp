@@ -103,6 +103,8 @@ void LuvieApp::EditorSwitcher::onTimelineChanged() {
     // Runs on every timeline notify, but updateMidiTarget() returns immediately
     // unless the visible editor actually changed.
     app->updateMidiTarget();
+    // The toggles follow the pattern on screen: each pattern keeps its own arms.
+    app->syncArmButtons();
 }
 
 // Which pattern editor is on screen, if any. Two things decide it: the selected
@@ -118,16 +120,19 @@ void LuvieApp::updateMidiTarget()
     }
     if (next == midiTarget) return;
 
-    // Leaving an editor ends its take and releases anything it was sounding, so a
-    // key held while switching tabs neither hangs nor keeps recording.
-    if (midiTarget) {
-        midiTarget->setRecordArmed(false);
-        midiTarget->setGrowArmed(false);
-        midiTarget->releaseMidiNotes();
-        midiTarget->clearLiveNotes();
-    }
-    if (patternPanel) patternPanel->stopRecording();
+    // Nothing is disarmed: a pattern's Record and Grow belong to it, not to the
+    // editor showing it, and an armed pattern keeps recording off screen. Notes
+    // still held are released where they were sent (heldNotes_), so only the lit
+    // rows need clearing.
+    if (midiTarget) midiTarget->clearLiveNotes();
     midiTarget = next;
+}
+
+void LuvieApp::syncArmButtons()
+{
+    if (!patternPanel || !song_) return;
+    const int patId = song_->get().patternIdForSelectedLane();
+    patternPanel->showArmState(recorders.recordArmed(patId), recorders.growArmed(patId));
 }
 
 int LuvieApp::midiInInstrument() const
@@ -142,8 +147,12 @@ int LuvieApp::midiInInstrument() const
 
 bool LuvieApp::midiInAccepted(int slot, const uint8_t* data, int len) const
 {
+    return instrumentAccepts(midiInInstrument(), slot, data, len);
+}
+
+bool LuvieApp::instrumentAccepts(int instr, int slot, const uint8_t* data, int len) const
+{
     if (!outputsOverlay) return true;
-    const int instr = midiInInstrument();
     std::string inputName;
     int         channel   = 0;
     KeySplit    split     = KeySplit::None;
@@ -184,11 +193,6 @@ void LuvieApp::midiInputRenamed(const std::string& oldName, const std::string& n
 {
     midiIn.rename(oldName, newName);
     sceneTriggers.renameInput(oldName, newName);
-}
-
-void LuvieApp::stopMidiRecording()
-{
-    if (midiTarget) midiTarget->releaseMidiNotes();
 }
 
 void LuvieApp::saveAsCb(Fl_Widget*, void* data) {
@@ -611,6 +615,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         harmonyEd->setPlayheadLoopMode(loop);
         drumEd->setPlayheadLoopMode(loop);
         pianorollEd->setPlayheadLoopMode(loop);
+        recorders.setLoopMode(loop);
     });
     // Both halves of the saved loop state report through one hook: the mode when it
     // settles (which for Loop -> Song is the end of the hand-off, not the click),
@@ -769,45 +774,95 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             std::string type;
             int         value = 0;
             if (midiLearn.handle(data, len, type, value)) {
-                if (midiTarget) {
-                    midiTarget->midiParam(type, value);
-                } else {
-                    // No pattern editor showing: still heard, on the selected track's
-                    // instrument, so the control behaves the same from the Song tab.
-                    const int instr = midiInInstrument();
-                    if (instr >= 0) auditioner.param(instr, ccForType(type), value);
-                }
+                // Heard as it moves, armed or not, on the instrument of the editor
+                // showing — or with none showing, the selected track's, so the
+                // control behaves the same from the Song tab. Learned controls work
+                // from every input, so that one hears it whatever the input.
+                std::vector<int> heard;
+                const int instr = midiInInstrument();
+                if (instr >= 0) heard.push_back(instr);
+                // Each armed pattern records it too, if its instrument hears this
+                // input, and sounds it once per instrument.
+                recorders.forEachRecording([&](PatternRecorder& r) {
+                    const int ri = r.instrumentId();
+                    if (!instrumentAccepts(ri, slot, data, len)) return;
+                    r.param(type, value);
+                    if (std::find(heard.begin(), heard.end(), ri) == heard.end())
+                        heard.push_back(ri);
+                });
+                for (int i : heard) auditioner.param(i, ccForType(type), value);
                 return;
             }
         }
-        if (!accepted) return;
         // Anything Luvie has no meaning for is passed to the instrument rather than
         // dropped: an unbound controller, and program change and poly aftertouch,
         // which have never had a lane here. Nothing records these and nothing
         // replays them, so unlike a note there is no live echo to suppress. The CC
         // number survives too — param() above remaps it through ccForType() — so
         // the synth sees what the controller sent and its MIDI learn can bind it.
+        // It goes where a note from the same place would: the instrument on screen
+        // and every armed pattern's, each only if this is its input.
         if (learnable || status == 0xA0 || status == 0xC0) {
+            std::vector<int> heard;
             const int instr = midiInInstrument();
-            if (instr < 0) {
-                if (luvieDebug())
-                    fprintf(stderr, "[luvie] passthru: no instrument (no editor "
-                                    "showing and no track selected)\n");
-                return;
-            }
-            auditioner.passThrough(instr, data, len);
+            if (accepted && instr >= 0) heard.push_back(instr);
+            recorders.forEachRecording([&](PatternRecorder& r) {
+                const int ri = r.instrumentId();
+                if (instrumentAccepts(ri, slot, data, len)
+                    && std::find(heard.begin(), heard.end(), ri) == heard.end())
+                    heard.push_back(ri);
+            });
+            if (heard.empty() && luvieDebug())
+                fprintf(stderr, "[luvie] passthru: no instrument (none on this input, "
+                                "no editor showing and no track selected)\n");
+            for (int i : heard) auditioner.passThrough(i, data, len);
             return;
         }
-        if (!midiTarget) return;
-        const int pitch  = data[1] & 0x7F;
-        if (status == 0x90) {
-            const int vel = (len >= 3) ? (data[2] & 0x7F) : 0;
-            // Velocity 0 is a note-off by the running-status convention; the
-            // editor handles that, so it is passed through as sent.
-            midiTarget->midiNoteOn(pitch, vel);
-        } else if (status == 0x80) {
-            midiTarget->midiNoteOff(pitch);
+        if (status != 0x90 && status != 0x80) return;
+        const int pitch = data[1] & 0x7F;
+        const int vel   = (status == 0x90 && len >= 3) ? (data[2] & 0x7F) : 0;
+        const int key   = heldKey(slot, data);
+
+        // Velocity 0 is a note-off by the running-status convention.
+        if (vel == 0) {
+            if (midiTarget && accepted) midiTarget->liveNoteOff(pitch);
+            recorders.forEachRecording([&](PatternRecorder& r) {
+                if (instrumentAccepts(r.instrumentId(), slot, data, len)) r.noteOff(pitch);
+            });
+            // Released on exactly the instruments the key went down on.
+            auto it = heldNotes_.find(key);
+            if (it == heldNotes_.end()) return;
+            for (int i : it->second) auditioner.noteOff(i, pitch);
+            heldNotes_.erase(it);
+            return;
         }
+
+        // A key already down is struck again without a note-off in between: end
+        // the note it left sounding first, so nothing hangs.
+        if (auto it = heldNotes_.find(key); it != heldNotes_.end()) {
+            for (int i : it->second) auditioner.noteOff(i, pitch);
+            heldNotes_.erase(it);
+        }
+
+        // Always audible, armed or not: trying a note out is half of what a keyboard
+        // is for. On the instrument of the editor showing, when this is its input...
+        std::vector<int> heard;
+        if (midiTarget && accepted) {
+            midiTarget->liveNoteOn(pitch);
+            heard.push_back(midiTarget->currentInstrumentId());
+        }
+        // ...and on the instrument of every armed pattern whose input it is, which
+        // records it too. One note per instrument, however many patterns share it.
+        recorders.forEachRecording([&](PatternRecorder& r) {
+            const int ri = r.instrumentId();
+            if (!instrumentAccepts(ri, slot, data, len)) return;
+            r.noteOn(pitch, vel);
+            if (std::find(heard.begin(), heard.end(), ri) == heard.end())
+                heard.push_back(ri);
+        });
+        if (heard.empty()) return;
+        for (int i : heard) auditioner.noteOn(i, pitch, vel);
+        heldNotes_[key] = std::move(heard);
     });
 
     // A recorded note quantised just ahead of the playhead has already been heard
@@ -817,21 +872,33 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         transport->skipNoteOnce(instrumentId, pitch, bar, tol);
         og2->playheadSkipNoteOnce(instrumentId, pitch, (float)bar, (float)tol);
     };
-    for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
-                                  (BasePatternEditor*)pianorollEd})
-        ed->onSkipNoteOnce = skipNoteOnce;
-
-    // The Record toggle arms whichever editor is currently the target.
-    patternPanel->onRecordChanged = [this](bool on) {
-        if (midiTarget) midiTarget->setRecordArmed(on);
-        if (onRecordArmChanged) onRecordArmChanged();
+    recorders.setContext(pattern, transport, &loopMgr);
+    recorders.onSkipNoteOnce = skipNoteOnce;
+    // Flexible bars lengthening a pattern: whichever editor shows it keeps the head
+    // in view.
+    recorders.onGrew = [this](int patId, float headBeat) {
+        drumEd->followGrowth(patId, headBeat);
+        pianorollEd->followGrowth(patId, headBeat);
     };
 
-    // Grow goes to the same place, and shares Record's lifetime: it stays on between
-    // takes but is cleared whenever the visible editor changes, so flexible bars are
-    // always something the user has just asked for.
-    patternPanel->onGrowChanged = [this](bool on) {
-        if (midiTarget) midiTarget->setGrowArmed(on);
+    // The Record and Grow toggles arm the pattern on screen, from the lane it is
+    // shown for. Each pattern keeps its own: they stay as they are while other
+    // patterns are shown, and the toggles follow whichever is (syncArmButtons).
+    auto shownPattern = [this](int& patId, int& laneId) {
+        const auto& tl = song_->get();
+        patId  = tl.patternIdForSelectedLane();
+        laneId = tl.selectedLaneId;
+    };
+    patternPanel->onRecordChanged = [this, shownPattern](bool on) {
+        int patId = 0, laneId = 0;
+        shownPattern(patId, laneId);
+        recorders.setRecordArmed(patId, laneId, on);
+        if (onRecordArmChanged) onRecordArmChanged();
+    };
+    patternPanel->onGrowChanged = [this, shownPattern](bool on) {
+        int patId = 0, laneId = 0;
+        shownPattern(patId, laneId);
+        recorders.setGrowArmed(patId, laneId, on);
     };
 
     // Tab clicks fire nothing by default, so the target would go stale when the
@@ -841,15 +908,19 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     }, this);
     updateMidiTarget();
 
-    // Stopping ends the take: notes still held are committed with the length they
-    // reached and the undo group closes, so the next run is its own undo entry.
-    // Pause and rewind both come through here, and they disarm Record too: the next
-    // take is something the user asks for again, not something play resumes.
+    // Stopping ends every take: notes still held are committed with the length
+    // they reached and the undo groups close, so the next run is its own undo
+    // entry. Pause and rewind both come through here, and they disarm Record on
+    // every pattern too: the next take is something the user asks for again, not
+    // something play resumes. Grow stays armed.
     if (bottomPane) {
         bottomPane->onPlayStateChanged = [this](bool playing) {
+            // Where this run began: a take in Song Mode keeps everything from there.
+            recorders.setRunStart(playing && transport_ ? transport_->position() : -1.0f);
             if (playing) return;
-            stopMidiRecording();
-            if (patternPanel) patternPanel->endTake();
+            if (!recorders.disarmAllRecord()) return;
+            syncArmButtons();
+            if (onRecordArmChanged) onRecordArmChanged();
         };
     }
 
@@ -1241,6 +1312,11 @@ void LuvieApp::applyShownScene() {
 }
 
 void LuvieApp::applyLoopState(bool loopMode, const std::vector<int>& activePatterns) {
+    // Every load comes through here, and a loaded project starts with nothing
+    // armed: the arms were for patterns of the project it replaced.
+    recorders.clear();
+    syncArmButtons();
+    if (onRecordArmChanged) onRecordArmChanged();
     applyingLoopState = true;
     // Mode first: it gates sync() off, so a Song-mode sync() can't overwrite the
     // set we are about to restore.

@@ -7,6 +7,7 @@
 #include "chords.hpp"        // noteToneIndex, rowToMidi
 #include "timeSettings.hpp"  // BeatUnit
 #include <algorithm>
+#include <iterator>   // std::size
 #include <set>
 #include <string>
 #include <vector>
@@ -80,10 +81,31 @@ struct Pattern {
 	int  rootPitch = 0;      // base note index (matches rootChoice)
 	std::string chordHash;   // stable ChordDef hash; empty = "major" (see chords.hpp)
 	bool useSharp  = false;  // #/b display spelling
-	int  divisions = 0;      // divChoice index; 0 = None (kDivisionsDefault in patternPanel.cpp)
+	int  divisions = 0;      // index into kPatternDivisors; 0 = None
 	bool snapEnabled = true; // snap new notes and resized edges to the divisions
 	int  zoomPct   = 200;    // horizontal zoom, % of the x1 column width (kZoomPercents in patternPanel.cpp)
 };
+
+// The beat subdivisions the Div control offers, indexed by Pattern::divisions.
+inline constexpr int kPatternDivisors[]  = { 1, 2, 3, 4, 5, 6, 7 };
+inline constexpr int kDivisionsDefault   = 0;  // None
+
+// Parts per beat for a Pattern::divisions index, falling back to the default for
+// an index out of range.
+inline int patternDivisor(int divisionsIdx)
+{
+	if (divisionsIdx < 0 || divisionsIdx >= (int)std::size(kPatternDivisors))
+		divisionsIdx = kDivisionsDefault;
+	return kPatternDivisors[divisionsIdx];
+}
+
+// The Snap quantum in beats for a pattern's own Div and Snap settings, or 0 when
+// Snap is off. What the panel sends the editors for the pattern on screen, and what
+// recording into a pattern quantises to whether it is on screen or not.
+inline float patternSnapBeats(const Pattern& p)
+{
+	return p.snapEnabled ? 1.0f / (float)patternDivisor(p.divisions) : 0.0f;
+}
 
 // MIDI pitch a stored note sounds at. A pianoroll pattern keeps the MIDI note
 // number itself in `row`; a harmony pattern keeps a chord-tone index that only

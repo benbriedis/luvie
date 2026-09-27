@@ -178,11 +178,12 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     ModernButton    rapidBtn;
     // Flexible bars, immediately left of Record. Off, a take records into a pattern
     // of the length it already has; on, the pattern gains bars as the take runs.
-    // Session state only — deliberately not stored in the project, so it is always a
-    // choice the user has just made.
+    // Both toggles show the state of the pattern on screen: each pattern is armed on
+    // its own and stays armed while others are shown (see PatternRecorders). Session
+    // state only — deliberately not stored in the project.
     ModernButton    growBtn;
     // Record arm, on the right of the bar. Pianoroll and drum only — the harmony
-    // editor cannot record, so it hides this (and disarms it) like it does Rapid.
+    // editor cannot record, so it hides this like it does Rapid.
     RecordButton    recordBtn;
 
     float computeSnapBeats() const;
@@ -202,10 +203,9 @@ class PatternPanel : public ControlBar, public ITimelineObserver {
     void initRapidBtn();
     void initRecordBtn();
     void initGrowBtn();
-    // Turns the toggle off and tells the editor, if it is on. Used whenever
-    // recording has to stop for a reason other than the user clicking it.
-    void disarmRecord();
-    void disarmGrow();
+    // Sets a toggle and its colours without firing its callback.
+    void showRecord(bool on);
+    void showGrow(bool on);
     void initInput();
 
     void configureHarmonyRow();
@@ -239,7 +239,7 @@ public:
     std::function<void(int)>   onDivisionsChanged;
     std::function<void(float)> onZoomChanged;
     std::function<void(bool)>  onRapidChanged;
-    // Record arm/disarm from the toggle. The owner passes it to the editor.
+    // Record arm/disarm from the toggle, for the pattern on screen.
     std::function<void(bool)>  onRecordChanged;
     // Flexible bars on/off from the toggle, likewise.
     std::function<void(bool)>  onGrowChanged;
@@ -263,15 +263,10 @@ public:
         return chordDefs[idx].hash;
     }
     bool isSharp()   const { return useSharp; }
-    bool isRecordArmed() const { return recordBtn.value() != 0; }
 
-    // Disarms recording from outside — leaving the Pattern Editor tab, say. Grow goes
-    // with it: it is a property of the take, and like the arm it should be something
-    // the user chose for the editor in front of them rather than something inherited.
-    void stopRecording() { disarmRecord(); disarmGrow(); }
-    // Disarms Record alone, when the transport stops. Grow stays: it is kept between
-    // takes in the same editor.
-    void endTake() { disarmRecord(); }
+    // Show the arm states of the pattern on screen. The owner keeps them, per
+    // pattern, and calls this whenever the pattern shown or its states change.
+    void showArmState(bool record, bool grow) { showRecord(record); showGrow(grow); }
 
     void setParams(int root, std::string_view chordHash, bool sharp);
     void setInstruments(ObservableInstrument* instr);

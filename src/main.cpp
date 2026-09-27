@@ -253,7 +253,7 @@ int main(int argc, char **argv) {
             alerts.push_back("Jack transport selected but JACK is not running");
         if (portReg.anyJack() && jackDown)
             alerts.push_back("Jack MIDI output in use but JACK is not running");
-        if (midiInIsJack() && app.patternPanel && app.patternPanel->isRecordArmed() && jackDown)
+        if (midiInIsJack() && app.anyRecordArmed() && jackDown)
             alerts.push_back("Recording from Jack MIDI input but JACK is not running");
         app.bottomPane->setAlerts(alerts);
     };

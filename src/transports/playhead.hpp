@@ -43,16 +43,22 @@ class Playhead : public ITimelineObserver {
 	float lastPosition = 0.0f;
 	std::function<bool(int)> loopEnabledFn;
 
+	// Set by setFixedPattern(): the pattern this playhead follows regardless of the
+	// selection. 0 means the one the editor shows for patternTrack.
+	int   fixedPatId   = 0;
+
 	// Phase for a displayed pattern that nothing is playing — not switched on in the
 	// Loop Editor and not under a song block. Nothing is sounding it, so the editor
 	// owns where it sits: it tiles the song from this bar. Recording needs a real
 	// place to put a note whether or not the pattern is switched on, and the drawn
-	// head has to agree with it. Held for one pattern at a time and read back only
-	// for that one (freeAnchorFor), so a pattern never inherits the phase that
-	// flexible-bars recording left on another.
+	// head has to agree with it. Kept per pattern in the LoopManager (see
+	// LoopManager::freeAnchor), which every playhead reading the pattern shares.
+	// Without one, a single entry here stands in: held for one pattern at a time and
+	// read back only for that one, so a pattern never inherits another's phase.
 	float freeAnchorBar   = 0.0f;
 	int   freeAnchorPatId = 0;
 	float freeAnchorFor(int patId) const;
+	void  setFreeAnchor(int patId, float anchorBar);
 
 	// ── Soft (Native/Debug) output, driven from the same crossing logic ──────────
 	PortRegistry* portReg     = nullptr;
@@ -141,6 +147,11 @@ public:
 	// gets there just as the engine switches. Clearing it returns to Live.
 	void setHandoff(bool on, float offsetBars = 0.0f);
 	void setPatternTrack(int track) { patternTrack = track; }
+	// Follow one pattern whatever the editor is showing — for a recorder, which
+	// keeps recording into its pattern after the selection has moved on. Puts the
+	// playhead in pattern view (patternTrack >= 0 is what selects it); the track
+	// index itself is then never read.
+	void setFixedPattern(int patId) { fixedPatId = patId; patternTrack = 0; }
 
 	// Everything the displayed pattern's phase depends on, sampled together. Growth
 	// (flexible-bars recording) needs the anchor and the beat scale as well as the

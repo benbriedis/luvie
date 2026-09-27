@@ -43,8 +43,6 @@ static constexpr Fl_Color kSnapActiveColor  = 0x3B82F600;
 // Divisions split one beat (a time-signature denominator unit) into this many
 // parts; the choice labels are "1/1" (1), "1/2", "1/3", "1/4", "1/5", "1/6" and
 // "1/7".
-static constexpr int kDivisors[]       = { 1, 2, 3, 4, 5, 6, 7 };
-static constexpr int kDivisionsDefault = 0;  // None
 // Horizontal zoom, as a percentage of the column width the editors were built
 // at. Ordered coarsest to finest so the dropdown reads as a scale; the labels
 // pair with the percentages by index, and the percentage -- not the index -- is
@@ -200,17 +198,13 @@ int PatternPanel::selectedPatternId() const
 float PatternPanel::computeSnapBeats() const
 {
     if (!timeControls.divSec.snapBtn.value()) return 0.0f;
-    int idx = timeControls.divSec.divChoice.value();
-    if (idx < 0 || idx >= (int)std::size(kDivisors)) idx = kDivisionsDefault;
-    return 1.0f / (float)kDivisors[idx];
+    return 1.0f / (float)patternDivisor(timeControls.divSec.divChoice.value());
 }
 
 // How many parts the beat is split into (1 = None).
 int PatternPanel::computeDivisions() const
 {
-    int idx = timeControls.divSec.divChoice.value();
-    if (idx < 0 || idx >= (int)std::size(kDivisors)) idx = kDivisionsDefault;
-    return kDivisors[idx];
+    return patternDivisor(timeControls.divSec.divChoice.value());
 }
 
 float PatternPanel::computeZoomFactor() const
@@ -634,26 +628,22 @@ void PatternPanel::initGrowBtn()
     }, this);
 }
 
-void PatternPanel::disarmGrow()
+void PatternPanel::showGrow(bool on)
 {
-    if (!growBtn.value()) return;
-    growBtn.value(0);
-    growBtn.color(panelBg);
-    growBtn.labelcolor(panelText);
+    if ((growBtn.value() != 0) == on) return;
+    growBtn.value(on ? 1 : 0);
+    growBtn.color(on ? kGrowActiveColor : panelBg);
+    growBtn.labelcolor(on ? FL_WHITE : panelText);
     growBtn.redraw();
-    if (onGrowChanged) onGrowChanged(false);
 }
 
-// Everything that turns recording off other than a click on the toggle itself
-// goes through here, so the button, the editor and the colour never disagree.
-void PatternPanel::disarmRecord()
+void PatternPanel::showRecord(bool on)
 {
-    if (!recordBtn.value()) return;
-    recordBtn.value(0);
-    recordBtn.color(panelBg);
-    recordBtn.labelcolor(panelText);
+    if ((recordBtn.value() != 0) == on) return;
+    recordBtn.value(on ? 1 : 0);
+    recordBtn.color(on ? kRecordActiveColor : panelBg);
+    recordBtn.labelcolor(on ? FL_WHITE : panelText);
     recordBtn.redraw();
-    if (onRecordChanged) onRecordChanged(false);
 }
 
 void PatternPanel::initInput()
@@ -938,12 +928,9 @@ void PatternPanel::configureHarmonyRow()
 {
     harmonyControls.show();
     rapidBtn.show();
-    // The harmony editor cannot record, so the toggle goes away — and takes any
-    // armed take with it, exactly as switching away from Rapid cancels that.
-    disarmRecord();
+    // The harmony editor cannot record, so the toggles go away. Only hidden: the
+    // arm states belong to other patterns, which keep them.
     recordBtn.hide();
-    // Only hidden here: the toggle itself is cleared by stopRecording(), which the
-    // change of MIDI target runs on the way into this editor.
     growBtn.hide();
     zoomChoice.activate();
     canFold = true;

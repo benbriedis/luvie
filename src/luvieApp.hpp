@@ -4,6 +4,7 @@
 #pragma once
 #include <array>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 #include <FL/Fl_Group.H>
@@ -14,6 +15,7 @@
 #include "loopManager.hpp"
 #include "loopModeController.hpp"
 #include "noteAuditioner.hpp"
+#include "patternRecorder.hpp"
 #include "midiInPort.hpp"
 #include "midiLearn.hpp"
 #include "sceneTriggers.hpp"
@@ -229,9 +231,12 @@ public:
     StartupOverlay*    startupOverlay = nullptr;
 
     // ── MIDI input routing ───────────────────────────────────────────────────
-    // Incoming MIDI goes to whichever pattern editor is on screen: it auditions
-    // there, and records there when that editor's Record toggle is armed. The Song
-    // and Loop tabs are not targets, so moving to one stops recording.
+    // Incoming MIDI sounds on the instrument of whichever pattern editor is on
+    // screen, and lights its rows. Separately, every pattern with Record armed
+    // hears its own instrument's input, whatever is on screen — so several can be
+    // played through and recorded at once, from different inputs, channels or
+    // sides of a split. The Song and Loop tabs are not targets, but armed patterns
+    // keep recording from them.
     //
     // Call after anything that can change which editor is visible — a tab switch,
     // or a selection change that swaps one pattern editor for another.
@@ -246,14 +251,17 @@ public:
     // alike — except by MIDI learn and the scene triggers, which listen to every
     // input. True when there is no such instrument.
     bool midiInAccepted(int slot, const uint8_t* data, int len) const;
+    // midiInAccepted() for any instrument: true when it has no input set, else
+    // instrumentHears().
+    bool instrumentAccepts(int instrId, int slot, const uint8_t* data, int len) const;
     // The same test for any instrument: whether a message arriving on `slot` is on
     // instrument `instrId`'s input, channel and side of its split. False when there
     // is no such instrument.
     bool instrumentHears(int instrId, int slot, const uint8_t* data, int len) const;
-    // Releases held notes and closes any open take. Called when the transport
-    // stops, so a key held across the stop does not hang or keep recording.
-    void stopMidiRecording();
-    // Fired whenever the Record toggle arms or disarms, after the editor is told.
+    // Is any pattern armed to record?
+    bool anyRecordArmed() const { return recorders.anyRecordArmed(); }
+    // Fired whenever a Record toggle arms or disarms, including every one the
+    // transport stopping disarms.
     std::function<void()> onRecordArmChanged;
 
     void build(AppWindow* window, ObservableSong* song, ObservablePattern* pattern,
@@ -283,6 +291,18 @@ private:
     bool             applyingLoopState = false;   // suppresses reporting during a load
     void checkLoopStateChanged();
     void onLoopsChanged();
+
+    // Every pattern with Record or Grow armed. Session state, never saved.
+    PatternRecorders recorders;
+    // Puts the shown pattern's arm states on the panel's toggles.
+    void syncArmButtons();
+    // The instruments each held key was sent to, so its note-off reaches the same
+    // ones even if what is on screen, or what is armed, has changed since. Keyed
+    // by input slot, channel and pitch (heldKey).
+    std::map<int, std::vector<int>> heldNotes_;
+    static int heldKey(int slot, const uint8_t* data) {
+        return (slot << 16) | ((data[0] & 0x0F) << 8) | (data[1] & 0x7F);
+    }
 
     bool layingOutPatternTab = false;
     int  harmonyRootTrigger_ = -1;

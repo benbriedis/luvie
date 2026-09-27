@@ -196,6 +196,12 @@ void LoopManager::reanchor(int patId, float anchorBar)
 	notify();
 }
 
+float LoopManager::freeAnchor(int patId) const
+{
+	auto it = freeAnchors.find(patId);
+	return it == freeAnchors.end() ? 0.0f : it->second;
+}
+
 void LoopManager::reanchorAll(float anchorBar)
 {
 	bool changed = false;

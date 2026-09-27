@@ -109,6 +109,18 @@ public:
 	// snapshot that is about to be replaced.
 	void mirrorArmedScene(const std::unordered_map<int, float>& pending, float atBar);
 
+	// ── Free anchors ──────────────────────────────────────────────────────────
+	// The phase of a pattern that nothing is playing: not switched on and not under
+	// a song block. Nothing sounds it, so no engine follows it; it exists so the
+	// pattern editor's head and recording agree on where such a pattern is. Kept
+	// here rather than in each Playhead because more than one reads it — the editor
+	// drawing the pattern and every recorder armed on one — and a recorder moving it
+	// (pinning a take's phase, flexible bars re-phasing) must move the drawn head
+	// too. UI-side only, never mirrored or saved, and never notifies: nothing about
+	// playback depends on it. 0 (tile from bar 0) until something sets it.
+	float freeAnchor(int patId) const;
+	void  setFreeAnchor(int patId, float anchorBar) { freeAnchors[patId] = anchorBar; }
+
 	void addObserver(ILoopObserver* o);
 	void removeObserver(ILoopObserver* o);
 
@@ -122,6 +134,7 @@ private:
 	bool                           pendingScene = false;
 	float                          pendingAtBar = 0.0f;
 	std::vector<ILoopObserver*> observers;
+	std::unordered_map<int, float> freeAnchors;
 
 	void notify();
 };

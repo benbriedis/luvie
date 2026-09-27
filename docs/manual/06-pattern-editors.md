@@ -134,28 +134,49 @@ your place, and start when you are ready.
 
 That is the whole requirement. It does not matter whether the pattern is switched
 on in the Loop Editor, or whether the song playhead happens to be inside one of
-its blocks: whatever is on screen is what you record into, in Song Mode and Loop
-Mode alike. When nothing is playing the pattern it simply runs alongside the song
+its blocks, or even whether the pattern is still on screen: an armed pattern is
+recorded into, in Song Mode and Loop Mode alike. When nothing is playing the pattern it simply runs alongside the song
 from bar 1, and the playhead in the editor is drawn greyed to show that you are
 recording into it without hearing it. Switch it on in the Loop Editor if you want
 to hear it as well.
 
+### Recording several patterns at once
+
+**Record** belongs to the pattern, not to the editor. Arm it, then select another
+pattern: the first stays armed, and the toggle now shows the state of the pattern
+you are looking at. Arm that one too and both record. You can go on to the Song
+or Loop tab and they keep recording there.
+
+Every armed pattern listens to its own instrument's MIDI input, channel and side
+of the keyboard split, and plays it through to that instrument — so with two
+keyboards, two channels or a split keyboard, each hand or player can be recorded
+into a different pattern in the same pass. Armed patterns whose instruments share
+an input all hear it.
+
 ## Recording into the song
 
 A take in Song Mode is something you want to hear back in its place, so the first
-note of one puts the pattern there: a block appears on the track you are editing,
-covering the pass of the pattern you played into. Swap to the Song Editor
-afterwards and it is waiting for you, and from that moment you hear the pattern
-as you overdub further passes. Undoing the take takes the block with it.
+note of one puts the pattern there: a block appears on the pattern's own track.
+It starts at the bar you started the transport from — nothing is cut off before
+your first note — and repeats the pattern up to the end of the pass you are
+playing in. With **Grow** armed, the pattern itself starts there instead, and the
+bars before your first note become part of it. Swap to the Song Editor afterwards
+and it is waiting for you, and from that moment you hear the pattern as you
+overdub further passes. Undoing the take takes the block with it.
+
+When several patterns are recording, each gets its own block on its own track.
 
 Nothing is placed if there is already a block under the playhead — you are
 recording into that one — and nothing is placed in Loop Mode, or when the pattern
 is switched on in the Loop Editor, because then you are working on the pattern
-rather than on the song.
+rather than on the song. If the pattern is already playing from a block elsewhere
+in the song, the new block keeps that timing and starts at the pass you are in.
 
-The one case where no block appears is when it would have to overlap a
-neighbouring block on the same track, which the Song Editor does not allow. The
-take still records; move or shorten the neighbour and place the pattern yourself.
+The Song Editor does not allow blocks on a track to overlap, so a neighbouring
+block shortens the new one: it starts after a block that ends before the
+playhead, and stops at one that starts after it. If there is no room at all
+around the playhead, no block appears; the take still records, and you can make
+room and place the pattern yourself.
 Run Luvie with `LUVIE_DEBUG=1` and it will say when this happens.
 
 What gets recorded:
@@ -174,19 +195,21 @@ What gets recorded:
 - **Recording adds, never replaces.** Playing over a part that already has notes
   leaves them alone, so you can build a part up in several passes.
 - **A whole pass is one undo.** However many notes a take contains, one Ctrl+Z
-  removes all of them. A take ends when you disarm the toggle, stop the
-  transport, or leave the editor — the next one is its own undo entry.
+  removes all of them. A take ends when you disarm the toggle or stop the
+  transport — the next one is its own undo entry. Patterns recorded in the same
+  pass are undone together.
 
-The toggle stays armed between takes, so stopping and starting the transport
-records again without re-arming. It disarms itself when you leave the editor:
-switching to the Song or Loop tab, or selecting a pattern of another type. A key
-still held down when that happens is written with the length it reached rather
-than being lost.
+Stopping or pausing the transport disarms **Record** on every pattern, so the next
+take is always one you have just asked for. A key still held down when that
+happens is written with the length it reached rather than being lost. Arms are
+not saved with the project.
 
 ## Flexible bars
 
 Ordinarily you have to decide how many bars the pattern is before you play it.
 The **Grow** toggle, immediately left of **Record**, lets you decide afterwards.
+Like **Record** it belongs to the pattern and stays set while you look at other
+patterns, but it is not disarmed when the transport stops.
 
 Arm **Record** and **Grow**, and start the transport. Nothing changes at first:
 the pattern loops the way it always does, so you can wait for your entry. The
@@ -194,8 +217,8 @@ moment you play your first note the pattern stops looping, and from then on it
 gains a bar each time the playhead approaches the end. Keep playing for as long
 as the part lasts.
 
-When the take ends — you stop the transport, disarm **Record** or **Grow**, or
-leave the editor — the bars you did not play into are taken off again. The
+When the take ends — you stop the transport, or disarm **Record** or **Grow** —
+the bars you did not play into are taken off again. The
 pattern never ends up shorter than it was before the take, and never shorter
 than one bar. As always, the whole take is one Ctrl+Z, and that includes the
 bars it added.

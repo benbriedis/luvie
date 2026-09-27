@@ -313,6 +313,7 @@ bool Playhead::isInPattern(float /*bars*/) const
 int Playhead::displayedPatternId() const
 {
 	if (!obsTl) return 0;
+	if (fixedPatId > 0) return fixedPatId;
 	const Timeline& tl = obsTl->get();
 	if (patternTrack < 0 || patternTrack >= (int)tl.tracks.size()) return 0;
 	const auto& track = tl.tracks[patternTrack];
@@ -338,9 +339,7 @@ Playhead::PatternPos Playhead::patternPos(float bars) const
 {
 	PatternPos pp;
 	if (patternTrack < 0 || !obsTl) return pp;
-	const auto& tracks = obsTl->get().tracks;
-	if (patternTrack >= (int)tracks.size()) return pp;
-	int patId = displayedPatternId();
+	int patId = displayedPatternId();   // 0 as well for a track index out of range
 	if (patId <= 0) return pp;
 
 	// Time sig: use bar 0 in loop mode (loop editor's sig), current bar in song mode.
@@ -366,7 +365,14 @@ Playhead::PatternPos Playhead::patternPos(float bars) const
 
 float Playhead::freeAnchorFor(int patId) const
 {
+	if (loopMgr) return loopMgr->freeAnchor(patId);
 	return freeAnchorPatId == patId ? freeAnchorBar : 0.0f;
+}
+
+void Playhead::setFreeAnchor(int patId, float anchorBar)
+{
+	if (loopMgr) { loopMgr->setFreeAnchor(patId, anchorBar); return; }
+	setFreeAnchor(patId, anchorBar);
 }
 
 void Playhead::reanchorPattern(float anchorBar)
@@ -377,8 +383,7 @@ void Playhead::reanchorPattern(float anchorBar)
 		loopMgr->reanchor(patId, anchorBar);
 		return;
 	}
-	freeAnchorBar   = anchorBar;
-	freeAnchorPatId = patId;
+	setFreeAnchor(patId, anchorBar);
 }
 
 void Playhead::pinPatternAnchor()
@@ -388,10 +393,9 @@ void Playhead::pinPatternAnchor()
 	// Adopt the anchor the pattern has right now — the block's when one is playing
 	// it, otherwise the one it already had (freeAnchorFor, so a pattern never
 	// inherits the phase left behind on a different one).
-	freeAnchorBar   = (loopMgr && loopMgr->isPatternActive(patId))
-	                ? loopMgr->patternAnchorBar(patId)
-	                : freeAnchorFor(patId);
-	freeAnchorPatId = patId;
+	setFreeAnchor(patId, (loopMgr && loopMgr->isPatternActive(patId))
+	                     ? loopMgr->patternAnchorBar(patId)
+	                     : freeAnchorFor(patId));
 }
 
 float Playhead::patternBeat(float bars) const
