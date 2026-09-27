@@ -182,6 +182,16 @@ bool LuvieApp::instrumentHears(int instrId, int slot, const uint8_t* data, int l
     return true;
 }
 
+std::vector<int> LuvieApp::passThroughInstruments(int slot, const uint8_t* data, int len) const
+{
+    std::vector<int> ids;
+    if (!outputsOverlay) return ids;
+    for (int id : outputsOverlay->instrumentIds())
+        if (outputsOverlay->instrumentPassesThrough(id) && instrumentHears(id, slot, data, len))
+            ids.push_back(id);
+    return ids;
+}
+
 void LuvieApp::setHarmonyRootTrigger(int instrId, bool edited)
 {
     harmonyRootTrigger_ = instrId;
@@ -790,7 +800,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
                     if (std::find(heard.begin(), heard.end(), ri) == heard.end())
                         heard.push_back(ri);
                 });
-                for (int i : heard) auditioner.param(i, ccForType(type), value);
+                // Sounded only where Pass through is on, like a note; recorded
+                // either way.
+                for (int i : heard)
+                    if (!outputsOverlay || outputsOverlay->instrumentPassesThrough(i))
+                        auditioner.param(i, ccForType(type), value);
                 return;
             }
         }
@@ -800,21 +814,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         // replays them, so unlike a note there is no live echo to suppress. The CC
         // number survives too — param() above remaps it through ccForType() — so
         // the synth sees what the controller sent and its MIDI learn can bind it.
-        // It goes where a note from the same place would: the instrument on screen
-        // and every armed pattern's, each only if this is its input.
+        // It goes where a note from the same place would: every instrument with
+        // Pass through on that this is the input of.
         if (learnable || status == 0xA0 || status == 0xC0) {
-            std::vector<int> heard;
-            const int instr = midiInInstrument();
-            if (accepted && instr >= 0) heard.push_back(instr);
-            recorders.forEachRecording([&](PatternRecorder& r) {
-                const int ri = r.instrumentId();
-                if (instrumentAccepts(ri, slot, data, len)
-                    && std::find(heard.begin(), heard.end(), ri) == heard.end())
-                    heard.push_back(ri);
-            });
+            const std::vector<int> heard = passThroughInstruments(slot, data, len);
             if (heard.empty() && luvieDebug())
-                fprintf(stderr, "[luvie] passthru: no instrument (none on this input, "
-                                "no editor showing and no track selected)\n");
+                fprintf(stderr, "[luvie] passthru: no instrument (none with Pass through "
+                                "on this input)\n");
             for (int i : heard) auditioner.passThrough(i, data, len);
             return;
         }
@@ -844,22 +850,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             heldNotes_.erase(it);
         }
 
-        // Always audible, armed or not: trying a note out is half of what a keyboard
-        // is for. On the instrument of the editor showing, when this is its input...
-        std::vector<int> heard;
-        if (midiTarget && accepted) {
-            midiTarget->liveNoteOn(pitch);
-            heard.push_back(midiTarget->currentInstrumentId());
-        }
-        // ...and on the instrument of every armed pattern whose input it is, which
-        // records it too. One note per instrument, however many patterns share it.
+        // The editor showing lights the key, when this is its instrument's input...
+        if (midiTarget && accepted) midiTarget->liveNoteOn(pitch);
+        // ...every armed pattern whose input it is records it...
         recorders.forEachRecording([&](PatternRecorder& r) {
-            const int ri = r.instrumentId();
-            if (!instrumentAccepts(ri, slot, data, len)) return;
-            r.noteOn(pitch, vel);
-            if (std::find(heard.begin(), heard.end(), ri) == heard.end())
-                heard.push_back(ri);
+            if (instrumentAccepts(r.instrumentId(), slot, data, len)) r.noteOn(pitch, vel);
         });
+        // ...and it sounds, as played, on every instrument with Pass through on that
+        // it is the input of, whatever is on screen and whether or not it is armed.
+        std::vector<int> heard = passThroughInstruments(slot, data, len);
         if (heard.empty()) return;
         for (int i : heard) auditioner.noteOn(i, pitch, vel);
         heldNotes_[key] = std::move(heard);
@@ -873,7 +872,13 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         og2->playheadSkipNoteOnce(instrumentId, pitch, (float)bar, (float)tol);
     };
     recorders.setContext(pattern, transport, &loopMgr);
-    recorders.onSkipNoteOnce = skipNoteOnce;
+    // Only an instrument with Pass through on was heard live; without it the
+    // recorded note has not been played yet, so its first firing must sound.
+    recorders.onSkipNoteOnce = [this, skipNoteOnce](int instrumentId, int pitch,
+                                                    double bar, double tol) {
+        if (outputsOverlay && !outputsOverlay->instrumentPassesThrough(instrumentId)) return;
+        skipNoteOnce(instrumentId, pitch, bar, tol);
+    };
     // Flexible bars lengthening a pattern: whichever editor shows it keeps the head
     // in view.
     recorders.onGrew = [this](int patId, float headBeat) {

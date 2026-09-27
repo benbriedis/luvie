@@ -359,7 +359,8 @@ std::string appStateToJsonString(const AppState& state) {
                            {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
                            {"gm1Instrument", c.gm1Instrument},
                            {"inputName", c.inputName}, {"inputChannel", c.inputChannel},
-                           {"split", keySplitToString(c.split)}, {"splitNote", c.splitNote}});
+                           {"split", keySplitToString(c.split)}, {"splitNote", c.splitNote},
+                           {"passThrough", c.passThrough}});
     }
     json jins = json::array();
     for (const auto& in : state.midiInputs)
@@ -540,6 +541,7 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         ch.inputChannel      = std::clamp(jc.value("inputChannel", legacyChannel), 0, 16);
         ch.split             = keySplitFromString(jc.value("split", ""));
         ch.splitNote         = std::clamp(jc.value("splitNote", 60), 0, 127);
+        ch.passThrough       = jc.value("passThrough", true);
         state.jackInstruments.push_back(std::move(ch));
     }
     return true;

@@ -349,7 +349,7 @@ int main(int argc, char **argv) {
             instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
                               c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument, c.inputName, c.inputChannel,
-                              c.split, c.splitNote});
+                              c.split, c.splitNote, c.passThrough});
         connOverlay->setInstruments(instrs);
         app.pushInstruments();
         syncPorts();
@@ -370,7 +370,7 @@ int main(int argc, char **argv) {
                                              ci.isDrum, ci.fallbackNoteNames,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
                                              ci.gm1Instrument, ci.inputName, ci.inputChannel,
-                                             ci.split, ci.splitNote});
+                                             ci.split, ci.splitNote, ci.passThrough});
     };
 
     // Let the menu's Import/Export include the outputs section.

@@ -12,6 +12,7 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Input.H>
+#include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl.H>
 #include <algorithm>
@@ -52,6 +53,8 @@ static constexpr int splitLabelW       = 36;
 static constexpr int splitChoiceW      = 70;
 static constexpr int splitNoteW        = 60;
 static constexpr int splitLearnW       = 90;
+// "Pass through", at the end of the same sub-row.
+static constexpr int passThroughW      = 100;
 
 static constexpr int drumRowH          = 32;
 static constexpr int drumBtnH          = 22;
@@ -483,7 +486,7 @@ void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
                                 ci.gm1Instrument,
                                 ci.inputName.empty() ? inputs_[0].name : ci.inputName,
                                 std::clamp(ci.inputChannel, 0, 16),
-                                ci.split, std::clamp(ci.splitNote, 0, 127)});
+                                ci.split, std::clamp(ci.splitNote, 0, 127), ci.passThrough});
     rebuildInstrumentRows();
 }
 
@@ -498,7 +501,7 @@ std::vector<OutputsOverlay::InstrumentInfo> OutputsOverlay::getInstruments() con
         result.push_back({instr.id, instr.name, instr.portName, instr.midiChannel, instr.drumMap,
                           instr.isDrum, instr.fallbackNoteNames, instr.programNumber, instr.bankMsb, instr.bankLsb,
                           instr.gm1Instrument, instr.inputName, instr.inputChannel,
-                          instr.split, instr.splitNote});
+                          instr.split, instr.splitNote, instr.passThrough});
     return result;
 }
 
@@ -514,6 +517,21 @@ bool OutputsOverlay::instrumentInput(int instrId, std::string& inputName, int& c
         return true;
     }
     return false;
+}
+
+bool OutputsOverlay::instrumentPassesThrough(int instrId) const
+{
+    for (const auto& instr : instruments_)
+        if (instr.id == instrId) return instr.passThrough;
+    return false;
+}
+
+std::vector<int> OutputsOverlay::instrumentIds() const
+{
+    std::vector<int> ids;
+    ids.reserve(instruments_.size());
+    for (const auto& instr : instruments_) ids.push_back(instr.id);
+    return ids;
 }
 
 bool OutputsOverlay::handleSplitLearn(const std::string& inputName, const uint8_t* data, int len)
@@ -911,6 +929,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         if (row.splitChoice)     discard(row.splitChoice);
         if (row.splitNoteLabel)  discard(row.splitNoteLabel);
         if (row.splitLearnBtn)   discard(row.splitLearnBtn);
+        if (row.passThroughCheck) discard(row.passThroughCheck);
         if (row.outputLabel)     discard(row.outputLabel);
         if (row.outChanLabel)    discard(row.outChanLabel);
     }
@@ -1105,6 +1124,19 @@ void OutputsOverlay::rebuildInstrumentRows() {
         splitLearn->setBorderWidth(1);
         splitLearn->setBorderColor(borderCol);
         splitLearn->callback(splitLearnCb, this);
+        ix += splitLearnW + 16;
+
+        // Pass through: what is played here goes straight on to the output, as played.
+        auto* passThru = new Fl_Check_Button(ix, inWidY, passThroughW, progBtnH, "Pass through");
+        passThru->labelsize(11);
+        passThru->labelcolor(subTextCol);
+        passThru->down_box(FL_DOWN_BOX);
+        passThru->color(inputBgCol);
+        passThru->selection_color(textCol);
+        passThru->value(instruments_[i].passThrough ? 1 : 0);
+        passThru->tooltip("Send the notes played on this input straight to the MIDI output, "
+                          "unquantised. With a split, only this instrument's side of it.");
+        passThru->callback(passThroughCb, this);
 
         // MIDI output sub-row — where the instrument sends, laid out to match
         const int outSubY = inSubY + progRowH;
@@ -1235,7 +1267,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
                               progInp, progDrop, msbInp, lsbInp,
                               bankLbl, msbLbl, lsbLbl, progLbl, gm1Lbl,
                               inLbl, inCh, inChanLbl, inChanCh,
-                              splitLbl, splitCh, splitNoteLbl, splitLearn,
+                              splitLbl, splitCh, splitNoteLbl, splitLearn, passThru,
                               outLbl, outChanLbl, instruments_[i].name});
         updateSplitRow(i);
         y += rowH + 4 * progRowH + (drum ? drumRowH : 0);
@@ -1510,6 +1542,16 @@ void OutputsOverlay::splitChoiceCb(Fl_Widget* w, void* d) {
     }
 }
 
+void OutputsOverlay::passThroughCb(Fl_Widget* w, void* d) {
+    auto* self = static_cast<OutputsOverlay*>(d);
+    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
+        if (w != self->instrRows_[i].passThroughCheck) continue;
+        self->instruments_[i].passThrough = static_cast<Fl_Check_Button*>(w)->value() != 0;
+        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
+        return;
+    }
+}
+
 void OutputsOverlay::splitLearnCb(Fl_Widget* w, void* d) {
     auto* self = static_cast<OutputsOverlay*>(d);
     for (int i = 0; i < (int)self->instrRows_.size(); i++) {
@@ -1770,7 +1812,7 @@ std::vector<Fl_Widget*> OutputsOverlay::getFocusOrder() const {
     for (const auto& row : instrRows_) {
         add(row.nameInput); add(row.deleteBtn);
         add(row.inputChoice); add(row.inChanChoice);
-        add(row.splitChoice); add(row.splitLearnBtn);
+        add(row.splitChoice); add(row.splitLearnBtn); add(row.passThroughCheck);
         add(row.portChoice);  add(row.midiChanChoice);
     }
     add(addDrumInstrBtn);

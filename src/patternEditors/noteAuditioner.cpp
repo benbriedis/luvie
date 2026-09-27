@@ -71,15 +71,17 @@ void NoteAuditioner::noteOn(int instrumentId, int midi, int velocity)
 
     if (!midiSink && (!portReg || !portReg->find(r.portName))) return;
     sendNote(r.portName, r.channel0, midi, velocity, true);
-    heldNotes.push_back(new Pending{this, r.portName, r.channel0, midi});
+    heldNotes.push_back(new Pending{this, r.portName, r.channel0, midi, instrumentId});
 }
 
 void NoteAuditioner::noteOff(int instrumentId, int midi)
 {
-    (void)instrumentId;   // the route was captured at note-on and is what must be used
+    // Matched by instrument, not just pitch: one key can be sounding on several
+    // instruments at once, and each is released on its own. The route to send the
+    // note-off on is the one captured at note-on.
     for (int i = (int)heldNotes.size() - 1; i >= 0; i--) {
         Pending* p = heldNotes[i];
-        if (p->pitch != midi) continue;
+        if (p->pitch != midi || p->instrumentId != instrumentId) continue;
         sendOff(p);
         heldNotes.erase(heldNotes.begin() + i);
         delete p;

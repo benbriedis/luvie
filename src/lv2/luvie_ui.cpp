@@ -256,7 +256,7 @@ static void collectOverlayOutputs(LuvieUI* ui, AppState& state)
                                          ci.isDrum, ci.fallbackNoteNames,
                                          ci.programNumber, ci.bankMsb, ci.bankLsb,
                                          ci.gm1Instrument, ci.inputName, ci.inputChannel,
-                                         ci.split, ci.splitNote});
+                                         ci.split, ci.splitNote, ci.passThrough});
 }
 
 /* Push a loaded `state` into the Outputs overlay and re-register JACK ports to
@@ -279,7 +279,7 @@ static void applyOverlayOutputs(LuvieUI* ui, const AppState& state)
         instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
                           c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
                           c.gm1Instrument, c.inputName, c.inputChannel,
-                          c.split, c.splitNote});
+                          c.split, c.splitNote, c.passThrough});
     overlay->setInstruments(instrs);
     ui->app.pushInstruments();
 }

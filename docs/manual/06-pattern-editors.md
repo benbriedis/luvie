@@ -121,8 +121,9 @@ reliable way to turn a played note back into one.
 
 Set the MIDI input up first — see
 [MIDI input, output and instruments](03-outputs.md). Once a keyboard is
-connected, playing it sounds the open pattern's instrument whether or not you are
-recording, so you can try things out before committing to them.
+connected, playing it sounds each instrument that has **Pass through** on,
+whether or not you are recording, so you can try things out before committing to
+them.
 
 Only MIDI from the input and channel the pattern's instrument is played from is
 heard and recorded; see
@@ -148,9 +149,9 @@ you are looking at. Arm that one too and both record. You can go on to the Song
 or Loop tab and they keep recording there.
 
 Every armed pattern listens to its own instrument's MIDI input, channel and side
-of the keyboard split, and plays it through to that instrument — so with two
-keyboards, two channels or a split keyboard, each hand or player can be recorded
-into a different pattern in the same pass. Armed patterns whose instruments share
+of the keyboard split — so with two keyboards, two channels or a split
+keyboard, each hand or player can be recorded into a different pattern in the
+same pass. Armed patterns whose instruments share
 an input all hear it.
 
 ## Recording into the song

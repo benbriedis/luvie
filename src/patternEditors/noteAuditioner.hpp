@@ -53,7 +53,8 @@ public:
     void passThrough(int instrumentId, const uint8_t* msg, int len);
 
 private:
-    struct Pending { NoteAuditioner* self; std::string portName; int channel; int pitch; };
+    struct Pending { NoteAuditioner* self; std::string portName; int channel; int pitch;
+                     int instrumentId = -1; };
     static void offCb(void* data);
     void        sendOff(const Pending* p);
     void        sendNote(const std::string& portName, int ch, int midi, int velocity, bool on);

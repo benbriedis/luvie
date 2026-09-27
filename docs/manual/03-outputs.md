@@ -123,12 +123,20 @@ everything, which is what you want for a single keyboard. Set it to 1-16 to
 ignore everything else. This is useful when a controller sends on several
 channels at once, or when two keyboards share one port on different channels.
 
-While you are editing one of an instrument's patterns — or, from the Song and
-Loop tabs, while its track is selected — only MIDI from its input and channel is
-heard. Everything else is ignored: notes, bound controls and pass-through alike.
-So a drum kit can be played from a pad controller and a piano from a keyboard,
-each picking up only its own.
+**Pass through** — on by default. What you play on the instrument's input and
+channel is sent straight to its MIDI output as you play it, unquantised, so you
+hear the instrument whatever tab or pattern is on screen and whether or not
+anything is recording. With a keyboard split only the keys on this instrument's
+side of the split are passed through. Unbound controllers, program changes and
+aftertouch are passed through the same way. Controls bound with MIDI learn are
+still recorded, but only sent to an instrument that has Pass through on. Turn it
+off for an instrument you only want to hear from its patterns — a recorded note
+is then first heard when the pattern plays it.
 
-Incoming notes go to whichever pattern editor is open, and are played on that
-pattern's instrument so you hear what you are playing. Recording them is
-described in [The pattern editors](06-pattern-editors.md).
+While you are editing one of an instrument's patterns — or, from the Song and
+Loop tabs, while its track is selected — only MIDI from its input and channel
+reaches the editor. So a drum kit can be played from a pad controller and a
+piano from a keyboard, each picking up only its own.
+
+Incoming notes light up the rows of whichever pattern editor is open. Recording
+them is described in [The pattern editors](06-pattern-editors.md).

@@ -18,6 +18,7 @@ class CollapsiblePane;
 class Fl_Box;
 class Fl_Input;
 class Fl_Choice;
+class Fl_Check_Button;
 
 class OutputsOverlay : public OverlayWindow {
     ModernButton* addBtn          = nullptr;
@@ -70,6 +71,7 @@ class OutputsOverlay : public OverlayWindow {
         int  inputChannel      = 0;          // 0 = Any; 1-16
         KeySplit split         = KeySplit::None;
         int  splitNote         = 60;
+        bool passThrough       = true;
     };
     struct InstrumentRow {
         Fl_Box*       typeLabel      = nullptr;
@@ -101,6 +103,7 @@ class OutputsOverlay : public OverlayWindow {
         Fl_Choice*    splitChoice     = nullptr;
         Fl_Box*       splitNoteLabel  = nullptr;
         ModernButton* splitLearnBtn   = nullptr;
+        Fl_Check_Button* passThroughCheck = nullptr;
         Fl_Box*       outputLabel     = nullptr;
         Fl_Box*       outChanLabel    = nullptr;
         std::string   committedName;
@@ -189,6 +192,7 @@ class OutputsOverlay : public OverlayWindow {
     static void instrInChanCb   (Fl_Widget*, void*);
     static void splitChoiceCb   (Fl_Widget*, void*);
     static void splitLearnCb    (Fl_Widget*, void*);
+    static void passThroughCb   (Fl_Widget*, void*);
     static void deleteCb        (Fl_Widget*, void*);
     static void instrNameCb     (Fl_Widget*, void*);
     static void instrDeleteCb   (Fl_Widget*, void*);
@@ -252,6 +256,7 @@ public:
         int         inputChannel      = 0;
         KeySplit    split             = KeySplit::None;
         int         splitNote         = 60;
+        bool        passThrough       = true;
     };
     void setInstruments(const std::vector<InstrumentInfo>& instrs);
     std::vector<InstrumentInfo> getInstruments() const;
@@ -259,6 +264,11 @@ public:
     // there is no such instrument. Cheap: for the MIDI input path, which runs per event.
     bool instrumentInput(int instrId, std::string& inputName, int& channel,
                          KeySplit& split, int& splitNote) const;
+    // Whether instrument `instrId` sends what it is played straight to its output.
+    // False if there is no such instrument.
+    bool instrumentPassesThrough(int instrId) const;
+    // Every instrument's id, in the list's order.
+    std::vector<int> instrumentIds() const;
 
     // Split learn: an instrument's MIDI Learn button waits for a key on that
     // instrument's input (and channel), which becomes its split point. Feed every

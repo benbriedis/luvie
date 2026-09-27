@@ -108,6 +108,9 @@ struct JackInstrument {
     int         inputChannel      = 0;   // 0 = Any; 1-16 = that channel alone
     KeySplit    split             = KeySplit::None;
     int         splitNote         = 60;  // lowest note (Upper) or highest (Lower)
+    // Whether what is played on its input is sent straight on to its output, as
+    // played — heard whether or not any of its patterns is being edited or recorded.
+    bool        passThrough       = true;
 };
 
 // App-level state that gets persisted to / loaded from disk.

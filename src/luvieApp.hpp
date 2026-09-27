@@ -231,12 +231,13 @@ public:
     StartupOverlay*    startupOverlay = nullptr;
 
     // ── MIDI input routing ───────────────────────────────────────────────────
-    // Incoming MIDI sounds on the instrument of whichever pattern editor is on
-    // screen, and lights its rows. Separately, every pattern with Record armed
-    // hears its own instrument's input, whatever is on screen — so several can be
-    // played through and recorded at once, from different inputs, channels or
-    // sides of a split. The Song and Loop tabs are not targets, but armed patterns
-    // keep recording from them.
+    // Incoming MIDI lights the rows of whichever pattern editor is on screen.
+    // Separately, every pattern with Record armed records its own instrument's
+    // input, whatever is on screen, and every instrument with Pass through on
+    // sounds what is played on its input, unquantised — so several can be played
+    // and recorded at once, from different inputs, channels or sides of a split.
+    // The Song and Loop tabs are not targets, but armed patterns keep recording
+    // from them.
     //
     // Call after anything that can change which editor is visible — a tab switch,
     // or a selection change that swaps one pattern editor for another.
@@ -258,6 +259,9 @@ public:
     // instrument `instrId`'s input, channel and side of its split. False when there
     // is no such instrument.
     bool instrumentHears(int instrId, int slot, const uint8_t* data, int len) const;
+    // Every instrument with Pass through on that hears a message arriving on
+    // `slot` (instrumentHears()): where it is sent straight on to, as played.
+    std::vector<int> passThroughInstruments(int slot, const uint8_t* data, int len) const;
     // Is any pattern armed to record?
     bool anyRecordArmed() const { return recorders.anyRecordArmed(); }
     // Fired whenever a Record toggle arms or disarms, including every one the
