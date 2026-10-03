@@ -26,7 +26,7 @@ static constexpr Fl_Color colTrackDiv    = 0x37415100;  // separator between tra
 static constexpr Fl_Color colInstrHeader = 0x64748B00;  // dedicated instrument name row bg
 static constexpr int      instrNameRowH  = 24;           // height of instrument header rows
 static constexpr int      iconAreaW      = 16;           // width reserved for expand/collapse arrow
-static constexpr int      btnColW        = 22;           // right column holding the R/S/M buttons
+static constexpr int      btnColW        = 22;           // right column holding a collapsed track's / header's S/M
 
 // Record/Solo/Mute button colours
 static constexpr Fl_Color colBtnOff  = 0x29354800;
@@ -36,6 +36,17 @@ static constexpr Fl_Color colRecDot  = 0xEF444400;
 // Record dot border and dot heights; both even so they share a centre pixel.
 static constexpr int      recRingH   = 10;
 static constexpr int      recDotH    = 6;
+// An expanded lane's R/S/M sit edge to edge in a row at the bottom right of the
+// lane, filling the band from the name down to the row's bottom border.
+static constexpr int      laneBtnW   = 16;
+static constexpr int      laneBtnH   = 16;
+static constexpr int      laneBtnBottom = 1;   // the row's bottom border line
+
+// Top of a lane row's bottom band, which holds the kind tag and the R/S/M row.
+static int laneBandY(int ry, int rh) { return ry + rh - laneBtnBottom - laneBtnH; }
+
+// Where an expanded lane's button row starts: right-aligned in the row.
+static int laneBtnX(int rowX, int rowW) { return rowX + rowW - 3 * laneBtnW; }
 static constexpr Fl_Color colBtnTextOn  = FL_WHITE;
 static constexpr Fl_Color colBtnTextOff = 0x64748B00;
 
@@ -133,17 +144,21 @@ TrackLabels::RowButtons TrackLabels::buttonsFor(int absRow, int ry) const
             groupState(t, allSolo, allMute);
             stack({{LabelBtn::Solo, allSolo}, {LabelBtn::Mute, allMute}}, -1, 0);
         } else {
+            // An expanded lane: R, S, M in a row at the bottom right.
             for (const auto& l : t.lanes) {
                 if (l.id != ref.id) continue;
                 const Pattern* pat = timeline->patternById(l.patternId);
-                // Harmony patterns are not recorded into, so they get no R.
-                if (pat && pat->type != PatternType::HARMONY) {
-                    bool armed = isRecordArmed && isRecordArmed(l.patternId);
-                    stack({{LabelBtn::Rec, armed}, {LabelBtn::Solo, l.solo}, {LabelBtn::Mute, l.mute}},
-                          l.id, l.patternId);
-                } else {
-                    stack({{LabelBtn::Solo, l.solo}, {LabelBtn::Mute, l.mute}}, l.id, l.patternId);
-                }
+                const int x0 = laneBtnX(x(), w()), by = laneBandY(ry, rh);
+                auto put = [&](int slot, LabelBtn k, bool on) {
+                    rb.btn[rb.count++] = {k, x0 + slot * laneBtnW, by, laneBtnW, laneBtnH,
+                                          on, t.id, l.id, l.patternId, BtnShape::Rect, 0};
+                };
+                // Harmony patterns are not recorded into, so they get no R; their
+                // S/M keep the same slots so the columns still line up.
+                if (pat && pat->type != PatternType::HARMONY)
+                    put(0, LabelBtn::Rec, isRecordArmed && isRecordArmed(l.patternId));
+                put(1, LabelBtn::Solo, l.solo);
+                put(2, LabelBtn::Mute, l.mute);
                 break;
             }
         }
@@ -438,8 +453,9 @@ void TrackLabels::draw()
         if (!kind) return;
         fl_font(FL_HELVETICA, 8);
         fl_color(fl_color_average(colText, bg, 0.45f));
-        fl_draw(kind, x() + 4, ry, w() - 8 - btnColW, rh - 2,
-                FL_ALIGN_LEFT | FL_ALIGN_BOTTOM | FL_ALIGN_CLIP);
+        int bandY = laneBandY(ry, rh);
+        fl_draw(kind, x() + 4, bandY, laneBtnX(x(), w()) - x() - 8, laneBtnH,
+                FL_ALIGN_LEFT | FL_ALIGN_CLIP);
     };
 
     // Draw left-aligned, but when the text is wider than the cell show its END
@@ -456,25 +472,30 @@ void TrackLabels::draw()
         fl_draw(s.c_str() + i, tx, ty, tw, th, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
     };
 
-    // Record/Solo/Mute buttons in the right-hand column (see buttonsFor()). Each
-    // leaves a 1px gap below it so neighbouring unlit buttons stay distinct.
-    auto drawButtons = [&](int absRow, int ry) {
+    // Record/Solo/Mute buttons (see buttonsFor()). Stacked ones leave a 1px gap
+    // below them so neighbouring unlit buttons stay distinct.
+    // A selected lane's unlit buttons take the selection blue, so the highlight
+    // runs the full width of the cell; a lit S/M/R still shows its own colour.
+    auto drawButtons = [&](int absRow, int ry, bool selected = false) {
+        const Fl_Color offBg   = selected ? colSelected : colBtnOff;
+        const Fl_Color offText = selected ? fl_color_average(colBtnTextOn, colSelected, 0.55f)
+                                          : colBtnTextOff;
         RowButtons rb = buttonsFor(absRow, ry);
         for (int b = 0; b < rb.count; b++) {
             const BtnRect& r = rb.btn[b];
-            const int bh = r.h - 1;
+            const int bh = r.h - r.gapBelow;
             if (r.kind == LabelBtn::Rec) {
-                fl_color(colBtnOff);
+                fl_color(offBg);
                 fl_rectf(r.x, r.y, r.w, bh);
-                Fl_Color ring = r.on ? colBtnTextOn : colBtnTextOff;
-                Fl_Color dot  = r.on ? colRecDot : fl_color_average(colRecDot, colBtnOff, 0.4f);
+                Fl_Color ring = r.on ? colBtnTextOn : offText;
+                Fl_Color dot  = r.on ? colRecDot : fl_color_average(colRecDot, offBg, 0.4f);
                 int cx = r.x + r.w / 2, cy = r.y + bh / 2;
                 svgGlyph::draw(kRecordSvg, cx, cy, ring, recRingH);
                 svgGlyph::draw(kRecordSvg, cx, cy, dot,  recDotH);
                 continue;
             }
             const bool solo = r.kind == LabelBtn::Solo;
-            fl_color(!r.on ? colBtnOff : solo ? colSoloOn : colMuteOn);
+            fl_color(!r.on ? offBg : solo ? colSoloOn : colMuteOn);
             if (r.shape != BtnShape::Rect) {
                 // One half of a diagonally split square, with a small letter
                 // centred on the triangle's centroid. A 1px line of the row
@@ -488,13 +509,13 @@ void TrackLabels::draw()
                 const int cx = ul ? x0 + r.w / 3 : x1 - r.w / 3;
                 const int cy = ul ? y0 + r.h / 3 : y1 - r.h / 3;
                 fl_font(FL_HELVETICA_BOLD, 7);
-                fl_color(r.on ? colBtnTextOn : colBtnTextOff);
+                fl_color(r.on ? colBtnTextOn : offText);
                 fl_draw(solo ? "S" : "M", cx - 5, cy - 5, 10, 10, FL_ALIGN_CENTER);
                 continue;
             }
             fl_rectf(r.x, r.y, r.w, bh);
             fl_font(FL_HELVETICA_BOLD, 9);
-            fl_color(r.on ? colBtnTextOn : colBtnTextOff);
+            fl_color(r.on ? colBtnTextOn : offText);
             fl_draw(solo ? "S" : "M", r.x, r.y, r.w, bh, FL_ALIGN_CENTER);
         }
     };
@@ -578,15 +599,18 @@ void TrackLabels::draw()
                     for (int j = 0; j < (int)track.lanes.size(); j++)
                         if (track.lanes[j].id == ref.id) { laneNum = j + 1; break; }
 
-                    // Every lane row carries the button column; its name must leave room.
+                    // A collapsed track's row keeps its S/M in the right-hand column.
                     int rightPad = btnColW;
 
                     if (isUnstacked) {
-                        // ── Unstacked lane: just pattern name (instrument name is in header row) ──
+                        // ── Unstacked lane: pattern name above, kind tag and R/S/M
+                        // in the band below (instrument name is in header row) ──
                         fl_font(FL_HELVETICA, 11);
                         fl_color(isDragSrc ? fl_color_average(colText, FL_WHITE, 0.5f) : colText);
                         int patId = track.lanes[laneNum-1].patternId;
-                        drawTailClipped(patName(patId), x() + 4, ry, w() - 8 - rightPad, rh);
+                        int nameY = ry + 2;
+                        drawTailClipped(patName(patId), x() + 4, nameY, w() - 8,
+                                        laneBandY(ry, rh) - nameY);
                         drawKindTag(patKind(patId), ry, rh, bg);
                     } else if (isFirstLane) {
                         // ── Stacked first lane: right-arrow expand icon + track label ──
@@ -599,7 +623,8 @@ void TrackLabels::draw()
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                     }
 
-                    drawButtons(i, ry);
+                    // Only an expanded lane's row is drawn in the selection colour.
+                    drawButtons(i, ry, isSel && isUnstacked);
                 }
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
@@ -687,7 +712,7 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
-            // R/S/M buttons in the right-hand column.
+            // R/S/M buttons.
             if (row >= 0 && row < (int)ro.size()) {
                 RowButtons rb = buttonsFor(row, y() + rowYInPanel(row));
                 for (int b = 0; b < rb.count; b++) {

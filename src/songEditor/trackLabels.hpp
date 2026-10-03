@@ -49,7 +49,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     void cancelEdit();
     void checkDuplicate();
 
-    // The Record/Solo/Mute buttons in a row's right-hand column. A lane row's
+    // The Record/Solo/Mute buttons on a row. A lane row's
     // buttons act on its own pattern; an instrument row's S/M act on every lane
     // of the track at once (laneId < 0), and are lit when all its lanes are.
     enum class LabelBtn { Rec, Solo, Mute };
@@ -65,6 +65,7 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
         int  laneId;   // -1 for an instrument row's group button
         int  patId;
         BtnShape shape = BtnShape::Rect;
+        int  gapBelow  = 1;   // undrawn strip at the bottom, separating stacked buttons
 
         bool contains(int ex, int ey) const {
             if (ex < x || ex >= x + w || ey < y || ey >= y + h) return false;
