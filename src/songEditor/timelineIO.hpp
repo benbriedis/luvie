@@ -138,19 +138,21 @@ struct AppState {
     std::vector<int> activeLoopPatterns;   // pattern IDs, ascending
 
     // The Loop Editor's scenes. Scene S is not here: it is the song-linked scene, and
-    // the set it shows is already saved as activeLoopPatterns above. Scenes 1-4 are
+    // the set it shows is already saved as activeLoopPatterns above. Scenes 1-8 are
     // the user's own — the song never writes them — so each is its own pattern-id
     // list, ascending. Like the fields above these are otherwise runtime-only state,
     // and anchors are not saved here either, for the same reason.
-    // A project saved before scenes existed loads with four empty scenes and Scene S
-    // shown, which is exactly what those sessions were.
-    std::array<std::vector<int>, 4> scenes;
-    int currentScene = 0;   // 0 = Scene S, 1-4; the scene the Loop Editor shows
+    // A project saved before scenes existed loads with empty scenes and Scene S
+    // shown, which is exactly what those sessions were. One saved when there were
+    // only four loads with Scenes 5-8 empty.
+    static constexpr int kUserScenes = 8;
+    std::array<std::vector<int>, kUserScenes> scenes;
+    int currentScene = 0;   // 0 = Scene S, 1-8; the scene the Loop Editor shows
     // The MIDI triggers for the scenes: the one that switches to each scene, Scene S
     // first, then the Next, Previous and First scene triggers the scenes share (see
     // SceneTriggerMap). Kind None where there is none, which is every slot in a
     // project saved before triggers existed.
-    std::array<MidiTrigger, 8> sceneTriggers;
+    std::array<MidiTrigger, kUserScenes + 1 + 3> sceneTriggers;
     // The instrument whose notes set the Harmony Editor's base note, or -1 for
     // none — which is what a project saved before it existed loads as.
     int harmonyRootTrigger = -1;

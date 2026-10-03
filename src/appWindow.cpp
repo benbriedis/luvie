@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "appWindow.hpp"
+#include "modern/contextMenuPopup.hpp"
 #include <FL/Fl.H>
 #include <FL/platform.H>     // fl_display (X11), fl_xid(), fl_wl_xid(), fl_wl_display()
 #include <cstddef>           // offsetof
@@ -130,6 +131,17 @@ bool AppWindow::inVisiblePopup(int ex, int ey) const
 		                 && ey >= p->y() && ey < p->y() + p->h())
 			return true;
 	return false;
+}
+
+bool AppWindow::dismissContextPopups()
+{
+	bool any = false;
+	for (auto* p : popups)
+		if (auto* menu = dynamic_cast<ContextMenuPopup*>(p); menu && menu->visible()) {
+			menu->dismiss();
+			any = true;
+		}
+	return any;
 }
 
 int AppWindow::detectEdge() const
@@ -284,7 +296,10 @@ int AppWindow::handle(int event)
         if (onDeleteSelection && onDeleteSelection()) return 1;
     }
 
+    // A focused widget inside the popup sees Escape first, but none of them want
+    // it, so it climbs to here: popups are sub-windows of this one.
     if (event == FL_KEYBOARD && Fl::event_key() == FL_Escape) {
+        if (dismissContextPopups()) return 1;
         if (onEscape) onEscape();
         return 1;
     }

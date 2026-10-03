@@ -82,6 +82,25 @@ int OverlayWindow::handle(int event) {
         applyScrollY(newY);
         return 1;
     }
+    // Content scrolled up sits under the title bar: clipped out of sight, but still
+    // a child, and added after the close button so it would get the mouse first.
+    // There, only the close button takes the mouse.
+    if ((event == FL_PUSH || event == FL_MOVE || event == FL_ENTER)
+        && Fl::event_y() < headerH) {
+        Fl_Widget* close = closeBtn_;
+        if (!close->visible() || !Fl::event_inside(close)) {
+            if (event != FL_PUSH) Fl::belowmouse(this);
+            return 1;
+        }
+        if (event == FL_PUSH) {
+            if (close->handle(FL_PUSH)) Fl::pushed(close);
+            return 1;
+        }
+        if (Fl::belowmouse() == close) return close->handle(FL_MOVE);
+        close->handle(FL_ENTER);
+        Fl::belowmouse(close);
+        return 1;
+    }
     return BasePopup::handle(event);
 }
 

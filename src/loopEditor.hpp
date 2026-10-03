@@ -69,7 +69,7 @@ public:
     // The Flip button was clicked; the editor swaps its axes. The button lives here
     // rather than in the editor so it takes part in the row's folding.
     std::function<void()> onFlip;
-    // A scene button was clicked. 0 is Scene S; 1..4 the user's own.
+    // A scene button was clicked. 0 is Scene S; 1..8 the user's own.
     std::function<void(int)> onSceneChosen;
     // A scene button was right-clicked.
     std::function<void(int)> onSceneContext;

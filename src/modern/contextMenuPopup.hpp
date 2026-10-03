@@ -78,6 +78,10 @@ public:
         box(FL_BORDER_BOX);
     }
 
+    // Escape: close without acting. A plain menu has nothing to undo, so it just
+    // hides; a popup whose hide() does something (commit an edit) overrides this.
+    virtual void dismiss() { hide(); }
+
     // A context menu's size is determined entirely by its contents. As a
     // sub-window of AppWindow it would otherwise be rescaled by the parent's
     // Fl_Group::resize() whenever the main window is resized, so ignore any

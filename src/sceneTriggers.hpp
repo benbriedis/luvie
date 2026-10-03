@@ -89,6 +89,8 @@ private:
     void displayChanged() { if (onDisplayChanged) onDisplayChanged(); }
 };
 
+static_assert(AppState::kUserScenes == SceneBank::kUserScenes,
+              "AppState::scenes holds one set per user scene");
 static_assert(std::tuple_size_v<decltype(AppState::sceneTriggers)> == SceneTriggerMap::kSlots,
               "AppState::sceneTriggers holds one trigger per SceneTriggerMap slot");
 

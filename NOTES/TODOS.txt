@@ -53,11 +53,7 @@ FUTURE FUNCTIONALITY
 
 - Could provide input triggers for patterns when in loop mode (useful to Ableton-style pads).
 
-- Pianoroll and drum patterns - allow importing of patterns.
-
-- Pianoroll and drum patterns - should support recording of patterns... (inc parameter changes)
-
-- Allow multiple MIDI inputs.
+- Maybe allow importing of patterns. Might be difficult... don't think there's a concept of bar lines.
 
 - cf Is pitch randomisation possible for drums?
 
@@ -77,10 +73,6 @@ FUTURE FUNCTIONALITY
 THINK ABOUT when in song mode when rewinding:  reset all loops (ie any manual changes should disappear)
       - but want if repositioning playhead manually or the song loops due to looping being on?
 	  - do we want a setting to control this behaviour?
-
-Swapping between song editor and loop editor - think I'd rather round out the song editor's bar 
-   (but hold on to last bar settings).
-   BUT I'd still need an intermediate mode going out too to allow the bar to finish...
 
 cf custom chord and scale builder
    - Would want to be able to export and import them.
@@ -373,7 +365,6 @@ Consider allowing notes to hang over into start of the pattern...
 NB some horizontal red lines in Song Editor are thicker than others...
 
 Create SVG glyphs for a bunch of icons:
-  - Record button
   - Right triangle used in menus
   - Settings gear
   - Transport icons
@@ -399,35 +390,10 @@ Allow some/all parameters to be hidden
 Allow parameter recording sensitivity to be set - record more or less parameters
 
 
-Manual: 
-   multi-select move, copy, delete descriptions.
-   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
-   + Alt-click-sweep slice selection and copying
-
-	USE IN CARLA - re parameters etc...	 
-	  click Luvie's Edit button (wrench), go to the Edit tab → Settings group, and tick "Send Control Changes". While
-	  you're there, tick Send Channel Pressure, Send Pitchbend and Send Program Changes too — the pass-through I added handles all of them,
-	  but Carla withholds each one independently.  + there's one or two other checkboxes...
-
-	Mention 'grow' option on website + docs (inc use case)
-
-	auditioning
-
 cf Option of disabling MIDI through Luvie? Or even removing it entirely when recording. 
      Useful for setting things up though it think...
 
-Allow scene changes to be triggered by MIDI inputs
-	Look at changing base note of current pattern using MIDI trigger - eg using a keyboard split...
-	    identify top and/or bottom keyboard note.  Mute the notes otherwise.
-		Could also allow ANY 'A' on a MIDI input set the base note.
-		Ideally might identify at what point the base notes drop down an octave.
-		Swapping between different chord types might require pre-choosing a palette of scales and chords somehow.
-
 BUG: resizing window on left often causes an unwanted pattern instance block to be added on release.
-
-BUG: all popups should be escapable using Esc
-
-TODO hover over an automation dot - should be able to press Delete
 
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
@@ -437,26 +403,8 @@ FEATURE: when the last time signature or tempo is off screen show it on the far 
 
 	Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
 
-Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
-
-Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
-   Also allow editting (maybe not saving)
-  
 If I tag it I might be able to start writing some music with it...
 
-------
-
-
-cf Intermediate mode 
-cf Putting a time signature in the Loop Editor, or # of beats per bar.
-Have song editor play to end of bar.
-
-
-Allow more scenes to be added in time
-
-Weird that I cant use that other control for Volume...
-
-Sync the time signature and/or BPM with the Song editor? Maybe optionally?
 
 -------
    
@@ -472,7 +420,7 @@ cf being able to save triggers outside project? As defaults? Not so keen on that
    Probably not worth having a small export facility (yet anyway)
    
 
-Add more scenes
+Have a variable number of scenes?
 
 cf being able to map notes (or buttons) to loops - allows us to preset  different scales etc
    OR better just to use scenes?
@@ -484,10 +432,6 @@ To document:
   - Using a split instrument to select base notes for arpeggiators.
   
 Is there an 'aconnectgui' equivalent that works across Windows and Mac?
-
-TODO test split keyboard properly
-
-TODO scene buttons should show context cursors
 
 Closing instruments window - seem to need to be scrolled up
 
@@ -504,3 +448,33 @@ Recording - cf disable snap by default? enable grow by default?
   Maybe disable snap by default for everything?
   
   
+Weird that I cant use that other control for Volume...
+
+CHECK CURRENT BEHAVIOUR... Have song editor play to end of bar. - cf Intermediate mode 
+CHECK CURRENT BEHAVIOUR... Sync the time signature and/or BPM with the Song editor? Maybe optionally?
+Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
+Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
+   Also allow editting (maybe not saving)
+Swapping between song editor and loop editor - think I'd rather round out the song editor's bar 
+   (but hold on to last bar settings).
+   BUT I'd still need an intermediate mode going out too to allow the bar to finish...
+
+
+BUG: we're still getting missing notes and cut off notes, at least in plugin mode.
+     Any refactoring useful wrt to the DSP, and the song and patterns that feed it?
+
+
+Manual: 
+   multi-select move, copy, delete descriptions.
+   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
+   + Alt-click-sweep slice selection and copying
+
+	USE IN CARLA - re parameters etc...	 
+	  click Luvie's Edit button (wrench), go to the Edit tab → Settings group, and tick "Send Control Changes". While
+	  you're there, tick Send Channel Pressure, Send Pitchbend and Send Program Changes too — the pass-through I added handles all of them,
+	  but Carla withholds each one independently.  + there's one or two other checkboxes...
+
+	Mention 'grow' option on website + docs (inc use case)
+
+	auditioning
+

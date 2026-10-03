@@ -164,6 +164,12 @@ void MarkerPopup::doDiscard()
 	commit();
 }
 
+void MarkerPopup::dismiss()
+{
+	if (creating) doDiscard();
+	else          InputEditorPopup::dismiss();
+}
+
 void MarkerPopup::doOk()
 {
 	if (kind == TEMPO) {

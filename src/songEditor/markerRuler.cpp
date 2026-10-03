@@ -293,6 +293,25 @@ int MarkerRuler::handle(int event)
 		}
 		return 1;
 	}
+	case FL_KEYBOARD:
+	case FL_SHORTCUT: {
+		// Hover-delete, as the grids do for notes: the ruler never takes focus, so
+		// FLTK broadcasts the key and the cursor decides whose it is. A Delete with
+		// a selection active never gets this far — AppWindow has already claimed it.
+		const int key = Fl::event_key();
+		if (key != FL_Delete && key != FL_BackSpace) return 0;
+		if (!Fl::event_inside(this) || Fl::event_x() < x() + clipLeft) return 0;
+		if (draggingBar >= 0) return 0;
+		// The open popup holds callbacks for its marker; removing it underneath
+		// would leave the popup to commit to a marker that is gone.
+		if (tempoPopup->visible() || timeSigPopup->visible()) return 0;
+		const int bar = hitTest(Fl::event_x()).bar;
+		if (bar < 0 || isFixed(bar)) return 0;
+		if (kind == TEMPO) timeline->removeBpm(bar);
+		else               timeline->removeTimeSig(bar);
+		window()->cursor(contextMenuCursorImage(), 0, 0);
+		return 1;
+	}
 	}
 	return Fl_Widget::handle(event);
 }

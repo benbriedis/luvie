@@ -38,6 +38,9 @@ public:
         return ContextMenuPopup::handle(event);
     }
 
+    // Escape leaves the value as it was, unlike a click away, which commits it.
+    void dismiss() override { commit(); }
+
     void hide() override {
         if (!committed && visible()) { doOk(); return; }
         Fl_Window::hide();

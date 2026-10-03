@@ -101,7 +101,7 @@ LoopPanel::LoopPanel(int x, int y, int w, int h)
         static_cast<LoopPanel*>(d)->commitTimeSig();
     }, this);
 
-    // Scene buttons: "S" is the song-linked scene, 1..4 the user's own.
+    // Scene buttons: "S" is the song-linked scene, 1..8 the user's own.
     for (int i = 0; i < SceneBank::kScenes; i++) {
         char lbl[4];
         if (i == SceneBank::kSceneSong) std::snprintf(lbl, sizeof(lbl), "S");

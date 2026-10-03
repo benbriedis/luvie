@@ -18,6 +18,9 @@ class AppWindow : public Fl_Double_Window {
 
 	// True when this window-relative point lies inside a popup that is showing.
 	bool      inVisiblePopup(int ex, int ey) const;
+	// Escape: close every context menu that is showing. Returns true if there
+	// was one. The View overlays are left alone; they have their own close button.
+	bool      dismissContextPopups();
 	int       detectEdge()        const;
 	Fl_Cursor edgeCursor(int dir) const;
 	// Hands an interactive resize to the window manager. Returns false if this
@@ -38,7 +41,8 @@ public:
 	std::function<void()> onUndo;
 	std::function<void()> onRedo;
 
-	// Escape clears any active multi-selection. It has to be routed through the
+	// Escape closes any open context menu, and only that. Otherwise it clears
+	// any active multi-selection. It has to be routed through the
 	// window because the grids never take keyboard focus and the window swallows
 	// Escape before FLTK's shortcut fallback would reach them. Returns true when
 	// something was actually cleared; the key is consumed either way, as before.

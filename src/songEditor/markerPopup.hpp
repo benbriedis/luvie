@@ -42,6 +42,9 @@ public:
 	                 std::function<void()>                                 onRemove);
 
 	int handle(int event) override;
+	// Escape on a marker this right-click just created cancels it, as the Cancel
+	// button does; on an existing one it closes leaving the marker unchanged.
+	void dismiss() override;
 
 private:
 	void doOk() override;

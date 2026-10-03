@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-// The Loop Editor's scenes: five boards over the one grid of pattern blocks, alike in
+// The Loop Editor's scenes: nine boards over the one grid of pattern blocks, alike in
 // every way but which blocks are switched on.
 //
 // Slot 0 is "Scene S", the song-linked scene, and it is a *mirror* rather than a set
@@ -19,7 +19,7 @@
 // window between a click and the bar line it lands on. Its content is already
 // persisted as AppState::activeLoopPatterns, so it is never saved from here.
 //
-// Slots 1..4 are the user's own. The song never writes them; only a click does.
+// Slots 1..8 are the user's own. The song never writes them; only a click does.
 //
 // This is a store of sets, not a playback authority — LoopManager remains the single
 // authority for what is actually sounding and at what phase. Runtime state, persisted
@@ -28,7 +28,7 @@
 class SceneBank {
 public:
 	static constexpr int kSceneSong = 0;   // "Scene S"
-	static constexpr int kScenes    = 5;   // slot 0 plus Scenes 1..4
+	static constexpr int kScenes    = 9;   // slot 0 plus Scenes 1..8
 	static constexpr int kUserScenes = kScenes - 1;
 
 	static bool isUserScene(int scene) { return scene >= 1 && scene < kScenes; }

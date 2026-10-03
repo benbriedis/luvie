@@ -13,7 +13,7 @@ using json = nlohmann::json;
 // AppState::sceneTriggers: the scenes' own triggers, saved as the "sceneTriggers"
 // array, then the navigation ones, saved by name under "sceneNavTriggers" in the
 // order SceneTriggerMap keeps them.
-static constexpr int   kSceneTriggerCount = 5;
+static constexpr int   kSceneTriggerCount = AppState::kUserScenes + 1;
 static const char*     kSceneNavNames[3]  = {"next", "previous", "first"};
 
 // ── Note ─────────────────────────────────────────────────────────────────────
@@ -440,9 +440,9 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
     state.loopMode = j.value("loopMode", false);
     for (const auto& jp : j.value("activeLoopPatterns", json::array()))
         state.activeLoopPatterns.push_back(jp.get<int>());
-    // Absent in projects saved before scenes existed: four empty scenes with Scene S
+    // Absent in projects saved before scenes existed: empty scenes with Scene S
     // shown, which is what the Loop Editor was before it had any.
-    state.currentScene = std::clamp(j.value("currentScene", 0), 0, 4);
+    state.currentScene = std::clamp(j.value("currentScene", 0), 0, AppState::kUserScenes);
     // Absent in projects saved before scene triggers existed: no scene has one. The
     // navigation triggers came later still, and are absent from those too.
     {
