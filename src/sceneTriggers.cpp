@@ -198,8 +198,9 @@ SceneTriggerMap::Fired SceneTriggerMap::handle(const std::string& input, const u
     //
     // The navigation slots only ever match exactly. Firing Next on a momentary
     // button's release would step twice per press; the price is that a toggle
-    // button steps on every other press. Patterns are the same, for the same
-    // reason: a release would toggle the pattern straight back.
+    // button steps on every other press. Patterns and the transport slots are the
+    // same, for the same reason: a release would toggle them straight back (or
+    // rewind twice, harmlessly, but a toggle button would then rewind on release).
     int exactPattern = -1;
     for (const auto& [patId, b] : patternTriggers_) {
         if (!b.sameControl(t)) continue;
@@ -213,7 +214,7 @@ SceneTriggerMap::Fired SceneTriggerMap::handle(const std::string& input, const u
         if (!triggers_[s].sameControl(t)) continue;
         consumed = true;
         if (triggers_[s].value == t.value) exact = s;
-        if (isNavSlot(s)) continue;
+        if (!isSceneSlot(s)) continue;
         any = s;
         sharing++;
     }
@@ -264,6 +265,8 @@ std::string SceneTriggerMap::slotName(int slot)
     case kNextScene:  return "Next scene";
     case kPrevScene:  return "Previous scene";
     case kFirstScene: return "First scene";
+    case kPlayPause:  return "Play/Pause";
+    case kRewind:     return "Rewind";
     case SceneBank::kSceneSong: return "Scene S";
     default: return "Scene " + std::to_string(slot);
     }

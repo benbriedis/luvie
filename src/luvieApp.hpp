@@ -201,6 +201,9 @@ public:
     // From a loaded project, after its timeline: triggers for patterns it no longer
     // has are dropped.
     void applyTriggers(const AppState& state);
+    // Show the transport buttons' triggers in their tooltips and outline the one
+    // learning. Called whenever the trigger map's display changes.
+    void refreshTransportTriggers();
     // The instrument whose notes set the Harmony Editor's base note, or -1. Chosen
     // from the base note's right-click menu and saved with the project
     // (AppState::harmonyRootTrigger); like the triggers above, kept out of the timeline.

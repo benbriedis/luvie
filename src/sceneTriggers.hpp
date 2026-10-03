@@ -21,7 +21,9 @@
 // input.
 //
 // Slots 0..kScenes-1 are the scenes themselves (0 is Scene S); the navigation
-// slots follow. Everything below that takes an int slot takes one of those.
+// slots follow, then the transport's Play/Pause and Rewind buttons, which live here
+// so a controller button cannot be bound to a transport button and a scene at once.
+// Everything below that takes an int slot takes one of those.
 //
 // The Loop Editor's pattern blocks have triggers too, kept here by pattern id
 // rather than by slot. One button does one thing, scene or pattern, so they share
@@ -36,8 +38,12 @@ public:
     static constexpr int kNextScene  = SceneBank::kScenes;
     static constexpr int kPrevScene  = SceneBank::kScenes + 1;
     static constexpr int kFirstScene = SceneBank::kScenes + 2;
-    static constexpr int kSlots      = SceneBank::kScenes + 3;
-    static bool isNavSlot(int slot) { return slot >= kNextScene && slot < kSlots; }
+    static constexpr int kPlayPause  = SceneBank::kScenes + 3;
+    static constexpr int kRewind     = SceneBank::kScenes + 4;
+    static constexpr int kSlots      = SceneBank::kScenes + 5;
+    static bool isNavSlot(int slot) { return slot >= kNextScene && slot <= kFirstScene; }
+    static bool isTransportSlot(int slot) { return slot == kPlayPause || slot == kRewind; }
+    static bool isSceneSlot(int slot) { return slot >= 0 && slot < kNextScene; }
 
     using Triggers        = std::array<MidiTrigger, kSlots>;
     using PatternTriggers = std::map<int, MidiTrigger>;   // by pattern id
@@ -108,6 +114,7 @@ public:
     // where space is tight.
     static std::string describe(const MidiTrigger& t, bool withInput = true);
     // What a slot is, for a menu: "Next scene". Scenes are "Scene S", "Scene 1"...
+    // and the transport's "Play/Pause" and "Rewind".
     static std::string slotName(int slot);
     // The context-menu item that starts (or, mid-learn, cancels) learning `slot`,
     // naming the current trigger: "MIDI learn (Note 36 ch10)" for the scene's own,

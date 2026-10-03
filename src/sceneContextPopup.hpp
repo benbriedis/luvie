@@ -14,7 +14,7 @@
 // Next, Previous and First scene triggers. Those are shared by every scene and have
 // no button of their own, so every scene button's menu offers them.
 class SceneContextPopup : public ContextMenuPopup {
-    static constexpr int kNav     = SceneTriggerMap::kSlots - SceneTriggerMap::kNextScene;
+    static constexpr int kNav     = SceneTriggerMap::kFirstScene - SceneTriggerMap::kNextScene + 1;
     static constexpr int dividerH = 9;
 
     // One learn item and its Clear per slot this menu edits: the scene's own first,

@@ -54,6 +54,7 @@ private:
 	Icon altIcon;
 	bool useAlt = false;
 	bool visualDisabled = false;   // drawn greyed but still clickable
+	bool learning = false;         // outlined amber while its MIDI trigger is learned
 
 	void drawIcon(int cx, int cy, int s, Icon icon);
 
@@ -63,7 +64,13 @@ public:
 	// Draw the button as if disabled without actually deactivating it (it stays
 	// clickable). Used for the loop toggle while the app is in Loop mode.
 	void setVisualDisabled(bool d) { visualDisabled = d; redraw(); }
+	// Outline the button while it waits for its MIDI trigger.
+	void setLearning(bool l) { if (learning != l) { learning = l; redraw(); } }
+	// Right-click: open a context menu at the window-relative point. When set the
+	// button shows the context cursor while hovered.
+	std::function<void(int wx, int wy)> onContextMenu;
 	void draw() override;
+	int  handle(int event) override;
 };
 
 
@@ -109,6 +116,17 @@ public:
 	// Fired after the rewind button repositions the transport, so views can scroll
 	// the (possibly off-screen) playhead into view even when stopped.
 	std::function<void()> onRewind;
+
+	// Press Play/Pause or Rewind as if clicked: how their MIDI triggers land. Does
+	// nothing while the buttons are disabled (no clock source yet).
+	void pressPlayPause();
+	void pressRewind();
+	// Right-click on Play/Pause or Rewind; the menu offers MIDI learn for it.
+	enum class Button { PlayPause, Rewind };
+	std::function<void(Button, int wx, int wy)> onContextMenu;
+	// Outline the button learning its trigger, and name each trigger in its tooltip.
+	void setTriggerVisual(bool playPauseLearning, const std::string& playPauseTip,
+	                      bool rewindLearning,    const std::string& rewindTip);
 
 	// Fired whenever playback starts or stops, however it happened — the button,
 	// the host, or another JACK client. MIDI recording listens so that stopping

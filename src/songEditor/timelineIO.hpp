@@ -149,10 +149,10 @@ struct AppState {
     std::array<std::vector<int>, kUserScenes> scenes;
     int currentScene = 0;   // 0 = Scene S, 1-8; the scene the Loop Editor shows
     // The MIDI triggers for the scenes: the one that switches to each scene, Scene S
-    // first, then the Next, Previous and First scene triggers the scenes share (see
-    // SceneTriggerMap). Kind None where there is none, which is every slot in a
-    // project saved before triggers existed.
-    std::array<MidiTrigger, kUserScenes + 1 + 3> sceneTriggers;
+    // first, then the Next, Previous and First scene triggers the scenes share, then
+    // the transport's Play/Pause and Rewind (see SceneTriggerMap). Kind None where
+    // there is none, which is every slot in a project saved before triggers existed.
+    std::array<MidiTrigger, kUserScenes + 1 + 3 + 2> sceneTriggers;
     // The Loop Editor's pattern triggers, by pattern id: each toggles its pattern.
     // Empty in a project saved before they existed.
     std::map<int, MidiTrigger> patternTriggers;

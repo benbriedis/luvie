@@ -279,11 +279,6 @@ BUG: clicking on 'Add automation' (and anything similar) - moving the cursor awa
 BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
      messy flickery behaviour. Probably best to only resize one at a time.
 
-Additional MIDI triggers?
-	- Start/stop
-	- Enable/disable patterns in loop mode - cf using a Ableton-style pad 
-
- 
 TODO change the tab being display when undoing/redoing as necessary 
      (+ scroll? cf recenter? cf storing position when editing?) 
 
@@ -447,6 +442,9 @@ Manual:
 	auditioning
 
     - Scene triggers
+	- Loop triggers
+	- Base note trigger in harmony editor
+	- Play/pause and rewind triggers
     - Using a split instrument to select base notes for arpeggiators.
   
 	Document

@@ -30,6 +30,7 @@
 #include "trackContextPopup.hpp"
 #include "loopContextPopup.hpp"
 #include "sceneContextPopup.hpp"
+#include "transportContextPopup.hpp"
 #include "rootTriggerPopup.hpp"
 #include "loopRulerContextPopup.hpp"
 #include "paramLaneContextPopup.hpp"
@@ -201,6 +202,20 @@ void LuvieApp::setHarmonyRootTrigger(int instrId, bool edited)
     if (edited && onMidiLearnChanged) onMidiLearnChanged();
 }
 
+void LuvieApp::refreshTransportTriggers()
+{
+    if (!bottomPane) return;
+    auto tip = [this](int slot, const char* what) -> std::string {
+        if (sceneTriggers.isLearning(slot)) return std::string(what) + "\nMIDI: learning…";
+        const MidiTrigger* t = sceneTriggers.bindingFor(slot);
+        return t ? std::string(what) + "\nMIDI: " + SceneTriggerMap::describe(*t) : what;
+    };
+    bottomPane->setTriggerVisual(sceneTriggers.isLearning(SceneTriggerMap::kPlayPause),
+                                 tip(SceneTriggerMap::kPlayPause, "Play/Pause"),
+                                 sceneTriggers.isLearning(SceneTriggerMap::kRewind),
+                                 tip(SceneTriggerMap::kRewind, "Rewind"));
+}
+
 void LuvieApp::applyTriggers(const AppState& state)
 {
     std::set<int> live;
@@ -368,6 +383,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* ctxPop    = new TrackContextPopup;
     auto* loopCtxPop = new LoopContextPopup;
     auto* sceneCtxPop = new SceneContextPopup;
+    auto* transportCtxPop = new TransportContextPopup;
     auto* rootTrigPop = new RootTriggerPopup;
     auto* loopRulerPop = new LoopRulerContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
@@ -710,17 +726,26 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
     midiLearn.onEdited = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
 
-    // Scene and pattern triggers: right-click a scene button or a pattern block to
-    // learn one. Only one learn is in flight at a time, param lane, scene or
-    // pattern, so one control never completes two.
-    sceneCtxPop->triggers = &sceneTriggers;
-    loopCtxPop->triggers  = &sceneTriggers;
+    // Scene, pattern and transport triggers: right-click a scene button, a pattern
+    // block, or Play/Pause or Rewind to learn one. Only one learn is in flight at a
+    // time, param lane, scene, pattern or transport, so one control never completes
+    // two.
+    sceneCtxPop->triggers     = &sceneTriggers;
+    loopCtxPop->triggers      = &sceneTriggers;
+    transportCtxPop->triggers = &sceneTriggers;
     loopEd->setSceneContextPopup(sceneCtxPop);
     loopEd->setSceneTriggers(&sceneTriggers);
+    bottomPane->onContextMenu = [transportCtxPop](Transport::Button b, int wx, int wy) {
+        transportCtxPop->open(b == Transport::Button::PlayPause ? SceneTriggerMap::kPlayPause
+                                                                : SceneTriggerMap::kRewind,
+                              wx, wy);
+    };
     sceneTriggers.onDisplayChanged = [this]() {
         loopEd->refreshSceneTriggers();
         loopEd->redrawGrid();   // the blocks show their triggers too
+        refreshTransportTriggers();
     };
+    refreshTransportTriggers();
     sceneTriggers.onEdited         = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
     sceneTriggers.onLearnStarted   = [this]() {
         midiLearn.cancelLearn();
@@ -775,14 +800,18 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             return;
         const int status = data[0] & 0xF0;
 
-        // Scene and pattern triggers first: a button bound to a scene or a pattern
+        // Scene, pattern and transport triggers first: a button bound to one of them
         // means nothing else, and its release is swallowed with it. They work from
         // any tab and in either mode, like the buttons and blocks they stand for.
         // Next and Previous step from the scene shown, so pressing Next twice before
         // the first switch lands still moves two scenes on.
         bool       consumed = false;
         const auto fired    = sceneTriggers.handle(midiIn.nameForSlot(slot), data, len, consumed);
-        if (fired.slot >= 0 && loopEd)
+        if (fired.slot == SceneTriggerMap::kPlayPause && bottomPane)
+            bottomPane->pressPlayPause();
+        else if (fired.slot == SceneTriggerMap::kRewind && bottomPane)
+            bottomPane->pressRewind();
+        else if (fired.slot >= 0 && loopEd)
             loopEd->chooseScene(SceneTriggerMap::targetScene(fired.slot, sceneBank.shownScene()));
         if (fired.pattern >= 0 && loopEd)
             loopEd->togglePatternId(fired.pattern);
@@ -1010,6 +1039,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);
     window->add(sceneCtxPop); window->registerPopup(sceneCtxPop);
+    window->add(transportCtxPop); window->registerPopup(transportCtxPop);
     window->add(rootTrigPop); window->registerPopup(rootTrigPop);
     window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);

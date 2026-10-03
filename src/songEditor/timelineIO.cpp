@@ -12,9 +12,12 @@ using json = nlohmann::json;
 
 // AppState::sceneTriggers: the scenes' own triggers, saved as the "sceneTriggers"
 // array, then the navigation ones, saved by name under "sceneNavTriggers" in the
-// order SceneTriggerMap keeps them.
-static constexpr int   kSceneTriggerCount = AppState::kUserScenes + 1;
-static const char*     kSceneNavNames[3]  = {"next", "previous", "first"};
+// order SceneTriggerMap keeps them, then the transport's, by name under
+// "transportTriggers".
+static constexpr int   kSceneTriggerCount     = AppState::kUserScenes + 1;
+static const char*     kSceneNavNames[3]      = {"next", "previous", "first"};
+static constexpr int   kTransportTriggerFirst = kSceneTriggerCount + 3;
+static const char*     kTransportNames[2]     = {"playPause", "rewind"};
 
 // ── Note ─────────────────────────────────────────────────────────────────────
 
@@ -400,6 +403,10 @@ std::string appStateToJsonString(const AppState& state) {
     for (int i = 0; i < 3; i++)
         if (state.sceneTriggers[kSceneTriggerCount + i].kind != MidiTriggerKind::None)
             jnav[kSceneNavNames[i]] = triggerToJson(state.sceneTriggers[kSceneTriggerCount + i]);
+    json jtransport = json::object();
+    for (int i = 0; i < 2; i++)
+        if (state.sceneTriggers[kTransportTriggerFirst + i].kind != MidiTriggerKind::None)
+            jtransport[kTransportNames[i]] = triggerToJson(state.sceneTriggers[kTransportTriggerFirst + i]);
     json jpat = json::array();
     for (const auto& [patId, t] : state.patternTriggers) {
         json jt = triggerToJson(t);
@@ -423,6 +430,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"sceneTriggers",      jtrig},
         {"sceneNavTriggers",   jnav},
         {"patternTriggers",    jpat},
+        {"transportTriggers",  jtransport},
         {"harmonyRootTrigger", state.harmonyRootTrigger},
         {"loopSigTop",         state.loopSigTop},
         {"loopSigBottom",      state.loopSigBottom},
@@ -477,6 +485,12 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         for (int i = 0; i < 3; i++)
             if (jnav.contains(kSceneNavNames[i]))
                 triggerFromJson(jnav.at(kSceneNavNames[i]), state.sceneTriggers[kSceneTriggerCount + i]);
+        // Absent before transport triggers existed: neither button has one.
+        const json jtransport = j.value("transportTriggers", json::object());
+        for (int i = 0; i < 2; i++)
+            if (jtransport.contains(kTransportNames[i]))
+                triggerFromJson(jtransport.at(kTransportNames[i]),
+                                state.sceneTriggers[kTransportTriggerFirst + i]);
         // Absent before pattern triggers existed: no pattern has one.
         for (const auto& jt : j.value("patternTriggers", json::array())) {
             if (!jt.is_object() || !jt.contains("pattern")) continue;

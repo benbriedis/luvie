@@ -4,6 +4,7 @@
 #include "transport.hpp"
 #include "editor.hpp"
 #include "popupStyle.hpp"
+#include "modern/cursors.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -11,6 +12,9 @@
 static constexpr Fl_Color borderColor = 0xCBD5E100;  // slate blue-grey
 static constexpr Fl_Color pressedColor = 0x3B82F600; // blue accent
 static constexpr Fl_Color iconColor = 0x37415100;    // dark slate
+// Outline of a button waiting for its MIDI trigger: the amber param labels and
+// scene buttons use for "Learning…".
+static constexpr Fl_Color learningColor = 0xF59E0B00;
 
 static constexpr Fl_Color alertColor   = 0xDC262600; // red
 static constexpr Fl_Color bubbleBorder = 0x94A3B800; // slate grey
@@ -223,8 +227,37 @@ void TransportButton::draw() {
 		fl_line_style(0);
 	}
 
+	if (learning) {
+		fl_color(learningColor);
+		fl_line_style(FL_SOLID, 2);
+		fl_arc(cx - r - 1, cy - r - 1, r * 2 + 2, r * 2 + 2, 0.0, 360.0);
+		fl_line_style(0);
+	}
+
 	fl_color(icon_col);
 	drawIcon(cx, cy, r / 2, useAlt ? altIcon : icon);
+}
+
+int TransportButton::handle(int event) {
+	if (onContextMenu) {
+		switch (event) {
+		case FL_ENTER:
+			window()->cursor(contextMenuCursorImage(), 0, 0);
+			break;
+		case FL_LEAVE:
+			window()->cursor(FL_CURSOR_DEFAULT);
+			break;
+		case FL_PUSH:
+			if (Fl::event_button() == FL_RIGHT_MOUSE) {
+				// The menu takes the pointer; hand back the normal cursor first.
+				window()->cursor(FL_CURSOR_DEFAULT);
+				onContextMenu(Fl::event_x(), Fl::event_y());
+				return 1;
+			}
+			break;
+		}
+	}
+	return Fl_Button::handle(event);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +323,25 @@ void Transport::enableButtons()
 	playPauseBtn->activate();
 	rewindBtn->redraw();
 	playPauseBtn->redraw();
+}
+
+void Transport::pressPlayPause()
+{
+	if (playPauseBtn->active_r()) playPauseBtn->do_callback();
+}
+
+void Transport::pressRewind()
+{
+	if (rewindBtn->active_r()) rewindBtn->do_callback();
+}
+
+void Transport::setTriggerVisual(bool playPauseLearning, const std::string& playPauseTip,
+                                 bool rewindLearning,    const std::string& rewindTip)
+{
+	playPauseBtn->setLearning(playPauseLearning);
+	rewindBtn->setLearning(rewindLearning);
+	playPauseBtn->copy_tooltip(playPauseTip.empty() ? nullptr : playPauseTip.c_str());
+	rewindBtn->copy_tooltip(rewindTip.empty() ? nullptr : rewindTip.c_str());
 }
 
 void Transport::setControlTransport(ITransport* ct)
@@ -399,6 +451,13 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 		}
 		btn->redraw();
 	}, this);
+
+	rewindBtn->onContextMenu = [this](int wx, int wy) {
+		if (onContextMenu) onContextMenu(Button::Rewind, wx, wy);
+	};
+	playPauseBtn->onContextMenu = [this](int wx, int wy) {
+		if (onContextMenu) onContextMenu(Button::PlayPause, wx, wy);
+	};
 
 	end();
 }
