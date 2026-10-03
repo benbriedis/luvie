@@ -8,6 +8,8 @@
 #include "appWindow.hpp"
 #include "cursors.hpp"
 #include "inlineEditDispatch.hpp"
+#include "modern/recordButton.hpp"
+#include "modern/svgGlyph.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -933,6 +935,28 @@ void LoopEditor::onLoopsChanged()
 // Draw
 // ======================================================
 
+// A block's record button: a small square inset from its top-right corner, clear
+// of the pattern name, which is centred lower down.
+static constexpr int recBtnSize  = 14;
+static constexpr int recBtnInset = 4;
+// Record dot border and dot heights; both even so they share a centre pixel.
+static constexpr int recRingH    = 12;
+static constexpr int recDotH     = 8;
+static constexpr Fl_Color recDotColor = 0xEF444400;
+
+void LoopEditor::recBtnRect(int bx, int by, int bw, int& rx, int& ry, int& rs) const
+{
+    rs = recBtnSize;
+    rx = bx + bw - recBtnInset - rs;
+    ry = by + recBtnInset;
+}
+
+bool LoopEditor::patternRecordable(int patId) const
+{
+    const Pattern* p = timeline ? timeline->patternById(patId) : nullptr;
+    return p && p->type != PatternType::HARMONY;
+}
+
 void LoopEditor::draw()
 {
     // Grid area background
@@ -1077,6 +1101,18 @@ void LoopEditor::draw()
                     fl_draw(patKind, bx + 4, blockY + nameLineH, bw - 8, kindLineH,
                             FL_ALIGN_CENTER | FL_ALIGN_CLIP);
                     fl_font(FL_HELVETICA_BOLD, 13);   // restore for the next cell's name
+                }
+
+                // Record button, top right: bright when armed, dimmed otherwise.
+                if (patternRecordable(patId)) {
+                    int rx, ry, rs;
+                    recBtnRect(bx, by, bw, rx, ry, rs);
+                    bool armed = isRecordArmed && isRecordArmed(patId);
+                    Fl_Color ring = armed ? FL_WHITE : fl_color_average(FL_WHITE, bg, 0.35f);
+                    Fl_Color dot  = armed ? recDotColor : fl_color_average(recDotColor, bg, 0.4f);
+                    int cx = rx + rs / 2, cy = ry + rs / 2;
+                    svgGlyph::draw(kRecordSvg, cx, cy, ring, recRingH);
+                    svgGlyph::draw(kRecordSvg, cx, cy, dot,  recDotH);
                 }
 
                 // Playhead line — always running, regardless of toggle state
@@ -1253,6 +1289,23 @@ int LoopEditor::handle(int event)
         int trackIdx = -1, laneIdx = -1, col = -1, row = -1;
         if (!cellAt(mx, my, trackIdx, laneIdx, col, row)) return 0;
         take_focus();
+
+        // A left click on a block's record button arms or disarms its pattern, and
+        // nothing else: it neither toggles the loop nor starts a drag.
+        if (Fl::event_button() == FL_LEFT_MOUSE && timeline && onRecordToggled) {
+            const Lane& lane = timeline->get().tracks[trackIdx].lanes[laneIdx];
+            if (patternRecordable(lane.patternId)) {
+                int bx, by, bw, bh, rx, ry, rs;
+                btnRect(col, row, bx, by, bw, bh);
+                recBtnRect(bx, by, bw, rx, ry, rs);
+                if (Fl::event_inside(rx, ry, rs, rs)) {
+                    bool armed = isRecordArmed && isRecordArmed(lane.patternId);
+                    onRecordToggled(lane.patternId, lane.id, !armed);
+                    redrawGrid();
+                    return 1;
+                }
+            }
+        }
 
         // Either button selects the block it lands on: a left click goes on to
         // toggle it, a right click to open its menu, and both read better if the

@@ -133,6 +133,8 @@ void LuvieApp::syncArmButtons()
     if (!patternPanel || !song_) return;
     const int patId = song_->get().patternIdForSelectedLane();
     patternPanel->showArmState(recorders.recordArmed(patId), recorders.growArmed(patId));
+    if (songEd) songEd->redrawTrackLabels();
+    if (loopEd) loopEd->redrawGrid();
 }
 
 int LuvieApp::midiInInstrument() const
@@ -898,8 +900,22 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         int patId = 0, laneId = 0;
         shownPattern(patId, laneId);
         recorders.setRecordArmed(patId, laneId, on);
+        if (songEd) songEd->redrawTrackLabels();
+        if (loopEd) loopEd->redrawGrid();
         if (onRecordArmChanged) onRecordArmChanged();
     };
+    // The Song Editor's lane R buttons arm their own lane's pattern, sharing the
+    // same recorders, so the panel toggle follows when that pattern is shown.
+    // The Loop Editor's block record buttons do the same.
+    auto isArmed = [this](int patId) { return recorders.recordArmed(patId); };
+    auto toggleArm = [this](int patId, int laneId, bool on) {
+        recorders.setRecordArmed(patId, laneId, on);
+        syncArmButtons();
+        if (onRecordArmChanged) onRecordArmChanged();
+    };
+    songEd->setRecordArmHooks(isArmed, toggleArm);
+    loopEd->isRecordArmed   = isArmed;
+    loopEd->onRecordToggled = toggleArm;
     patternPanel->onGrowChanged = [this, shownPattern](bool on) {
         int patId = 0, laneId = 0;
         shownPattern(patId, laneId);

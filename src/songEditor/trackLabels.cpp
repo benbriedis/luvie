@@ -7,6 +7,8 @@
 #include "cursors.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "inlineEditDispatch.hpp"
+#include "modern/recordButton.hpp"
+#include "modern/svgGlyph.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -24,12 +26,16 @@ static constexpr Fl_Color colTrackDiv    = 0x37415100;  // separator between tra
 static constexpr Fl_Color colInstrHeader = 0x64748B00;  // dedicated instrument name row bg
 static constexpr int      instrNameRowH  = 24;           // height of instrument header rows
 static constexpr int      iconAreaW      = 16;           // width reserved for expand/collapse arrow
-static constexpr int      btnColW        = 22;           // right column holding the S/M buttons (first lane only)
+static constexpr int      btnColW        = 22;           // right column holding the R/S/M buttons
 
-// Solo/Mute button colours (buttons appear on the top-most lane of each track)
+// Record/Solo/Mute button colours
 static constexpr Fl_Color colBtnOff  = 0x29354800;
 static constexpr Fl_Color colSoloOn  = 0x22C55E00;
 static constexpr Fl_Color colMuteOn  = 0xEF444400;
+static constexpr Fl_Color colRecDot  = 0xEF444400;
+// Record dot border and dot heights; both even so they share a centre pixel.
+static constexpr int      recRingH   = 10;
+static constexpr int      recDotH    = 6;
 static constexpr Fl_Color colBtnTextOn  = FL_WHITE;
 static constexpr Fl_Color colBtnTextOff = 0x64748B00;
 
@@ -70,6 +76,97 @@ int TrackLabels::rowHFor(int absRow) const
     if (absRow >= 0 && absRow < (int)ro.size() && ro[absRow].kind == RowKind::Header)
         return instrNameRowH;
     return rowHeight;
+}
+
+TrackLabels::RowButtons TrackLabels::buttonsFor(int absRow, int ry) const
+{
+    RowButtons rb;
+    if (!timeline) return rb;
+    const auto& tl = timeline->get();
+    const auto& ro = tl.rowOrder;
+    if (absRow < 0 || absRow >= (int)ro.size()) return rb;
+    const RowRef& ref = ro[absRow];
+    const int rh = rowHFor(absRow);
+    const int bw = btnColW - 2;
+    const int bx = x() + w() - btnColW + 1;
+
+    auto add = [&](LabelBtn k, int X, int Y, int H, bool on, int trackId, int laneId, int patId,
+                   BtnShape shape = BtnShape::Rect) {
+        rb.btn[rb.count++] = {k, X, Y, bw, H, on, trackId, laneId, patId, shape};
+    };
+    // Group S/M for a whole track: lit only when every lane is.
+    auto groupState = [](const Track& t, bool& allSolo, bool& allMute) {
+        allSolo = allMute = !t.lanes.empty();
+        for (const auto& l : t.lanes) { allSolo &= l.solo; allMute &= l.mute; }
+    };
+
+    if (ref.kind == RowKind::Header) {
+        // The header row is too short to stack two buttons, so they split one
+        // square diagonally.
+        for (const auto& t : tl.tracks) {
+            if (t.id != ref.id) continue;
+            if (t.lanes.empty()) break;
+            bool allSolo, allMute;
+            groupState(t, allSolo, allMute);
+            add(LabelBtn::Solo, bx, ry + 2, rh - 4, allSolo, t.id, -1, 0, BtnShape::UpperLeft);
+            add(LabelBtn::Mute, bx, ry + 2, rh - 4, allMute, t.id, -1, 0, BtnShape::LowerRight);
+            break;
+        }
+    } else if (ref.kind == RowKind::Lane) {
+        int tIdx = timeline->trackIndexForLaneId(ref.id);
+        if (tIdx < 0) return rb;
+        const Track& t = tl.tracks[tIdx];
+        // Stack the buttons down the column in equal slices of the row.
+        auto stack = [&](std::initializer_list<std::pair<LabelBtn, bool>> btns, int laneId, int patId) {
+            const int n = (int)btns.size();
+            int i = 0;
+            for (const auto& [k, on] : btns) {
+                int top = ry + rh * i / n, bot = ry + rh * (i + 1) / n;
+                add(k, bx, top, bot - top, on, t.id, laneId, patId);
+                ++i;
+            }
+        };
+        if (t.stackedLanes) {
+            // A collapsed track is one combined row: group S/M only.
+            if (t.lanes.empty() || t.lanes[0].id != ref.id) return rb;
+            bool allSolo, allMute;
+            groupState(t, allSolo, allMute);
+            stack({{LabelBtn::Solo, allSolo}, {LabelBtn::Mute, allMute}}, -1, 0);
+        } else {
+            for (const auto& l : t.lanes) {
+                if (l.id != ref.id) continue;
+                const Pattern* pat = timeline->patternById(l.patternId);
+                // Harmony patterns are not recorded into, so they get no R.
+                if (pat && pat->type != PatternType::HARMONY) {
+                    bool armed = isRecordArmed && isRecordArmed(l.patternId);
+                    stack({{LabelBtn::Rec, armed}, {LabelBtn::Solo, l.solo}, {LabelBtn::Mute, l.mute}},
+                          l.id, l.patternId);
+                } else {
+                    stack({{LabelBtn::Solo, l.solo}, {LabelBtn::Mute, l.mute}}, l.id, l.patternId);
+                }
+                break;
+            }
+        }
+    }
+    return rb;
+}
+
+void TrackLabels::pressButton(const BtnRect& b)
+{
+    switch (b.kind) {
+    case LabelBtn::Rec:
+        if (onRecordToggled) onRecordToggled(b.patId, b.laneId, !b.on);
+        redraw();
+        break;
+    case LabelBtn::Solo:
+        if (b.laneId >= 0) timeline->setLaneSolo(b.laneId, !b.on);
+        else               timeline->setTrackLanesSolo(b.trackId, !b.on);
+        break;
+    case LabelBtn::Mute:
+        if (b.laneId >= 0) timeline->setLaneMute(b.laneId, !b.on);
+        else               timeline->setTrackLanesMute(b.trackId, !b.on);
+        break;
+    }
 }
 
 int TrackLabels::rowYInPanel(int absRow) const
@@ -335,13 +432,13 @@ void TrackLabels::draw()
         return nullptr;
     };
 
-    // Draw the kind tag faintly in the bottom-left corner of a lane row. Kept on
-    // the left so the S/M buttons (top-most lane only) never shift it.
+    // Draw the kind tag faintly in the bottom-left corner of a lane row, clear of
+    // the button column.
     auto drawKindTag = [&](const char* kind, int ry, int rh, Fl_Color bg) {
         if (!kind) return;
         fl_font(FL_HELVETICA, 8);
         fl_color(fl_color_average(colText, bg, 0.45f));
-        fl_draw(kind, x() + 4, ry, w() - 8, rh - 2,
+        fl_draw(kind, x() + 4, ry, w() - 8 - btnColW, rh - 2,
                 FL_ALIGN_LEFT | FL_ALIGN_BOTTOM | FL_ALIGN_CLIP);
     };
 
@@ -359,21 +456,47 @@ void TrackLabels::draw()
         fl_draw(s.c_str() + i, tx, ty, tw, th, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
     };
 
-    // Solo/Mute buttons occupy the right btnColW of the top-most lane row only; lower
-    // lanes leave the space to their pattern names.
-    auto drawTrackButtons = [&](int ry, int rh, bool solo, bool mute) {
-        int bx   = x() + w() - btnColW + 1;
-        int bw   = btnColW - 2;
-        int btnH = rh / 2;
-        fl_color(solo ? colSoloOn : colBtnOff);
-        fl_rectf(bx, ry, bw, btnH);
-        fl_font(FL_HELVETICA_BOLD, 9);
-        fl_color(solo ? colBtnTextOn : colBtnTextOff);
-        fl_draw("S", bx, ry, bw, btnH, FL_ALIGN_CENTER);
-        fl_color(mute ? colMuteOn : colBtnOff);
-        fl_rectf(bx, ry + btnH, bw, rh - btnH);
-        fl_color(mute ? colBtnTextOn : colBtnTextOff);
-        fl_draw("M", bx, ry + btnH, bw, rh - btnH, FL_ALIGN_CENTER);
+    // Record/Solo/Mute buttons in the right-hand column (see buttonsFor()). Each
+    // leaves a 1px gap below it so neighbouring unlit buttons stay distinct.
+    auto drawButtons = [&](int absRow, int ry) {
+        RowButtons rb = buttonsFor(absRow, ry);
+        for (int b = 0; b < rb.count; b++) {
+            const BtnRect& r = rb.btn[b];
+            const int bh = r.h - 1;
+            if (r.kind == LabelBtn::Rec) {
+                fl_color(colBtnOff);
+                fl_rectf(r.x, r.y, r.w, bh);
+                Fl_Color ring = r.on ? colBtnTextOn : colBtnTextOff;
+                Fl_Color dot  = r.on ? colRecDot : fl_color_average(colRecDot, colBtnOff, 0.4f);
+                int cx = r.x + r.w / 2, cy = r.y + bh / 2;
+                svgGlyph::draw(kRecordSvg, cx, cy, ring, recRingH);
+                svgGlyph::draw(kRecordSvg, cx, cy, dot,  recDotH);
+                continue;
+            }
+            const bool solo = r.kind == LabelBtn::Solo;
+            fl_color(!r.on ? colBtnOff : solo ? colSoloOn : colMuteOn);
+            if (r.shape != BtnShape::Rect) {
+                // One half of a diagonally split square, with a small letter
+                // centred on the triangle's centroid. A 1px line of the row
+                // background between the halves keeps them apart.
+                const int x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
+                const bool ul = r.shape == BtnShape::UpperLeft;
+                if (ul) fl_polygon(x0, y0, x1, y0, x0, y1);
+                else    fl_polygon(x1, y0, x1, y1, x0, y1);
+                fl_color(colInstrHeader);
+                fl_line(x1 - 1, y0, x0, y1 - 1);
+                const int cx = ul ? x0 + r.w / 3 : x1 - r.w / 3;
+                const int cy = ul ? y0 + r.h / 3 : y1 - r.h / 3;
+                fl_font(FL_HELVETICA_BOLD, 7);
+                fl_color(r.on ? colBtnTextOn : colBtnTextOff);
+                fl_draw(solo ? "S" : "M", cx - 5, cy - 5, 10, 10, FL_ALIGN_CENTER);
+                continue;
+            }
+            fl_rectf(r.x, r.y, r.w, bh);
+            fl_font(FL_HELVETICA_BOLD, 9);
+            fl_color(r.on ? colBtnTextOn : colBtnTextOff);
+            fl_draw(solo ? "S" : "M", r.x, r.y, r.w, bh, FL_ALIGN_CENTER);
+        }
     };
 
     fl_push_clip(x(), y(), w(), h());   // partial top/bottom rows must not overdraw neighbours
@@ -411,13 +534,16 @@ void TrackLabels::draw()
                 // Find the track name by track ID
                 for (const auto& t : tl.tracks) {
                     if (t.id == ref.id) {
+                        // Leave room for the group S/M buttons, when there are lanes.
+                        int btnPad = t.lanes.empty() ? 0 : btnColW;
                         fl_font(FL_HELVETICA_BOLD, 9);
                         fl_color(colNormal);
-                        fl_draw(tl.instrumentName(t.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4, rh,
+                        fl_draw(tl.instrumentName(t.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4 - btnPad, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                         break;
                     }
                 }
+                drawButtons(i, ry);
             } else if (ref.kind == RowKind::Lane) {
                 // ref.id is a Lane ID — find the owning Track
                 bool isSel = (ref.id == tl.selectedLaneId);
@@ -452,9 +578,8 @@ void TrackLabels::draw()
                     for (int j = 0; j < (int)track.lanes.size(); j++)
                         if (track.lanes[j].id == ref.id) { laneNum = j + 1; break; }
 
-                    // Only the top-most lane keeps the S/M buttons; its name must
-                    // leave room for them, while lower lanes reclaim the full width.
-                    int rightPad = isFirstLane ? btnColW : 0;
+                    // Every lane row carries the button column; its name must leave room.
+                    int rightPad = btnColW;
 
                     if (isUnstacked) {
                         // ── Unstacked lane: just pattern name (instrument name is in header row) ──
@@ -474,8 +599,7 @@ void TrackLabels::draw()
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
                     }
 
-                    if (isFirstLane)
-                        drawTrackButtons(ry, rh, track.solo, track.mute);
+                    drawButtons(i, ry);
                 }
             } else {
                 Fl_Color bg = isDragSrc ? fl_color_average(colParam, FL_WHITE, 0.75f) : colParam;
@@ -563,19 +687,12 @@ int TrackLabels::handle(int event)
             if (editingAbsRow >= 0 && row != editingAbsRow)
                 commitEdit();
 
-            // S/M buttons live in the right btnColW of the top-most lane row.
-            if (Fl::event_x() >= x() + w() - btnColW &&
-                row >= 0 && row < (int)ro.size() && ro[row].kind == RowKind::Lane) {
-                int tIdx = timeline->trackIndexForLaneId(ro[row].id);
-                if (tIdx >= 0) {
-                    const auto& t = timeline->get().tracks[tIdx];
-                    if (!t.lanes.empty() && t.lanes[0].id == ro[row].id) {
-                        int rowPY = rowYInPanel(row);
-                        bool isSolo = (Fl::event_y() - y() - rowPY) < rowHFor(row) / 2;
-                        if (isSolo) timeline->setTrackSolo(t.id, !t.solo);
-                        else        timeline->setTrackMute(t.id, !t.mute);
-                        return 1;
-                    }
+            // R/S/M buttons in the right-hand column.
+            if (row >= 0 && row < (int)ro.size()) {
+                RowButtons rb = buttonsFor(row, y() + rowYInPanel(row));
+                for (int b = 0; b < rb.count; b++) {
+                    const BtnRect& r = rb.btn[b];
+                    if (r.contains(Fl::event_x(), Fl::event_y())) { pressButton(r); return 1; }
                 }
             }
 

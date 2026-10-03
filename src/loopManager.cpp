@@ -25,13 +25,12 @@ void LoopManager::sync(const ObservableSong& tl, float currentBar)
 {
 	const Timeline& data = tl.get();
 
-	bool anySolo = std::any_of(data.tracks.begin(), data.tracks.end(),
-	                           [](const Track& t) { return t.solo; });
+	const bool anySolo = data.anyLaneSolo();
 
 	std::unordered_map<int, float> songResult;
 	for (const auto& track : data.tracks) {
-		if (track.mute || (anySolo && !track.solo)) continue;
 		for (const auto& lane : track.lanes) {
+			if (!Timeline::laneAudible(lane, anySolo)) continue;
 			for (const auto& inst : lane.patterns) {
 				if (currentBar < inst.startBar || currentBar >= inst.startBar + inst.length)
 					continue;

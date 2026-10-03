@@ -229,9 +229,11 @@ public:
     // Track management
     int  addTrack(int instrumentId = 0, int patternId = 0, int atIndex = -1);
     void removeTrack(int trackId);
-    void setTrackSolo(int trackId, bool solo);
-    void setTrackMute(int trackId, bool mute);
-    bool isTrackPlaying(int trackId) const;
+    // Solo/mute one pattern lane, or every lane of a track at once.
+    void setLaneSolo(int laneId, bool solo);
+    void setLaneMute(int laneId, bool mute);
+    void setTrackLanesSolo(int trackId, bool solo);
+    void setTrackLanesMute(int trackId, bool mute);
     void selectTrack(int index);
     void selectLane(int trackIndex, int laneId);
     int  addLane(int trackId);

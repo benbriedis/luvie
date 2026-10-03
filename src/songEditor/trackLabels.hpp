@@ -7,6 +7,8 @@
 #include "observableSong.hpp"
 #include "inlineInput.hpp"
 #include <FL/Fl_Group.H>
+#include <array>
+#include <functional>
 
 class TrackContextPopup;
 class ParamLaneContextPopup;
@@ -47,12 +49,51 @@ class TrackLabels : public Fl_Group, public ITimelineObserver {
     void cancelEdit();
     void checkDuplicate();
 
+    // The Record/Solo/Mute buttons in a row's right-hand column. A lane row's
+    // buttons act on its own pattern; an instrument row's S/M act on every lane
+    // of the track at once (laneId < 0), and are lit when all its lanes are.
+    enum class LabelBtn { Rec, Solo, Mute };
+    // The instrument header row is too short to stack S over M, so the two share
+    // one square cut along its bottom-left to top-right diagonal: S takes the
+    // upper-left triangle, M the lower-right.
+    enum class BtnShape { Rect, UpperLeft, LowerRight };
+    struct BtnRect {
+        LabelBtn kind;
+        int  x, y, w, h;
+        bool on;
+        int  trackId;
+        int  laneId;   // -1 for an instrument row's group button
+        int  patId;
+        BtnShape shape = BtnShape::Rect;
+
+        bool contains(int ex, int ey) const {
+            if (ex < x || ex >= x + w || ey < y || ey >= y + h) return false;
+            if (shape == BtnShape::Rect) return true;
+            // Upper-left of the diagonal from (x + w, y) to (x, y + h).
+            bool upperLeft = (ex - x) * h + (ey - y) * w < w * h;
+            return upperLeft == (shape == BtnShape::UpperLeft);
+        }
+    };
+    struct RowButtons {
+        std::array<BtnRect, 3> btn;
+        int count = 0;
+    };
+    // The buttons shown on row absRow, whose top edge is at screen y `ry`. Shared
+    // by draw() and handle() so the two can never disagree.
+    RowButtons buttonsFor(int absRow, int ry) const;
+    void pressButton(const BtnRect& b);
+
     int rowHFor(int absRow) const;
     int rowYInPanel(int absRow) const;  // cumulative pixel Y from widget top to row absRow
     int absRowAtPanelY(int py) const;   // absRow from pixel Y within widget
 
 public:
     void commitEdit();
+
+    // Record arm is kept by the app's pattern recorders, so the lane R buttons
+    // read and toggle the same state as the pattern editor's Record toggle.
+    std::function<bool(int patId)> isRecordArmed;
+    std::function<void(int patId, int laneId, bool on)> onRecordToggled;
 
 public:
     TrackLabels(int x, int y, int w, int numVisibleRows, int rowHeight);

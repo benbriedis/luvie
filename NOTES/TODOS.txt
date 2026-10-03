@@ -315,18 +315,10 @@ Maybe an optional toolbar to have tool versions for some of these.
 		  Rewind could be '<' and/or ','
 	   Generally prefer to have 1 good set of bindings though...
 
-Triggers are kind-of related and it might be possible/desirable to cover both with one
-mechanism. What sort of triggers might be desirable?
-	- Enable/disable patterns in loop mode - eg using a Ableton-style pad 
-	          (NB I have a couple of pads without lights. Could I use my Laptop screen or tablet?)
+Additional MIDI triggers?
 	- Start/stop
-	- Next/previous set, if/when I have sets.
-	- cf pressing a note in combo with another control to set base note in loop mode.
-	     Alt: split the keyboard.
-    - Hook buttons up to some specific scales/chords in loop mode
-Live recording notes would also be useful of course.
-      
- 
+	- Enable/disable patterns in loop mode - cf using a Ableton-style pad 
+
  
 TODO change the tab being display when undoing/redoing as necessary 
      (+ scroll? cf recenter? cf storing position when editing?) 
@@ -390,8 +382,6 @@ Create SVG glyphs for a bunch of icons:
 
 .........
 
-Probably should allow multiple MIDI inputs
-
 Allow other parameters to be added
 
 cf allowing copying from pianoroll into harmony as chromatic. Maybe not very useful though.
@@ -439,8 +429,6 @@ BUG: all popups should be escapable using Esc
 
 TODO hover over an automation dot - should be able to press Delete
 
-Test scenes...
-
 Look at changing time signatures: auto changes are a bit annoying.
    Number of bars are also implicated. Don't want to (easily) lose notes.
 
@@ -472,14 +460,6 @@ Sync the time signature and/or BPM with the Song editor? Maybe optionally?
 
 -------
    
-- Show 'Record' icon in Song editor LHS column. Allow to be alarmed and disarmed.
-   cf MAY be able to remove 'Pianoroll' and 'Harmony' label.
-   cf placing it on the RHS, LHS, underneath?
-- Show 'Record' icon in Loop editor - probably in patterns, but the instrument label cells might be an option. 
-   Allow to be alarmed and disarmed.
-   cf MAY be able to remove 'Pianoroll' and 'Harmony' label.
-   cf placing it on the RHS, LHS, underneath?  
-
 Probably allow the base note to span multiple octaves (and/or set the drop back point)
    - A keyboard could eg map 2 octaves instead of one to the base note
    - cf Option of listing multi octaves (maybe 2 octaves?) in the base dropdown

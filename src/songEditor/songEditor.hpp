@@ -19,7 +19,7 @@ class TrackContextPopup;
 class ParamLaneContextPopup;
 
 class SongEditor : public Editor, public ITimelineObserver {
-    static constexpr int labelW    = 80;
+    static constexpr int labelW    = 90;
     static constexpr int controlsW = 22;   // right button column inside the labels strip
     static constexpr int scrollbarW = 14;
 
@@ -82,6 +82,12 @@ public:
     // Param rows show their type's MIDI-learn binding and live value.
     void setMidiLearn(const MidiLearnMap* m) { trackLabels.setMidiLearn(m); }
     void redrawTrackLabels() { trackLabels.redraw(); }
+    // Lets the lane R buttons share the pattern recorders' arm state.
+    void setRecordArmHooks(std::function<bool(int patId)> isArmed,
+                           std::function<void(int patId, int laneId, bool on)> onToggled) {
+        trackLabels.isRecordArmed   = std::move(isArmed);
+        trackLabels.onRecordToggled = std::move(onToggled);
+    }
     void setTrackView(int trackIndex, bool beatResolution);
 
     // Ask for the playhead to be scrolled to the left edge (if off-screen) on the

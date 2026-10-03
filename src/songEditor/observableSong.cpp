@@ -1035,7 +1035,7 @@ int ObservableSong::addTrack(int instrumentId, int patternId, int atIndex)
 {
     int id     = nextId++;
     int laneId = nextId++;
-    Lane lane{laneId, patternId, {}};
+    Lane lane{laneId, patternId};
     Track newTrack;
     newTrack.id           = id;
     newTrack.instrumentId = instrumentId;
@@ -1339,27 +1339,38 @@ void ObservableSong::moveTrack(int trackId, int insertBeforeTrackId)
     notify();
 }
 
-void ObservableSong::setTrackSolo(int trackId, bool s)
+void ObservableSong::setLaneSolo(int laneId, bool s)
 {
     for (auto& t : data.tracks)
-        if (t.id == trackId) { t.solo = s; notify(); return; }
+        for (auto& l : t.lanes)
+            if (l.id == laneId) { l.solo = s; notify(); return; }
 }
 
-void ObservableSong::setTrackMute(int trackId, bool m)
+void ObservableSong::setLaneMute(int laneId, bool m)
 {
     for (auto& t : data.tracks)
-        if (t.id == trackId) { t.mute = m; notify(); return; }
+        for (auto& l : t.lanes)
+            if (l.id == laneId) { l.mute = m; notify(); return; }
 }
 
-bool ObservableSong::isTrackPlaying(int trackId) const
+void ObservableSong::setTrackLanesSolo(int trackId, bool s)
 {
-    bool anySolo = false;
-    for (const auto& t : data.tracks) if (t.solo) { anySolo = true; break; }
-    for (const auto& t : data.tracks) {
+    for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
-        return !t.mute && (!anySolo || t.solo);
+        for (auto& l : t.lanes) l.solo = s;
+        notify();
+        return;
     }
-    return false;
+}
+
+void ObservableSong::setTrackLanesMute(int trackId, bool m)
+{
+    for (auto& t : data.tracks) {
+        if (t.id != trackId) continue;
+        for (auto& l : t.lanes) l.mute = m;
+        notify();
+        return;
+    }
 }
 
 void ObservableSong::selectTrack(int index)
@@ -1410,7 +1421,7 @@ int ObservableSong::addLane(int trackId)
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
-        t.lanes.push_back(Lane{laneId, patId, {}});
+        t.lanes.push_back(Lane{laneId, patId});
 
         if (!t.stackedLanes || existingLaneIds.empty()) {
             int insertAt = (int)data.rowOrder.size();
@@ -1468,7 +1479,7 @@ int ObservableSong::addPianorollLane(int trackId)
         data.patterns.push_back(std::move(newPat));
 
         int laneId = nextId++;
-        t.lanes.push_back(Lane{laneId, patId, {}});
+        t.lanes.push_back(Lane{laneId, patId});
 
         if (!t.stackedLanes || existingLaneIds.empty()) {
             int insertAt = (int)data.rowOrder.size();
@@ -1529,7 +1540,7 @@ int ObservableSong::cloneLane(int trackId, int laneId)
         for (const auto& l : t.lanes) existingLaneIds.insert(l.id);
 
         int newLaneId = nextId++;
-        t.lanes.push_back(Lane{newLaneId, patId, {}});
+        t.lanes.push_back(Lane{newLaneId, patId});
 
         if (!t.stackedLanes || existingLaneIds.empty()) {
             int insertAt = (int)data.rowOrder.size();

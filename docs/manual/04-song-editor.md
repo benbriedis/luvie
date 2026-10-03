@@ -12,7 +12,10 @@ with each track containing the entire arrangement of patterns for a given instru
 A track in turn is divided into multiple "lanes" with each lane controlling 
 a single pattern.
 
-Tracks can be muted or soloed using the S and M buttons that sit in the first lane of each track.
+Each lane has its own buttons at the right of its label. S and M solo and mute that lane's pattern,
+and the red dot arms the pattern to record (pianoroll and drum patterns only). The dot is the same
+Record toggle the pattern editor shows, so arming a pattern in one place arms it in the other.
+The S and M buttons on a track's instrument row solo or mute all its lanes at once.
 
 ## Placing pattern blocks
 

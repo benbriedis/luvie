@@ -65,14 +65,14 @@ struct PatternInstance {
 struct Lane {
 	int id;
 	int patternId = 0;   // the pattern displayed in the pattern editor for this lane
+	bool solo     = false;
+	bool mute     = false;
 	std::vector<PatternInstance> patterns;
 };
 
 struct Track {
 	int  id;
 	int  instrumentId    = 0;
-	bool solo            = false;
-	bool mute            = false;
 	bool stackedLanes    = false;
 	std::vector<Lane> lanes;
 	std::vector<int>  loopLanes;  // lane IDs in loop-editor order (independent of lanes[])
@@ -106,6 +106,18 @@ struct Timeline {
 		for (const auto& i : instruments)
 			if (i.id == id) return i.name;
 		return {};
+	}
+
+	// Solo and mute belong to each pattern lane. A lane sounds unless it is muted,
+	// or some other lane is soloed and it is not.
+	bool anyLaneSolo() const {
+		for (const auto& t : tracks)
+			for (const auto& l : t.lanes)
+				if (l.solo) return true;
+		return false;
+	}
+	static bool laneAudible(const Lane& l, bool anySolo) {
+		return !l.mute && (!anySolo || l.solo);
 	}
 
 	bool instrumentIsDrum(int id) const {

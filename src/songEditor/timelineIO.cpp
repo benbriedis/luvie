@@ -154,7 +154,8 @@ static PatternInstance instanceFromJson(const json& j) {
 static json laneToJson(const Lane& l) {
     json jinsts = json::array();
     for (const auto& inst : l.patterns) jinsts.push_back(instanceToJson(inst));
-    return {{"id", l.id}, {"patternId", l.patternId}, {"patterns", jinsts}};
+    return {{"id", l.id}, {"patternId", l.patternId},
+            {"solo", l.solo}, {"mute", l.mute}, {"patterns", jinsts}};
 }
 
 static json trackToJson(const Track& t) {
@@ -169,8 +170,6 @@ static json trackToJson(const Track& t) {
         {"id",           t.id},
         {"instrumentId", t.instrumentId},
         {"patternId",    t.lanes.empty() ? 0 : t.lanes[0].patternId},
-        {"solo",         t.solo},
-        {"mute",         t.mute},
         {"stackedLanes", t.stackedLanes},
         {"patterns",     jinsts},
         {"lanes",        jlanes},
@@ -182,8 +181,9 @@ static Track trackFromJson(const json& j) {
     Track t;
     t.id           = j.at("id");
     t.instrumentId = j.value("instrumentId", 0);
-    t.solo         = j.value("solo", false);
-    t.mute         = j.value("mute", false);
+    // Older songs kept solo/mute on the track; they now belong to each lane.
+    const bool trackSolo = j.value("solo", false);
+    const bool trackMute = j.value("mute", false);
     t.stackedLanes = j.value("stackedLanes", false);
 
     if (j.contains("lanes") && j.at("lanes").is_array() && !j.at("lanes").empty()) {
@@ -191,6 +191,8 @@ static Track trackFromJson(const json& j) {
             Lane lane;
             lane.id        = jl.value("id", 0);
             lane.patternId = jl.value("patternId", 0);
+            lane.solo      = jl.value("solo", false) || trackSolo;
+            lane.mute      = jl.value("mute", false) || trackMute;
             for (const auto& jinst : jl.value("patterns", json::array()))
                 lane.patterns.push_back(instanceFromJson(jinst));
             t.lanes.push_back(std::move(lane));
@@ -199,6 +201,8 @@ static Track trackFromJson(const json& j) {
         Lane lane;
         lane.id        = 0;
         lane.patternId = j.value("patternId", 0);
+        lane.solo      = trackSolo;
+        lane.mute      = trackMute;
         for (const auto& jinst : j.value("patterns", json::array()))
             lane.patterns.push_back(instanceFromJson(jinst));
         t.lanes.push_back(std::move(lane));

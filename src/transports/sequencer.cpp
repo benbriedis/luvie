@@ -343,8 +343,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
         return evts;
     };
 
-    bool anySolo = std::any_of(tl.tracks.begin(), tl.tracks.end(),
-                               [](const Track& t) { return t.solo; });
+    const bool anySolo = tl.anyLaneSolo();
 
     auto findPattern = [&](int patId) -> const Pattern* {
         for (const auto& p : tl.patterns)
@@ -402,8 +401,8 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
             TrackSnap ts;
             // Each stacked lane loops its own displayed pattern independently when
             // that pattern is active; layer them all on the track's instrument.
-            if (!track.mute && (!anySolo || track.solo))
             for (const Lane& laneRef : track.lanes) {
+                if (!Timeline::laneAudible(laneRef, anySolo)) continue;
                 auto it = actives.find(laneRef.patternId);
                 if (it == actives.end()) continue;
                 emitLoopInstance(ts, findPattern(laneRef.patternId), it->second,
@@ -416,16 +415,12 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
         int trackIdx = 0;
         for (const Track& track : tl.tracks) {
             TrackSnap ts;
-            if (track.mute || (anySolo && !track.solo)) {
-                newSnap.tracks.push_back(std::move(ts));
-                ++trackIdx;
-                continue;
-            }
             if (track.lanes.empty()) { newSnap.tracks.push_back(std::move(ts)); ++trackIdx; continue; }
             // Iterate every lane: a track can have stacked lanes that layer
             // independent patterns on the same instrument simultaneously.
             for (const Lane& lane : track.lanes)
             for (const PatternInstance& inst : lane.patterns) {
+                if (!Timeline::laneAudible(lane, anySolo)) continue;
                 const Pattern* pat = timeline->patternForInstance(inst.id);
                 if (!pat || pat->lengthBeats <= 0.0f) continue;
 
@@ -475,6 +470,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
             // timeline instances above, so only manual ones are added here.
             if (loopMgr)
                 for (const Lane& lane : track.lanes) {
+                    if (!Timeline::laneAudible(lane, anySolo)) continue;
                     if (!loopMgr->isManual(lane.patternId)) continue;
                     auto it = loopMgr->patterns().find(lane.patternId);
                     if (it == loopMgr->patterns().end()) continue;

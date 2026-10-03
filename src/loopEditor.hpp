@@ -193,6 +193,10 @@ private:
     float beatProgress(int trackIdx, int laneIdx) const;
     void  btnRect(int col, int row, int& bx, int& by, int& bw, int& bh) const;
     bool  cellAt(int mx, int my, int& trackIdx, int& laneIdx, int& col, int& row) const;
+    // The record button in the top-right corner of a block at (bx, by, bw).
+    void  recBtnRect(int bx, int by, int bw, int& rx, int& ry, int& rs) const;
+    // Whether this pattern gets a record button (harmony patterns are not recorded).
+    bool  patternRecordable(int patId) const;
 
     // Map an instrument-axis slot to the real index into tracks via loopOrder.
     int   trackForAxis(int axisIdx) const;
@@ -243,6 +247,14 @@ public:
     // changed; the app decides whether that scene is the one sounding and so whether
     // LoopManager needs to follow.
     std::function<void(int patId)> onSceneEdited;
+    // Record arm is kept by the app's pattern recorders, so the blocks' record
+    // buttons read and toggle the same state as the pattern editor's Record toggle.
+    std::function<bool(int patId)> isRecordArmed;
+    std::function<void(int patId, int laneId, bool on)> onRecordToggled;
+    // Repaint the pattern blocks only, leaving the control strip alone (see timerCb).
+    void redrawGrid() {
+        if (visible_r()) damage(FL_DAMAGE_ALL, x(), y(), w(), gridAreaH());
+    }
 
     void setTimeline(ObservableSong* tl);
     void setPattern(ObservablePattern* p) { patternObs = p; }
