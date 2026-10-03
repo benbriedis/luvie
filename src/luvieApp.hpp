@@ -194,9 +194,13 @@ public:
     // the Song Editor. Saved with the project (AppState::midiLearn) but kept out of
     // the timeline, so undo never changes a binding.
     MidiLearnMap midiLearn;
-    // The MIDI triggers that switch the Loop Editor's scenes. Saved with the project
-    // (AppState::sceneTriggers), and like midiLearn kept out of the timeline.
+    // The MIDI triggers that switch the Loop Editor's scenes and toggle its patterns.
+    // Saved with the project (AppState::sceneTriggers, AppState::patternTriggers),
+    // and like midiLearn kept out of the timeline.
     SceneTriggerMap sceneTriggers;
+    // From a loaded project, after its timeline: triggers for patterns it no longer
+    // has are dropped.
+    void applyTriggers(const AppState& state);
     // The instrument whose notes set the Harmony Editor's base note, or -1. Chosen
     // from the base note's right-click menu and saved with the project
     // (AppState::harmonyRootTrigger); like the triggers above, kept out of the timeline.

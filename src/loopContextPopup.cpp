@@ -6,7 +6,7 @@
 #include <FL/fl_draw.H>
 
 LoopContextPopup::LoopContextPopup()
-    : ContextMenuPopup(popW, 6*30+2)
+    : ContextMenuPopup(popW, 8*30+2)
 {
     openPatternBtn      = addItem(0, "Open pattern");
     addLaneBtn          = addItem(1, "Add harmony pattern");
@@ -14,6 +14,8 @@ LoopContextPopup::LoopContextPopup()
     cloneLaneBtn        = addItem(3, "Clone pattern");
     removeLaneBtn       = addItem(4, "Remove pattern");
     showInstrumentsBtn  = addItem(5, "Show instruments");
+    learnBtn            = addItem(6, "MIDI learn");
+    clearLearnBtn       = addItem(7, "Clear MIDI learn");
 
     openPatternBtn->callback([](Fl_Widget*, void* d) {
         static_cast<LoopContextPopup*>(d)->doOpenPattern();
@@ -33,6 +35,12 @@ LoopContextPopup::LoopContextPopup()
     showInstrumentsBtn->callback([](Fl_Widget*, void* d) {
         static_cast<LoopContextPopup*>(d)->doShowInstruments();
     }, this);
+    learnBtn->callback([](Fl_Widget*, void* d) {
+        static_cast<LoopContextPopup*>(d)->doLearn();
+    }, this);
+    clearLearnBtn->callback([](Fl_Widget*, void* d) {
+        static_cast<LoopContextPopup*>(d)->doClearLearn();
+    }, this);
 
     end();
     hide();
@@ -44,6 +52,12 @@ void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int 
     timeline      = tl;
     targetTrackId = trackId;
     targetLaneId  = laneId;
+    targetPatId   = -1;
+    if (tl && !fromLabel)
+        for (const auto& t : tl->song()->get().tracks)
+            if (t.id == trackId)
+                for (const auto& l : t.lanes)
+                    if (l.id == laneId) targetPatId = l.patternId;
 
     auto flags = tl ? tl->song()->trackMenuFlags(trackId)
                     : ObservableSong::TrackMenuFlags{};
@@ -60,6 +74,25 @@ void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int 
     // Add Pattern copies the track's existing pattern type, so name it for what
     // it will actually create.
     addLaneBtn->label(flags.isDrumTrack ? "Add drum pattern" : "Add harmony pattern");
+
+    // MIDI learn needs a specific pattern, like Open; Clear shows only when there is
+    // a trigger to clear. The rows are stacked here, and popH follows, because
+    // ContextMenuPopup::resize() snaps the window back to popH.
+    int y = 1 + 6 * btnH;
+    auto place = [&](ModernButton* b, bool vis) {
+        if (!vis) { b->hide(); return; }
+        b->resize(b->x(), y, b->w(), b->h());
+        b->show();
+        y += btnH;
+    };
+    const bool canLearn = triggers && targetPatId >= 0;
+    learnBtn->copy_label(canLearn ? triggers->patternLearnMenuLabel(targetPatId).c_str()
+                                  : "MIDI learn");
+    canLearn ? learnBtn->activate() : learnBtn->deactivate();
+    place(learnBtn,      triggers != nullptr);
+    place(clearLearnBtn, canLearn && triggers->patternBindingFor(targetPatId));
+    popH = y + 1;
+    size(popW, popH);
 
     openAt(wx, wy);
 }
@@ -109,4 +142,16 @@ void LoopContextPopup::doRemoveLane()
     if (!timeline) return;
     timeline->song()->removeLane(targetTrackId, targetLaneId);
     if (auto* win = window()) win->redraw();
+}
+
+void LoopContextPopup::doLearn()
+{
+    hide();
+    if (triggers && targetPatId >= 0) triggers->toggleLearnPattern(targetPatId);
+}
+
+void LoopContextPopup::doClearLearn()
+{
+    hide();
+    if (triggers && targetPatId >= 0) triggers->clearPattern(targetPatId);
 }

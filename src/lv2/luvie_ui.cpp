@@ -303,6 +303,7 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
     ui->app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
     state.midiLearn = ui->app.midiLearn.bindings();
     state.sceneTriggers = ui->app.sceneTriggers.triggers();
+    state.patternTriggers = ui->app.sceneTriggers.patternTriggers();
     state.harmonyRootTrigger = ui->app.harmonyRootTrigger();
     return true;
 }
@@ -540,7 +541,7 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
     ui->app.applyScenes(state.scenes, state.currentScene);
     ui->loopMode = state.loopMode;
     ui->app.midiLearn.setBindings(state.midiLearn);
-    ui->app.sceneTriggers.setTriggers(state.sceneTriggers);
+    ui->app.applyTriggers(state);
     ui->app.setHarmonyRootTrigger(state.harmonyRootTrigger);
     /* Song-loop region: applySongLoop() sets the ruler + toggle and pushes through
        onSongLoopChanged, which updates ui->songLoop* below. Done while

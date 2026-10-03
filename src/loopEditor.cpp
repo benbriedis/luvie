@@ -319,6 +319,9 @@ static constexpr Fl_Color headerBg       = 0x1E293B00;
 static constexpr Fl_Color headerText     = 0xCBD5E100;
 
 // Line heights of the pattern name and the kind tag stacked beneath it in a cell.
+// A block's MIDI trigger badge: the colours a param label's MIDI-learn badge uses.
+static constexpr Fl_Color triggerLearningColor = 0xF59E0B00;   // amber
+static constexpr Fl_Color triggerBoundColor    = 0x22C55E00;   // green
 static constexpr int nameLineH = 17;
 static constexpr int kindLineH = 11;
 
@@ -811,7 +814,17 @@ void LoopEditor::togglePattern(int trackIdx, int laneIdx)
     if (trackIdx < 0 || trackIdx >= (int)tracks.size()) return;
     if (laneIdx < 0 || laneIdx >= (int)tracks[trackIdx].lanes.size()) return;
 
-    const int patId = tracks[trackIdx].lanes[laneIdx].patternId;
+    togglePatternId(tracks[trackIdx].lanes[laneIdx].patternId);
+}
+
+void LoopEditor::togglePatternId(int patId)
+{
+    if (!timeline || !loopMgr) return;
+    // A trigger can outlive its pattern within a session (kept so an undo of the
+    // delete brings it back working), so a stale id is not an error.
+    const auto& pats = timeline->get().patterns;
+    if (std::none_of(pats.begin(), pats.end(), [&](const auto& p) { return p.id == patId; }))
+        return;
     const int shown = scenes ? scenes->shownScene() : SceneBank::kSceneSong;
 
     if (SceneBank::isUserScene(shown)) {
@@ -1113,6 +1126,26 @@ void LoopEditor::draw()
                     int cx = rx + rs / 2, cy = ry + rs / 2;
                     svgGlyph::draw(kRecordSvg, cx, cy, ring, recRingH);
                     svgGlyph::draw(kRecordSvg, cx, cy, dot,  recDotH);
+                }
+
+                // MIDI trigger, bottom left, drawn like a param label's MIDI-learn
+                // badge: amber "Learning…" while waiting for one, otherwise a green
+                // dot and the trigger. Nothing when the pattern has none.
+                if (sceneTriggers) {
+                    const int tx = bx + 6, ty = by + bh - 15, th = 12;
+                    fl_font(FL_HELVETICA, 9);
+                    if (sceneTriggers->isLearningPattern(patId)) {
+                        fl_color(triggerLearningColor);
+                        fl_draw("Learning…", tx, ty, bw - 12, th, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                    } else if (const MidiTrigger* t = sceneTriggers->patternBindingFor(patId)) {
+                        const int dot = 5;
+                        fl_color(triggerBoundColor);
+                        fl_pie(tx, ty + (th - dot) / 2, dot, dot, 0, 360);
+                        fl_color(fl_color_average(FL_WHITE, bg, 0.7f));
+                        fl_draw(SceneTriggerMap::describe(*t, false).c_str(), tx + dot + 4, ty,
+                                bw - 12 - dot - 4, th, FL_ALIGN_LEFT | FL_ALIGN_CLIP);
+                    }
+                    fl_font(FL_HELVETICA_BOLD, 13);   // restore for the next cell's name
                 }
 
                 // Playhead line — always running, regardless of toggle state

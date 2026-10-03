@@ -392,6 +392,7 @@ int main(int argc, char **argv) {
         app.songLoopState(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         state.midiLearn = app.midiLearn.bindings();
         state.sceneTriggers = app.sceneTriggers.triggers();
+        state.patternTriggers = app.sceneTriggers.patternTriggers();
         state.harmonyRootTrigger = app.harmonyRootTrigger();
         return state;
     };
@@ -415,7 +416,7 @@ int main(int argc, char **argv) {
         app.applyScenes(state.scenes, state.currentScene);
         app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol, state.songLoopEndCol);
         app.midiLearn.setBindings(state.midiLearn);
-        app.sceneTriggers.setTriggers(state.sceneTriggers);
+        app.applyTriggers(state);
         app.setHarmonyRootTrigger(state.harmonyRootTrigger);
     };
 

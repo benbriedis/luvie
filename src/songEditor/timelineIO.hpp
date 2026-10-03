@@ -153,6 +153,9 @@ struct AppState {
     // SceneTriggerMap). Kind None where there is none, which is every slot in a
     // project saved before triggers existed.
     std::array<MidiTrigger, kUserScenes + 1 + 3> sceneTriggers;
+    // The Loop Editor's pattern triggers, by pattern id: each toggles its pattern.
+    // Empty in a project saved before they existed.
+    std::map<int, MidiTrigger> patternTriggers;
     // The instrument whose notes set the Harmony Editor's base note, or -1 for
     // none — which is what a project saved before it existed loads as.
     int harmonyRootTrigger = -1;

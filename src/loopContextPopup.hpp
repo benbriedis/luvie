@@ -6,6 +6,7 @@
 
 #include "modern/contextMenuPopup.hpp"
 #include "observablePattern.hpp"
+#include "sceneTriggers.hpp"
 #include <functional>
 
 // Context menu shown when right-clicking a pattern block in the Loop Editor.
@@ -23,9 +24,12 @@ private:
     ModernButton*       cloneLaneBtn;
     ModernButton*       removeLaneBtn;
     ModernButton*       showInstrumentsBtn;
+    ModernButton*       learnBtn;
+    ModernButton*       clearLearnBtn;
     ObservablePattern*  timeline      = nullptr;
     int                 targetTrackId = -1;
     int                 targetLaneId  = -1;
+    int                 targetPatId   = -1;
 
     void doOpenPattern();
     void doShowInstruments();
@@ -33,16 +37,21 @@ private:
     void doAddPianorollLane();
     void doCloneLane();
     void doRemoveLane();
+    void doLearn();
+    void doClearLearn();
 
 public:
     LoopContextPopup();
 
     std::function<void(int trackIndex, int laneId)> onOpenPattern;
     std::function<void()>                           onShowInstruments;
+    // Where "MIDI learn" and "Clear MIDI learn" act: the pattern's trigger, which
+    // toggles it. Without it they never show.
+    SceneTriggerMap*                                triggers = nullptr;
 
     // fromLabel: opened by right-clicking an instrument label (a whole row/column)
     // rather than a specific pattern cell, so the pattern-specific actions
-    // ('Open Pattern' / 'Remove Pattern') are disabled.
+    // ('Open Pattern' / 'Remove Pattern' / 'MIDI learn') are disabled.
     void open(int trackId, int laneId, ObservablePattern* tl, int wx, int wy,
               bool fromLabel = false);
 };

@@ -265,7 +265,12 @@ public:
     void refreshSceneVisual();
     // Switch to a scene as if its button had been clicked. How a MIDI trigger lands.
     void chooseScene(int scene);
-    // The scene buttons' right-click menu, and the triggers it edits.
+    // Toggle a pattern as if its block had been clicked. How a pattern's MIDI
+    // trigger lands: in Loop or Song mode alike, and on a user scene it edits that
+    // scene's set, just as a click does.
+    void togglePatternId(int patId);
+    // The scene buttons' right-click menu, and the triggers it edits. The blocks
+    // read their own triggers from the same map.
     void setSceneContextPopup(SceneContextPopup* popup) { sceneContextPopup = popup; }
     void setSceneTriggers(const SceneTriggerMap* t) { sceneTriggers = t; refreshSceneTriggers(); }
     // Repaint the scene buttons' trigger state. Called when a trigger or the learn

@@ -51,8 +51,6 @@ FUTURE FUNCTIONALITY
   possibly multiple simultaneous CPMs. Too fussy and obscure I think to give the Loop Editor
   its own time signature and beat definitions for this purpose that are otherwise not used.
 
-- Could provide input triggers for patterns when in loop mode (useful to Ableton-style pads).
-
 - Maybe allow importing of patterns. Might be difficult... don't think there's a concept of bar lines.
 
 - cf Is pitch randomisation possible for drums?
@@ -67,8 +65,6 @@ FUTURE FUNCTIONALITY
 - Add a dark theme
 
 - More MIDI parameters and features - see MIDI_EXTENSIONS.txt
-
-- LATER cf 'scenes' for song/verse looping or swapping between songs
 
 THINK ABOUT when in song mode when rewinding:  reset all loops (ie any manual changes should disappear)
       - but want if repositioning playhead manually or the song loops due to looping being on?
@@ -218,7 +214,7 @@ Distro and Build:
 
 MINOR
 -----
-LHS label column of regular pattern is wider than necessary.
+LHS label column of harmony pattern is wider than necessary.
 
 Loop Editor: maybe show a mini version of the patterns, similar to Seq24
   Showing bar boundaries in summaries WOULD be useful.
@@ -257,8 +253,6 @@ Add more hover over notes for controls
 
 
 ------------------------------------
-Try Helvum
-
 
 Deb installer says 'Unknown license'.  Also, no screenshots
 
@@ -284,28 +278,6 @@ BUG: clicking on 'Add automation' (and anything similar) - moving the cursor awa
 
 BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
      messy flickery behaviour. Probably best to only resize one at a time.
-
-Document
-	Ctrl-click  select/deselect
-	Shift-click  slection area
-	Ctrl-A   select all
-	Ctrl-Z   undo
-	Ctrl-Y   redo
-	Ctrl-C   copy selection
-	Ctrl-X   cut selection
-	Ctrl-V   paste
-	Alt-click-sweep  slice selection      (may clash with some WMs)
-Maybe list these shortcuts in a window even if they are not edittable.
-Maybe an optional toolbar to have tool versions for some of these.
-
-    cf P or space over song editor to move playhead
-	Create a shortcut mechanism and menu...  (cf dividing by editor type) 
-	   cf start/stop    - map to space
-		  open pattern  - eg map to <Enter>
-		  open context? - eg context button  (currently not working)
-		  solo? mute?
-		  Rewind could be '<' and/or ','
-	   Generally prefer to have 1 good set of bindings though...
 
 Additional MIDI triggers?
 	- Start/stop
@@ -427,16 +399,12 @@ cf being able to map notes (or buttons) to loops - allows us to preset  differen
 
 Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
 
-To document:
-  - Scene triggers
-  - Using a split instrument to select base notes for arpeggiators.
-  
 Is there an 'aconnectgui' equivalent that works across Windows and Mac?
 
 Closing instruments window - seem to need to be scrolled up
 
   
-  'luviedrums1' and 'luvieinst1' not ideal native MIDI output names 
+'luviedrums1' and 'luvieinst1' not ideal native MIDI output names 
   
 There's some missing icon sitting next to MIDI learn in the Instrument's MIDI input
 
@@ -477,4 +445,30 @@ Manual:
 	Mention 'grow' option on website + docs (inc use case)
 
 	auditioning
+
+    - Scene triggers
+    - Using a split instrument to select base notes for arpeggiators.
+  
+	Document
+		Ctrl-click  select/deselect
+		Shift-click  slection area
+		Ctrl-A   select all
+		Ctrl-Z   undo
+		Ctrl-Y   redo
+		Ctrl-C   copy selection
+		Ctrl-X   cut selection
+		Ctrl-V   paste
+		Alt-click-sweep  slice selection      (may clash with some WMs)
+	Maybe list these shortcuts in a window even if they are not edittable.
+	Maybe an optional toolbar to have tool versions for some of these.
+
+		cf P or space over song editor to move playhead
+		Create a shortcut mechanism and menu...  (cf dividing by editor type) 
+		   cf start/stop    - map to space
+			  open pattern  - eg map to <Enter>
+			  open context? - eg context button  (currently not working)
+			  solo? mute?
+			  Rewind could be '<' and/or ','
+		   Generally prefer to have 1 good set of bindings though...
+
 

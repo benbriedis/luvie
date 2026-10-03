@@ -400,6 +400,13 @@ std::string appStateToJsonString(const AppState& state) {
     for (int i = 0; i < 3; i++)
         if (state.sceneTriggers[kSceneTriggerCount + i].kind != MidiTriggerKind::None)
             jnav[kSceneNavNames[i]] = triggerToJson(state.sceneTriggers[kSceneTriggerCount + i]);
+    json jpat = json::array();
+    for (const auto& [patId, t] : state.patternTriggers) {
+        json jt = triggerToJson(t);
+        if (jt.is_null()) continue;
+        jt["pattern"] = patId;
+        jpat.push_back(jt);
+    }
     json j = {
         {"version",         1},
         {"transport",       state.transport},
@@ -415,6 +422,7 @@ std::string appStateToJsonString(const AppState& state) {
         {"currentScene",       state.currentScene},
         {"sceneTriggers",      jtrig},
         {"sceneNavTriggers",   jnav},
+        {"patternTriggers",    jpat},
         {"harmonyRootTrigger", state.harmonyRootTrigger},
         {"loopSigTop",         state.loopSigTop},
         {"loopSigBottom",      state.loopSigBottom},
@@ -469,6 +477,14 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         for (int i = 0; i < 3; i++)
             if (jnav.contains(kSceneNavNames[i]))
                 triggerFromJson(jnav.at(kSceneNavNames[i]), state.sceneTriggers[kSceneTriggerCount + i]);
+        // Absent before pattern triggers existed: no pattern has one.
+        for (const auto& jt : j.value("patternTriggers", json::array())) {
+            if (!jt.is_object() || !jt.contains("pattern")) continue;
+            MidiTrigger t;
+            triggerFromJson(jt, t);
+            if (t.kind != MidiTriggerKind::None)
+                state.patternTriggers[jt.value("pattern", -1)] = t;
+        }
     }
     state.harmonyRootTrigger = j.value("harmonyRootTrigger", -1);
     // Absent before Loop mode had its own meter: -1, "follow the song".

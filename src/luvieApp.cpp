@@ -201,6 +201,14 @@ void LuvieApp::setHarmonyRootTrigger(int instrId, bool edited)
     if (edited && onMidiLearnChanged) onMidiLearnChanged();
 }
 
+void LuvieApp::applyTriggers(const AppState& state)
+{
+    std::set<int> live;
+    if (song_)
+        for (const auto& p : song_->get().patterns) live.insert(p.id);
+    sceneTriggers.setTriggers(state.sceneTriggers, state.patternTriggers, live);
+}
+
 void LuvieApp::midiInputRenamed(const std::string& oldName, const std::string& newName)
 {
     midiIn.rename(oldName, newName);
@@ -236,7 +244,7 @@ void LuvieApp::importCb(Fl_Widget*, void* data) {
     app->applyLoopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     app->applyScenes(state.scenes, state.currentScene);
     app->midiLearn.setBindings(state.midiLearn);
-    app->sceneTriggers.setTriggers(state.sceneTriggers);
+    app->applyTriggers(state);
     app->setHarmonyRootTrigger(state.harmonyRootTrigger);
 }
 
@@ -267,6 +275,7 @@ void LuvieApp::exportCb(Fl_Widget*, void* data) {
     app->loopTimeSig(state.loopSigTop, state.loopSigBottom, state.loopSigBeat);
     state.midiLearn          = app->midiLearn.bindings();
     state.sceneTriggers      = app->sceneTriggers.triggers();
+    state.patternTriggers    = app->sceneTriggers.patternTriggers();
     state.harmonyRootTrigger = app->harmonyRootTrigger();
     saveAppState(state, path);
 }
@@ -701,12 +710,17 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
     midiLearn.onEdited = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
 
-    // Scene triggers: right-click a scene button to learn one. Only one learn is in
-    // flight at a time, param lane or scene, so one control never completes two.
+    // Scene and pattern triggers: right-click a scene button or a pattern block to
+    // learn one. Only one learn is in flight at a time, param lane, scene or
+    // pattern, so one control never completes two.
     sceneCtxPop->triggers = &sceneTriggers;
+    loopCtxPop->triggers  = &sceneTriggers;
     loopEd->setSceneContextPopup(sceneCtxPop);
     loopEd->setSceneTriggers(&sceneTriggers);
-    sceneTriggers.onDisplayChanged = [this]() { loopEd->refreshSceneTriggers(); };
+    sceneTriggers.onDisplayChanged = [this]() {
+        loopEd->refreshSceneTriggers();
+        loopEd->redrawGrid();   // the blocks show their triggers too
+    };
     sceneTriggers.onEdited         = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
     sceneTriggers.onLearnStarted   = [this]() {
         midiLearn.cancelLearn();
@@ -761,14 +775,17 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             return;
         const int status = data[0] & 0xF0;
 
-        // Scene triggers first: a button bound to a scene means nothing else, and its
-        // release is swallowed with it. They work from any tab, like the buttons.
+        // Scene and pattern triggers first: a button bound to a scene or a pattern
+        // means nothing else, and its release is swallowed with it. They work from
+        // any tab and in either mode, like the buttons and blocks they stand for.
         // Next and Previous step from the scene shown, so pressing Next twice before
         // the first switch lands still moves two scenes on.
-        bool      consumed = false;
-        const int fired    = sceneTriggers.handle(midiIn.nameForSlot(slot), data, len, consumed);
-        if (fired >= 0 && loopEd)
-            loopEd->chooseScene(SceneTriggerMap::targetScene(fired, sceneBank.shownScene()));
+        bool       consumed = false;
+        const auto fired    = sceneTriggers.handle(midiIn.nameForSlot(slot), data, len, consumed);
+        if (fired.slot >= 0 && loopEd)
+            loopEd->chooseScene(SceneTriggerMap::targetScene(fired.slot, sceneBank.shownScene()));
+        if (fired.pattern >= 0 && loopEd)
+            loopEd->togglePatternId(fired.pattern);
         if (consumed) return;
 
         // The Harmony Editor's base note follows its trigger instrument's keys —
