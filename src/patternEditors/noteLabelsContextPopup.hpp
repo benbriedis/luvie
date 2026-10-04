@@ -29,14 +29,17 @@ class NoteLabelsContextPopup : public ContextMenuPopup {
     void doShowParamSubmenu() {
         if (!paramSubmenu) return;
         paramSubmenu->onLearnNew = nullptr;
-        if (paramActions && paramActions->learnNew && instrumentId_ != 0 && pendingOnSelect) {
-            paramSubmenu->onLearnNew = [this]() {
-                auto add = pendingOnSelect;
-                paramActions->learnNew(instrumentId_, [add](const std::string& name) {
-                    add(name.c_str());
-                });
+        paramSubmenu->onNew      = nullptr;
+        auto add = pendingOnSelect;
+        auto addLane = [add](const std::string& name) { add(name.c_str()); };
+        if (paramActions && paramActions->learnNew && instrumentId_ != 0 && add)
+            paramSubmenu->onLearnNew = [this, addLane]() {
+                paramActions->learnNew(instrumentId_, addLane);
             };
-        }
+        if (paramActions && paramActions->create && instrumentId_ != 0 && add)
+            paramSubmenu->onNew = [this, addLane](int wx, int wy) {
+                paramActions->create(instrumentId_, wx, wy, addLane);
+            };
         paramSubmenu->showFor(this, y() + addBtn->y(), ownNames_, hasFn_);
     }
 

@@ -53,13 +53,18 @@ either by hovering over them and pressing delete or by right-clicking on them an
 
 ### Parameters
 
-Each automation lane controls a *parameter*. The 'Add automation' menu lists the standard MIDI ones -
-Pitch, Modulation, Volume, Pan and Expression - with the rest of the General MIDI controllers (Sustain,
-Cutoff, Resonance, Reverb, Channel pressure, ...) under 'Other standard'.
+Each automation lane controls a *parameter*. The 'Add automation' menu lists the standard MIDI ones
+under 'Standard' (Pitch, Modulation, Volume, Pan and Expression) and the rest of the General MIDI
+controllers (Sustain, Cutoff, Resonance, Reverb, Channel pressure, ...) under 'Other standard'. The
+instrument's own parameters (see below) are under 'Custom'.
 
 Synths have many more controls than these, and they don't agree on which CC does what, so each
-instrument can also have parameters of its own. To add one, choose 'New (MIDI learn)' from the
-'Add automation' menu and move the control on your MIDI controller. Luvie makes a parameter that sends
+instrument can also have parameters of its own. To add one, choose 'New parameter...' from the
+'Add automation' menu, give it a name and say what it sends (see below). Its lane is added and you can
+draw its values with the mouse, as with any other lane. No MIDI controller is needed.
+
+If you do have a controller, 'New (MIDI learn)' is quicker: choose it and move the control on your
+controller. Luvie makes a parameter that sends
 whatever that control sends, adds its lane, and binds the control to it. If the control sends a standard
 CC the parameter gets the standard name (CC74 becomes 'Cutoff'). Otherwise it is named after the CC, e.g.
 'CC21'. The control's movements go straight through to the synth, so if your synth has its own MIDI learn
@@ -77,7 +82,8 @@ that doesn't follow the standard. The change only affects that instrument.
 
 What a parameter *sends* is separate from which control *drives* it ('MIDI learn' on the lane). That
 means the pitch wheel can drive a Cutoff lane. The wheel springs back when you let go, and that is
-recorded like any other movement.
+recorded like any other movement. MIDI learn is optional. Where nothing is being recorded, as in the Song Editor
+and the Harmony Editor, a bound control still lets you play the parameter live while you audition.
 
 ## Time slices
 

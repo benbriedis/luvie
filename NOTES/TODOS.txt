@@ -340,7 +340,6 @@ Create SVG glyphs for a bunch of icons:
 
 .........
 
-Allow other parameters to be added
 
 cf allowing copying from pianoroll into harmony as chromatic. Maybe not very useful though.
 

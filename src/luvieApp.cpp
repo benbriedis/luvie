@@ -737,7 +737,32 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             return true;
         });
     };
-    paramActions.learnNew = [this](int instrId, std::function<void(const std::string&)> addLane) {
+    // Defined by hand, for when no controller is to hand. It starts on the first CC
+    // that neither the standard set nor the instrument's own parameters send.
+    paramActions.create = [this, pdefPop](int instrId, int wx, int wy,
+                                          std::function<void(const std::string&)> addLane) {
+        if (!song_) return;
+        ParamDef def;
+        def.kind = ParamOutKind::CC;
+        const Instrument* in = song_->get().instrument(instrId);
+        for (int cc = 0; cc < 128; cc++) {
+            def.cc = cc;
+            if (standardParamFor(def.kind, cc)) continue;
+            if (in && std::any_of(in->paramDefs.begin(), in->paramDefs.end(),
+                                  [&](const ParamDef& d) { return d.sameOutput(def); }))
+                continue;
+            break;
+        }
+        def.name = defaultParamName(def.kind, def.cc);
+        pdefPop->open(wx, wy, def, [this, instrId, addLane](const ParamDef& d) {
+            if (!song_) return true;
+            ObservableSong::Batch batch(song_);
+            if (!song_->setParamDef(instrId, "", d)) return false;
+            if (addLane) addLane(d.name);
+            return true;
+        });
+    };
+    paramActions.learnNew = [this](int instrId,std::function<void(const std::string&)> addLane) {
         midiLearn.startLearnNew(instrId, [this, instrId, addLane](const MidiSrc& src) {
             if (!song_) return std::string{};
             const ParamOutKind kind = src.kind == MidiSrcKind::PitchBend ? ParamOutKind::PitchBend
@@ -1094,7 +1119,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
+    window->add(ctxPop->paramSubmenu->standard); window->registerPopup(ctxPop->paramSubmenu->standard);
     window->add(ctxPop->paramSubmenu->more); window->registerPopup(ctxPop->paramSubmenu->more);
+    window->add(ctxPop->paramSubmenu->custom); window->registerPopup(ctxPop->paramSubmenu->custom);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);
     window->add(sceneCtxPop); window->registerPopup(sceneCtxPop);
     window->add(transportCtxPop); window->registerPopup(transportCtxPop);
@@ -1102,11 +1129,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);
+    window->add(plcPop->paramSubmenu->standard); window->registerPopup(plcPop->paramSubmenu->standard);
     window->add(plcPop->paramSubmenu->more); window->registerPopup(plcPop->paramSubmenu->more);
+    window->add(plcPop->paramSubmenu->custom); window->registerPopup(plcPop->paramSubmenu->custom);
     window->add(pdPop);  window->registerPopup(pdPop);
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
+    window->add(nlCtxPop->paramSubmenu->standard); window->registerPopup(nlCtxPop->paramSubmenu->standard);
     window->add(nlCtxPop->paramSubmenu->more); window->registerPopup(nlCtxPop->paramSubmenu->more);
+    window->add(nlCtxPop->paramSubmenu->custom); window->registerPopup(nlCtxPop->paramSubmenu->custom);
     window->add(pdefPop); window->registerPopup(pdefPop);
     window->add(settingsPop); window->registerPopup(settingsPop);
     // Hover popup: a positioned sub-window, but NOT registered — registering

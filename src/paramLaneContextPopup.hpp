@@ -30,16 +30,21 @@ class ParamLaneContextPopup : public ContextMenuPopup {
         if (!paramSubmenu) return;
         int instrId = timeline->song()->instrumentIdForParamLane(laneId);
         paramSubmenu->onLearnNew = nullptr;
-        if (paramActions && paramActions->learnNew && instrId != 0) {
-            paramSubmenu->onLearnNew = [this, instrId]() {
-                ObservablePattern* tl = timeline;
-                const int at = insertIndex();
-                paramActions->learnNew(instrId, [tl, instrId, at](const std::string& name) {
-                    if (!tl || tl->song()->hasParamLane(name, instrId)) return;
-                    tl->song()->addParamLane(name, instrId, at);
-                });
+        paramSubmenu->onNew      = nullptr;
+        ObservablePattern* tl = timeline;
+        const int at = insertIndex();
+        auto addLane = [tl, instrId, at](const std::string& name) {
+            if (!tl || tl->song()->hasParamLane(name, instrId)) return;
+            tl->song()->addParamLane(name, instrId, at);
+        };
+        if (paramActions && paramActions->learnNew && instrId != 0)
+            paramSubmenu->onLearnNew = [this, instrId, addLane]() {
+                paramActions->learnNew(instrId, addLane);
             };
-        }
+        if (paramActions && paramActions->create && instrId != 0)
+            paramSubmenu->onNew = [this, instrId, addLane](int wx, int wy) {
+                paramActions->create(instrId, wx, wy, addLane);
+            };
         paramSubmenu->showFor(this, y() + 1 + 0*btnH, timeline->song(), instrId);
     }
 

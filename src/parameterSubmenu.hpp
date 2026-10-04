@@ -22,11 +22,17 @@ struct ParamMenuActions {
     // MIDI learn a new parameter on the instrument; addLane then gets its name and
     // adds the lane where the menu was opened.
     std::function<void(int instrumentId, std::function<void(const std::string&)> addLane)> learnNew;
+    // Define a new parameter on the instrument by hand, opening the editor at
+    // (wx, wy); addLane then gets its name, as for learnNew.
+    std::function<void(int instrumentId, int wx, int wy,
+                       std::function<void(const std::string&)> addLane)> create;
 };
 
-// The "Add automation" submenu: the core standard parameters, then the
-// instrument's own, then "Other standard" (a submenu of the rest of the standard
-// set) and "New (MIDI learn)". Parameters the target already has a lane
+// The "Add automation" submenu: "Standard" (a submenu of the core standard
+// parameters), "Other standard" (the rest of the standard set), "Custom" (the
+// instrument's own parameters; greyed when it has none), then "New parameter…" and
+// "New (MIDI learn)". A standard parameter the instrument has redefined stays under
+// its standard heading. Parameters the target already has a lane
 // for are ticked and greyed. The rows are rebuilt each time it opens, since the
 // instrument's parameters change.
 class ParameterSubmenu : public ContextMenuPopup {
@@ -35,19 +41,51 @@ class ParameterSubmenu : public ContextMenuPopup {
     std::vector<std::string>               names_;   // one per parameter row
     std::vector<std::unique_ptr<ItemData>> itemData_;
     std::function<bool(const char*)>       hasFn_;
-    ModernButton*                          moreBtn_ = nullptr;
-    bool                                   nested_  = false;
+    // The top menu, or one of its submenus.
+    enum class Kind { Top, Core, Other, Custom };
 
-    explicit ParameterSubmenu(bool nested) : ContextMenuPopup(popW, 2), nested_(nested) {
+    ModernButton*                          standardBtn_ = nullptr;
+    ModernButton*                          moreBtn_     = nullptr;
+    ModernButton*                          customBtn_   = nullptr;
+    Kind                                   kind_        = Kind::Top;
+
+    explicit ParameterSubmenu(Kind kind) : ContextMenuPopup(popW, 2), kind_(kind) {
         end();
         hide();
-        if (!nested_) {
-            more = new ParameterSubmenu(true);
-            more->onSelect = [this](const char* type) {
-                hide();
-                if (onSelect) onSelect(type);
-            };
+        if (kind_ == Kind::Top) {
+            standard = new ParameterSubmenu(Kind::Core);
+            more     = new ParameterSubmenu(Kind::Other);
+            custom   = new ParameterSubmenu(Kind::Custom);
+            for (ParameterSubmenu* sub : {standard, more, custom})
+                sub->onSelect = [this](const char* type) {
+                    hide();
+                    if (onSelect) onSelect(type);
+                };
         }
+    }
+
+    // Opens one of the submenus, closing the other.
+    void showSub(ParameterSubmenu* sub, ModernButton* btn) {
+        if (!sub || !btn) return;
+        for (ParameterSubmenu* other : {standard, more, custom})
+            if (other && other != sub) other->hide();
+        sub->hasFn_ = hasFn_;
+        sub->rebuild(ownNames_);
+        sub->place(this, y() + btn->y());
+        sub->show();
+    }
+
+    ModernButton* addSubRow(int row, const char* label, ParameterSubmenu* sub,
+                            void (*open)(Fl_Widget*, void*)) {
+        auto* b = addRow(row, label);
+        b->setSubmenuArrow(true);
+        b->onEnter = [this, sub]() {
+            for (ParameterSubmenu* other : {standard, more, custom})
+                if (other && other != sub) other->hideSoon();
+            if (sub) sub->cancelHide();
+        };
+        b->callback(open, this);
+        return b;
     }
 
     void select(int idx) {
@@ -62,7 +100,10 @@ class ParameterSubmenu : public ContextMenuPopup {
         auto* b = addItem(row, label);
         end();
         b->reserveTick(true);
-        if (!nested_) b->onEnter = [this]() { if (more) more->hideSoon(); };
+        if (kind_ == Kind::Top) b->onEnter = [this]() {
+            for (ParameterSubmenu* sub : {standard, more, custom})
+                if (sub) sub->hideSoon();
+        };
         return b;
     }
 
@@ -89,26 +130,40 @@ class ParameterSubmenu : public ContextMenuPopup {
         resizable(nullptr);
         names_.clear();
         itemData_.clear();
-        moreBtn_ = nullptr;
+        standardBtn_ = nullptr;
+        moreBtn_     = nullptr;
+        customBtn_   = nullptr;
         int row = 0;
 
-        if (nested_) {
+        if (kind_ == Kind::Custom) {
+            for (const auto& n : ownNames)
+                if (!standardParam(n)) addParamRow(row++, n);
+        } else if (kind_ != Kind::Top) {
+            const bool core = kind_ == Kind::Core;
             for (const auto& s : kStandardParams)
-                if (!s.core && std::find(ownNames.begin(), ownNames.end(), s.name) == ownNames.end())
-                    addParamRow(row++, s.name);
+                if (s.core == core) addParamRow(row++, s.name);
         } else {
-            for (const auto& s : kStandardParams)
-                if (s.core) addParamRow(row++, s.name);
-            for (const auto& n : ownNames) {
-                const StandardParam* s = standardParam(n);
-                if (!s || !s->core) addParamRow(row++, n);
+            standardBtn_ = addSubRow(row++, "Standard", standard, [](Fl_Widget*, void* d) {
+                auto* self = static_cast<ParameterSubmenu*>(d);
+                self->showSub(self->standard, self->standardBtn_);
+            });
+            moreBtn_ = addSubRow(row++, "Other standard", more, [](Fl_Widget*, void* d) {
+                auto* self = static_cast<ParameterSubmenu*>(d);
+                self->showSub(self->more, self->moreBtn_);
+            });
+            customBtn_ = addSubRow(row++, "Custom", custom, [](Fl_Widget*, void* d) {
+                auto* self = static_cast<ParameterSubmenu*>(d);
+                self->showSub(self->custom, self->customBtn_);
+            });
+            if (std::none_of(ownNames.begin(), ownNames.end(),
+                             [](const std::string& n) { return !standardParam(n); }))
+                customBtn_->deactivate();
+            if (onNew) {
+                auto* add = addRow(row++, "New parameter…");
+                add->callback([](Fl_Widget*, void* d) {
+                    static_cast<ParameterSubmenu*>(d)->startNew();
+                }, this);
             }
-            moreBtn_ = addRow(row++, "Other standard");
-            moreBtn_->setSubmenuArrow(true);
-            moreBtn_->onEnter = [this]() { if (more) more->cancelHide(); };
-            moreBtn_->callback([](Fl_Widget*, void* d) {
-                static_cast<ParameterSubmenu*>(d)->showMore();
-            }, this);
             if (onLearnNew) {
                 auto* learn = addRow(row++, "New (MIDI learn)");
                 learn->callback([](Fl_Widget* w, void* d) {
@@ -125,7 +180,8 @@ class ParameterSubmenu : public ContextMenuPopup {
     // arrives (learnStateChanged) or it is closed, which cancels the learn.
     void startLearnNew(ModernButton* row) {
         if (!onLearnNew) return;
-        if (more) more->hide();
+        for (ParameterSubmenu* sub : {standard, more, custom})
+            if (sub) sub->hide();
         onLearnNew();
         learningNew_ = true;
         row->copy_label("Move a control…");
@@ -134,12 +190,14 @@ class ParameterSubmenu : public ContextMenuPopup {
         redraw();
     }
 
-    void showMore() {
-        if (!more || !moreBtn_) return;
-        more->hasFn_ = hasFn_;
-        more->rebuild(ownNames_);
-        more->place(this, y() + moreBtn_->y());
-        more->show();
+    // The editor opens where the menu was, which closes along with the one it
+    // was opened from.
+    void startNew() {
+        auto fn = onNew;
+        const int wx = x(), wy = y();
+        hide();
+        if (parent_) parent_->hide();
+        if (fn) fn(wx, wy);
     }
 
     void place(BasePopup* parent, int btnY) {
@@ -170,12 +228,18 @@ public:
     std::function<void(const char*)> onSelect;
     // "New (MIDI learn)" chosen: start the learn. Unset, the row is not shown.
     std::function<void()>            onLearnNew;
+    // "New parameter…" chosen, with where to open the editor (window coordinates).
+    // Unset, the row is not shown.
+    std::function<void(int wx, int wy)> onNew;
     // Cancelled if the menu closes before the control arrives.
     MidiLearnMap*                    midiLearn = nullptr;
-    // The "Other standard" submenu. The owner adds it to the window beside this.
-    ParameterSubmenu*                more = nullptr;
+    // The "Standard", "Other standard" and "Custom" submenus. The owner adds them
+    // to the window beside this.
+    ParameterSubmenu*                standard = nullptr;
+    ParameterSubmenu*                more     = nullptr;
+    ParameterSubmenu*                custom   = nullptr;
 
-    ParameterSubmenu() : ParameterSubmenu(false) {}
+    ParameterSubmenu() : ParameterSubmenu(Kind::Top) {}
     ~ParameterSubmenu() override { Fl::remove_timeout(hideTimeout, this); }
 
     // For the opening menu's other rows to call on hover. The submenu closes after
@@ -197,7 +261,8 @@ public:
 
     void hide() override {
         cancelHide();
-        if (more) more->hide();
+        for (ParameterSubmenu* sub : {standard, more, custom})
+            if (sub) sub->hide();
         if (learningNew_) {
             learningNew_ = false;
             if (midiLearn) midiLearn->cancelLearn();
