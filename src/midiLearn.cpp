@@ -33,9 +33,12 @@ MidiSrc sourceOf(const uint8_t* d, int len, int& raw)
     }
 }
 
-// Raw control value -> lane units. A 7-bit control on the 14-bit Pitch lane maps
-// 64 to 8192 exactly, so a centred knob means no bend, and still reaches both ends.
-int scaleToLane(const MidiSrc& src, int raw, int laneMax)
+} // namespace
+
+// Raw control value -> lane units. A 7-bit control on a 14-bit (pitch bend) lane
+// maps 64 to 8192 exactly, so a centred knob means no bend, and still reaches both
+// ends. The pitch wheel on a 7-bit lane keeps its top 7 bits.
+int MidiLearnMap::scaleToLane(const MidiSrc& src, int raw, int laneMax)
 {
     const bool wide = src.kind == MidiSrcKind::PitchBend;
     if (laneMax > 127) {
@@ -44,8 +47,6 @@ int scaleToLane(const MidiSrc& src, int raw, int laneMax)
     }
     return wide ? raw >> 7 : raw;
 }
-
-} // namespace
 
 void MidiLearnMap::setBindings(const MidiLearnBindings& b)
 {
@@ -58,16 +59,51 @@ void MidiLearnMap::setBindings(const MidiLearnBindings& b)
 void MidiLearnMap::startLearn(const std::string& type)
 {
     if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: waiting for a control for %s\n", type.c_str());
-    learning_ = type;
+    learning_    = type;
+    learningNew_ = 0;
+    learnNewComplete_ = nullptr;
+    if (onLearnStarted) onLearnStarted();
+    displayChanged();
+}
+
+void MidiLearnMap::startLearnNew(int instrumentId,
+                                 std::function<std::string(const MidiSrc&)> complete)
+{
+    learnNewComplete_ = std::move(complete);
+    if (luvieDebug())
+        fprintf(stderr, "[luvie] midi learn: waiting for a control for a new parameter on %d\n",
+                instrumentId);
+    learning_.clear();
+    learningNew_ = instrumentId;
     if (onLearnStarted) onLearnStarted();
     displayChanged();
 }
 
 void MidiLearnMap::cancelLearn()
 {
-    if (learning_.empty()) return;
-    if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: cancelled for %s\n", learning_.c_str());
+    if (learning_.empty() && learningNew_ == 0) return;
+    if (luvieDebug()) fprintf(stderr, "[luvie] midi learn: cancelled for %s\n",
+                              learning_.empty() ? "a new parameter" : learning_.c_str());
     learning_.clear();
+    learningNew_      = 0;
+    learnNewComplete_ = nullptr;
+    displayChanged();
+}
+
+void MidiLearnMap::rename(const std::string& from, const std::string& to, bool keepOld)
+{
+    if (from == to) return;
+    if (learning_ == from && !keepOld) learning_ = to;
+    // Kept for another instrument: one control drives one name, so the new name
+    // starts unbound.
+    if (keepOld) return;
+    auto it = bindings_.find(from);
+    if (it == bindings_.end()) { displayChanged(); return; }
+    bindings_[to] = it->second;
+    bindings_.erase(from);
+    values_.erase(from);
+    values_.erase(to);
+    if (onEdited) onEdited();
     displayChanged();
 }
 
@@ -94,11 +130,22 @@ std::optional<int> MidiLearnMap::value(const std::string& type) const
     return it->second;
 }
 
-bool MidiLearnMap::handle(const uint8_t* data, int len, std::string& typeOut, int& valueOut)
+bool MidiLearnMap::handle(const uint8_t* data, int len, std::string& typeOut,
+                          MidiSrc& srcOut, int& rawOut)
 {
     int raw = 0;
     const MidiSrc src = sourceOf(data, len, raw);
     if (src.kind == MidiSrcKind::None) return false;
+
+    if (learningNew_ != 0) {
+        // The app makes the parameter — or finds the one already sending this — and
+        // names it; from here on it is an ordinary learn of that name.
+        auto complete = std::move(learnNewComplete_);
+        learnNewComplete_ = nullptr;
+        learningNew_      = 0;
+        learning_         = complete ? complete(src) : std::string{};
+        if (learning_.empty()) displayChanged();
+    }
 
     if (!learning_.empty()) {
         // One control drives one type: taking it for this type takes it away from
@@ -121,9 +168,10 @@ bool MidiLearnMap::handle(const uint8_t* data, int len, std::string& typeOut, in
 
     for (const auto& [type, bound] : bindings_) {
         if (bound != src) continue;
-        typeOut  = type;
-        valueOut = scaleToLane(src, raw, laneMaxValue(type));
-        values_[type] = valueOut;
+        typeOut = type;
+        srcOut  = src;
+        rawOut  = raw;
+        values_[type] = scaleToLane(src, raw, laneMaxFor ? laneMaxFor(type) : 127);
         displayChanged();
         return true;
     }

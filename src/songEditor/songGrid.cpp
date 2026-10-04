@@ -12,6 +12,8 @@
 #include <cmath>
 
 static constexpr Fl_Color kParamRowBg      = 0xF0F4FF00;
+// The centre a Centre-resting parameter (Pitch, Pan) returns to.
+static constexpr Fl_Color kParamCentre     = 0xD0D0E000;
 static constexpr Fl_Color kParamLine       = 0x8888CC00;
 static constexpr Fl_Color kParamDotFill    = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim     = 0x1111EE00;
@@ -336,10 +338,16 @@ void SongGrid::rebuildParamLanes()
 {
     localParamLanes.clear();
     if (!timeline) return;
-    for (const auto& lane : timeline->get().paramLanes) {
+    const Timeline& tl = timeline->get();
+    for (const auto& lane : tl.paramLanes) {
         ParamLaneLocal local;
         local.id   = lane.id;
         local.type = lane.type;
+        ParamDef def;
+        if (tl.paramDef(lane.instrumentId, lane.type, def)) {
+            local.maxVal  = paramMaxValue(def);
+            local.centred = def.rest == ParamRest::Centre;
+        }
         for (const auto& pt : lane.points)
             local.points.push_back({pt.id, pt.beat, pt.value, pt.anchor});
         localParamLanes.push_back(std::move(local));
@@ -398,7 +406,7 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
     const int dotR = std::max(2, rowHeight / 9);
     const int totalRange = rowHeight - 1 - 2 * dotR;
     if (totalRange <= 0) return;
-    const int maxVal = laneMaxValue(lane.type);
+    const int maxVal = lane.maxVal;
 
     auto dotYFor = [&](int value) {
         return rowY + dotR + (int)((maxVal - value) * totalRange / (float)maxVal);
@@ -419,6 +427,14 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
             fl_color(0xFF999900);
             fl_pie(x() - dotR, vdotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
         }
+    }
+
+    if (lane.centred) {
+        const int cy = dotYFor((maxVal + 1) / 2);
+        fl_color(kParamCentre);
+        fl_line_style(FL_DOT);
+        fl_line(x(), cy, x() + gridRight, cy);
+        fl_line_style(0);
     }
 
     fl_color(kParamLine);
@@ -723,7 +739,7 @@ void SongGrid::addBandHitExtras()
         int vr = visualRowForLaneId(lane.id);
         if (vr < 0 || vr >= numRows) continue;
         const int rowTop = rowY(vr);
-        const int maxVal = laneMaxValue(lane.type);
+        const int maxVal = lane.maxVal;
         for (const auto& pt : lane.points) {
             if (pt.anchor) continue;
             int dotX = (int)((pt.beat - colOffset) * colWidth);
@@ -759,7 +775,7 @@ void SongGrid::drawParamSelection(int laneIdx, int rowYPx) const
     const int dotR       = std::max(2, rowHeight / 9);
     const int totalRange = rowHeight - 1 - 2 * dotR;
     if (totalRange <= 0) return;
-    const int maxVal = laneMaxValue(lane.type);
+    const int maxVal = lane.maxVal;
     const int r      = dotR + 2;
     fl_color(selectionColor);
     for (const auto& pt : lane.points) {
@@ -900,7 +916,7 @@ int SongGrid::findParamPointAtCursor(int laneIdx) const
     for (int i = 0; i < (int)localParamLanes[laneIdx].points.size(); i++) {
         const auto& pt = localParamLanes[laneIdx].points[i];
         int dotX = x() + (int)((pt.beat - colOffset) * colWidth);
-        const int mv = laneMaxValue(localParamLanes[laneIdx].type);
+        const int mv = localParamLanes[laneIdx].maxVal;
         int dotY = pRowY + dotR + (totalRange > 0 ? (int)((mv - pt.value) * totalRange / (float)mv) : 0);
         float dx = (float)(ex - dotX);
         float dy = (float)(ey - dotY);
@@ -958,7 +974,7 @@ int SongGrid::handleParamEvent(int event)
         int laneVR  = visualRowForLaneId(localParamLanes[li].id);
         int pRowY   = y() + (laneVR >= 0 ? SongGrid::rowY(laneVR) : 0);
         int value   = localParamLanes[li].points[predIdx].value;
-        int mv      = laneMaxValue(localParamLanes[li].type);
+        int mv      = localParamLanes[li].maxVal;
         return pRowY + dotR + (totalRange > 0 ? (int)((mv - value) * totalRange / (float)mv) : 0);
     };
 
@@ -978,7 +994,7 @@ int SongGrid::handleParamEvent(int event)
                 float beat = pt.beat;
                 int   val  = pt.value;
                 bool  anc  = pt.anchor;
-                int maxVal = laneMaxValue(localParamLanes[laneIdx].type);
+                int maxVal = localParamLanes[laneIdx].maxVal;
                 paramState = ParamIdle{};
                 paramDotPopup->open(Fl::event_x(), Fl::event_y(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
@@ -1035,7 +1051,7 @@ int SongGrid::handleParamEvent(int event)
             }
             if (!hitVirtual) {
                 int maxVal  = laneIdx >= 0 && laneIdx < (int)localParamLanes.size()
-                              ? laneMaxValue(localParamLanes[laneIdx].type) : 127;
+                              ? localParamLanes[laneIdx].maxVal : 127;
                 float beat  = (float)ex / colWidth + colOffset;
                 if (snap > 0.0f) beat = std::round(beat / snap) * snap;
                 beat = std::max(0.0f, beat);
@@ -1050,7 +1066,7 @@ int SongGrid::handleParamEvent(int event)
 
     case FL_DRAG: {
         if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
-            int maxVal  = laneMaxValue(localParamLanes[d->laneIdx].type);
+            int maxVal  = localParamLanes[d->laneIdx].maxVal;
             int laneVR  = visualRowForLaneId(localParamLanes[d->laneIdx].id);
             int eyInRow = ey - (laneVR >= 0 ? SongGrid::rowY(laneVR) : 0);
             int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
@@ -1082,7 +1098,7 @@ int SongGrid::handleParamEvent(int event)
                 newBeat = std::clamp(newBeat, lo, hi);
             }
 
-            int maxVal   = laneMaxValue(localParamLanes[d->laneIdx].type);
+            int maxVal   = localParamLanes[d->laneIdx].maxVal;
             int laneVR   = visualRowForLaneId(localParamLanes[d->laneIdx].id);
             int eyInRow  = ey - (laneVR >= 0 ? SongGrid::rowY(laneVR) : 0);
             int mapped   = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);

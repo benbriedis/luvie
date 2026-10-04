@@ -508,7 +508,7 @@ int ObservablePattern::addPatternParamLane(int patId, const std::string& type)
         ParamLane lane;
         lane.id   = laneId;
         lane.type = type;
-        lane.points.push_back({song_->nextId++, 0.0f, laneDefaultValue(type), true});
+        lane.points.push_back({song_->nextId++, 0.0f, song_->data.paramDefault(p.instrumentId, type), true});
         p.paramLanes.push_back(std::move(lane));
         song_->notify();
         return laneId;
@@ -538,7 +538,7 @@ int ObservablePattern::addPatternParamPoint(int patId, int laneId, float beat, i
             int ptId = song_->nextId++;
             auto it = std::lower_bound(lane.points.begin(), lane.points.end(),
                 beat, [](const ParamPoint& p, float b) { return p.beat < b; });
-            lane.points.insert(it, {ptId, beat, std::clamp(value, 0, laneMaxValue(lane.type)), false});
+            lane.points.insert(it, {ptId, beat, std::clamp(value, 0, song_->data.paramMax(p.instrumentId, lane.type)), false});
             song_->notify();
             return ptId;
         }
@@ -570,7 +570,7 @@ void ObservablePattern::moveParamPoint(int pointId, float beat, int value)
                 if (pt.id != pointId) continue;
                 if (!pt.anchor)
                     pt.beat  = std::max(0.0f, beat);
-                pt.value = std::clamp(value, 0, laneMaxValue(lane.type));
+                pt.value = std::clamp(value, 0, song_->data.paramMax(pat.instrumentId, lane.type));
                 std::stable_sort(lane.points.begin(), lane.points.end(),
                     [](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
                 song_->notify();
@@ -613,11 +613,11 @@ bool isNoteType(PatternType t) { return t == PatternType::HARMONY || t == Patter
 
 // Insert keeping the lane sorted, after any point already on that beat, so two
 // points stacked on one beat keep the order they were copied in.
-void insertPoint(ParamLane& lane, int id, float beat, int value)
+void insertPoint(ParamLane& lane, int id, float beat, int value, int maxVal)
 {
     auto it = std::upper_bound(lane.points.begin(), lane.points.end(), beat,
         [](float b, const ParamPoint& p) { return b + kSliceEps < p.beat; });
-    lane.points.insert(it, {id, beat, std::clamp(value, 0, laneMaxValue(lane.type)), false});
+    lane.points.insert(it, {id, beat, std::clamp(value, 0, maxVal), false});
 }
 
 ParamPoint* anchorOf(ParamLane& lane)
@@ -725,7 +725,7 @@ bool ObservablePattern::rangeFits(int patId, const SliceClip& clip, float at) co
 }
 
 // The body of a paste, on a pattern already known to take it (rangeFits).
-static void pasteRangeIn(Pattern& pat, const SliceClip& clip, float at, int& nextId)
+static void pasteRangeIn(const Timeline& tl, Pattern& pat, const SliceClip& clip, float at, int& nextId)
 {
     for (const SliceLane& sl : clip.lanes) {
         bool have = std::any_of(pat.paramLanes.begin(), pat.paramLanes.end(),
@@ -734,7 +734,7 @@ static void pasteRangeIn(Pattern& pat, const SliceClip& clip, float at, int& nex
         ParamLane lane;
         lane.id   = nextId++;
         lane.type = sl.type;
-        lane.points.push_back({nextId++, 0.0f, laneDefaultValue(sl.type), true});
+        lane.points.push_back({nextId++, 0.0f, tl.paramDefault(pat.instrumentId, sl.type), true});
         pat.paramLanes.push_back(std::move(lane));
     }
 
@@ -773,6 +773,7 @@ static void pasteRangeIn(Pattern& pat, const SliceClip& clip, float at, int& nex
             [&](const ParamLane& l) { return l.type == sl.type; });
         if (it == pat.paramLanes.end()) continue;
         ParamLane& lane = *it;
+        const int maxVal = tl.paramMax(pat.instrumentId, lane.type);
         bool anchorTaken = false;
         for (const auto& [dBeat, value] : sl.points) {
             const float beat = at + dBeat;
@@ -780,12 +781,12 @@ static void pasteRangeIn(Pattern& pat, const SliceClip& clip, float at, int& nex
             // landing there becomes its value rather than a second point.
             if (beat <= kSliceEps && !anchorTaken) {
                 if (ParamPoint* a = anchorOf(lane)) {
-                    a->value = std::clamp(value, 0, laneMaxValue(lane.type));
+                    a->value = std::clamp(value, 0, maxVal);
                     anchorTaken = true;
                     continue;
                 }
             }
-            insertPoint(lane, nextId++, beat, value);
+            insertPoint(lane, nextId++, beat, value, maxVal);
         }
     }
 }
@@ -795,7 +796,7 @@ bool ObservablePattern::pasteRange(int patId, const SliceClip& clip, float at)
     if (!rangeFits(patId, clip, at)) return false;
     for (auto& pat : song_->data.patterns) {
         if (pat.id != patId) continue;
-        pasteRangeIn(pat, clip, at, song_->nextId);
+        pasteRangeIn(song_->data, pat, clip, at, song_->nextId);
         song_->notify();
         return true;
     }
@@ -809,7 +810,7 @@ bool ObservablePattern::moveRange(int patId, float start, float end, float to)
     for (auto& pat : song_->data.patterns) {
         if (pat.id != patId) continue;
         clearRangeIn(pat, start, end);
-        pasteRangeIn(pat, clip, to, song_->nextId);
+        pasteRangeIn(song_->data, pat, clip, to, song_->nextId);
         song_->notify();
         return true;
     }

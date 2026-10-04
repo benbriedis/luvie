@@ -39,9 +39,10 @@ TrackContextPopup::TrackContextPopup()
         static_cast<TrackContextPopup*>(d)->doRemoveLane();
     }, this);
 
-    // Hovering any non-submenu button hides the parameter submenu.
+    // Hovering any non-submenu button hides the parameter submenu, after a moment
+    // (see ParameterSubmenu::hideSoon); back on "Add automation" it stays.
     auto hideSubmenuFn = [this]() {
-        if (paramSubmenu) paramSubmenu->hide();
+        if (paramSubmenu) paramSubmenu->hideSoon();
     };
     openPatternBtn->onEnter      = hideSubmenuFn;
     showInstrumentsBtn->onEnter  = hideSubmenuFn;
@@ -49,6 +50,7 @@ TrackContextPopup::TrackContextPopup()
     addPianorollLaneBtn->onEnter = hideSubmenuFn;
     cloneLaneBtn->onEnter        = hideSubmenuFn;
     removeLaneBtn->onEnter       = hideSubmenuFn;
+    addParamBtn->onEnter         = [this]() { if (paramSubmenu) paramSubmenu->cancelHide(); };
 
     paramSubmenu = new ParameterSubmenu();
     paramSubmenu->onSelect = [this](const char* type) {
@@ -75,6 +77,7 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
     flags.canOpenPattern ? openPatternBtn->activate()      : openPatternBtn->deactivate();
     flags.canOpenPattern ? cloneLaneBtn->activate()        : cloneLaneBtn->deactivate();
     flags.canRemoveLane  ? removeLaneBtn->activate()       : removeLaneBtn->deactivate();
+    flags.canAddParam    ? addParamBtn->activate()         : addParamBtn->deactivate();
     flags.isDrumTrack    ? addPianorollLaneBtn->deactivate(): addPianorollLaneBtn->activate();
     // Add Pattern copies the track's existing pattern type, so name it for what
     // it will actually create.
@@ -106,7 +109,19 @@ int TrackContextPopup::targetInstrumentId() const
 void TrackContextPopup::doShowParamSubmenu()
 {
     if (!paramSubmenu) return;
-    paramSubmenu->showFor(this, y() + 1 + 5*btnH, timeline->song(), targetInstrumentId());
+    const int instrId = targetInstrumentId();
+    paramSubmenu->onLearnNew = nullptr;
+    if (paramActions && paramActions->learnNew && instrId != 0) {
+        ObservablePattern* tl = timeline;
+        const int trackId = targetTrackId;
+        paramSubmenu->onLearnNew = [this, tl, instrId, trackId]() {
+            paramActions->learnNew(instrId, [tl, instrId, trackId](const std::string& name) {
+                if (!tl || tl->song()->hasParamLane(name, instrId)) return;
+                tl->song()->addParamLane(name, instrId, tl->song()->paramLaneInsertIndex(trackId));
+            });
+        };
+    }
+    paramSubmenu->showFor(this, y() + 1 + 5*btnH, timeline->song(), instrId);
 }
 
 void TrackContextPopup::doAddLane()

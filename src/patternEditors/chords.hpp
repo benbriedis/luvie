@@ -244,14 +244,4 @@ inline int rowToMidi(int row, int rootPitch, int chordIndex)
     return midi < 0 ? 0 : (midi > 127 ? 127 : midi);
 }
 
-// Map a param-lane type name → MIDI CC number; -1 means pitch bend.
-inline int ccForType(const std::string& type)
-{
-    if (type == "Modulation") return 1;
-    if (type == "Volume")     return 7;
-    if (type == "Pan")        return 10;
-    if (type == "Expression") return 11;
-    return -1;  // "Pitch" and unknowns → pitch bend
-}
-
 #endif

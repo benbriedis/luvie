@@ -40,15 +40,15 @@ public:
     void noteOn (int instrumentId, int midi, int velocity);
     void noteOff(int instrumentId, int midi);
 
-    // A controller value, sent straight through — how a bound MIDI-learn control is
-    // heard as it moves. ccNumber < 0 means pitch bend (value 0-16383), following
-    // ccForType(); otherwise a CC with value 0-127.
-    void param(int instrumentId, int ccNumber, int value);
+    // A parameter value, sent straight through — how a bound MIDI-learn control is
+    // heard as it moves. outCode is paramOutCode(): a CC number, kParamOutBend
+    // (value 0-16383) or kParamOutPressure.
+    void param(int instrumentId, int outCode, int value);
 
     // A message from the MIDI input forwarded verbatim to the instrument's port,
     // with only its channel rewritten to the route's. This is what controls Luvie
     // has no binding for take: unlike param(), the CC number is not remapped
-    // through ccForType(), so the synth sees what the controller actually sent and
+    // through the instrument's parameters, so the synth sees what the controller actually sent and
     // its own MIDI learn can bind it. len is 1..3.
     void passThrough(int instrumentId, const uint8_t* msg, int len);
 

@@ -223,6 +223,31 @@ static json paramPointToJson(const ParamPoint& p) {
 static ParamPoint paramPointFromJson(const json& j) {
     return {j.at("id"), j.at("beat"), j.value("value", 63), j.value("anchor", false)};
 }
+// An instrument's parameter: {"name", "out": "cc"|"bend"|"pressure", "num" (CC
+// only), "rest": "min"|"centre"|"max"}.
+static json paramDefToJson(const ParamDef& d) {
+    json j = {{"name", d.name}};
+    switch (d.kind) {
+        case ParamOutKind::PitchBend: j["out"] = "bend";     break;
+        case ParamOutKind::Pressure:  j["out"] = "pressure"; break;
+        default:                      j["out"] = "cc"; j["num"] = d.cc; break;
+    }
+    j["rest"] = d.rest == ParamRest::Centre ? "centre" : d.rest == ParamRest::Max ? "max" : "min";
+    return j;
+}
+
+static ParamDef paramDefFromJson(const json& j) {
+    ParamDef d;
+    d.name = j.value("name", std::string{});
+    const std::string out = j.value("out", std::string{"cc"});
+    d.kind = out == "bend" ? ParamOutKind::PitchBend
+           : out == "pressure" ? ParamOutKind::Pressure : ParamOutKind::CC;
+    d.cc   = std::clamp(j.value("num", 0), 0, 127);
+    const std::string rest = j.value("rest", std::string{"min"});
+    d.rest = rest == "centre" ? ParamRest::Centre : rest == "max" ? ParamRest::Max : ParamRest::Min;
+    return d;
+}
+
 static json paramLaneToJson(const ParamLane& lane) {
     json jpts = json::array();
     for (const auto& p : lane.points) jpts.push_back(paramPointToJson(p));
@@ -270,8 +295,15 @@ static json timelineToJson(const Timeline& tl) {
     for (const auto& t : tl.tracks) jtracks.push_back(trackToJson(t));
 
     json jinstrs = json::array();
-    for (const auto& i : tl.instruments)
-        jinstrs.push_back({{"id", i.id}, {"name", i.name}, {"isDrum", i.isDrum}});
+    for (const auto& i : tl.instruments) {
+        json ji = {{"id", i.id}, {"name", i.name}, {"isDrum", i.isDrum}};
+        if (!i.paramDefs.empty()) {
+            json jdefs = json::array();
+            for (const auto& d : i.paramDefs) jdefs.push_back(paramDefToJson(d));
+            ji["params"] = jdefs;
+        }
+        jinstrs.push_back(ji);
+    }
 
     json jparams = json::array();
     for (const auto& lane : tl.paramLanes) jparams.push_back(paramLaneToJson(lane));
@@ -320,8 +352,13 @@ static Timeline timelineFromJson(const json& j) {
         tl.patterns.push_back(patternFromJson(jp));
     for (const auto& jt : j.value("tracks", json::array()))
         tl.tracks.push_back(trackFromJson(jt));
-    for (const auto& ji : j.value("instruments", json::array()))
-        tl.instruments.push_back({ji.at("id"), ji.at("name").get<std::string>(), ji.value("isDrum", false)});
+    for (const auto& ji : j.value("instruments", json::array())) {
+        Instrument in{ji.at("id"), ji.at("name").get<std::string>(), ji.value("isDrum", false)};
+        // Absent in files written before instruments had parameters of their own.
+        for (const auto& jd : ji.value("params", json::array()))
+            in.paramDefs.push_back(paramDefFromJson(jd));
+        tl.instruments.push_back(std::move(in));
+    }
     for (const auto& jp : j.value("paramLanes", json::array()))
         tl.paramLanes.push_back(paramLaneFromJson(jp));
     for (const auto& jr : j.value("rowOrder", json::array()))

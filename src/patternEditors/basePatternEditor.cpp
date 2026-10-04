@@ -120,6 +120,7 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
         if (!popup || !pattern || lastSelectedTrack < 0) return;
         if (lastSelectedTrack >= (int)pattern->get().tracks.size()) return;
         int patId = pattern->get().patternIdForSelectedLane();
+        setParamTarget(popup, patId);
         popup->open(
             Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
@@ -128,6 +129,15 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
             labelsRenameHandler()
         );
     });
+}
+
+// The pattern's instrument, whose parameters its lanes are.
+void BasePatternEditor::setParamTarget(NoteLabelsContextPopup* popup, int patId) const
+{
+    int instrId = 0;
+    for (const auto& p : pattern->get().patterns)
+        if (p.id == patId) instrId = p.instrumentId;
+    popup->setParamTarget(instrId, ParameterSubmenu::ownParamNames(&pattern->get(), instrId));
 }
 
 void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup)
@@ -144,6 +154,7 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
                 for (const auto& l : p.paramLanes)
                     if (l.id == laneId) laneType = l.type;
         }
+        setParamTarget(popup, patId);
         popup->open(
             Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },

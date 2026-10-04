@@ -51,6 +51,34 @@ To create a lane right-click on the track in the left hand column and choose 'Ad
 You can add dots on the rubberbands by clicking on it. You can click and drag them around, and you can delete them
 either by hovering over them and pressing delete or by right-clicking on them and using the menu option.
 
+### Parameters
+
+Each automation lane controls a *parameter*. The 'Add automation' menu lists the standard MIDI ones -
+Pitch, Modulation, Volume, Pan and Expression - with the rest of the General MIDI controllers (Sustain,
+Cutoff, Resonance, Reverb, Channel pressure, ...) under 'Other standard'.
+
+Synths have many more controls than these, and they don't agree on which CC does what, so each
+instrument can also have parameters of its own. To add one, choose 'New (MIDI learn)' from the
+'Add automation' menu and move the control on your MIDI controller. Luvie makes a parameter that sends
+whatever that control sends, adds its lane, and binds the control to it. If the control sends a standard
+CC the parameter gets the standard name (CC74 becomes 'Cutoff'). Otherwise it is named after the CC, e.g.
+'CC21'. The control's movements go straight through to the synth, so if your synth has its own MIDI learn
+you can use it at the same time.
+
+To rename a parameter or change what it sends, right-click its lane and choose 'Edit parameter'. You can set:
+
+- **Name**: renames the parameter's lanes on this instrument too.
+- **Sends**: a CC (with its number), pitch bend or channel pressure.
+- **Rests**: Min, Centre or Max. A new lane starts at this value. Centre also draws a dotted line
+  through the middle of the lane, as for Pitch and Pan.
+
+The standard parameters can be edited the same way, e.g. pointing Volume at a different CC for a synth
+that doesn't follow the standard. The change only affects that instrument.
+
+What a parameter *sends* is separate from which control *drives* it ('MIDI learn' on the lane). That
+means the pitch wheel can drive a Cutoff lane. The wheel springs back when you let go, and that is
+recorded like any other movement.
+
 ## Time slices
 
 Sometimes you want to move or copy a whole stretch of a pattern - the notes and the automation

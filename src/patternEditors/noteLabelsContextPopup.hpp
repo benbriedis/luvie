@@ -9,6 +9,7 @@
 #include "midiLearn.hpp"
 #include <functional>
 #include <string>
+#include <vector>
 
 class NoteLabelsContextPopup : public ContextMenuPopup {
     std::function<void(const char*)> pendingOnSelect;
@@ -18,12 +19,25 @@ class NoteLabelsContextPopup : public ContextMenuPopup {
     ModernButton*                    renameBtn = nullptr;
     ModernButton*                    addBtn    = nullptr;
     ModernButton*                    removeBtn = nullptr;
+    ModernButton*                    editBtn       = nullptr;
     ModernButton*                    learnBtn      = nullptr;
     ModernButton*                    clearLearnBtn = nullptr;
     std::string                      learnType_;
+    int                              instrumentId_ = 0;
+    std::vector<std::string>         ownNames_;
 
     void doShowParamSubmenu() {
-        if (paramSubmenu) paramSubmenu->showFor(this, y() + addBtn->y(), hasFn_);
+        if (!paramSubmenu) return;
+        paramSubmenu->onLearnNew = nullptr;
+        if (paramActions && paramActions->learnNew && instrumentId_ != 0 && pendingOnSelect) {
+            paramSubmenu->onLearnNew = [this]() {
+                auto add = pendingOnSelect;
+                paramActions->learnNew(instrumentId_, [add](const std::string& name) {
+                    add(name.c_str());
+                });
+            };
+        }
+        paramSubmenu->showFor(this, y() + addBtn->y(), ownNames_, hasFn_);
     }
 
 public:
@@ -32,14 +46,24 @@ public:
     ParameterSubmenu* paramSubmenu = nullptr;
     // Where "MIDI learn" and "Clear MIDI learn" act. Without it they never show.
     MidiLearnMap*     midiLearn    = nullptr;
+    // "Edit parameter" and "New (MIDI learn)". Without it they never show.
+    ParamMenuActions* paramActions = nullptr;
 
-    NoteLabelsContextPopup() : ContextMenuPopup(popW, 5*30+2) {
+    NoteLabelsContextPopup() : ContextMenuPopup(popW, 6*30+2) {
         renameBtn = addItem(0, "Rename");
         addBtn    = addItem(1, "Add automation");
         addBtn->setSubmenuArrow(true);
         removeBtn = addItem(2, "Remove automation");
-        learnBtn      = addItem(3, "MIDI learn");
-        clearLearnBtn = addItem(4, "Clear MIDI learn");
+        editBtn       = addItem(3, "Edit parameter");
+        learnBtn      = addItem(4, "MIDI learn");
+        clearLearnBtn = addItem(5, "Clear MIDI learn");
+
+        editBtn->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<NoteLabelsContextPopup*>(d);
+            self->hide();
+            if (self->paramActions && self->paramActions->edit)
+                self->paramActions->edit(self->instrumentId_, self->learnType_, self->x(), self->y());
+        }, this);
 
         renameBtn->callback([](Fl_Widget*, void* d) {
             auto* self = static_cast<NoteLabelsContextPopup*>(d);
@@ -65,10 +89,13 @@ public:
             self->hide();
             if (self->midiLearn) self->midiLearn->clear(self->learnType_);
         }, this);
-        // Moving down onto them from "Add automation" closes its submenu, as
+        // Moving down onto them from "Add automation" closes its submenu (after a
+        // moment: see ParameterSubmenu::hideSoon), as
         // "Remove automation" does for the Song Editor's menu.
-        auto closeSubmenu = [this]() { if (paramSubmenu) paramSubmenu->hide(); };
+        auto closeSubmenu = [this]() { if (paramSubmenu) paramSubmenu->hideSoon(); };
+        addBtn->onEnter = [this]() { if (paramSubmenu) paramSubmenu->cancelHide(); };
         removeBtn->onEnter     = closeSubmenu;
+        editBtn->onEnter       = closeSubmenu;
         learnBtn->onEnter      = closeSubmenu;
         clearLearnBtn->onEnter = closeSubmenu;
 
@@ -80,6 +107,13 @@ public:
 
         end();
         hide();
+    }
+
+    // The instrument the pattern plays and its own parameters, for the parameter
+    // submenu and "Edit parameter". Set before each open(); 0 for none.
+    void setParamTarget(int instrumentId, std::vector<std::string> ownNames) {
+        instrumentId_ = instrumentId;
+        ownNames_     = std::move(ownNames);
     }
 
     void open(int wx, int wy,
@@ -96,6 +130,8 @@ public:
         learnType_      = std::move(learnType);
         // The MIDI-learn items are for a param lane that was right-clicked.
         const bool canLearn = midiLearn && !learnType_.empty();
+        const bool canEdit  = paramActions && paramActions->edit && !learnType_.empty()
+                           && instrumentId_ != 0;
         if (canLearn) learnBtn->copy_label(midiLearn->learnMenuLabel(learnType_).c_str());
 
         // Stack the visible rows from the top with no gaps. "Rename" only shows
@@ -114,6 +150,7 @@ public:
         place(renameBtn, (bool)pendingOnRename);
         place(addBtn,    true);
         place(removeBtn, (bool)pendingOnRemove);
+        place(editBtn,       canEdit);
         place(learnBtn,      canLearn);
         place(clearLearnBtn, canLearn && midiLearn->bindingFor(learnType_));
 

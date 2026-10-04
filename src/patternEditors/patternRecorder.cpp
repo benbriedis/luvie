@@ -247,7 +247,7 @@ void PatternRecorder::thinRecordedParams()
     for (const auto& lane : p->paramLanes) {
         auto it = taken.find(lane.id);
         if (it == taken.end()) continue;
-        const double tol = laneMaxValue(lane.type) / 100.0;   // ~1 CC step
+        const double tol = pattern->get().paramMax(p->instrumentId, lane.type) / 100.0;   // ~1 CC step
         auto flushRun = [&]() {
             if (ids.size() > 2) {
                 thinParamRun(beats, values, tol, keep);

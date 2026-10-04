@@ -81,7 +81,8 @@ public:
     void setParamLaneContextPopup(ParamLaneContextPopup* p);
     // Param rows show their type's MIDI-learn binding and live value.
     void setMidiLearn(const MidiLearnMap* m) { trackLabels.setMidiLearn(m); }
-    void redrawTrackLabels() { trackLabels.redraw(); }
+    // Skipped while not on screen, as BasePatternEditor::redrawParamLabels().
+    void redrawTrackLabels() { if (trackLabels.visible_r()) trackLabels.redraw(); }
     // Lets the lane R buttons share the pattern recorders' arm state.
     void setRecordArmHooks(std::function<bool(int patId)> isArmed,
                            std::function<void(int patId, int laneId, bool on)> onToggled) {

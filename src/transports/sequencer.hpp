@@ -193,7 +193,7 @@ protected:
         std::string portName;
         int   midiChannel;       // 0-based
         int   priority;          // 0 = song-level; trackIdx+1 for pattern lanes
-        int   ccNumber;          // 1,7,10,11; -1 = pitch bend
+        int   ccNumber;          // paramOutCode(): CC 0-127, kParamOutBend, kParamOutPressure
         std::vector<ParamEventSnap> events;
     };
     struct Snapshot {

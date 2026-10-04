@@ -276,6 +276,9 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 		}
 
 		for (const auto& lane : pat->paramLanes) {
+			ParamDef def;
+			if (!tl.paramDef(instrumentId, lane.type, def)) continue;
+			const int outCode = paramOutCode(def);
 			auto checkFire = [&](float evtBeat, int value) {
 				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
@@ -284,7 +287,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
-					emitSoftParam(instrumentId, ccForType(lane.type), value);
+					emitSoftParam(instrumentId, outCode, value);
 				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
@@ -565,6 +568,9 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 		}
 
 		for (const auto& lane : pat->paramLanes) {
+			ParamDef def;
+			if (!tl.paramDef(instrumentId, lane.type, def)) continue;
+			const int outCode = paramOutCode(def);
 			auto checkFire = [&](float evtBeat, int value) {
 				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
@@ -573,7 +579,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
-					emitSoftParam(instrumentId, ccForType(lane.type), value);
+					emitSoftParam(instrumentId, outCode, value);
 				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
@@ -595,32 +601,23 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 	// emitSoftParam filters to ports that need soft sequencing, so Jack-clock-driven
 	// ports are left to JackTransport.
 	for (const auto& lane : tl.paramLanes) {
-		int cc = ccForType(lane.type);
-		for (int i = 0; i < (int)lane.points.size(); i++) {
-			auto report = [&](float barPos, int value) {
-				if (barPos < prevPos || barPos >= curPos) return;
-				if (verbose) {
-					int bar = (int)barPos + 1;
-					printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
-					       bar, lane.type.c_str(), value);
-				}
-				emitSoftParam(lane.instrumentId, cc, value);
-			};
-			report(lane.points[i].beat, lane.points[i].value);
-			if (i + 1 < (int)lane.points.size()) {
-				float b0 = lane.points[i].beat,  b1 = lane.points[i+1].beat;
-				int   v0 = lane.points[i].value, v1 = lane.points[i+1].value;
-				if (b1 > b0 && v1 != v0) {
-					float db = b1 - b0;
-					int   dv = v1 - v0;
-					if (dv > 0)
-						for (int N = v0; N < v1; N++)
-							report(b0 + (N + 0.5f - v0) / dv * db, N + 1);
-					else
-						for (int N = v1; N < v0; N++)
-							report(b0 + (N + 0.5f - v0) / dv * db, N);
-				}
+		ParamDef def;
+		if (!tl.paramDef(lane.instrumentId, lane.type, def)) continue;
+		const int outCode = paramOutCode(def);
+		auto report = [&](float barPos, int value) {
+			if (barPos < prevPos || barPos >= curPos) return;
+			if (verbose) {
+				int bar = (int)barPos + 1;
+				printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
+				       bar, lane.type.c_str(), value);
 			}
+			emitSoftParam(lane.instrumentId, outCode, value);
+		};
+		for (int i = 0; i < (int)lane.points.size(); i++) {
+			report(lane.points[i].beat, lane.points[i].value);
+			if (i + 1 < (int)lane.points.size())
+				densifyParamRamp(lane.points[i].beat,  lane.points[i+1].beat,
+				                 lane.points[i].value, lane.points[i+1].value, report);
 		}
 	}
 }
@@ -664,15 +661,15 @@ void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
 	softNotes.push_back({r.portName, r.channel0, midi, offBar});
 }
 
-void Playhead::emitSoftParam(int instrumentId, int ccNumber, int value)
+void Playhead::emitSoftParam(int instrumentId, int outCode, int value)
 {
 	if (!portReg || !instrRoute) return;
 	MidiInstrRoute r = instrRoute(instrumentId);
 	if (r.portName.empty()) return;
 	Port* p = portReg->find(r.portName);
 	if (!p || !portNeedsSoftSeq(p)) return;
-	if (ccNumber < 0) p->pitchBend(r.channel0, value);
-	else              p->cc(r.channel0, ccNumber, value);
+	uint8_t m[3];
+	p->raw(m, encodeParamMessage(outCode, r.channel0, value, m));
 }
 
 void Playhead::flushSoftNoteOffs(float curPos)

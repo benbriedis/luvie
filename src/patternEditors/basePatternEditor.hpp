@@ -83,6 +83,8 @@ protected:
     void layoutBody() override { relayout(); }
     void onWheelX(int d) override { setColOffset(colOffset + d); }
     void onWheelY(int d) override { setRowOffset(currentRowOffset() - d); }
+    // Tells the param menu which instrument pattern patId plays.
+    void setParamTarget(NoteLabelsContextPopup* popup, int patId) const;
 
     BasePatternEditor(int x, int y, int visibleW, int numRows, int numCols,
                       int rowHeight, int colWidth, float snap, int lw);
@@ -122,7 +124,10 @@ public:
     void setParamDotPopup(ParamDotPopup* p) { paramGrid.setParamDotPopup(p); }
     // The param labels show each lane's MIDI-learn binding and live value.
     void setMidiLearn(const MidiLearnMap* m) { paramLabels.setMidiLearn(m); }
-    void redrawParamLabels() { paramLabels.redraw(); }
+    // Skipped while not on screen: FLTK still marks a hidden widget's rectangle of
+    // the window for repainting, and on Wayland that area flickers. Showing the
+    // editor redraws it in full anyway.
+    void redrawParamLabels() { if (paramLabels.visible_r()) paramLabels.redraw(); }
     void onTimelineChanged() override;
 };
 

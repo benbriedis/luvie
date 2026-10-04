@@ -138,7 +138,11 @@ void ObservableSong::loadTimeline(const Timeline& tl)
             for (const auto& t : data.tracks)
                 for (const auto& l : t.lanes)
                     data.rowOrder.push_back({RowKind::Lane, l.id});
-            for (const auto& l : data.paramLanes) data.rowOrder.push_back({RowKind::Param, l.id});
+            for (const auto& l : data.paramLanes) {
+                const bool hidden = std::any_of(data.tracks.begin(), data.tracks.end(),
+                    [&l](const Track& t) { return t.stackedLanes && t.instrumentId == l.instrumentId; });
+                if (!hidden) data.rowOrder.push_back({RowKind::Param, l.id});
+            }
         }
     }
     // A loaded file is trusted no further than the invariants: sort the markers
@@ -1090,6 +1094,8 @@ ObservableSong::TrackMenuFlags ObservableSong::trackMenuFlags(int trackId) const
         if (t.id != trackId) continue;
         flags.canRemoveLane  = !t.stackedLanes && !t.lanes.empty();
         flags.canOpenPattern = !t.stackedLanes && !t.lanes.empty();
+        // A collapsed track's automation rows are hidden, so a new one would be too.
+        flags.canAddParam    = !t.stackedLanes;
         if (!t.lanes.empty()) {
             int patId = t.lanes[0].patternId;
             for (const auto& p : data.patterns)
@@ -1588,6 +1594,7 @@ void ObservableSong::setStackedLanes(int trackId, bool stacked)
                 std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
                     [&collapsedIds](const RowRef& r) { return r.kind == RowKind::Lane && collapsedIds.count(r.id); }),
                 data.rowOrder.end());
+            hideParamRows(t.instrumentId);
             // Reset selectedLaneId to first lane so a row is highlighted
             if (!t.lanes.empty()) {
                 bool selIsNonFirst = false;
@@ -1606,10 +1613,61 @@ void ObservableSong::setStackedLanes(int trackId, bool stacked)
             }
             for (int j = 1; j < (int)t.lanes.size(); j++)
                 data.rowOrder.insert(data.rowOrder.begin() + insertAt + (j - 1), RowRef{RowKind::Lane, t.lanes[j].id});
+            showParamRows(t.instrumentId, paramLaneInsertIndex(t.id));
         }
         rebuildInstrumentHeaders();
         notify();
         return;
+    }
+}
+
+// A collapsed track hides its instrument's automation rows with its extra lanes.
+// They still play: only their rows leave rowOrder. Their order there is kept in
+// data.paramLanes, which nothing else orders, so showParamRows() can put them back
+// as they were.
+void ObservableSong::hideParamRows(int instrumentId)
+{
+    if (instrumentId == 0) return;
+    std::vector<int> shown;   // the instrument's param rows, top to bottom
+    for (const auto& r : data.rowOrder)
+        if (r.kind == RowKind::Param && instrumentIdForParamLane(r.id) == instrumentId)
+            shown.push_back(r.id);
+    if (shown.empty()) return;
+    // Reorder the instrument's lanes among the slots they already occupy; rows not
+    // shown (hidden by an earlier collapse) go last.
+    auto rank = [&shown](int laneId) {
+        auto it = std::find(shown.begin(), shown.end(), laneId);
+        return it == shown.end() ? (int)shown.size() : (int)(it - shown.begin());
+    };
+    std::vector<size_t>    slots;
+    std::vector<ParamLane> mine;
+    for (size_t i = 0; i < data.paramLanes.size(); i++)
+        if (data.paramLanes[i].instrumentId == instrumentId) {
+            slots.push_back(i);
+            mine.push_back(std::move(data.paramLanes[i]));
+        }
+    std::stable_sort(mine.begin(), mine.end(),
+        [&](const ParamLane& a, const ParamLane& b) { return rank(a.id) < rank(b.id); });
+    for (size_t k = 0; k < slots.size(); k++)
+        data.paramLanes[slots[k]] = std::move(mine[k]);
+    data.rowOrder.erase(
+        std::remove_if(data.rowOrder.begin(), data.rowOrder.end(),
+            [&](const RowRef& r) {
+                return r.kind == RowKind::Param &&
+                       std::find(shown.begin(), shown.end(), r.id) != shown.end(); }),
+        data.rowOrder.end());
+}
+
+void ObservableSong::showParamRows(int instrumentId, int atIndex)
+{
+    if (instrumentId == 0) return;
+    if (atIndex < 0 || atIndex > (int)data.rowOrder.size()) atIndex = (int)data.rowOrder.size();
+    for (const auto& l : data.paramLanes) {
+        if (l.instrumentId != instrumentId) continue;
+        const bool present = std::any_of(data.rowOrder.begin(), data.rowOrder.end(),
+            [&l](const RowRef& r) { return r.kind == RowKind::Param && r.id == l.id; });
+        if (present) continue;
+        data.rowOrder.insert(data.rowOrder.begin() + atIndex++, RowRef{RowKind::Param, l.id});
     }
 }
 
@@ -1950,7 +2008,7 @@ int ObservableSong::addParamLane(const std::string& type, int instrumentId, int 
     lane.id           = laneId;
     lane.type         = type;
     lane.instrumentId = instrumentId;
-    lane.points.push_back({nextId++, 0.0f, laneDefaultValue(type), true});
+    lane.points.push_back({nextId++, 0.0f, data.paramDefault(instrumentId, type), true});
     data.paramLanes.push_back(std::move(lane));
     RowRef ref{RowKind::Param, laneId};
     if (atIndex >= 0 && atIndex <= (int)data.rowOrder.size())
@@ -2008,7 +2066,7 @@ int ObservableSong::addParamPoint(int laneId, float beat, int value)
         int ptId = nextId++;
         auto it = std::lower_bound(lane.points.begin(), lane.points.end(),
             beat, [](const ParamPoint& p, float b) { return p.beat < b; });
-        lane.points.insert(it, {ptId, beat, std::clamp(value, 0, laneMaxValue(lane.type)), false});
+        lane.points.insert(it, {ptId, beat, std::clamp(value, 0, data.paramMax(lane.instrumentId, lane.type)), false});
         notify();
         return ptId;
     }
@@ -2035,11 +2093,132 @@ void ObservableSong::moveParamPoint(int pointId, float beat, int value)
             if (pt.id != pointId) continue;
             if (!pt.anchor)
                 pt.beat  = std::max(0.0f, beat);
-            pt.value = std::clamp(value, 0, laneMaxValue(lane.type));
+            pt.value = std::clamp(value, 0, data.paramMax(lane.instrumentId, lane.type));
             std::stable_sort(lane.points.begin(), lane.points.end(),
                 [](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
             notify();
             return;
         }
     }
+}
+
+namespace {
+
+// Whether the instrument has a lane named `name`, in the Song Editor or in one of
+// its patterns.
+bool instrumentHasLaneNamed(const Timeline& tl, int instrumentId, const std::string& name)
+{
+    for (const auto& l : tl.paramLanes)
+        if (l.instrumentId == instrumentId && l.type == name) return true;
+    for (const auto& p : tl.patterns) {
+        if (p.instrumentId != instrumentId) continue;
+        for (const auto& l : p.paramLanes)
+            if (l.type == name) return true;
+    }
+    return false;
+}
+
+} // namespace
+
+std::string ObservableSong::paramForOutput(int instrumentId, ParamOutKind kind, int cc)
+{
+    const ParamDef want{{}, kind, cc, ParamRest::Min};
+    const Instrument* in = data.instrument(instrumentId);
+    const StandardParam* std_ = standardParamFor(kind, cc);
+    if (!in) return std_ ? std_->name : std::string{};
+
+    for (const auto& d : in->paramDefs)
+        if (d.sameOutput(want)) return d.name;
+    ParamDef resolved;
+    if (std_ && data.paramDef(instrumentId, std_->name, resolved) && resolved.sameOutput(want))
+        return std_->name;
+
+    // A new parameter, under a name nothing on the instrument answers to yet.
+    auto taken = [&](const std::string& n) {
+        ParamDef d;
+        return data.paramDef(instrumentId, n, d) || instrumentHasLaneNamed(data, instrumentId, n);
+    };
+    std::string name = defaultParamName(kind, cc);
+    if (taken(name)) name = describeParamOutput(kind, cc);
+    for (int n = 2; taken(name); n++)
+        name = describeParamOutput(kind, cc) + " " + std::to_string(n);
+
+    ParamDef def = want;
+    def.name = name;
+    def.rest = kind == ParamOutKind::PitchBend ? ParamRest::Centre : ParamRest::Min;
+    for (auto& i : data.instruments)
+        if (i.id == instrumentId) i.paramDefs.push_back(def);
+    notify();
+    return name;
+}
+
+bool ObservableSong::setParamDef(int instrumentId, const std::string& oldName, const ParamDef& def)
+{
+    Instrument* in = nullptr;
+    for (auto& i : data.instruments)
+        if (i.id == instrumentId) in = &i;
+    if (!in || def.name.empty()) return false;
+
+    const bool renamed = def.name != oldName;
+    if (renamed) {
+        // A standard name the instrument has not used yet is free to take over.
+        for (const auto& d : in->paramDefs)
+            if (d.name == def.name) return false;
+        if (instrumentHasLaneNamed(data, instrumentId, def.name)) return false;
+    }
+
+    const int oldMax = data.paramMax(instrumentId, oldName);
+
+    // Kept where it was in the instrument's list, or added at the end. A standard
+    // parameter set back exactly as standard needs no entry at all.
+    const StandardParam* s = standardParam(def.name);
+    const bool asStandard  = s && toParamDef(*s) == def;
+    auto it = std::find_if(in->paramDefs.begin(), in->paramDefs.end(),
+                           [&](const ParamDef& d) { return d.name == oldName; });
+    if (it != in->paramDefs.end()) {
+        if (asStandard) in->paramDefs.erase(it);
+        else            *it = def;
+    } else if (!asStandard) {
+        in->paramDefs.push_back(def);
+    }
+
+    if (renamed) {
+        for (auto& l : data.paramLanes)
+            if (l.instrumentId == instrumentId && l.type == oldName) l.type = def.name;
+        for (auto& p : data.patterns) {
+            if (p.instrumentId != instrumentId) continue;
+            for (auto& l : p.paramLanes)
+                if (l.type == oldName) l.type = def.name;
+        }
+    }
+
+    // A lane moving between 7-bit and 14-bit keeps its shape: its values are
+    // rescaled to the new range.
+    const int newMax = paramMaxValue(def);
+    auto rescaleLane = [oldMax, newMax](ParamLane& l) {
+        if (oldMax == newMax) return;
+        for (auto& pt : l.points)
+            pt.value = std::clamp((int)std::lround(pt.value * (double)newMax / oldMax), 0, newMax);
+    };
+    for (auto& l : data.paramLanes)
+        if (l.instrumentId == instrumentId && l.type == def.name) rescaleLane(l);
+    for (auto& p : data.patterns) {
+        if (p.instrumentId != instrumentId) continue;
+        for (auto& l : p.paramLanes)
+            if (l.type == def.name) rescaleLane(l);
+    }
+    notify();
+    return true;
+}
+
+bool ObservableSong::paramNameUsedElsewhere(int instrumentId, const std::string& name) const
+{
+    if (standardParam(name)) return true;
+    for (const auto& i : data.instruments) {
+        if (i.id == instrumentId) continue;
+        for (const auto& d : i.paramDefs)
+            if (d.name == name) return true;
+        if (instrumentHasLaneNamed(data, i.id, name)) return true;
+    }
+    return false;
 }

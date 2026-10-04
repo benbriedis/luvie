@@ -240,6 +240,8 @@ public:
     int  addPianorollLane(int trackId);
     int  cloneLane(int trackId, int laneId);
     void removeLane(int trackId, int laneId);
+    // Collapsing (stacked) also hides the instrument's automation rows; expanding
+    // shows them again below the track's lanes.
     void setStackedLanes(int trackId, bool stacked);
     int  trackIndexForId(int trackId) const;
     int  trackIndexForLaneId(int laneId) const;
@@ -251,6 +253,7 @@ public:
         bool canOpenPattern = false;
         bool canRemoveLane  = false;
         bool isDrumTrack    = false;
+        bool canAddParam    = false;
     };
     TrackMenuFlags trackMenuFlags(int trackId) const;
     // rowOrder insertion index for a new param lane belonging to this track.
@@ -316,6 +319,23 @@ public:
     int  addParamPoint(int laneId, float beat, int value);
     void removeParamPoint(int pointId);
     void moveParamPoint(int pointId, float beat, int value);
+
+    // Instrument parameters (see paramDefs.hpp). A lane names a parameter; these
+    // say what each name sends on each instrument.
+    //
+    // The name of the instrument's parameter that sends this output: its own, else
+    // the standard one if not overridden, else a new parameter of its own, named for
+    // the output ("Cutoff" for CC74, else "CC21"). Empty for no instrument, unless
+    // a standard parameter sends it.
+    std::string paramForOutput(int instrumentId, ParamOutKind kind, int cc);
+    // Make `def` the instrument's parameter in place of `oldName` — one of its own
+    // or a standard one. A new name renames the instrument's lanes of oldName, song
+    // and pattern alike; a standard oldName stays available as the preset. False,
+    // with nothing changed, for an empty name or one the instrument already uses.
+    bool setParamDef(int instrumentId, const std::string& oldName, const ParamDef& def);
+    // Whether `name` still means something to an instrument other than this one:
+    // it is standard, or another instrument has a parameter or lane of that name.
+    bool paramNameUsedElsewhere(int instrumentId, const std::string& name) const;
 
     // Build a flat Note list for grid consumption (row = track index)
     std::vector<Note> buildNotes() const;
@@ -465,6 +485,10 @@ private:
     void sortBpms();
     void sortTimeSigs();
     void removeParamLanesForInstrument(int instrumentId);
+    // A collapsed track's instrument's automation rows leave rowOrder, and come
+    // back at atIndex (-1: the end) in the order they left. Neither notifies.
+    void hideParamRows(int instrumentId);
+    void showParamRows(int instrumentId, int atIndex);
 };
 
 #endif

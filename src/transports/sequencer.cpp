@@ -368,7 +368,10 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
         buildNotes(is, pat, trackIdx, trackInstrument);
 
         // Param lanes. Build BEFORE moving `is` below — moving leaves portName empty.
+        const int instrId = pat->instrumentId != 0 ? pat->instrumentId : trackInstrument;
         for (const auto& lane : pat->paramLanes) {
+            ParamDef def;
+            if (!tl.paramDef(instrId, lane.type, def)) continue;
             auto evts = buildParamEvents(lane);
             if (evts.empty()) continue;
             ParamInstSnap pis;
@@ -381,7 +384,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
             pis.portName     = is.portName;
             pis.midiChannel  = is.midiChannel;
             pis.priority     = trackIdx + 1;
-            pis.ccNumber     = ccForType(lane.type);
+            pis.ccNumber     = paramOutCode(def);
             pis.events       = std::move(evts);
             newSnap.paramInsts.push_back(std::move(pis));
         }
@@ -444,7 +447,11 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
                 // Param lanes for this pattern instance. Build BEFORE moving `is`
                 // into ts.instances below — moving leaves is.portName empty.
                 if (!is.portName.empty()) {
+                    const int instrId = pat->instrumentId != 0 ? pat->instrumentId
+                                                               : track.instrumentId;
                     for (const auto& lane : pat->paramLanes) {
+                        ParamDef def;
+                        if (!tl.paramDef(instrId, lane.type, def)) continue;
                         auto evts = buildParamEvents(lane);
                         if (evts.empty()) continue;
                         ParamInstSnap pis;
@@ -456,7 +463,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
                         pis.portName     = is.portName;
                         pis.midiChannel  = is.midiChannel;
                         pis.priority     = trackIdx + 1;
-                        pis.ccNumber     = ccForType(lane.type);
+                        pis.ccNumber     = paramOutCode(def);
                         pis.events       = std::move(evts);
                         newSnap.paramInsts.push_back(std::move(pis));
                     }
@@ -488,6 +495,8 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
             if (lane.instrumentId == 0) continue;
             auto rit = instrumentMap_.find(lane.instrumentId);
             if (rit == instrumentMap_.end() || rit->second.portName.empty()) continue;
+            ParamDef def;
+            if (!tl.paramDef(lane.instrumentId, lane.type, def)) continue;
             auto evts = buildParamEvents(lane);
             if (evts.empty()) continue;
             ParamInstSnap pis;
@@ -499,7 +508,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
             pis.portName     = rit->second.portName;
             pis.midiChannel  = rit->second.midiChannel - 1;  // store 0-based
             pis.priority     = 0;
-            pis.ccNumber     = ccForType(lane.type);
+            pis.ccNumber     = paramOutCode(def);
             pis.events       = std::move(evts);
             newSnap.paramInsts.push_back(std::move(pis));
         }
@@ -1002,23 +1011,9 @@ void Sequencer::fireParamEvents(double prevBars, double curBars)
                paramScratch[j].bar         == p.bar)
             ++j;
 
-        if (p.ccNumber < 0) {
-            // Pitch bend: value is already 0-16383 (14-bit).
-            int     val14 = p.value;
-            uint8_t msg[3] = {
-                static_cast<uint8_t>(0xE0 | (p.midiChannel & 0x0F)),
-                static_cast<uint8_t>(val14 & 0x7F),
-                static_cast<uint8_t>((val14 >> 7) & 0x7F)
-            };
-            emit(*p.portName, p.bar, msg, 3);
-        } else {
-            uint8_t msg[3] = {
-                static_cast<uint8_t>(0xB0 | (p.midiChannel & 0x0F)),
-                static_cast<uint8_t>(p.ccNumber & 0x7F),
-                static_cast<uint8_t>(p.value    & 0x7F)
-            };
-            emit(*p.portName, p.bar, msg, 3);
-        }
+        uint8_t msg[3];
+        const int len = encodeParamMessage(p.ccNumber, p.midiChannel, p.value, msg);
+        emit(*p.portName, p.bar, msg, len);
         i = j;
     }
 }

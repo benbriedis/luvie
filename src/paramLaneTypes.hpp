@@ -12,12 +12,6 @@
 #include <cstdlib>
 #include <utility>
 
-// Returns the maximum value for a param lane: 16383 for pitch bend, 127 for CC lanes.
-inline int laneMaxValue(const std::string& type)
-{
-    return (type == "Pitch") ? 16383 : 127;
-}
-
 // Densify the linear ramp between two automation points into intermediate
 // stepped events, invoking sink(beat, value) for each. The endpoints themselves
 // are NOT emitted (callers emit the points). CC lanes (range <=127) step by 1, one
@@ -75,16 +69,6 @@ inline void thinParamRun(const std::vector<float>& beats, const std::vector<int>
     }
 }
 
-// Returns the MIDI default (reset) value for a param lane.
-inline int laneDefaultValue(const std::string& type)
-{
-    if (type == "Pitch")      return 8192;  // no bend
-    if (type == "Volume")     return 100;
-    if (type == "Pan")        return 64;    // center
-    if (type == "Expression") return 127;
-    return 0;  // Modulation and unknowns
-}
-
 struct ParamPtLocal {
     int   id;
     float beat;
@@ -96,6 +80,8 @@ struct ParamLaneLocal {
     int                       id;
     std::string               type;
     std::vector<ParamPtLocal> points;  // sorted by beat
+    int                       maxVal  = 127;    // from the parameter's ParamDef
+    bool                      centred = false;  // rests at Centre: draw the centre line
 };
 
 struct ParamIdle {};

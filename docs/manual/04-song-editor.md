@@ -51,6 +51,9 @@ Automation lanes use rubberbands.
 New change points can be added to a rubberband by single-clicking. 
 To delete a change point right-click a dot and select Delete from the popup menu.
 
+See [Parameters](06-pattern-editors.md#parameters) for adding your synth's own controls
+(filter cutoff and so on) and for changing what a parameter sends.
+
 ## Rulers and markers
 
 At the top of the song editor there are a number or "rulers". These are

@@ -350,13 +350,6 @@ Probably want a tool really...
    + Have a harmony --> pianoroll option
    
    
-- Loop Editor sets + being able to switch (cf intermediate mode going in or out? immediate?)
-
-Allow more parameters to be shown via click and drag.
-Allow some/all parameters to be hidden
-Allow parameter recording sensitivity to be set - record more or less parameters
-
-
 cf Option of disabling MIDI through Luvie? Or even removing it entirely when recording. 
      Useful for setting things up though it think...
 
@@ -388,11 +381,6 @@ cf being able to save triggers outside project? As defaults? Not so keen on that
    
 
 Have a variable number of scenes?
-
-cf being able to map notes (or buttons) to loops - allows us to preset  different scales etc
-   OR better just to use scenes?
-
-Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
 
 Is there an 'aconnectgui' equivalent that works across Windows and Mac?
 
@@ -456,7 +444,7 @@ Manual:
 		Ctrl-C   copy selection
 		Ctrl-X   cut selection
 		Ctrl-V   paste
-		Alt-click-sweep  slice selection      (may clash with some WMs)
+		Alt-click-sweep  slice selection      (may clash with some WMs) Q: which? And could users do anything about it?
 	Maybe list these shortcuts in a window even if they are not edittable.
 	Maybe an optional toolbar to have tool versions for some of these.
 
@@ -468,5 +456,23 @@ Manual:
 			  solo? mute?
 			  Rewind could be '<' and/or ','
 		   Generally prefer to have 1 good set of bindings though...
+
+
+How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
+
+May be good idea to be able to view current set of triggers in a list somewhere. Otherwise could get a bit lost. Have a clear all button?
+   NB reusing a button or control in one place should clear any previous use too.
+
+Q: is it worth ditching intermediate mode altogether? NB still would want beats to line up... NB notes that were started should continue on
+   until they end...
+   
+Q: Does RaySession *have* to use global project directories, or can we split them up / use local projects?   
+   Would rather just have a default search directory.
+
+Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
+
+Allow more parameters to be shown via click and drag.
+Allow some/all parameters to be hidden
+Allow parameter recording sensitivity to be set - record more or less parameters
 
 

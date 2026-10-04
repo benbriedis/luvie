@@ -11,6 +11,8 @@
 #include <cmath>
 
 static constexpr Fl_Color kParamRowBg  = 0xF0F4FF00;
+// The centre a Centre-resting parameter (Pitch, Pan) returns to.
+static constexpr Fl_Color kParamCentre = 0xD0D0E000;
 static constexpr Fl_Color kParamLine   = 0x8888CC00;
 static constexpr Fl_Color kParamDotFill = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim  = 0x1111EE00;
@@ -56,9 +58,13 @@ void PatternParamLabels::draw()
                 fl_color(kText);
                 fl_draw(type.c_str(), x() + 4, rowY + (badge ? 4 : 0), w() - 8, nameH,
                         FL_ALIGN_LEFT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
-                if (badge)
+                if (badge) {
+                    ParamDef def;
+                    const std::string out = pattern->get().paramDef(pat->instrumentId, type, def)
+                                          ? describeParamOutput(def) : std::string{};
                     drawMidiLearnBadge(midiLearn, type, x() + 4, rowY + kParamRowH / 2,
-                                       w() - 8, kParamRowH / 2 - 4, FL_ALIGN_LEFT);
+                                       w() - 8, kParamRowH / 2 - 4, FL_ALIGN_LEFT, out);
+                }
             }
         }
     }
@@ -106,6 +112,11 @@ void PatternParamGrid::rebuildLanes()
             ParamLaneLocal local;
             local.id   = lane.id;
             local.type = lane.type;
+            ParamDef def;
+            if (pattern->get().paramDef(p.instrumentId, lane.type, def)) {
+                local.maxVal  = paramMaxValue(def);
+                local.centred = def.rest == ParamRest::Centre;
+            }
             for (const auto& pt : lane.points)
                 local.points.push_back({pt.id, pt.beat, pt.value, pt.anchor});
             localLanes.push_back(std::move(local));
@@ -185,7 +196,7 @@ void PatternParamGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
     const int dotR = std::max(2, kParamRowH / 9);
     const int totalRange = kParamRowH - 1 - 2 * dotR;
     if (totalRange <= 0) return;
-    const int maxVal = laneMaxValue(lane.type);
+    const int maxVal = lane.maxVal;
 
     auto dotYFor = [&](int value) {
         return rowY + dotR + (int)((maxVal - value) * totalRange / (float)maxVal);
@@ -206,6 +217,14 @@ void PatternParamGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
             fl_color(0xFF999900);
             fl_pie(x() + padX_ - dotR, vdotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
         }
+    }
+
+    if (lane.centred) {
+        const int cy = dotYFor((maxVal + 1) / 2);
+        fl_color(kParamCentre);
+        fl_line_style(FL_DOT);
+        fl_line(x() + padX_, cy, x() + gridRight, cy);
+        fl_line_style(0);
     }
 
     fl_color(kParamLine);
@@ -248,7 +267,7 @@ int PatternParamGrid::findParamPointAtCursor(int laneIdx, int rowY) const
     int bestIdx  = -1;
     float bestDist = (float)(hitR + 1);
 
-    const int maxVal = laneMaxValue(localLanes[laneIdx].type);
+    const int maxVal = localLanes[laneIdx].maxVal;
     for (int i = 0; i < (int)localLanes[laneIdx].points.size(); i++) {
         const auto& pt = localLanes[laneIdx].points[i];
         int dotX = x() + padX_ + (int)((pt.beat - colOffset_) * colWidth_);
@@ -298,7 +317,7 @@ int PatternParamGrid::handle(int event)
     int gridRight = std::min(w(), padX_ + (numCols_ - colOffset_) * colWidth_);
 
     auto dotYForRow = [&](int li, int rowY, int value) {
-        int mv = laneMaxValue(li < (int)localLanes.size() ? localLanes[li].type : std::string{});
+        int mv = (li < (int)localLanes.size() ? localLanes[li].maxVal : 127);
         return rowY + dotR + (totalRange > 0 ? (int)((mv - value) * totalRange / (float)mv) : 0);
     };
 
@@ -344,7 +363,7 @@ int PatternParamGrid::handle(int event)
         switch (event) {
         case FL_DRAG: {
             if (auto* d = std::get_if<ParamVirtualDrag>(&paramState)) {
-                int maxVal  = laneMaxValue(localLanes[d->laneIdx].type);
+                int maxVal  = localLanes[d->laneIdx].maxVal;
                 int laneVR  = d->laneIdx - laneOffset;
                 int eyInRow = ey - laneVR * kParamRowH;
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
@@ -373,7 +392,7 @@ int PatternParamGrid::handle(int event)
                     newBeat = std::clamp(newBeat, lo, hi);
                 }
 
-                int maxVal  = laneMaxValue(localLanes[d->laneIdx].type);
+                int maxVal  = localLanes[d->laneIdx].maxVal;
                 int laneVR  = d->laneIdx - laneOffset;
                 int eyInRow = ey - laneVR * kParamRowH;
                 int mapped  = std::clamp(eyInRow - dotR, 0, totalRange > 0 ? totalRange : 0);
@@ -456,7 +475,7 @@ int PatternParamGrid::handle(int event)
             if (ptIdx >= 0 && dotPopup) {
                 auto& pt = localLanes[laneIdx].points[ptIdx];
                 int ptId = pt.id; float beat = pt.beat; int val = pt.value; bool anc = pt.anchor;
-                int maxVal = laneMaxValue(localLanes[laneIdx].type);
+                int maxVal = localLanes[laneIdx].maxVal;
                 paramState = ParamIdle{};
                 dotPopup->open(Fl::event_x(), Fl::event_y(), val, anc, maxVal,
                     [this, ptId, beat](int newVal) {
@@ -490,7 +509,7 @@ int PatternParamGrid::handle(int event)
                 }
             }
             if (!hitVirtual) {
-                int maxVal  = laneMaxValue(laneIdx < (int)localLanes.size() ? localLanes[laneIdx].type : std::string{});
+                int maxVal  = (laneIdx < (int)localLanes.size() ? localLanes[laneIdx].maxVal : 127);
                 float beat  = (float)(ex - padX_) / colWidth_ + colOffset_;
                 if (snap_ > 0.0f) beat = std::round(beat / snap_) * snap_;
                 beat = std::max(0.0f, beat);

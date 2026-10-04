@@ -20,7 +20,7 @@ add_library(luvie_core STATIC
     patternEditors/sliceController.cpp
     loopEditor.cpp loopContextPopup.cpp
     luvieApp.cpp songEditor/timelineIO.cpp modern/overlayWindow.cpp modern/collapsiblePane.cpp
-    outputs/outputsOverlay.cpp paramDotPopup.cpp patternEditors/patternParamGrid.cpp
+    outputs/outputsOverlay.cpp paramDotPopup.cpp paramDefPopup.cpp patternEditors/patternParamGrid.cpp
     outputs/jackPort.cpp
     outputs/rtMidiPort.cpp outputs/debugPort.cpp outputs/portRegistry.cpp jackShim.cpp
     outputs/midiInPort.cpp

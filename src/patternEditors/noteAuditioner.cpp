@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "noteAuditioner.hpp"
+#include "paramDefs.hpp"
 #include "luvieDebug.hpp"
 #include "port.hpp"
 #include "portRegistry.hpp"
@@ -89,31 +90,20 @@ void NoteAuditioner::noteOff(int instrumentId, int midi)
     }
 }
 
-void NoteAuditioner::param(int instrumentId, int ccNumber, int value)
+void NoteAuditioner::param(int instrumentId, int outCode, int value)
 {
     if (!instrRoute) return;
-    MidiInstrRoute r  = instrRoute(instrumentId);
-    const int      ch = r.channel0 & 0x0F;
+    MidiInstrRoute r = instrRoute(instrumentId);
+    uint8_t m[3];
+    const int len = encodeParamMessage(outCode, r.channel0, value, m);
     if (midiSink) {
-        uint8_t m[3];
-        if (ccNumber < 0) {
-            value = std::clamp(value, 0, 16383);
-            m[0] = static_cast<uint8_t>(0xE0 | ch);
-            m[1] = static_cast<uint8_t>(value & 0x7F);
-            m[2] = static_cast<uint8_t>((value >> 7) & 0x7F);
-        } else {
-            m[0] = static_cast<uint8_t>(0xB0 | ch);
-            m[1] = static_cast<uint8_t>(ccNumber & 0x7F);
-            m[2] = static_cast<uint8_t>(std::clamp(value, 0, 127));
-        }
-        midiSink(r.portName, m, 3);
+        midiSink(r.portName, m, len);
         return;
     }
     if (!portReg || r.portName.empty()) return;
     Port* port = portReg->find(r.portName);
     if (!port) return;
-    if (ccNumber < 0) port->pitchBend(ch, std::clamp(value, 0, 16383));
-    else              port->cc(ch, ccNumber, std::clamp(value, 0, 127));
+    port->raw(m, len);
 }
 
 void NoteAuditioner::passThrough(int instrumentId, const uint8_t* msg, int len)

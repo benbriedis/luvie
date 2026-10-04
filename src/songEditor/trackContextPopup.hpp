@@ -37,6 +37,7 @@ private:
 
 public:
     ParameterSubmenu*                    paramSubmenu = nullptr;
+    ParamMenuActions*                    paramActions = nullptr;
 
     TrackContextPopup();
 

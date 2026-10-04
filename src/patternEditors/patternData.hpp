@@ -59,7 +59,7 @@ struct ParamPoint {
 
 struct ParamLane {
 	int                      id;
-	std::string              type;    // "Pitch", "Modulation", etc.
+	std::string              type;    // the parameter it automates: "Pitch", "Cutoff", ... (see paramDefs.hpp)
 	std::vector<ParamPoint>  points;  // sorted by beat
 	int                      instrumentId = 0;  // owning instrument; routes to its port only
 };

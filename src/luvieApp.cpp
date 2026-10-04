@@ -36,12 +36,12 @@
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
 #include "pianorollEditor.hpp"
-#include "chords.hpp"          // ccForType
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
 #include "transportOverlay.hpp"
 #include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
+#include "paramDefPopup.hpp"
 #include "noteLabelsContextPopup.hpp"
 #include "patternParamGrid.hpp"
 
@@ -388,6 +388,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* loopRulerPop = new LoopRulerContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
+    auto* pdefPop    = new ParamDefPopup{};
     auto* nlCtxPop   = new NoteLabelsContextPopup;
     auto* settingsPop = new SettingsMenuPopup;
 
@@ -714,17 +715,58 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // what is bound and what it last sent.
     nlCtxPop->midiLearn = &midiLearn;
     plcPop->midiLearn   = &midiLearn;
+    // Instrument parameters. "Edit parameter" names a parameter and says what it
+    // sends; "New (MIDI learn)" makes one from the next control moved, sending what
+    // that control sends — and since the control is then bound and heard, moving it
+    // further sweeps the synth, whose own MIDI learn can pick it up.
+    nlCtxPop->paramActions = &paramActions;
+    plcPop->paramActions   = &paramActions;
+    ctxPop->paramActions   = &paramActions;
+    for (ParameterSubmenu* m : {ctxPop->paramSubmenu, plcPop->paramSubmenu, nlCtxPop->paramSubmenu})
+        m->midiLearn = &midiLearn;
+    paramActions.edit = [this, pdefPop](int instrId, const std::string& name, int wx, int wy) {
+        if (!song_) return;
+        ParamDef def;
+        if (!song_->get().paramDef(instrId, name, def)) def.name = name;
+        pdefPop->open(wx, wy, def, [this, instrId, name](const ParamDef& d) {
+            if (!song_) return true;
+            // Asked before the rename, while the old name is still in place.
+            const bool keepOld = song_->paramNameUsedElsewhere(instrId, name);
+            if (!song_->setParamDef(instrId, name, d)) return false;
+            midiLearn.rename(name, d.name, keepOld);
+            return true;
+        });
+    };
+    paramActions.learnNew = [this](int instrId, std::function<void(const std::string&)> addLane) {
+        midiLearn.startLearnNew(instrId, [this, instrId, addLane](const MidiSrc& src) {
+            if (!song_) return std::string{};
+            const ParamOutKind kind = src.kind == MidiSrcKind::PitchBend ? ParamOutKind::PitchBend
+                                    : src.kind == MidiSrcKind::Pressure  ? ParamOutKind::Pressure
+                                                                         : ParamOutKind::CC;
+            ObservableSong::Batch batch(song_);
+            const std::string name = song_->paramForOutput(instrId, kind, src.num);
+            if (!name.empty() && addLane) addLane(name);
+            return name;
+        });
+    };
     for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
                                   (BasePatternEditor*)pianorollEd})
         ed->setMidiLearn(&midiLearn);
     songEd->setMidiLearn(&midiLearn);
-    midiLearn.onDisplayChanged = [this]() {
+    midiLearn.onDisplayChanged = [this, ctxPop, plcPop, nlCtxPop]() {
         for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
                                       (BasePatternEditor*)pianorollEd})
             ed->redrawParamLabels();
         songEd->redrawTrackLabels();
+        for (ParameterSubmenu* m : {ctxPop->paramSubmenu, plcPop->paramSubmenu, nlCtxPop->paramSubmenu})
+            m->learnStateChanged();
     };
     midiLearn.onEdited = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
+    // A label's live value is in the units of the parameter on the instrument the
+    // control is heard on.
+    midiLearn.laneMaxFor = [this](const std::string& type) {
+        return song_ ? song_->get().paramMax(midiInInstrument(), type) : 127;
+    };
 
     // Scene, pattern and transport triggers: right-click a scene button, a pattern
     // block, or Play/Pause or Rewind to learn one. Only one learn is in flight at a
@@ -830,8 +872,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         const bool learnable = status == 0xB0 || status == 0xD0 || status == 0xE0;
         if (learnable) {
             std::string type;
-            int         value = 0;
-            if (midiLearn.handle(data, len, type, value)) {
+            MidiSrc     src;
+            int         raw = 0;
+            if (midiLearn.handle(data, len, type, src, raw)) {
+                // What the parameter is on each instrument it reaches: an
+                // instrument without one of that name gets the message as sent,
+                // like an unbound control, and records nothing.
+                auto defFor = [&](int instr, ParamDef& def) {
+                    return song_ && song_->get().paramDef(instr, type, def);
+                };
                 // Heard as it moves, armed or not, on the instrument of the editor
                 // showing — or with none showing, the selected track's, so the
                 // control behaves the same from the Song tab. Learned controls work
@@ -844,15 +893,23 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
                 recorders.forEachRecording([&](PatternRecorder& r) {
                     const int ri = r.instrumentId();
                     if (!instrumentAccepts(ri, slot, data, len)) return;
-                    r.param(type, value);
+                    ParamDef def;
+                    if (defFor(ri, def))
+                        r.param(type, MidiLearnMap::scaleToLane(src, raw, paramMaxValue(def)));
                     if (std::find(heard.begin(), heard.end(), ri) == heard.end())
                         heard.push_back(ri);
                 });
                 // Sounded only where Pass through is on, like a note; recorded
                 // either way.
-                for (int i : heard)
-                    if (!outputsOverlay || outputsOverlay->instrumentPassesThrough(i))
-                        auditioner.param(i, ccForType(type), value);
+                for (int i : heard) {
+                    if (outputsOverlay && !outputsOverlay->instrumentPassesThrough(i)) continue;
+                    ParamDef def;
+                    if (defFor(i, def))
+                        auditioner.param(i, paramOutCode(def),
+                                         MidiLearnMap::scaleToLane(src, raw, paramMaxValue(def)));
+                    else
+                        auditioner.passThrough(i, data, len);
+                }
                 return;
             }
         }
@@ -860,8 +917,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         // dropped: an unbound controller, and program change and poly aftertouch,
         // which have never had a lane here. Nothing records these and nothing
         // replays them, so unlike a note there is no live echo to suppress. The CC
-        // number survives too — param() above remaps it through ccForType() — so
-        // the synth sees what the controller sent and its MIDI learn can bind it.
+        // number survives too — param() above remaps it through the instrument's
+        // parameter — so the synth sees what the controller sent and its MIDI learn can bind it.
         // It goes where a note from the same place would: every instrument with
         // Pass through on that this is the input of.
         if (learnable || status == 0xA0 || status == 0xC0) {
@@ -1037,6 +1094,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(tsPop);  window->registerPopup(tsPop);
     window->add(ctxPop); window->registerPopup(ctxPop);
     window->add(ctxPop->paramSubmenu); window->registerPopup(ctxPop->paramSubmenu);
+    window->add(ctxPop->paramSubmenu->more); window->registerPopup(ctxPop->paramSubmenu->more);
     window->add(loopCtxPop); window->registerPopup(loopCtxPop);
     window->add(sceneCtxPop); window->registerPopup(sceneCtxPop);
     window->add(transportCtxPop); window->registerPopup(transportCtxPop);
@@ -1044,9 +1102,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);
+    window->add(plcPop->paramSubmenu->more); window->registerPopup(plcPop->paramSubmenu->more);
     window->add(pdPop);  window->registerPopup(pdPop);
     window->add(nlCtxPop); window->registerPopup(nlCtxPop);
     window->add(nlCtxPop->paramSubmenu); window->registerPopup(nlCtxPop->paramSubmenu);
+    window->add(nlCtxPop->paramSubmenu->more); window->registerPopup(nlCtxPop->paramSubmenu->more);
+    window->add(pdefPop); window->registerPopup(pdefPop);
     window->add(settingsPop); window->registerPopup(settingsPop);
     // Hover popup: a positioned sub-window, but NOT registered — registering
     // would route mouse-moves through AppWindow's click-away logic and break the

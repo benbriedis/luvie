@@ -6,6 +6,7 @@
 
 #include "patternData.hpp"   // Note, DrumNote, ParamLane, Pattern, PatternType
 #include "timeSettings.hpp"  // BeatUnit
+#include "paramDefs.hpp"     // ParamDef
 #include <string>
 #include <vector>
 
@@ -17,6 +18,9 @@ struct Instrument {
     int         id;
     std::string name;
     bool        isDrum = false;
+    // Parameters this instrument's synth has, or standard ones it overrides. A
+    // standard parameter left as it is has no entry. See paramDefs.hpp.
+    std::vector<ParamDef> paramDefs;
 };
 
 // Tempo in beats per minute, where a beat is the BeatUnit of the time signature
@@ -124,6 +128,30 @@ struct Timeline {
 		for (const auto& i : instruments)
 			if (i.id == id) return i.isDrum;
 		return false;
+	}
+
+	const Instrument* instrument(int id) const {
+		for (const auto& i : instruments)
+			if (i.id == id) return &i;
+		return nullptr;
+	}
+
+	// What the instrument's `name` parameter sends; false when neither the
+	// instrument nor the standard set defines it, and the lane is not sent.
+	bool paramDef(int instrumentId, const std::string& name, ParamDef& out) const {
+		static const std::vector<ParamDef> none;
+		const Instrument* in = instrument(instrumentId);
+		return resolveParamDef(in ? in->paramDefs : none, name, out);
+	}
+	// A lane's value range and starting value. An undefined parameter is taken
+	// as a CC resting at 0, so its lane can still be drawn and edited.
+	int paramMax(int instrumentId, const std::string& name) const {
+		ParamDef d;
+		return paramDef(instrumentId, name, d) ? paramMaxValue(d) : 127;
+	}
+	int paramDefault(int instrumentId, const std::string& name) const {
+		ParamDef d;
+		return paramDef(instrumentId, name, d) ? paramDefaultValue(d) : 0;
 	}
 
 	int patternIdForSelectedLane() const {

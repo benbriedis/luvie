@@ -79,7 +79,7 @@ class Playhead : public ITimelineObserver {
 
 	void emitSoftNoteOn(int instrumentId, int midi, float velocity,
 	                    float lenBeats, float beatsPerBar, float onBar);
-	void emitSoftParam (int instrumentId, int ccNumber, int value);
+	void emitSoftParam (int instrumentId, int outCode, int value);
 	void flushSoftNoteOffs(float curPos);
 	void allSoftNotesOff();
 

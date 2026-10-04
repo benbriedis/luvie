@@ -18,6 +18,7 @@
 #include "patternRecorder.hpp"
 #include "midiInPort.hpp"
 #include "midiLearn.hpp"
+#include "parameterSubmenu.hpp"   // ParamMenuActions
 #include "sceneTriggers.hpp"
 
 struct AppState;
@@ -194,6 +195,8 @@ public:
     // the Song Editor. Saved with the project (AppState::midiLearn) but kept out of
     // the timeline, so undo never changes a binding.
     MidiLearnMap midiLearn;
+    // What the param-lane menus do with instrument parameters (edit, learn new).
+    ParamMenuActions paramActions;
     // The MIDI triggers that switch the Loop Editor's scenes and toggle its patterns.
     // Saved with the project (AppState::sceneTriggers, AppState::patternTriggers),
     // and like midiLearn kept out of the timeline.
