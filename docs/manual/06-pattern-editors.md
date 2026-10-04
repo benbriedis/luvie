@@ -61,7 +61,9 @@ instrument's own parameters (see below) are under 'Custom'.
 Synths have many more controls than these, and they don't agree on which CC does what, so each
 instrument can also have parameters of its own. To add one, choose 'New parameter...' from the
 'Add automation' menu, give it a name and say what it sends (see below). Its lane is added and you can
-draw its values with the mouse, as with any other lane. No MIDI controller is needed.
+draw its values with the mouse, as with any other lane. No MIDI controller is needed. A parameter of
+the instrument's own lasts as long as it has lanes: deleting its last lane, in the Song Editor or in any
+pattern, deletes the parameter too.
 
 If you do have a controller, 'New (MIDI learn)' is quicker: choose it and move the control on your
 controller. Luvie makes a parameter that sends

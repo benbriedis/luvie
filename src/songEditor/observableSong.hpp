@@ -454,6 +454,11 @@ private:
     bool patternStillReferenced(int patId) const;
 
     void notify();
+    // Drops each instrument parameter of its own (not a redefined standard one)
+    // that no lane, song or pattern, still uses, so deleting the last lane of a
+    // parameter deletes the parameter too. notify() runs it, so it is part of the
+    // same undo entry as whatever removed the lane.
+    void pruneUnusedParamDefs();
     // The observer fan-out on its own, with no undo bookkeeping. notify() and
     // the undo machinery both go through it.
     void fanout();

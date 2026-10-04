@@ -456,6 +456,9 @@ Manual:
 			  Rewind could be '<' and/or ','
 		   Generally prefer to have 1 good set of bindings though...
 
+	It is possible to add custom MIDI parameters/automation. These are added to an instrument rather than across the app
+	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
+	the parameter are deleted then the parameter is removed.
 
 How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
 

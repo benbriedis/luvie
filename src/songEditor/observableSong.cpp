@@ -75,6 +75,7 @@ void ObservableSong::notify()
     // lastCommitted deliberately does not advance here, so the snapshot the
     // batch eventually records is the state from before its first mutation.
     if (batchDepth > 0) { batchDirty = true; return; }
+    pruneUnusedParamDefs();
 
     // Inside an UndoGroup only the first mutation records a snapshot, so the
     // whole gesture collapses to one undo entry.
@@ -2209,6 +2210,16 @@ bool ObservableSong::setParamDef(int instrumentId, const std::string& oldName, c
     }
     notify();
     return true;
+}
+
+void ObservableSong::pruneUnusedParamDefs()
+{
+    for (auto& in : data.instruments)
+        in.paramDefs.erase(
+            std::remove_if(in.paramDefs.begin(), in.paramDefs.end(), [&](const ParamDef& d) {
+                return !standardParam(d.name) && !instrumentHasLaneNamed(data, in.id, d.name);
+            }),
+            in.paramDefs.end());
 }
 
 bool ObservableSong::paramNameUsedElsewhere(int instrumentId, const std::string& name) const
