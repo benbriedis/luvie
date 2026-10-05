@@ -43,6 +43,8 @@ protected:
     int                paramLaneOffset   = 0;
     int                baseColWidth      = 0;   // colWidth at zoom x1
     float              lastLengthBeats   = -1.0f;
+    bool               wasFollowing      = false;   // followPlayhead() ran last tick
+    float              lastHeadBeat      = 0.0f;
 
     // Subclass grid geometry — all are one-liners forwarding to the concrete grid/labels
     virtual int  labelsWidth()      const = 0;
@@ -77,6 +79,8 @@ protected:
 
     void setRowOffset(int offset);
     void setColOffset(int offset);
+    // Per playhead tick: page the grid so a playing head stays in view.
+    void followPlayhead();
     void applyPatternLength(int patId);
     void updateParamScrollbar();
     void relayout();

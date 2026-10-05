@@ -17,6 +17,7 @@ BasePatternEditor::BasePatternEditor(int x, int y, int visibleW, int numRows, in
 {
     rulerOffsetX = scrollbarW + lw;
     seekingEnabled = false;
+    playhead.onTick = [this]() { followPlayhead(); };
     baseColWidth   = colWidth;
     sliceCtl.setSnap(snap);
     paramGrid.setSliceController(&sliceCtl);
@@ -103,6 +104,32 @@ void BasePatternEditor::followGrowth(int patId, float headBeat)
     const int headCol     = (int)headBeat;
     if (visibleCols > 1 && headCol >= colOffset + visibleCols - 1)
         setColOffset(headCol - visibleCols + 2);
+}
+
+void BasePatternEditor::followPlayhead()
+{
+    // Only while playing and on screen, so a stopped or hidden editor keeps
+    // wherever the user scrolled it.
+    if (!playhead.transportPlaying() || !visible_r()) { wasFollowing = false; return; }
+    const int colW = gridColWidth();
+    if (colW <= 0) return;
+    const int   visibleW    = gridWidgetW();
+    const int   visibleCols = visibleW / colW;
+    const int   headX       = playhead.xOffset();
+    const float headBeat    = (float)headX / colW;
+    const int   headPx      = headX - colOffset * colW;
+
+    if (!wasFollowing || headBeat < lastHeadBeat) {
+        // Just started, became visible, or the pattern wrapped (or was seeked)
+        // back: if the head is off screen, bring it to the left edge.
+        if (headPx < 0 || headPx >= visibleW)
+            setColOffset((int)headBeat);
+    } else if (headPx >= visibleW && visibleCols > 0) {
+        // Page forward the moment the head crosses the visible right edge.
+        setColOffset(colOffset + visibleCols);
+    }
+    wasFollowing = true;
+    lastHeadBeat = headBeat;
 }
 
 void BasePatternEditor::setAuditioner(NoteAuditioner* a)

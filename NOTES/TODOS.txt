@@ -344,9 +344,6 @@ Probably want a tool really...
    + Have a harmony --> pianoroll option
    
    
-cf Option of disabling MIDI through Luvie? Or even removing it entirely when recording. 
-     Useful for setting things up though it think...
-
 BUG: resizing window on left often causes an unwanted pattern instance block to be added on release.
 
 Look at changing time signatures: auto changes are a bit annoying.
@@ -378,23 +375,16 @@ Have a variable number of scenes?
 
 Is there an 'aconnectgui' equivalent that works across Windows and Mac?
 
-Closing instruments window - seem to need to be scrolled up
-
   
 'luviedrums1' and 'luvieinst1' not ideal native MIDI output names 
   
 There's some missing icon sitting next to MIDI learn in the Instrument's MIDI input
-
-cf slice selection - allow deletion of a blank selected portion. 
-     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
 
 Recording - cf disable snap by default? enable grow by default?
   Maybe store grow and snap in project and copy when cloning a pattern?
   Maybe disable snap by default for everything?
   
   
-Weird that I cant use that other control for Volume...
-
 CHECK CURRENT BEHAVIOUR... Have song editor play to end of bar. - cf Intermediate mode 
 CHECK CURRENT BEHAVIOUR... Sync the time signature and/or BPM with the Song editor? Maybe optionally?
 Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
@@ -405,8 +395,6 @@ Swapping between song editor and loop editor - think I'd rather round out the so
    BUT I'd still need an intermediate mode going out too to allow the bar to finish...
 
 
-BUG: we're still getting missing notes and cut off notes, at least in plugin mode.
-     Any refactoring useful wrt to the DSP, and the song and patterns that feed it?
 
 
 Manual: 
@@ -455,20 +443,49 @@ Manual:
 	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
 	the parameter are deleted then the parameter is removed.
 
+
+cf slice selection - allow deletion of a blank selected portion. 
+     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
+
 How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
 
 May be good idea to be able to view current set of triggers in a list somewhere. Otherwise could get a bit lost. Have a clear all button?
    NB reusing a button or control in one place should clear any previous use too.
 
-Q: is it worth ditching intermediate mode altogether? NB still would want beats to line up... NB notes that were started should continue on
-   until they end...
-   
 Q: Does RaySession *have* to use global project directories, or can we split them up / use local projects?   
    Would rather just have a default search directory.
 
+
 Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
+     Any refactoring useful wrt to the DSP, and the song and patterns that feed it?
 
 Allow more parameters to be shown via click and drag.
-Allow parameter recording sensitivity to be set - record more or less parameters
+Allow parameter recording sensitivity to be set for those Axiom 49 knobs? 
 
+
+Q: is it worth ditching intermediate mode altogether? Not bad waiting till the end of the bar...
+   NB still would want beats to line up... NB notes that were started should continue on
+   until they end...
+
+   
+Is the Portamento paramter a boolean?
+
+Click and drag parameter scroll and note scroll in Pattern Editors
+
+Look into dedicate MIDI S/W for setting mins, maxes, splitting keyboards, ..., maybe moving between presets, ...?
+  Would this allow me to simplify my own s/w?
+  
+cf possibility of having a section in the instrument settings showing bound (?) parameters
+
+CC20–31 and CC102–119 are undefined in the MIDI spec and are the usual choice.
+
+It was made for expressive controllers like the ROLI Seaboard, LinnStrument and Osmose, where each finger can slide or press on its own.
+
+Knobs... might want a sensitivity multipler....
+
+NOTE pressure currently not working with Pipewire. ALSA inputs OK.
+
+Copy scene content to other scenes/move scenes
+
+cf Cut and insert slice. Also wrt Song Editor.
 

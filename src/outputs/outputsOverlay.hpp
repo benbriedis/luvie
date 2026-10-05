@@ -67,7 +67,7 @@ class OutputsOverlay : public OverlayWindow {
         int  bankMsb           = -1;
         int  bankLsb           = -1;
         int  gm1Instrument     = -1;
-        std::string inputName;               // the MIDI input it is played from
+        std::string inputName;               // the MIDI input it is played from; empty = none
         int  inputChannel      = 0;          // 0 = Any; 1-16
         KeySplit split         = KeySplit::None;
         int  splitNote         = 60;
@@ -252,7 +252,7 @@ public:
         int         bankMsb           = -1;
         int         bankLsb           = -1;
         int         gm1Instrument     = -1;
-        std::string inputName;           // empty = the first input
+        std::string inputName;           // empty = none
         int         inputChannel      = 0;
         KeySplit    split             = KeySplit::None;
         int         splitNote         = 60;

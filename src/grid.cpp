@@ -210,7 +210,8 @@ int Grid::handle(int event)
                 selectionPopup->open(this,
                     [this]() { cutSelection(); redraw(); },
                     [this]() { copySelection(); },
-                    [this]() { deleteSelectedItems(); redraw(); });
+                    [this]() { deleteSelectedItems(); redraw(); },
+                    [this]() { slice->removeRange(); });
                 return 1;
             }
             if (Fl::event_button() == FL_RIGHT_MOUSE) {

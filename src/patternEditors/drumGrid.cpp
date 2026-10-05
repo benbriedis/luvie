@@ -210,7 +210,8 @@ int DrumGrid::handle(int evt)
             selectionPopup->open(this,
                 [this]() { cutSelection(); redraw(); },
                 [this]() { copySelection(); },
-                [this]() { deleteSelectedItems(); redraw(); });
+                [this]() { deleteSelectedItems(); redraw(); },
+                [this]() { slice->removeRange(); });
             return 1;
         }
         if (Fl::event_button() == FL_LEFT_MOUSE && (mods & FL_SHIFT)) {

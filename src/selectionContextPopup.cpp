@@ -7,11 +7,12 @@
 #include <FL/Fl_Window.H>
 
 SelectionContextPopup::SelectionContextPopup()
-    : ContextMenuPopup(popW, 3*30+2)
+    : ContextMenuPopup(popW, 4*btnH+2)
 {
     auto* cutBtn  = addItem(0, "Cut selection");
     auto* copyBtn = addItem(1, "Copy selection");
     auto* delBtn  = addItem(2, "Delete selection");
+    delSliceBtn   = addItem(3, "Delete slice");
 
     cutBtn->callback([](Fl_Widget*, void* me) {
         auto* self = (SelectionContextPopup*)me;
@@ -38,17 +39,31 @@ SelectionContextPopup::SelectionContextPopup()
         if (auto* win = self->window()) win->redraw();
     }, this);
 
+    delSliceBtn->callback([](Fl_Widget*, void* me) {
+        auto* self = (SelectionContextPopup*)me;
+        if (self->onDeleteSliceFn) self->onDeleteSliceFn();
+        self->hide();
+        if (auto* win = self->window()) win->redraw();
+    }, this);
+
     end();
     hide();
 }
 
 void SelectionContextPopup::open(Fl_Widget* owner, std::function<void()> onCut,
                                                   std::function<void()> onCopy,
-                                                  std::function<void()> onDelete)
+                                                  std::function<void()> onDelete,
+                                                  std::function<void()> onDeleteSlice)
 {
-    onCutFn    = std::move(onCut);
-    onCopyFn   = std::move(onCopy);
-    onDeleteFn = std::move(onDelete);
+    onCutFn         = std::move(onCut);
+    onCopyFn        = std::move(onCopy);
+    onDeleteFn      = std::move(onDelete);
+    onDeleteSliceFn = std::move(onDeleteSlice);
+
+    // Sized before positioning, so the menu is kept on screen at its real height.
+    if (onDeleteSliceFn) delSliceBtn->show(); else delSliceBtn->hide();
+    popH = (onDeleteSliceFn ? 4 : 3) * btnH + 2;
+    size(popW, popH);
 
     Fl_Window* win = owner->window();
     openAt({win->w(), win->h()}, {Fl::event_x(), Fl::event_y()}, 0);

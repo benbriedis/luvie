@@ -803,6 +803,83 @@ bool ObservablePattern::pasteRange(int patId, const SliceClip& clip, float at)
     return false;
 }
 
+// The value a lane plays at `beat`: linear between points, held after the last.
+static float laneValueAt(const std::vector<ParamPoint>& pts, float beat)
+{
+    if (pts.empty()) return 0.0f;
+    if (beat <= pts.front().beat) return (float)pts.front().value;
+    for (size_t i = 1; i < pts.size(); i++) {
+        const ParamPoint& a = pts[i - 1];
+        const ParamPoint& b = pts[i];
+        if (beat < b.beat) {
+            const float t = (b.beat > a.beat) ? (beat - a.beat) / (b.beat - a.beat) : 1.0f;
+            return a.value + t * (b.value - a.value);
+        }
+    }
+    return (float)pts.back().value;
+}
+
+bool ObservablePattern::removeRange(int patId, float start, float end)
+{
+    if (!(end > start)) return false;
+    for (auto& pat : song_->data.patterns) {
+        if (pat.id != patId) continue;
+        const float len = end - start;
+
+        // Pin what each lane plays at `end` before the points either side go, so
+        // the automation after the cut is unchanged. Only where the closed-up
+        // lane would not already give that value, to keep lanes uncluttered.
+        std::vector<std::pair<ParamLane*, int>> pins;
+        for (ParamLane& lane : pat.paramLanes) {
+            const bool hasPoint = std::any_of(lane.points.begin(), lane.points.end(),
+                [&](const ParamPoint& p) { return std::abs(p.beat - end) <= kSliceEps; });
+            if (hasPoint || end >= pat.lengthBeats - kSliceEps) continue;
+            const int v = (int)std::lround(laneValueAt(lane.points, end));
+            std::vector<ParamPoint> closed;
+            for (const ParamPoint& p : lane.points) {
+                if (p.anchor || p.beat < start - kSliceEps) closed.push_back(p);
+                else if (!inRange(p.beat, start, end))      closed.push_back({p.id, p.beat - len, p.value});
+            }
+            if ((int)std::lround(laneValueAt(closed, start)) != v)
+                pins.emplace_back(&lane, v);
+        }
+
+        clearRangeIn(pat, start, end);
+
+        for (Note& n : pat.notes)
+            if (n.beat >= end - kSliceEps) n.beat -= len;
+        for (DrumNote& d : pat.drumNotes)
+            if (d.beat >= end - kSliceEps) d.beat -= len;
+        for (ParamLane& lane : pat.paramLanes)
+            for (ParamPoint& p : lane.points)
+                if (!p.anchor && p.beat >= end - kSliceEps) p.beat -= len;
+        for (auto& [lane, v] : pins) {
+            if (start <= kSliceEps) {
+                // The cut began at the anchor, which stays put: it takes the value.
+                for (ParamPoint& p : lane->points)
+                    if (p.anchor) p.value = v;
+            } else {
+                lane->points.push_back({song_->nextId++, start, v});
+            }
+            std::sort(lane->points.begin(), lane->points.end(),
+                [](const ParamPoint& a, const ParamPoint& b) { return a.beat < b.beat; });
+        }
+
+        const int   top  = std::max(1, pat.timeSigTop);
+        const int   bars = std::max(1, (int)std::lround((pat.lengthBeats - len) / (float)top));
+        pat.lengthBeats  = (float)(bars * top);
+        // Rounding down can leave content past the new end.
+        truncatePatternNotes(pat);
+        for (ParamLane& lane : pat.paramLanes)
+            lane.points.erase(std::remove_if(lane.points.begin(), lane.points.end(),
+                [&](const ParamPoint& p) { return !p.anchor && p.beat >= pat.lengthBeats - kSliceEps; }),
+                lane.points.end());
+        song_->notify();
+        return true;
+    }
+    return false;
+}
+
 bool ObservablePattern::moveRange(int patId, float start, float end, float to)
 {
     SliceClip clip = captureRange(patId, start, end);

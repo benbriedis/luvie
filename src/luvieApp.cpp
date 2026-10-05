@@ -923,7 +923,26 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             loopEd->chooseScene(SceneTriggerMap::targetScene(fired.slot, sceneBank.shownScene()));
         if (fired.pattern >= 0 && loopEd)
             loopEd->togglePatternId(fired.pattern);
-        if (consumed) return;
+        if (consumed) {
+            if (luvieDebug() && status == 0x90)
+                fprintf(stderr, "[luvie] root trigger: note %d consumed by a scene/pattern "
+                                "trigger\n", data[1] & 0x7F);
+            return;
+        }
+
+        if (luvieDebug() && harmonyRootTrigger_ >= 0 && status == 0x90 && len >= 3
+            && (data[2] & 0x7F) > 0) {
+            std::string inName;
+            int         ch = 0, splitNote = 0;
+            KeySplit    split = KeySplit::None;
+            const bool  found = outputsOverlay
+                && outputsOverlay->instrumentInput(harmonyRootTrigger_, inName, ch, split, splitNote);
+            fprintf(stderr, "[luvie] root trigger: instr=%d found=%d input='%s' (slot %d, "
+                            "note came on %d '%s') ch=%d split=%d@%d hears=%d panel=%d\n",
+                    harmonyRootTrigger_, found, inName.c_str(), midiIn.slotForName(inName),
+                    slot, midiIn.nameForSlot(slot).c_str(), ch, (int)split, splitNote,
+                    instrumentHears(harmonyRootTrigger_, slot, data, len), patternPanel != nullptr);
+        }
 
         // The Harmony Editor's base note follows its trigger instrument's keys —
         // only those on that instrument's input, channel and side of its split. Not
@@ -1261,11 +1280,14 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         // (falling back to the first if only one port exists).
         const std::string port     = ports.empty() ? "" : ports[0];
         const std::string drumPort = ports.size() > 1 ? ports[1] : port;
+        // Both are played from the first MIDI input.
+        const auto inputs = outputsOverlay->getMidiInputs();
+        const std::string input = inputs.empty() ? "" : inputs[0].name;
         int id1 = instruments_->add("Instrument A", false);
         int id2 = instruments_->add("Drums A", true);
         outputsOverlay->setInstruments({
-            {id1, "Instrument A", port,      1, {}, false, false, -1, -1, -1, -1},
-            {id2, "Drums A",      drumPort, 10, {}, true,  false, -1, -1, -1, -1}
+            {id1, "Instrument A", port,      1, {}, false, false, -1, -1, -1, -1, input},
+            {id2, "Drums A",      drumPort, 10, {}, true,  false, -1, -1, -1, -1, input}
         });
     }
     pushInstruments();

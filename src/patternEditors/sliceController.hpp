@@ -63,6 +63,8 @@ public:
     // Commands. Each is one edit, so one undo.
     void copy() const;
     void deleteRange();
+    // Cut the slice out of the pattern, closing the gap and shortening it.
+    void removeRange();
     // True if the clipboard holds a slice this pattern could take.
     bool canPaste() const;
     // Paste with the slice's start on `beat` (snapped down to the grid, as the

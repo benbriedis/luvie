@@ -171,6 +171,14 @@ void SliceController::deleteRange()
     changed();
 }
 
+void SliceController::removeRange()
+{
+    if (!has || !pattern) return;
+    has = false;
+    pattern->removeRange(patternId, start, end);
+    changed();
+}
+
 bool SliceController::canPaste() const
 {
     return pattern && clipboard().holdsSlice(kind());

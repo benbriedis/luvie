@@ -484,7 +484,7 @@ void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
         instruments_.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
                                 ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
                                 ci.gm1Instrument,
-                                ci.inputName.empty() ? inputs_[0].name : ci.inputName,
+                                ci.inputName,
                                 std::clamp(ci.inputChannel, 0, 16),
                                 ci.split, std::clamp(ci.splitNote, 0, 127), ci.passThrough});
     rebuildInstrumentRows();
@@ -587,10 +587,12 @@ void OutputsOverlay::updateSplitRow(int i)
     row.splitChoice->value(static_cast<int>(instr.split));
 
     // "C4 and up" / "C4 and down" would crowd the row; the arrows say the same.
+    // FLTK's own arrow symbols rather than U+2191/U+2193, which the label font
+    // may not have.
     std::string noteText;
     if (split)
         noteText = splitNoteName(instr.splitNote)
-                 + (instr.split == KeySplit::Upper ? " \xe2\x86\x91" : " \xe2\x86\x93");
+                 + (instr.split == KeySplit::Upper ? " @-28->" : " @-22->");
     row.splitNoteLabel->copy_label(noteText.c_str());
     row.splitNoteLabel->copy_tooltip(!split ? ""
         : instr.split == KeySplit::Upper
@@ -603,8 +605,8 @@ void OutputsOverlay::updateSplitRow(int i)
     row.splitLearnBtn->tooltip(instr.split == KeySplit::Lower
         ? "Sets the highest key this instrument plays: press it on the instrument's MIDI input"
         : "Sets the lowest key this instrument plays: press it on the instrument's MIDI input");
-    if (split) row.splitLearnBtn->activate();
-    else       row.splitLearnBtn->deactivate();
+    if (split && !instr.inputName.empty()) row.splitLearnBtn->activate();
+    else                                   row.splitLearnBtn->deactivate();
     redraw();
 }
 
@@ -1346,15 +1348,15 @@ void OutputsOverlay::rebuildInputChoices() {
         auto* ch = instrRows_[i].inputChoice;
         if (!ch) continue;
         ch->clear();
+        // Item 0 is "(none)": an instrument that is not played from any input.
+        ch->add("(none)");
         int sel = 0;
         for (int j = 0; j < (int)inputs_.size(); j++) {
             ch->add(displayInputName(j).c_str());
-            if (inputs_[j].name == instruments_[i].inputName) sel = j;
+            if (inputs_[j].name == instruments_[i].inputName) sel = j + 1;
         }
-        if (!inputs_.empty()) {
-            ch->value(sel);
-            instruments_[i].inputName = inputs_[sel].name;
-        }
+        ch->value(sel);
+        instruments_[i].inputName = sel == 0 ? "" : inputs_[sel - 1].name;
     }
     for (int i = 0; i < (int)inRows_.size() && i < (int)inputs_.size(); i++) {
         if (!inRows_[i].deleteBtn) continue;
@@ -1505,9 +1507,16 @@ void OutputsOverlay::instrInputCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->instrRows_.size(); i++) {
         if (w != self->instrRows_[i].inputChoice) continue;
         int idx = static_cast<Fl_Choice*>(w)->value();
-        if (idx >= 0 && idx < (int)self->inputs_.size())
-            self->instruments_[i].inputName = self->inputs_[idx].name;
+        if (idx == 0)
+            self->instruments_[i].inputName.clear();
+        else if (idx > 0 && idx <= (int)self->inputs_.size())
+            self->instruments_[i].inputName = self->inputs_[idx - 1].name;
+        // With no input there is no key to learn a split from.
+        if (self->instruments_[i].inputName.empty()
+                && self->instruments_[i].id == self->splitLearnId_)
+            self->splitLearnId_ = -1;
         self->rebuildInputChoices();
+        self->updateSplitRow(i);
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }

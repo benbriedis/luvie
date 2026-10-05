@@ -13,7 +13,8 @@ class Fl_Widget;
 // that is part of a multi-selection. Its items act on the whole selection, so it
 // is a separate menu rather than a mode of the single-item one. Shared by every
 // editing grid: song blocks, pattern notes and drum hits all offer the same
-// three.
+// three. A pattern editor's time slice adds a fourth, "Delete slice", by passing
+// onDeleteSlice; without it the item is not shown.
 class SelectionContextPopup : public ContextMenuPopup {
 public:
     static constexpr int popW = 170;
@@ -22,12 +23,15 @@ public:
 
     void open(Fl_Widget* owner, std::function<void()> onCut,
                                 std::function<void()> onCopy,
-                                std::function<void()> onDelete);
+                                std::function<void()> onDelete,
+                                std::function<void()> onDeleteSlice = {});
 
 private:
+    ModernButton*         delSliceBtn = nullptr;
     std::function<void()> onCutFn;
     std::function<void()> onCopyFn;
     std::function<void()> onDeleteFn;
+    std::function<void()> onDeleteSliceFn;
 };
 
 #endif

@@ -1431,14 +1431,14 @@ int ObservableSong::addLane(int trackId)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
 
+        // The new pattern takes its type and instrument from the track's first
+        // lane, but starts as a single bar — only a clone copies the length.
         PatternType ptype  = PatternType::HARMONY;
-        float       beats  = 4.0f;   // 1 bar in 4/4 when the track has no lane to copy
         int         instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)
                 if (p.id == t.lanes[0].patternId) {
                     ptype   = p.type;
-                    beats   = p.lengthBeats;
                     instrId = p.instrumentId;
                     break;
                 }
@@ -1450,7 +1450,9 @@ int ObservableSong::addLane(int trackId)
         int patId = nextId++;
         Pattern newPat;
         newPat.id           = patId;
-        newPat.lengthBeats  = beats;
+        timeSigAt(0, newPat.timeSigTop, newPat.timeSigBottom);
+        newPat.beat         = beatAt(0);
+        newPat.lengthBeats  = (float)newPat.timeSigTop;
         newPat.type         = ptype;
         newPat.instrumentId = instrId;
         patternNames.assignAuto(newPat);
@@ -1491,12 +1493,12 @@ int ObservableSong::addPianorollLane(int trackId)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
 
-        float beats   = 4.0f;   // 1 bar in 4/4 when the track has no lane to copy
-        int   instrId = defaultInstrumentId;
+        // The instrument comes from the track's first lane; the pattern starts
+        // as a single bar — only a clone copies the length.
+        int instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)
                 if (p.id == t.lanes[0].patternId) {
-                    beats   = p.lengthBeats;
                     instrId = p.instrumentId;
                     break;
                 }
@@ -1508,7 +1510,9 @@ int ObservableSong::addPianorollLane(int trackId)
         int patId = nextId++;
         Pattern newPat;
         newPat.id           = patId;
-        newPat.lengthBeats  = beats;
+        timeSigAt(0, newPat.timeSigTop, newPat.timeSigBottom);
+        newPat.beat         = beatAt(0);
+        newPat.lengthBeats  = (float)newPat.timeSigTop;
         newPat.type         = PatternType::PIANOROLL;
         newPat.instrumentId = instrId;
         patternNames.assignAuto(newPat);

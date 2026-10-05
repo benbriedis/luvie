@@ -109,6 +109,12 @@ public:
     // Move [start, end) so it starts at `to`: a paste of the slice over its new
     // home after emptying its old one, in a single edit.
     bool moveRange(int patId, float start, float end, float to);
+    // Cut [start, end) out of the pattern: what it holds goes, everything after
+    // it — notes, drum hits and automation — moves back to close the gap, and the
+    // pattern shortens to match, rounded to the nearest whole bar (at least one).
+    // Automation after the cut plays as before. False, and nothing changed, if
+    // the range is empty.
+    bool removeRange(int patId, float start, float end);
 
     // ITimelineObserver — forwards all song changes to pattern observers
     void onTimelineChanged() override;

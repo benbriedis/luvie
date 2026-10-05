@@ -7,6 +7,8 @@
 #include "timeSettings.hpp"
 #include "panelStyle.hpp"
 #include "inlineEditDispatch.hpp"
+#include "luvieDebug.hpp"
+#include <cstdio>
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -855,10 +857,15 @@ void PatternPanel::refreshRootTooltip()
 void PatternPanel::setRootFromMidi(int midiNote)
 {
     const int patId = selectedPatternId();
+    if (luvieDebug())
+        fprintf(stderr, "[luvie] root trigger: note %d -> pattern %d\n", midiNote, patId);
     if (patId == 0 || !pattern) return;
     for (const auto& p : pattern->get().patterns) {
         if (p.id != patId) continue;
-        if (p.type != PatternType::HARMONY) return;
+        if (p.type != PatternType::HARMONY) {
+            if (luvieDebug()) fprintf(stderr, "[luvie] root trigger: pattern %d is not Harmony\n", patId);
+            return;
+        }
         // The choice lists A first, so A (MIDI 69, or 9 mod 12) is index 0.
         const int root = (midiNote + 3) % 12;
         if (p.rootPitch == root) return;   // repeating the key is not an edit
