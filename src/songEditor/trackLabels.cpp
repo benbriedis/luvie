@@ -642,11 +642,8 @@ void TrackLabels::draw()
                         const Fl_Font     font = fl_font();
                         const Fl_Fontsize size = fl_size();
                         const int nameW = (int)fl_width(lane.type.c_str()) + 10;
-                        ParamDef def;
-                        const std::string out = tl.paramDef(lane.instrumentId, lane.type, def)
-                                              ? describeParamOutput(def) : std::string{};
                         drawMidiLearnBadge(midiLearn, lane.type, x() + 4 + nameW, ry,
-                                           w() - 8 - nameW, rh, FL_ALIGN_RIGHT, out);
+                                           w() - 8 - nameW, rh, FL_ALIGN_RIGHT);
                         fl_font(font, size);
                         break;
                     }

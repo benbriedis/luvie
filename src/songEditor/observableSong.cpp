@@ -5,6 +5,7 @@
 #include "paramLaneTypes.hpp"
 #include "itransport.hpp"
 #include <algorithm>
+#include <iterator>
 #include <set>
 #include <unordered_map>
 #include <cmath>
@@ -59,6 +60,20 @@ void ObservableSong::tempoFanout()
     for (auto* o : copy) o->onGlobalTempoChanged();
 }
 
+namespace {
+
+// Every parameter name a lane, song or pattern, has.
+std::set<std::string> laneNamesOf(const Timeline& tl)
+{
+    std::set<std::string> names;
+    for (const auto& l : tl.paramLanes) names.insert(l.type);
+    for (const auto& p : tl.patterns)
+        for (const auto& l : p.paramLanes) names.insert(l.type);
+    return names;
+}
+
+} // namespace
+
 void ObservableSong::fanout()
 {
     // Every mutation funnels through here, so this is the one place the cached
@@ -77,6 +92,18 @@ void ObservableSong::notify()
     if (batchDepth > 0) { batchDirty = true; return; }
     pruneUnusedParamDefs();
 
+    // lastCommitted is the state before this edit, whatever undo or a load did to
+    // it in between, so this sees only what the edit itself changed.
+    std::set<std::string> namesAdded, namesRemoved;
+    if (onParamNamesChanged) {
+        const std::set<std::string> before = laneNamesOf(lastCommitted);
+        const std::set<std::string> after  = laneNamesOf(data);
+        std::set_difference(after.begin(), after.end(), before.begin(), before.end(),
+                            std::inserter(namesAdded, namesAdded.end()));
+        std::set_difference(before.begin(), before.end(), after.begin(), after.end(),
+                            std::inserter(namesRemoved, namesRemoved.end()));
+    }
+
     // Inside an UndoGroup only the first mutation records a snapshot, so the
     // whole gesture collapses to one undo entry.
     if (undoGroupDepth == 0 || !undoGroupSnapped) {
@@ -87,6 +114,8 @@ void ObservableSong::notify()
     }
     lastCommitted = data;
     fanout();
+    if (!namesAdded.empty() || !namesRemoved.empty())
+        onParamNamesChanged(namesAdded, namesRemoved);
 }
 
 void ObservableSong::notifyViewState()
@@ -2217,19 +2246,13 @@ void ObservableSong::pruneUnusedParamDefs()
     for (auto& in : data.instruments)
         in.paramDefs.erase(
             std::remove_if(in.paramDefs.begin(), in.paramDefs.end(), [&](const ParamDef& d) {
-                return !standardParam(d.name) && !instrumentHasLaneNamed(data, in.id, d.name);
+                return !instrumentHasLaneNamed(data, in.id, d.name);
             }),
             in.paramDefs.end());
 }
 
-bool ObservableSong::paramNameUsedElsewhere(int instrumentId, const std::string& name) const
+std::set<std::string> ObservableSong::paramLaneNames() const
 {
-    if (standardParam(name)) return true;
-    for (const auto& i : data.instruments) {
-        if (i.id == instrumentId) continue;
-        for (const auto& d : i.paramDefs)
-            if (d.name == name) return true;
-        if (instrumentHasLaneNamed(data, i.id, name)) return true;
-    }
-    return false;
+    return laneNamesOf(data);
 }
+

@@ -58,13 +58,9 @@ void PatternParamLabels::draw()
                 fl_color(kText);
                 fl_draw(type.c_str(), x() + 4, rowY + (badge ? 4 : 0), w() - 8, nameH,
                         FL_ALIGN_LEFT | FL_ALIGN_CENTER | FL_ALIGN_CLIP);
-                if (badge) {
-                    ParamDef def;
-                    const std::string out = pattern->get().paramDef(pat->instrumentId, type, def)
-                                          ? describeParamOutput(def) : std::string{};
+                if (badge)
                     drawMidiLearnBadge(midiLearn, type, x() + 4, rowY + kParamRowH / 2,
-                                       w() - 8, kParamRowH / 2 - 4, FL_ALIGN_LEFT, out);
-                }
+                                       w() - 8, kParamRowH / 2 - 4, FL_ALIGN_LEFT);
             }
         }
     }

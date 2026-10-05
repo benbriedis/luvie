@@ -32,13 +32,17 @@ struct ParamDef {
     ParamOutKind kind = ParamOutKind::CC;
     int          cc   = 0;               // CC only: 0-127
     ParamRest    rest = ParamRest::Min;
+    // The output range a lane's full sweep is mapped onto, so a lane can focus on
+    // part of what the synth's control covers. Either way round: min above max
+    // inverts it. -1 for outMax is the top of the output (paramMaxValue()), which
+    // stays the top when the output changes kind.
+    int          outMin = 0;
+    int          outMax = -1;
 
     bool sameOutput(const ParamDef& o) const {
         return kind == o.kind && (kind != ParamOutKind::CC || cc == o.cc);
     }
-    bool operator==(const ParamDef& o) const {
-        return name == o.name && sameOutput(o) && rest == o.rest;
-    }
+    bool operator==(const ParamDef& o) const;
 };
 
 // 16383 for pitch bend (14-bit), 127 for a CC or channel pressure.
@@ -47,6 +51,32 @@ inline int paramMaxValue(ParamOutKind kind)
     return kind == ParamOutKind::PitchBend ? 16383 : 127;
 }
 inline int paramMaxValue(const ParamDef& d) { return paramMaxValue(d.kind); }
+
+// The output range, in the output's own units.
+inline int paramOutMin(const ParamDef& d) { return std::clamp(d.outMin, 0, paramMaxValue(d)); }
+inline int paramOutMax(const ParamDef& d)
+{
+    return d.outMax < 0 ? paramMaxValue(d) : std::clamp(d.outMax, 0, paramMaxValue(d));
+}
+
+inline bool ParamDef::operator==(const ParamDef& o) const
+{
+    return name == o.name && sameOutput(o) && rest == o.rest
+        && paramOutMin(*this) == paramOutMin(o) && paramOutMax(*this) == paramOutMax(o);
+}
+
+// What a lane value (0..paramMaxValue()) sends: mapped onto the parameter's
+// output range, rounded to nearest. Allocation-free.
+inline int paramOutValue(const ParamDef& d, int laneValue)
+{
+    const int top = paramMaxValue(d);
+    const int lo  = paramOutMin(d);
+    const int hi  = paramOutMax(d);
+    const int v   = std::clamp(laneValue, 0, top);
+    if (lo == 0 && hi == top) return v;
+    const long long span = (long long)(hi - lo) * v;
+    return lo + (int)((span + (span < 0 ? -top / 2 : top / 2)) / top);
+}
 
 // Where a new lane starts.
 inline int paramDefaultValue(const ParamDef& d)

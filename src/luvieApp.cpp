@@ -728,14 +728,25 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (!song_) return;
         ParamDef def;
         if (!song_->get().paramDef(instrId, name, def)) def.name = name;
-        pdefPop->open(wx, wy, def, [this, instrId, name](const ParamDef& d) {
+        const MidiSrc* bound = midiLearn.bindingFor(name);
+        const MidiSrc  shown = bound ? *bound : MidiSrc{};
+        pdefPop->open(wx, wy, def, shown,
+                      [this, instrId, name, shown](const ParamDef& d, const MidiSrc& receives) {
             if (!song_) return true;
-            // Asked before the rename, while the old name is still in place.
-            const bool keepOld = song_->paramNameUsedElsewhere(instrId, name);
-            if (!song_->setParamDef(instrId, name, d)) return false;
+            // A rename moves the name's lanes, which would otherwise read as one
+            // parameter gone and a new one added: the control follows the rename,
+            // unless another instrument still has lanes of the old name.
+            paramNamesMuted_ = true;
+            const bool ok    = song_->setParamDef(instrId, name, d);
+            paramNamesMuted_ = false;
+            if (!ok) return false;
+            const bool keepOld = song_->paramLaneNames().count(name) > 0;
             midiLearn.rename(name, d.name, keepOld);
+            // Only a changed control is bound: a rename that leaves the old name its
+            // control (keepOld) must not take it back just because it was shown.
+            if (receives != shown) midiLearn.bind(d.name, receives);
             return true;
-        });
+        }, [this, name] { return midiLearn.value(name); });
     };
     // Defined by hand, for when no controller is to hand. It starts on the first CC
     // that neither the standard set nor the instrument's own parameters send.
@@ -754,13 +765,21 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             break;
         }
         def.name = defaultParamName(def.kind, def.cc);
-        pdefPop->open(wx, wy, def, [this, instrId, addLane](const ParamDef& d) {
+        // A name another instrument already uses keeps that name's control.
+        const MidiSrc* bound = midiLearn.bindingFor(def.name);
+        pdefPop->open(wx, wy, def, bound ? *bound : MidiSrc{},
+                      [this, instrId, addLane](const ParamDef& d, const MidiSrc& receives) {
             if (!song_) return true;
-            ObservableSong::Batch batch(song_);
-            if (!song_->setParamDef(instrId, "", d)) return false;
-            if (addLane) addLane(d.name);
+            {
+                ObservableSong::Batch batch(song_);
+                if (!song_->setParamDef(instrId, "", d)) return false;
+                if (addLane) addLane(d.name);
+            }
+            // After the batch: its lane landing gives the parameter its starting
+            // control, which the popup's choice then replaces.
+            midiLearn.bind(d.name, receives);
             return true;
-        });
+        }, [this, name = def.name] { return midiLearn.value(name); });
     };
     paramActions.learnNew = [this](int instrId,std::function<void(const std::string&)> addLane) {
         midiLearn.startLearnNew(instrId, [this, instrId, addLane](const MidiSrc& src) {
@@ -778,15 +797,37 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
                                   (BasePatternEditor*)pianorollEd})
         ed->setMidiLearn(&midiLearn);
     songEd->setMidiLearn(&midiLearn);
-    midiLearn.onDisplayChanged = [this, ctxPop, plcPop, nlCtxPop]() {
+    midiLearn.onDisplayChanged = [this, ctxPop, plcPop, nlCtxPop, pdefPop]() {
         for (BasePatternEditor* ed : {(BasePatternEditor*)harmonyEd, (BasePatternEditor*)drumEd,
                                       (BasePatternEditor*)pianorollEd})
             ed->redrawParamLabels();
         songEd->redrawTrackLabels();
         for (ParameterSubmenu* m : {ctxPop->paramSubmenu, plcPop->paramSubmenu, nlCtxPop->paramSubmenu})
             m->learnStateChanged();
+        if (pdefPop->visible()) pdefPop->refreshValue();
     };
     midiLearn.onEdited = [this]() { if (onMidiLearnChanged) onMidiLearnChanged(); };
+    // A parameter new to the project starts on its usual control (MidiLearnMap::
+    // initialSource) and one gone from it, its last lane deleted, goes back to what
+    // a new project gives it, so adding it again starts afresh. A control another
+    // parameter is still using stays with that one. Edits only: undo leaves the
+    // controls as they are.
+    song->onParamNamesChanged = [this](const std::set<std::string>& added,
+                                       const std::set<std::string>& removed) {
+        if (paramNamesMuted_ || !song_) return;
+        const std::set<std::string> live = song_->paramLaneNames();
+        auto inUse = [&](const std::string& n) { return live.count(n) > 0; };
+        const MidiLearnBindings defaults = defaultMidiLearnBindings();
+        for (const auto& n : removed) {
+            const auto it = defaults.find(n);
+            midiLearn.bindUnlessTaken(n, it != defaults.end() ? it->second : MidiSrc{}, inUse);
+        }
+        // One already bound keeps its control: Pitch and Modulation, or a lane a
+        // recording made for the control that drove it.
+        for (const auto& n : added)
+            if (!midiLearn.bindingFor(n))
+                midiLearn.bindUnlessTaken(n, MidiLearnMap::initialSource(n), inUse);
+    };
     // A label's live value is in the units of the parameter on the instrument the
     // control is heard on.
     midiLearn.laneMaxFor = [this](const std::string& type) {
@@ -930,8 +971,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
                     if (outputsOverlay && !outputsOverlay->instrumentPassesThrough(i)) continue;
                     ParamDef def;
                     if (defFor(i, def))
-                        auditioner.param(i, paramOutCode(def),
-                                         MidiLearnMap::scaleToLane(src, raw, paramMaxValue(def)));
+                        auditioner.param(i, paramOutCode(def), paramOutValue(def,
+                                         MidiLearnMap::scaleToLane(src, raw, paramMaxValue(def))));
                     else
                         auditioner.passThrough(i, data, len);
                 }

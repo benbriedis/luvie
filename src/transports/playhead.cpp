@@ -287,7 +287,7 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
-					emitSoftParam(instrumentId, outCode, value);
+					emitSoftParam(instrumentId, outCode, paramOutValue(def, value));
 				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
@@ -579,7 +579,7 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
-					emitSoftParam(instrumentId, outCode, value);
+					emitSoftParam(instrumentId, outCode, paramOutValue(def, value));
 				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
@@ -611,7 +611,7 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 				printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
 				       bar, lane.type.c_str(), value);
 			}
-			emitSoftParam(lane.instrumentId, outCode, value);
+			emitSoftParam(lane.instrumentId, outCode, paramOutValue(def, value));
 		};
 		for (int i = 0; i < (int)lane.points.size(); i++) {
 			report(lane.points[i].beat, lane.points[i].value);

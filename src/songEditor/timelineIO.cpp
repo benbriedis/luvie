@@ -224,7 +224,8 @@ static ParamPoint paramPointFromJson(const json& j) {
     return {j.at("id"), j.at("beat"), j.value("value", 63), j.value("anchor", false)};
 }
 // An instrument's parameter: {"name", "out": "cc"|"bend"|"pressure", "num" (CC
-// only), "rest": "min"|"centre"|"max"}.
+// only), "rest": "min"|"centre"|"max", "min"/"max" (the output range, only when
+// narrowed)}.
 static json paramDefToJson(const ParamDef& d) {
     json j = {{"name", d.name}};
     switch (d.kind) {
@@ -233,6 +234,8 @@ static json paramDefToJson(const ParamDef& d) {
         default:                      j["out"] = "cc"; j["num"] = d.cc; break;
     }
     j["rest"] = d.rest == ParamRest::Centre ? "centre" : d.rest == ParamRest::Max ? "max" : "min";
+    if (paramOutMin(d) != 0)                 j["min"] = paramOutMin(d);
+    if (paramOutMax(d) != paramMaxValue(d)) j["max"] = paramOutMax(d);
     return j;
 }
 
@@ -245,6 +248,8 @@ static ParamDef paramDefFromJson(const json& j) {
     d.cc   = std::clamp(j.value("num", 0), 0, 127);
     const std::string rest = j.value("rest", std::string{"min"});
     d.rest = rest == "centre" ? ParamRest::Centre : rest == "max" ? ParamRest::Max : ParamRest::Min;
+    d.outMin = std::clamp(j.value("min", 0), 0, paramMaxValue(d));
+    if (j.contains("max")) d.outMax = std::clamp(j.value("max", 0), 0, paramMaxValue(d));
     return d;
 }
 

@@ -8,6 +8,8 @@
 #include "timeline.hpp"
 #include "patternNames.hpp"
 #include <deque>
+#include <functional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -333,9 +335,14 @@ public:
     // and pattern alike; a standard oldName stays available as the preset. False,
     // with nothing changed, for an empty name or one the instrument already uses.
     bool setParamDef(int instrumentId, const std::string& oldName, const ParamDef& def);
-    // Whether `name` still means something to an instrument other than this one:
-    // it is standard, or another instrument has a parameter or lane of that name.
-    bool paramNameUsedElsewhere(int instrumentId, const std::string& name) const;
+    // Every parameter name some lane, song or pattern, of any instrument has.
+    std::set<std::string> paramLaneNames() const;
+    // An edit gave these names their first lane anywhere in the project, or took
+    // their last. Not fired by undo, redo or a load, which restore a state rather
+    // than make one. MIDI-learn bindings, which are project-wide and kept out of the
+    // timeline, follow it (see LuvieApp).
+    std::function<void(const std::set<std::string>& added,
+                       const std::set<std::string>& removed)> onParamNamesChanged;
 
     // Build a flat Note list for grid consumption (row = track index)
     std::vector<Note> buildNotes() const;
@@ -454,9 +461,9 @@ private:
     bool patternStillReferenced(int patId) const;
 
     void notify();
-    // Drops each instrument parameter of its own (not a redefined standard one)
-    // that no lane, song or pattern, still uses, so deleting the last lane of a
-    // parameter deletes the parameter too. notify() runs it, so it is part of the
+    // Drops each instrument parameter that no lane, song or pattern, still uses, so
+    // deleting the last lane of a parameter deletes the parameter too. A redefined
+    // standard one goes back to its standard definition. notify() runs it, so it is part of the
     // same undo entry as whatever removed the lane.
     void pruneUnusedParamDefs();
     // The observer fan-out on its own, with no undo bookkeeping. notify() and

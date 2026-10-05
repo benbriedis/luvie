@@ -75,12 +75,30 @@ you can use it at the same time.
 To rename a parameter or change what it sends, right-click its lane and choose 'Edit parameter'. You can set:
 
 - **Name**: renames the parameter's lanes on this instrument too.
+- **Receives**: the control on your controller that drives it: a CC (with its number), pitch bend,
+  channel pressure, or nothing. This is the same as MIDI-learning it, set by hand.
 - **Sends**: a CC (with its number), pitch bend or channel pressure.
+- **Min** and **Max**: the part of the output's range the lane covers, 0 to 127 by default (0 to
+  16383 for pitch bend). The lane still runs from bottom to top, but what is sent is scaled into
+  this range, so a lane can focus on the useful part of a synth control, e.g. a cutoff sweep
+  between 40 and 90. This applies to playback and to a controller played through live. Setting Min
+  above Max turns the control upside down.
 - **Rests**: Min, Centre or Max. A new lane starts at this value. Centre also draws a dotted line
   through the middle of the lane, as for Pitch and Pan.
 
+The popup also shows the parameter's current **Value**: the last value its control sent, as shown
+in its lane's label. It updates as you move the control. When Min and Max narrow the range, it
+also shows what that value sends, e.g. "64, sends 50".
+
 The standard parameters can be edited the same way, e.g. pointing Volume at a different CC for a synth
-that doesn't follow the standard. The change only affects that instrument.
+that doesn't follow the standard. The change only affects that instrument, and lasts as long as the
+parameter has lanes there: deleting its last lane puts it back to the standard.
+
+A standard parameter added to the project starts out receiving its standard control, so a controller
+sending CC74 drives Cutoff without being learned. If that control already drives another parameter it
+stays with that one, and the new parameter starts unbound. Deleting the last lane of a parameter
+anywhere in the project forgets its control, so adding it again starts afresh. Pitch and Modulation
+keep the pitch wheel and mod wheel throughout.
 
 What a parameter *sends* is separate from which control *drives* it ('MIDI learn' on the lane). That
 means the pitch wheel can drive a Cutoff lane. The wheel springs back when you let go, and that is

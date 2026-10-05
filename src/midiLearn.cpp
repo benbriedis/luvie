@@ -3,6 +3,7 @@
 
 #include "midiLearn.hpp"
 #include "paramLaneTypes.hpp"
+#include "paramDefs.hpp"
 #include "luvieDebug.hpp"
 #include <cstdio>
 
@@ -117,6 +118,61 @@ void MidiLearnMap::clear(const std::string& type)
     displayChanged();
 }
 
+void MidiLearnMap::assign(const std::string& type, const MidiSrc& src)
+{
+    // One control drives one type: taking it for this type takes it away from
+    // whichever type had it, so a fader never silently writes to two lanes.
+    for (auto it = bindings_.begin(); it != bindings_.end();) {
+        if (it->second == src && it->first != type) {
+            values_.erase(it->first);
+            it = bindings_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    bindings_[type] = src;
+}
+
+void MidiLearnMap::bind(const std::string& type, const MidiSrc& src)
+{
+    if (src.kind == MidiSrcKind::None) {
+        if (bindingFor(type)) clear(type);
+        return;
+    }
+    const MidiSrc* cur = bindingFor(type);
+    if (cur && *cur == src) return;
+    if (luvieDebug())
+        fprintf(stderr, "[luvie] midi learn: %s -> %s (edited)\n",
+                type.c_str(), describe(src).c_str());
+    assign(type, src);
+    values_.erase(type);
+    if (onEdited) onEdited();
+    displayChanged();
+}
+
+void MidiLearnMap::bindUnlessTaken(const std::string& type, const MidiSrc& src,
+                                   const std::function<bool(const std::string&)>& inUse)
+{
+    for (const auto& [other, bound] : bindings_)
+        if (other != type && bound == src && inUse && inUse(other)) {
+            bind(type, {});
+            return;
+        }
+    bind(type, src);
+}
+
+MidiSrc MidiLearnMap::initialSource(const std::string& type)
+{
+    const StandardParam* s = standardParam(type);
+    if (!s) return {};
+    switch (s->kind) {
+    case ParamOutKind::PitchBend: return {MidiSrcKind::PitchBend, 0};
+    case ParamOutKind::Pressure:  return {MidiSrcKind::Pressure, 0};
+    case ParamOutKind::CC:        return {MidiSrcKind::CC, s->cc};
+    }
+    return {};
+}
+
 const MidiSrc* MidiLearnMap::bindingFor(const std::string& type) const
 {
     auto it = bindings_.find(type);
@@ -148,17 +204,7 @@ bool MidiLearnMap::handle(const uint8_t* data, int len, std::string& typeOut,
     }
 
     if (!learning_.empty()) {
-        // One control drives one type: taking it for this type takes it away from
-        // whichever type had it, so a fader never silently writes to two lanes.
-        for (auto it = bindings_.begin(); it != bindings_.end();) {
-            if (it->second == src && it->first != learning_) {
-                values_.erase(it->first);
-                it = bindings_.erase(it);
-            } else {
-                ++it;
-            }
-        }
-        bindings_[learning_] = src;
+        assign(learning_, src);
         if (luvieDebug())
             fprintf(stderr, "[luvie] midi learn: %s -> %s\n",
                     learning_.c_str(), describe(src).c_str());

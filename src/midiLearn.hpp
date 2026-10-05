@@ -54,6 +54,17 @@ public:
     void rename(const std::string& from, const std::string& to, bool keepOld);
 
     void clear(const std::string& type);
+    // Binds `type` to `src` as a learn would, taking the control from any other
+    // type that had it. Kind None clears the binding. Does nothing when unchanged.
+    void bind(const std::string& type, const MidiSrc& src);
+    // bind(), except that a control `inUse` says another type still needs stays
+    // with that type, and `type` is left unbound instead.
+    void bindUnlessTaken(const std::string& type, const MidiSrc& src,
+                         const std::function<bool(const std::string&)>& inUse);
+    // The control a parameter starts out receiving from: for a standard one what it
+    // sends ("Cutoff" -> CC74), so the controller's usual control drives it. Kind
+    // None for any other.
+    static MidiSrc initialSource(const std::string& type);
     const MidiSrc* bindingFor(const std::string& type) const;
     // Last value received for `type`, in that lane's units (see laneMaxFor).
     std::optional<int> value(const std::string& type) const;
@@ -84,6 +95,8 @@ private:
     std::function<std::string(const MidiSrc&)> learnNewComplete_;
 
     void displayChanged() { if (onDisplayChanged) onDisplayChanged(); }
+    // bind() without the notifications.
+    void assign(const std::string& type, const MidiSrc& src);
 };
 
 #endif

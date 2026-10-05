@@ -328,12 +328,14 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
         }
     };
 
-    // Pre-compute all firing events (point values + half-integer crossings) for a lane.
-    auto buildParamEvents = [](const ParamLane& lane) -> std::vector<ParamEventSnap> {
+    // Pre-compute all firing events (point values + half-integer crossings) for a lane,
+    // in the parameter's output range.
+    auto buildParamEvents = [](const ParamLane& lane, const ParamDef& def)
+                                -> std::vector<ParamEventSnap> {
         std::vector<ParamEventSnap> evts;
-        auto sink = [&](float beat, int value) { evts.push_back({beat, value}); };
+        auto sink = [&](float beat, int value) { evts.push_back({beat, paramOutValue(def, value)}); };
         for (int i = 0; i < (int)lane.points.size(); i++) {
-            evts.push_back({lane.points[i].beat, lane.points[i].value});
+            sink(lane.points[i].beat, lane.points[i].value);
             if (i + 1 < (int)lane.points.size())
                 densifyParamRamp(lane.points[i].beat,  lane.points[i+1].beat,
                                  lane.points[i].value, lane.points[i+1].value, sink);
@@ -372,7 +374,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
         for (const auto& lane : pat->paramLanes) {
             ParamDef def;
             if (!tl.paramDef(instrId, lane.type, def)) continue;
-            auto evts = buildParamEvents(lane);
+            auto evts = buildParamEvents(lane, def);
             if (evts.empty()) continue;
             ParamInstSnap pis;
             pis.startBar     = anchorBar;
@@ -452,7 +454,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
                     for (const auto& lane : pat->paramLanes) {
                         ParamDef def;
                         if (!tl.paramDef(instrId, lane.type, def)) continue;
-                        auto evts = buildParamEvents(lane);
+                        auto evts = buildParamEvents(lane, def);
                         if (evts.empty()) continue;
                         ParamInstSnap pis;
                         pis.startBar     = inst.startBar;
@@ -497,7 +499,7 @@ bool Sequencer::buildSnapshot(Snapshot& newSnap)
             if (rit == instrumentMap_.end() || rit->second.portName.empty()) continue;
             ParamDef def;
             if (!tl.paramDef(lane.instrumentId, lane.type, def)) continue;
-            auto evts = buildParamEvents(lane);
+            auto evts = buildParamEvents(lane, def);
             if (evts.empty()) continue;
             ParamInstSnap pis;
             pis.startBar     = 0.0f;

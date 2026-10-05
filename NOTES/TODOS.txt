@@ -156,9 +156,6 @@ TO TEST Program number: a) connect to Casio b) maybe connect to some software sy
 When I start up in standalone mode (with -v) and close the application (using the window X) I don't get my audio back.
    Seems as if Pipewire is lost somehow? I can get it back using qjackctl.
 
-2. Add an 'expression' section at the bottom of BOTH the patterns and song editors
-   that allow for rubber bands on a range of parameters.
-
 BUG: Not rewinding right to start (Ardour + Jack). See TRANSPORTS.txt.
 
 ....
@@ -273,8 +270,6 @@ Apply at signpath.org — one-off, takes days to weeks. Requirements Luvie alrea
 
 Can I add to Arch AUR myself?
 
-
-BUG: clicking on 'Add automation' (and anything similar) - moving the cursor away shouldnt hide
 
 BUG: Song Editor - 2 blocks right next to each other. Resizing over the dead middle of the line gives
      messy flickery behaviour. Probably best to only resize one at a time.
@@ -474,7 +469,6 @@ Q: Does RaySession *have* to use global project directories, or can we split the
 Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
 
 Allow more parameters to be shown via click and drag.
-Allow some/all parameters to be hidden
 Allow parameter recording sensitivity to be set - record more or less parameters
 
 

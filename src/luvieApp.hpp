@@ -320,6 +320,9 @@ private:
 
     bool layingOutPatternTab = false;
     int  harmonyRootTrigger_ = -1;
+    // Set while an edit moves a parameter's control itself (a rename), so the song's
+    // onParamNamesChanged leaves the controls alone.
+    bool paramNamesMuted_    = false;
 
     ObservableSong*      song_        = nullptr;
     ObservablePattern*   pattern_     = nullptr;

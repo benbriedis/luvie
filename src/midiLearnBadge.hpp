@@ -10,14 +10,13 @@
 #include <string>
 
 // The MIDI-learn state of a param-lane type, drawn in a param row's label: an amber
-// "Learning…" while waiting for a control, otherwise a dot, the bound control and
-// its last value ("-" until one arrives). Nothing at all when the type is unbound.
+// "Learning…" while waiting for a control, otherwise a green dot and the last value
+// received ("-" until one arrives). Nothing at all when the type is unbound. Which
+// control it is, and what the parameter sends, are in its Edit parameter popup.
 // Shared by the pattern editors' param labels and the Song Editor's param rows so
-// the two read the same. `output` is what the parameter sends ("CC74"); when that
-// is not what the control sends it is shown too, as "Bend→CC74".
+// the two read the same.
 inline void drawMidiLearnBadge(const MidiLearnMap* map, const std::string& type,
-                               int x, int y, int w, int h, Fl_Align align,
-                               const std::string& output = {})
+                               int x, int y, int w, int h, Fl_Align align)
 {
     static constexpr Fl_Color kLearning = 0xF59E0B00;   // amber
     static constexpr Fl_Color kBound    = 0x22C55E00;   // green
@@ -29,13 +28,10 @@ inline void drawMidiLearnBadge(const MidiLearnMap* map, const std::string& type,
         fl_draw("Learning…", x, y, w, h, align | FL_ALIGN_CLIP);
         return;
     }
-    const MidiSrc* src = map->bindingFor(type);
-    if (!src) return;
+    if (!map->bindingFor(type)) return;
 
     const auto        v    = map->value(type);
-    std::string control = MidiLearnMap::describe(*src);
-    if (!output.empty() && output != control) control += "→" + output;
-    const std::string text = control + "  " + (v ? std::to_string(*v) : "-");
+    const std::string text = v ? std::to_string(*v) : "-";
     const int         dot  = 5;
     const int         tw   = (int)fl_width(text.c_str());
     // The dot sits just before the text, wherever the alignment puts it.
