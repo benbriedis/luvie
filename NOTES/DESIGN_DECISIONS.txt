@@ -87,9 +87,14 @@ Alternate plugin architectures
    
 Intermediate mode (between Loop and Song modes)
 =================
-When switching from Song Mode to Loop Mode could go into intermediate mode until bar end I guess 
-	Probably better to leave it the way it is though as some of the current playing patterns may
-	not extend to the end of the bar.
+Both directions play out the current bar and switch on the next barline, the same rule as
+switching between scenes, so there is one mental model for all of them. While the switch is
+pending the mode button is yellow and keeps the label of the mode that is still playing.
+The RT thread picks the seam frame, so the switch is beat-exact however long the message takes
+to arrive. At the seam, notes still held by the outgoing mode are released (note-offs only, no
+controller reset) and the clock is never relocated. Stopped, the switch is immediate.
+(Previously Song -> Loop was instant, on the grounds that some playing patterns may not extend
+to the end of the bar.)
 
 MISSION STATEMENT
 -----------------

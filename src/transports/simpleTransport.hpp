@@ -29,11 +29,15 @@ class SimpleTransport : public ITransport {
 	float  songLoopFold(float raw) const;
 
 	// Loop -> Song hand-off, armed by endLoopMode() and landed by position() on the
-	// way past handoffAtSecs. See the note there.
+	// way past handoffAtSecs. See the note there. Once landed, the shift lasts until
+	// the next mode change, where settleHandoff() folds it into playStartSeconds.
 	bool   handoffArmed     = false;
 	double handoffAtSecs    = 0.0;   // clock seconds the switch lands on (a bar line)
 	float  handoffResume    = 0.0f;  // song bar playback continues from
 	double handoffResumeSecs = 0.0;  // that bar in the song's own tempo map
+
+	// Disarm the hand-off, keeping its shift if it has already landed.
+	void settleHandoff();
 
 	// Seconds elapsed on the clock, before any hand-off shift.
 	double clockSeconds() const;

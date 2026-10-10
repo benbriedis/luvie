@@ -48,7 +48,18 @@ void SimpleTransport::seek(float bars) {
 void SimpleTransport::setLoopMode(bool m) {
 	// Entering a mode supersedes a hand-off out of one that has not landed yet — the
 	// user clicked back into Loop Mode mid-transition. Mirrors Sequencer::setLoopMode.
-	loopMode     = m;
+	loopMode = m;
+	settleHandoff();
+}
+
+void SimpleTransport::settleHandoff() {
+	// A hand-off that has already landed leaves the song timeline slid along by the
+	// shift position() applies. Dropping it here would throw the playhead forward to
+	// the raw clock — which ran on through the whole Loop-mode stretch — so fold it
+	// into the clock base instead: position() then reads the same bar with no shift.
+	// One still waiting for its bar line is simply cancelled.
+	if (handoffArmed && playing && clockSeconds() >= handoffAtSecs)
+		playStartSeconds += handoffResumeSecs - handoffAtSecs;
 	handoffArmed = false;
 }
 
@@ -113,8 +124,8 @@ float SimpleTransport::position() const {
 	double secs = clockSeconds();
 	// Past the point the hand-off was armed for: the loops are done, and the song's
 	// timeline is slid along so its resume bar falls exactly there. The shift stays
-	// applied for the rest of this play stretch — every call that re-anchors the
-	// clock (play/seek/rewind/pause) disarms it first.
+	// applied until the clock is re-anchored (play/seek/rewind/pause disarm it) or the
+	// mode next changes, where settleHandoff() folds it into the clock base.
 	if (handoffArmed && secs >= handoffAtSecs)
 		secs = handoffResumeSecs + (secs - handoffAtSecs);
 	return songLoopFold(std::max(0.0f, (float)timeline->secondsToBar(secs)));

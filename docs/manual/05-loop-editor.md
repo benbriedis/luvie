@@ -23,11 +23,19 @@ It is possible to rename an instrument in the editor by double clicking on the i
 
 ## Switching between modes
 
-It is possible to switch between Song Mode and Loop Mode while music is playing. 
-Switching modes is designed to minimize glitches in the music during the transition. 
-When switching from Song Mode to Loop Mode the playhead in the Song Editor is frozen and greyed out.
-The currently enabled loops continue to be played and looped, and they can be viewed and controlled from the Loop Editor.
+It is possible to switch between Song Mode and Loop Mode while music is playing.
+Switching modes is designed to minimize glitches in the music during the transition.
+In both directions the current bar is played out and the new mode takes over on the next barline,
+in the same way as switching between scenes. While the switch is pending the mode button is shown
+in yellow and still carries the label of the mode that is playing.
 
-When switching from Loop Mode to Song Mode the process enters a temporary switching mode
-(indicated in yellow).  The playhead in the Song Editor is immediately unfrozen but control over the output of
-notes is only transferred to the Song Editor when the next barline is reached.
+When switching from Song Mode to Loop Mode the song plays to the end of its current bar. At the barline
+the loops take over and the playhead in the Song Editor is frozen and greyed out on that barline.
+The patterns that were playing continue to be played and looped, and they can be viewed and controlled from the Loop Editor.
+
+When switching from Loop Mode to Song Mode the loops play out the rest of their bar. The playhead in the
+Song Editor is immediately unfrozen (still greyed out) and moves up to the bar it was frozen on, arriving
+there as the next barline is reached. At that point control over the output of notes passes back to the Song Editor.
+
+If the transport is stopped the switch happens immediately. Clicking the mode button again while it is
+yellow cancels the switch.

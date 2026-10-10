@@ -29,6 +29,10 @@ Suggestions for RaySession (install newest first)
 ==========================
 1. The true Close/stop button for the session is too small and hard to find.
 
+1. Does RaySession *have* to use global project directories, or can we split them up / use local projects?   
+   Would rather just have a default search directory.
+
+
 Suggestions for LV2
 ===================
 1. Add support for transport commands.
@@ -92,6 +96,7 @@ OUT OF SCOPE
 Sampler... could allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
 	Likely to lead on to sample filters, envelopes, trimming, ...
 
+NOTE pressure parameter currently not working with Pipewire. ALSA inputs OK.
 
 LIMITATION
 ==========
@@ -385,16 +390,33 @@ Recording - cf disable snap by default? enable grow by default?
   Maybe disable snap by default for everything?
   
   
-CHECK CURRENT BEHAVIOUR... Have song editor play to end of bar. - cf Intermediate mode 
-CHECK CURRENT BEHAVIOUR... Sync the time signature and/or BPM with the Song editor? Maybe optionally?
-Song editor playhead is being hidden when in Loop mode, maybe it should be shown and left where it is?
-Have the Loop Editor BPM follow changes in the SongEditor BPM? Allows for a smooth transition. [DONE i think...]
-   Also allow editting (maybe not saving)
-Swapping between song editor and loop editor - think I'd rather round out the song editor's bar 
-   (but hold on to last bar settings).
-   BUT I'd still need an intermediate mode going out too to allow the bar to finish...
+cf slice selection - allow deletion of a blank selected portion. 
+     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
+
+How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
+
+May be good idea to be able to view current set of MIDI triggers in a list somewhere. Otherwise could get a bit lost. 
+   Have a clear all button?
+   NB reusing a button or control in one place should clear any previous use too (or block adding a new one?)
 
 
+Allow more parameters to be shown via click and drag.
+
+Is the Portamento parameter a boolean?
+
+Click and drag parameter scroll and note scroll in Pattern Editors
+
+cf possibility of having a section in the instrument settings showing bound (?) parameters
+
+CC20–31 and CC102–119 are undefined in the MIDI spec and are the usual choice.  DOCUMENT?
+
+It was made for expressive controllers like the ROLI Seaboard, LinnStrument and Osmose, where each finger can slide or press on its own.
+
+Allow parameter recording sensitivity to be set for those Axiom 49 knobs? 
+
+Copy scene content to other scenes/move scenes?
+
+cf Cut and insert slice. Also wrt Song Editor.
 
 
 Manual: 
@@ -426,48 +448,6 @@ Manual:
 		Generally prefer to have 1 good set of bindings though...
 
 
-cf slice selection - allow deletion of a blank selected portion. 
-     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
-
-How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
-
-May be good idea to be able to view current set of triggers in a list somewhere. Otherwise could get a bit lost. Have a clear all button?
-   NB reusing a button or control in one place should clear any previous use too.
-
-Q: Does RaySession *have* to use global project directories, or can we split them up / use local projects?   
-   Would rather just have a default search directory.
-
-
 Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
      Any refactoring useful wrt to the DSP, and the song and patterns that feed it?
-
-Allow more parameters to be shown via click and drag.
-Allow parameter recording sensitivity to be set for those Axiom 49 knobs? 
-
-
-Q: is it worth ditching intermediate mode altogether? Not bad waiting till the end of the bar...
-   NB still would want beats to line up... NB notes that were started should continue on
-   until they end...
-
-   
-Is the Portamento paramter a boolean?
-
-Click and drag parameter scroll and note scroll in Pattern Editors
-
-Look into dedicate MIDI S/W for setting mins, maxes, splitting keyboards, ..., maybe moving between presets, ...?
-  Would this allow me to simplify my own s/w?
-  
-cf possibility of having a section in the instrument settings showing bound (?) parameters
-
-CC20–31 and CC102–119 are undefined in the MIDI spec and are the usual choice.  DOCUMENT?
-
-It was made for expressive controllers like the ROLI Seaboard, LinnStrument and Osmose, where each finger can slide or press on its own.
-
-Knobs... might want a sensitivity multipler....
-
-NOTE pressure currently not working with Pipewire. ALSA inputs OK.
-
-Copy scene content to other scenes/move scenes
-
-cf Cut and insert slice. Also wrt Song Editor.
 
