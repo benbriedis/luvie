@@ -140,18 +140,30 @@ public:
         lastEmitted = (int)evs.size();
 
         if (ran) wasPlaying = nowPlaying;
+        else if (nowPlaying && luvieDebug())
+            fprintf(stderr, "[luvie] render skipped (snapshot locked) at frame %ld\n",
+                    (long)startFrame);
+        if (clampedEvents > 0 && luvieDebug())
+            fprintf(stderr, "[luvie] %d event(s) clamped into cycle at frame %ld "
+                    "(nframes=%u)\n", clampedEvents, (long)startFrame, nf);
+        clampedEvents = 0;
     }
 
     /* Write the events routed to `portIdx` into an already-opened forge sequence.
        evs is sorted, so filtering preserves non-decreasing frame order. */
     void forgePort(LV2_Atom_Forge* fg, const URIs* u, int portIdx) const
     {
+        int dropped = 0;
         for (const Ev& e : evs) {
             if (e.port != portIdx) continue;
-            lv2_atom_forge_frame_time(fg, e.frame);
-            lv2_atom_forge_atom(fg, e.len, u->midi_MidiEvent);
-            lv2_atom_forge_write(fg, e.data, e.len);
+            if (!lv2_atom_forge_frame_time(fg, e.frame)
+                || !lv2_atom_forge_atom(fg, e.len, u->midi_MidiEvent)
+                || !lv2_atom_forge_write(fg, e.data, e.len))
+                dropped++;
         }
+        if (dropped > 0 && luvieDebug())
+            fprintf(stderr, "[luvie] output %d overflowed: %d event(s) dropped\n",
+                    portIdx, dropped);
     }
 
     int  lastEmittedCount() const { return lastEmitted; }
@@ -193,6 +205,7 @@ protected:
         // base so events after a song-loop wrap land past the seam, not at frame 0.
         long off = segFrameOffset(bar);
         if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
+        if (off < -1 || (nframes > 0 && off > static_cast<long>(nframes))) clampedEvents++;
         if (off < 0) off = 0;
         if (nframes > 0 && off > static_cast<long>(nframes) - 1)
             off = static_cast<long>(nframes) - 1;
@@ -216,6 +229,7 @@ private:
     double          sampleRate     = 48000.0;
     uint32_t        nframes        = 0;
     int             lastEmitted    = 0;
+    int             clampedEvents  = 0;   // diagnostics: emit() offsets outside the cycle
 
     struct PortSlot { char name[64]; };
     PortSlot slots[kMaxPluginOutputs]{};
@@ -758,8 +772,33 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 
         int64_t hostFrame = p->curFrame;
         if (atomToI64(uris, frameAtom, hostFrame)) {
-            if (hostFrame != p->curFrame) jumped = true;   // relocate
-            p->curFrame = hostFrame;
+            /* A host frame that disagrees with our own count is normally a relocate.
+               But Carla on PipeWire-JACK, while rolling, reports frames that wander a
+               buffer either side of the true position — sometimes for one cycle,
+               sometimes for a stretch of several — before settling back. Taking those
+               as relocates means hard resets (All Notes Off) plus re-rendered and
+               skipped windows, which clips and drops notes at random. So while rolling,
+               a discrepancy of a couple of buffers or less is treated as jitter and our
+               own counter kept, however long it lasts: an offset that small is
+               inaudible, whereas acting on it is not. Stopped, or beyond the window,
+               the host is followed as before — no real seek is that small. */
+            const int64_t delta     = hostFrame - p->curFrame;
+            const int64_t tolerance = 2 * (int64_t)sample_count;
+            if (delta != 0 && p->playing && delta >= -tolerance && delta <= tolerance) {
+                if (luvieDebug())
+                    fprintf(stderr, "[luvie] ignoring host frame jitter: expected %ld, "
+                            "host says %ld (delta %ld)\n", (long)p->curFrame,
+                            (long)hostFrame, (long)delta);
+            } else {
+                if (delta != 0) {
+                    jumped = true;   // relocate
+                    if (luvieDebug())
+                        fprintf(stderr, "[luvie] host relocate: expected frame %ld, host "
+                                "says %ld (delta %ld)\n", (long)p->curFrame,
+                                (long)hostFrame, (long)delta);
+                }
+                p->curFrame = hostFrame;
+            }
         }
         if (speedAtom && speedAtom->type == uris->atom_Float)
             p->playing = ((const LV2_Atom_Float*)speedAtom)->body != 0.0f;

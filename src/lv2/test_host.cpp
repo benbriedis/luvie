@@ -178,6 +178,8 @@ int main(int argc, char** argv) {
     int      unloopCycle   = -1;
     float    resumeBar     = 0.0f;
     int      relocateCycle = -1;
+    int      jitterEvery   = 0;      // --jitter N: stale host frame every N cycles
+    int      jitterLen     = 1;      // --jitter-len L: ...for L cycles in a row
     int      cycles        = 0;      // 0 = default, see below
     // --midi-in: pitch played into the plugin on cycle 1. It arrives on control_in,
     // which is where a host puts the performer's keyboard (see luvie_dsp.ttl).
@@ -207,6 +209,8 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--unloop") && i + 1 < argc) unloopCycle = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--resume") && i + 1 < argc) resumeBar = (float)atof(argv[++i]);
         else if (!strcmp(argv[i], "--relocate") && i + 1 < argc) relocateCycle = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--jitter") && i + 1 < argc) jitterEvery = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--jitter-len") && i + 1 < argc) jitterLen = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--worker-delay") && i + 1 < argc) g_workerDelay = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--restate")) restate = true;
         else if (!strcmp(argv[i], "--cycles") && i + 1 < argc) cycles = atoi(argv[++i]);
@@ -352,12 +356,18 @@ int main(int argc, char** argv) {
             frame += 64 * (int64_t)nframes;
             printf("cycle %d: host relocate to frame %ld\n", c, (long)frame);
         }
-        if (posEveryCycle || c == 0 || c == relocateCycle) {
+        // Host frame jitter, as Carla on PipeWire-JACK produces: every N cycles the
+        // reported frame runs one buffer behind for --jitter-len cycles, then is
+        // correct again. The DSP must ride through it without resetting or
+        // re-rendering.
+        const bool stale = jitterEvery > 0 && c > 0 && c % jitterEvery < jitterLen;
+        if (posEveryCycle || c == 0 || c == relocateCycle || stale
+            || (jitterEvery > 0 && c > 1 && c % jitterEvery == jitterLen)) {
             lv2_atom_forge_frame_time(&forge, 0);
             LV2_Atom_Forge_Frame objF;
             lv2_atom_forge_object(&forge, &objF, 0, uPos);
             lv2_atom_forge_key(&forge, uFrame);
-            lv2_atom_forge_long(&forge, frame);
+            lv2_atom_forge_long(&forge, stale ? frame - (int64_t)nframes : frame);
             lv2_atom_forge_key(&forge, uSpeed);
             lv2_atom_forge_float(&forge, 1.0f);
             lv2_atom_forge_pop(&forge, &objF);
