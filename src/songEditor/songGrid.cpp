@@ -1436,6 +1436,21 @@ int SongGrid::handle(int event)
     if (songPopup && songPopup->visible()) return 0;
     if (selectionPopup && selectionPopup->visible()) return 0;
 
+    // Enter over a pattern block opens its pattern, as a double-click does. The
+    // grid never takes focus, so this is a broadcast shortcut and the cursor
+    // decides whether it was meant for us, as with hover-delete.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
+        (Fl::event_key() == FL_Enter || Fl::event_key() == FL_KP_Enter) &&
+        !(Fl::event_state() & (FL_SHIFT | FL_COMMAND | FL_CTRL | FL_ALT | FL_META))) {
+        if (!visible_r() || !Fl::event_inside(this)) return 0;
+        int idx = -1;
+        if (auto* h = std::get_if<StateHoverMove>  (&state)) idx = h->noteIdx;
+        else if (auto* h = std::get_if<StateHoverResize>(&state)) idx = h->noteIdx;
+        if (idx < 0 || idx >= (int)notes.size()) return 0;
+        onNoteDoubleClick(idx);
+        return 1;
+    }
+
     // Active param interaction takes priority over everything
     if (!std::holds_alternative<ParamIdle>(paramState))
         return handleParamEvent(event);

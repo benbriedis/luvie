@@ -39,6 +39,7 @@
 #include "loopEditor.hpp"
 #include "outputsOverlay.hpp"
 #include "transportOverlay.hpp"
+#include "keyBindingsOverlay.hpp"
 #include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "paramDefPopup.hpp"
@@ -311,6 +312,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
 
     window->onUndo = [song]() { song->undo(); };
     window->onRedo = [song]() { song->redo(); };
+    // Same as pressing the transport's Rewind and Play/Pause buttons.
+    window->onRewind = [this]() { if (bottomPane) bottomPane->pressRewind(); };
+    window->onPlayPause = [this]() { if (bottomPane) bottomPane->pressPlayPause(); };
     // Only one editor is visible at a time, so clearing all of them is both
     // correct and simpler than working out which one has the cursor.
     window->onEscape = [this]() {
@@ -423,6 +427,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     settingsPop->onExport    = [this] { exportCb   (nullptr, this); };
     settingsPop->onTransport = [this] { transportCb(nullptr, this); };
     settingsPop->onOutputs   = [this] { outputsCb  (nullptr, this); };
+    settingsPop->onKeyBindings = [this] { keyBindingsCb(nullptr, this); };
 
     // ---- Song Editor tab ----
     auto* tab1 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Song Editor");
@@ -527,6 +532,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     };
     // Horizontal zoom: the grid scales its bar width and the three rulers above
     // it follow, so markers and the loop region stay over the bars they mark.
+    og2->setTopRuler(timeSigRuler);
     og2->onColWidthChanged = [timeSigRuler, tempoRuler, loopRuler](int cw) {
         timeSigRuler->setColWidth(cw);
         tempoRuler->setColWidth(cw);
@@ -641,6 +647,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         checkLoopStateChanged();
     };
     loopCtxPop->onOpenPattern     = openPatternTab;
+    loopEd->onOpenPattern         = openPatternTab;
     loopCtxPop->onShowInstruments = [this]() {
         if (outputsOverlay) outputsOverlay->show();
     };
@@ -1244,6 +1251,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         window->registerPopup(transportOverlay);
     }
 
+    // Key bindings overlay — same footprint again.
+    {
+        const int oy = 20;
+        const int om = 20;
+        keyBindingsOverlay = new KeyBindingsOverlay(om, oy, winW - 2*om, window->h() - oy - om);
+        window->add(keyBindingsOverlay);
+        window->registerPopup(keyBindingsOverlay);
+    }
+
     // New-project startup dialog — centred over the main window. main() shows it
     // (and wires its callbacks) only for a fresh project. Deliberately NOT
     // registered as a popup: it must be dismissed via its Confirm button, not by
@@ -1307,6 +1323,11 @@ void LuvieApp::outputsCb(Fl_Widget* w, void* data) {
 void LuvieApp::transportCb(Fl_Widget* w, void* data) {
     auto* app = static_cast<LuvieApp*>(data);
     if (app->transportOverlay) app->transportOverlay->show();
+}
+
+void LuvieApp::keyBindingsCb(Fl_Widget* w, void* data) {
+    auto* app = static_cast<LuvieApp*>(data);
+    if (app->keyBindingsOverlay) app->keyBindingsOverlay->show();
 }
 
 void LuvieApp::pushInstruments() {

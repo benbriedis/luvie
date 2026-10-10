@@ -347,3 +347,26 @@ void SongEditor::followPlayhead()
     wasPlaying = playing;
 }
 
+
+int SongEditor::handle(int event)
+{
+    // 'p' moves the playhead to the bar under the cursor, as a click on the ruler
+    // there would; over the rulers stacked above the editor too. The editor never
+    // takes focus, so this arrives as a broadcast shortcut and the cursor decides
+    // whether it was meant for us, as with the grids' hover-delete. A focused text
+    // input sees the key first and types it.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
+        (Fl::event_key() == 'p' || Fl::event_key() == 'P') &&
+        !(Fl::event_state() & (FL_SHIFT | FL_COMMAND | FL_CTRL | FL_ALT | FL_META))) {
+        if (!seekingEnabled || !visible_r()) return 0;
+        const int top = topRuler ? topRuler->y() : y();
+        if (Fl::event_y() < top || Fl::event_y() >= y() + h()) return 0;
+        if (Fl::event_x() >= x() + w()) return 0;
+        if (Fl::event_x() < x() + rulerOffsetX) return 0;   // over the track labels
+        playhead.seek(Fl::event_x(), x() + rulerOffsetX + gridPadX - hScrollPixel);
+        if (onSeek) onSeek();
+        redraw();
+        return 1;
+    }
+    return Editor::handle(event);
+}

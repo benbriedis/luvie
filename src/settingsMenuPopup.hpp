@@ -27,21 +27,24 @@ public:
     std::function<void()> onExport;
     std::function<void()> onTransport;
     std::function<void()> onOutputs;
+    std::function<void()> onKeyBindings;
 
     static constexpr int dividerH = 9;
 
-    SettingsMenuPopup() : ContextMenuPopup(popW, 5 * btnH + dividerH + 2) {
+    SettingsMenuPopup() : ContextMenuPopup(popW, 6 * btnH + dividerH + 2) {
         saveAsBtn         = addItem(0, "Save As");
         auto* importBtn   = addItem(1, "Import");
         auto* exportBtn   = addItem(2, "Export");
         auto* transportBtn= addItem(3, "Transport");
         auto* outputsBtn  = addItem(4, "Instruments and I/O");
+        auto* keysBtn     = addItem(5, "Key Bindings");
 
         // Separate the file items (Save As/Import/Export) from the view items
-        // (Transport/Outputs), as the old menu's divider did: nudge the view
+        // (Transport/Outputs/Key Bindings), as the old menu's divider did: nudge the view
         // items down by the gap and draw a thin rule through the middle of it.
         transportBtn->position(transportBtn->x(), transportBtn->y() + dividerH);
         outputsBtn  ->position(outputsBtn->x(),   outputsBtn->y()   + dividerH);
+        keysBtn     ->position(keysBtn->x(),      keysBtn->y()      + dividerH);
         auto* divider = new Fl_Box(1, 1 + 3 * btnH + dividerH / 2, popW - 2, 1);
         divider->box(FL_FLAT_BOX);
         divider->color(0xCBD5E100);
@@ -60,6 +63,9 @@ public:
         }, this);
         outputsBtn->callback([](Fl_Widget*, void* d) {
             auto* s = static_cast<SettingsMenuPopup*>(d); s->pick(s->onOutputs);
+        }, this);
+        keysBtn->callback([](Fl_Widget*, void* d) {
+            auto* s = static_cast<SettingsMenuPopup*>(d); s->pick(s->onKeyBindings);
         }, this);
 
         end();

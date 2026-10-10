@@ -35,6 +35,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     int                baseColWidth   = 0;   // colWidth at zoom x1
     bool               wasPlaying     = false;
     bool               pendingScroll  = false;  // snap playhead into view on next tick
+    Fl_Widget*         topRuler       = nullptr;  // highest ruler stacked above, for 'p'
 
     static constexpr int wheelStepPx = 24;   // pixels per mouse-wheel notch
 
@@ -51,6 +52,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     void onWheelY(int d) override { setScrollPx(scrollPx + d * wheelStepPx); }
     int  computeNumCols() const;
     void followPlayhead();
+    int  handle(int event) override;
 
 public:
     SongEditor(int x, int y, int visibleW,
@@ -69,6 +71,10 @@ public:
     // Horizontal zoom: `factor` scales the bar width from the width the grid was
     // built at (1 = that width). The bar under the left edge stays put.
     void setZoom(float factor);
+
+    // The rulers stacked directly above the editor share its bar columns, so 'p'
+    // over them seeks too. `top` is the highest of them.
+    void setTopRuler(Fl_Widget* top) { topRuler = top; }
 
     ISelectionHost* selectionHost() { return &songGrid; }
 

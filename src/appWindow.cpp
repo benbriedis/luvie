@@ -4,8 +4,37 @@
 #include "appWindow.hpp"
 #include "modern/contextMenuPopup.hpp"
 #include <FL/Fl.H>
+#include <FL/Fl_Input_.H>
 #include <FL/platform.H>     // fl_display (X11), fl_xid(), fl_wl_xid(), fl_wl_display()
 #include <cstddef>           // offsetof
+
+namespace {
+    Fl_Event_Dispatch previousDispatch = nullptr;
+    bool              spaceHeld        = false;   // swallows key auto-repeat
+}
+
+AppWindow::AppWindow(int w, int h) : Fl_Double_Window(w, h) {
+    static bool installed = false;
+    if (!installed) {
+        installed        = true;
+        previousDispatch = Fl::event_dispatch();
+        Fl::event_dispatch(spaceDispatch);
+    }
+}
+
+int AppWindow::spaceDispatch(int event, Fl_Window* w) {
+    if ((event == FL_KEYBOARD || event == FL_KEYUP) && Fl::event_key() == ' ' &&
+        !(Fl::event_state() & (FL_COMMAND | FL_CTRL | FL_ALT | FL_META)) &&
+        !dynamic_cast<Fl_Input_*>(Fl::focus())) {
+        auto* aw = dynamic_cast<AppWindow*>(w ? w->top_window() : nullptr);
+        if (aw && aw->onPlayPause) {
+            if (event == FL_KEYUP)  spaceHeld = false;
+            else if (!spaceHeld)  { spaceHeld = true; aw->onPlayPause(); }
+            return 1;
+        }
+    }
+    return previousDispatch ? previousDispatch(event, w) : Fl::handle_(event, w);
+}
 
 // _NET_WM_MOVERESIZE direction constants (also used as our edge IDs)
 static constexpr int DIR_TL=0, DIR_T=1, DIR_TR=2, DIR_R=3;
@@ -294,6 +323,15 @@ int AppWindow::handle(int event)
     if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
         (Fl::event_key() == FL_Delete || Fl::event_key() == FL_BackSpace)) {
         if (onDeleteSelection && onDeleteSelection()) return 1;
+    }
+
+    // Matched on the text rather than the key code: '<' sits on a different key
+    // (and usually needs shift) depending on the keyboard layout.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
+        !(Fl::event_state() & (FL_COMMAND | FL_CTRL | FL_ALT | FL_META)) &&
+        Fl::event_length() == 1 && Fl::event_text()[0] == '<') {
+        if (onRewind) onRewind();
+        return 1;
     }
 
     // A focused widget inside the popup sees Escape first, but none of them want

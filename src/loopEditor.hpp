@@ -251,6 +251,8 @@ public:
     // buttons read and toggle the same state as the pattern editor's Record toggle.
     std::function<bool(int patId)> isRecordArmed;
     std::function<void(int patId, int laneId, bool on)> onRecordToggled;
+    // Enter over a block: make its pattern current and open it in its editor.
+    std::function<void(int trackIdx, int laneId)> onOpenPattern;
     // Repaint the pattern blocks only, leaving the control strip alone (see timerCb).
     void redrawGrid() {
         if (visible_r()) damage(FL_DAMAGE_ALL, x(), y(), w(), gridAreaH());

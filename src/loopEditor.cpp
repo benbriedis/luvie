@@ -1224,6 +1224,21 @@ int LoopEditor::handle(int event)
         return 1;
     }
 
+    // Enter over a block opens its pattern, as the block's menu "Open pattern"
+    // does. Decided by the cursor, whether it came to us focused or broadcast.
+    if ((event == FL_KEYBOARD || event == FL_SHORTCUT) &&
+        (Fl::event_key() == FL_Enter || Fl::event_key() == FL_KP_Enter) &&
+        !(Fl::event_state() & (FL_SHIFT | FL_COMMAND | FL_CTRL | FL_ALT | FL_META)) &&
+        editingInstrId < 0 && onOpenPattern && timeline && visible_r()) {
+        int ti = -1, li = -1, col = -1, row = -1;
+        if (!cellAt(Fl::event_x(), Fl::event_y(), ti, li, col, row)) return 0;
+        const auto& tracks = timeline->get().tracks;
+        if (ti < 0 || ti >= (int)tracks.size() || li < 0 || li >= (int)tracks[ti].lanes.size())
+            return 0;
+        onOpenPattern(ti, tracks[ti].lanes[li].id);
+        return 1;
+    }
+
     // While an instrument-reorder drag is in progress, own all drag/release
     // events ourselves rather than letting a child (e.g. a scrollbar passed
     // under the cursor) swallow the commit.

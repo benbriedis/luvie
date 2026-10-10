@@ -28,9 +28,11 @@ class AppWindow : public Fl_Double_Window {
 	// the click — see wmResizeAvailable().
 	bool      startWmResize(int dir);
 	static bool wmResizeAvailable();
+	// Global event dispatch that claims space for onPlayPause (see below).
+	static int  spaceDispatch(int event, Fl_Window* w);
 
 public:
-	AppWindow(int w, int h) : Fl_Double_Window(w, h) {}
+	AppWindow(int w, int h);
 
 	void registerPopup(Fl_Window* p) { popups.push_back(p); }
 
@@ -67,6 +69,16 @@ public:
 	// left to travel on: the grids also delete the single note under the cursor,
 	// and that one genuinely does depend on where the cursor is.
 	std::function<bool()> onDeleteSelection;
+
+	// '<' rewinds the playhead, as the transport's Rewind button does. A focused
+	// text input sees the key first and types it, so this only fires otherwise.
+	std::function<void()> onRewind;
+
+	// Space toggles play/pause, as the transport's Play/Pause button does. Unlike
+	// the other accelerators this one is taken before the focused widget sees it:
+	// FLTK buttons take focus when clicked and fire on space, so otherwise space
+	// would re-press whatever was last clicked. A focused text input still gets it.
+	std::function<void()> onPlayPause;
 
 	// Every left/right press that reaches the window, in window coordinates,
 	// before the widget under it sees it. Used to dismiss a multi-selection when

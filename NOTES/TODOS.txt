@@ -411,37 +411,19 @@ Manual:
 
 	auditioning
 
+	It is possible to add custom MIDI parameters/automation. These are added to an instrument rather than across the app
+	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
+	the parameter are deleted then the parameter is removed.
+
     - Scene triggers
 	- Loop triggers
 	- Base note trigger in harmony editor
 	- Play/pause and rewind triggers
     - Using a split instrument to select base notes for arpeggiators.
   
-	Document
-		Ctrl-click  select/deselect
-		Shift-click  slection area
-		Ctrl-A   select all
-		Ctrl-Z   undo
-		Ctrl-Y   redo
-		Ctrl-C   copy selection
-		Ctrl-X   cut selection
-		Ctrl-V   paste
-		Alt-click-sweep  slice selection      (may clash with some WMs) Q: which? And could users do anything about it?
-	Maybe list these shortcuts in a window even if they are not edittable.
-	Maybe an optional toolbar to have tool versions for some of these.
-
-		cf P or space over song editor to move playhead
-		Create a shortcut mechanism and menu...  (cf dividing by editor type) 
-		   cf start/stop    - map to space
-			  open pattern  - eg map to <Enter>
-			  open context? - eg context button  (currently not working)
-			  solo? mute?
-			  Rewind could be '<' and/or ','
-		   Generally prefer to have 1 good set of bindings though...
-
-	It is possible to add custom MIDI parameters/automation. These are added to an instrument rather than across the app
-	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
-	the parameter are deleted then the parameter is removed.
+	Maybe an optional toolbar to have tool versions for some copy/paste/move options.
+	Maybe allow some key mapping - esp wrt the 'Alt-click'.
+		Generally prefer to have 1 good set of bindings though...
 
 
 cf slice selection - allow deletion of a blank selected portion. 
@@ -477,7 +459,7 @@ Look into dedicate MIDI S/W for setting mins, maxes, splitting keyboards, ..., m
   
 cf possibility of having a section in the instrument settings showing bound (?) parameters
 
-CC20–31 and CC102–119 are undefined in the MIDI spec and are the usual choice.
+CC20–31 and CC102–119 are undefined in the MIDI spec and are the usual choice.  DOCUMENT?
 
 It was made for expressive controllers like the ROLI Seaboard, LinnStrument and Osmose, where each finger can slide or press on its own.
 
