@@ -105,7 +105,16 @@ Luvie can be run in Carla as a plugin. Here's a quick walk through.
 
 ## Running in Ardour
 
-TODO check 'Strict I/O' setting
+TODO clean up this stuff:
+
+Ardour - click the Int. / Jack button in the top left to show 'Jack'.
+
+Set Window > Transport master to Jack
+
+Session > Properties > Timecode > JACK Transport /Time Settings
+   Uncheck 'Ardour is JACK Time Master'
+   
+TODO check 'Strict I/O' setting in the bus
 
 ## Simple Luvie test
 1. Create a quick song in the Song Editor (TODO screenshot)

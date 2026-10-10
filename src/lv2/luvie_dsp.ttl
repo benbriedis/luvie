@@ -106,9 +106,18 @@
     ] , [
         # Extra MIDI input (see luvie_dsp.h). Input 1 is control_in, above. Kept
         # after the outputs: nothing may be inserted ahead of midi_out.
+        #
+        # time:Position is declared only so the transport survives Ardour wiring one
+        # MIDI stream to several of our inputs (its default on a one-input bus).
+        # Inputs fed from the same stream share one host buffer, which Ardour clears
+        # as it reaches each port and writes the Position only into ports declaring
+        # time:Position — so with control_in alone declaring it, the later inputs
+        # wiped it and the DSP never saw the transport roll. The DSP still reads the
+        # Position from control_in only.
         a lv2:InputPort, atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         atom:supports midi:MidiEvent ;
+        atom:supports time:Position ;
         lv2:index 9 ;
         lv2:symbol "midi_in_2" ;
         lv2:name "MIDI In 2"
@@ -118,6 +127,7 @@
         a lv2:InputPort, atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         atom:supports midi:MidiEvent ;
+        atom:supports time:Position ;   # see midi_in_2
         lv2:index 10 ;
         lv2:symbol "midi_in_3" ;
         lv2:name "MIDI In 3"
@@ -127,6 +137,7 @@
         a lv2:InputPort, atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         atom:supports midi:MidiEvent ;
+        atom:supports time:Position ;   # see midi_in_2
         lv2:index 11 ;
         lv2:symbol "midi_in_4" ;
         lv2:name "MIDI In 4"

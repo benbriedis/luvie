@@ -270,6 +270,10 @@ struct Plugin {
     int64_t curFrame = 0;
     bool    playing  = false;
 
+    /* LUVIE_DEBUG only: totals since the last per-second run() summary, so an event
+       arriving in any cycle shows up, not just one in the cycle that prints. */
+    int dbgFrames = 0, dbgCtrlEvents = 0, dbgPositions = 0, dbgMidiIn = 0;
+
     /* LV2 Worker: run() hands the incoming JSON blob to schedule_work(); the host
        runs work() on a non-RT thread, which parses it and applies it to the engine.
        The worker thread is the ONLY thread that mutates song/engine state (single
@@ -802,6 +806,14 @@ static void run(LV2_Handle instance, uint32_t sample_count)
         }
         if (speedAtom && speedAtom->type == uris->atom_Float)
             p->playing = ((const LV2_Atom_Float*)speedAtom)->body != 0.0f;
+        /* Hosts send a Position only on change, so the per-second summary below
+           would almost always miss it: report each one as it arrives. */
+        if (luvieDebug())
+            fprintf(stderr, "[luvie] host position: frame=%s%ld speed=%s%.2f\n",
+                    frameAtom ? "" : "(none) ", (long)hostFrame,
+                    speedAtom ? "" : "(none) ",
+                    (speedAtom && speedAtom->type == uris->atom_Float)
+                        ? ((const LV2_Atom_Float*)speedAtom)->body : 0.0f);
     }
 
     /* ── Relay the host's MIDI input to the UI ────────────────────────────────
@@ -926,18 +938,20 @@ static void run(LV2_Handle instance, uint32_t sample_count)
         p->curFrame += sample_count;
 
     if (luvieDebug()) {
-        static int dbgAccum = 0;
-        dbgAccum += (int)sample_count;
+        p->dbgFrames     += (int)sample_count;
+        p->dbgCtrlEvents += ctrlEvents;
+        p->dbgPositions  += lastPos != nullptr;
+        p->dbgMidiIn     += midiInCount;
         int emitted = p->engine ? p->engine->lastEmittedCount() : 0;
-        if (emitted > 0 || dbgAccum >= (int)p->engine->sampleRateHz()) {
+        if (emitted > 0 || p->dbgFrames >= (int)p->engine->sampleRateHz()) {
             int outsConnected = 0;
             for (auto* s : p->out) if (s) outsConnected++;
-            fprintf(stderr, "[luvie] run: ctrlIn=%s ctrlEvents=%d gotPos=%d playing=%d "
-                    "frame=%ld emitted=%d outs=%d/%d\n",
-                    p->controlIn ? "connected" : "NULL", ctrlEvents,
-                    lastPos != nullptr, p->playing, (long)p->curFrame, emitted,
-                    outsConnected, LUVIE_NUM_MIDI_OUTS);
-            dbgAccum = 0;
+            fprintf(stderr, "[luvie] run(%p): ctrlIn=%s ctrlEvents=%d positions=%d "
+                    "midiIn=%d playing=%d frame=%ld emitted=%d outs=%d/%d\n",
+                    (void*)p, p->controlIn ? "connected" : "NULL", p->dbgCtrlEvents,
+                    p->dbgPositions, p->dbgMidiIn, p->playing, (long)p->curFrame,
+                    emitted, outsConnected, LUVIE_NUM_MIDI_OUTS);
+            p->dbgFrames = p->dbgCtrlEvents = p->dbgPositions = p->dbgMidiIn = 0;
         }
     }
 }
