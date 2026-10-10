@@ -1239,6 +1239,11 @@ int LoopEditor::handle(int event)
         return 1;
     }
 
+    // Focus given to the editor stays with the editor. Fl_Group would pass it on to
+    // the first child that takes it — the panel's Flip button — which then eats
+    // Enter and flips the grid instead of opening the block under the cursor.
+    if (event == FL_FOCUS) return 1;
+
     // While an instrument-reorder drag is in progress, own all drag/release
     // events ourselves rather than letting a child (e.g. a scrollbar passed
     // under the cursor) swallow the commit.
