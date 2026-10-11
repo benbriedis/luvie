@@ -206,6 +206,7 @@ Distro and Build:
 	- Probably build .deb, .rpm, maybe .aur for Linux. 
 	  AppImage is a possibility, but not that interested personally (going to need a build process for Windows and Mac eventually anyway).
 			Also look at Flatpak and Snap.
+			Snap - not so good for Ardour as plugins all have to copied into its little protected space.
 	  MAYBE have a .zip or something for installation as a plugin. NB Can share libluvie.a between standalone and plugin versions.
 	- Use CPack per platform to bundle
 	- macOS: "CPack DragNDrop (.dmg) for the app; plugin as luvie.lv2 containing a .dylib, codesigned + notarized."
@@ -292,9 +293,6 @@ BUG: clicking a dragging two blocks in a collapsed track can be dragged into a s
 
 Check out Entropictron
 
-
-Re DISTRO: Ubuntu seems to be favouring Snap for apps like Ardour now.
-   Maybe should use that instead - probably works for other distros etc too.
 
 TAG distro
 

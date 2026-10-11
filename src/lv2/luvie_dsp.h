@@ -11,6 +11,7 @@
 #include <lv2/core/lv2_util.h>
 #include <lv2/log/logger.h>
 #include <lv2/midi/midi.h>
+#include <lv2/parameters/parameters.h>
 #include <lv2/time/time.h>
 #include <lv2/urid/urid.h>
 #include <stdbool.h>
@@ -165,6 +166,7 @@ typedef struct {
     LV2_URID time_beatsPerMinute;
     LV2_URID time_speed;
     LV2_URID time_frame;          /* sample-frame transport position */
+    LV2_URID param_sampleRate;    /* DSP -> UI in the Position object: for OSC /locate */
     LV2_URID atom_Long;
     LV2_URID atom_Int;
     LV2_URID atom_Float;

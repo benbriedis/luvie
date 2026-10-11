@@ -80,6 +80,20 @@ The full set of realistic options:
   OSC port, is entirely Ardour-specific, and has no standard LV2 integration point. Not worth
   pursuing.
 
+  UPDATE (Oct 2026): IMPLEMENTED as the "Ardour OSC" choice of the Transport overlay's Control
+  setting (Jack / Ardour OSC / None, saved in the project). Since Ardour 5 there is no /ardour/
+  prefix. See src/transports/oscTransport.* and oscObserver.*. Notes from Ardour 9.8's source
+  (libs/surfaces/osc/osc.cc):
+   - /transport_play, /transport_stop, /locate ii (int32 sample, roll; roll=0 = "roll if
+     appropriate", so a rolling transport keeps rolling).
+   - Liveness: /transport_frame is answered with /transport_frame h. In Port Mode "Manual"
+     (the default) Ardour replies to its Reply Manual Port (default 8000), not the sender, so
+     Luvie listens on 8000 when it can, else an ephemeral port (then Ardour needs "Auto").
+   - No polling while Up: each command is followed by a probe; no answer within 1 s → Waiting,
+     re-probed every second on an FLTK timer.
+   - Position still comes from the DSP's time:Position; the DSP adds param:sampleRate to it
+     so the UI can convert bars to samples for /locate.
+
 
 ❯ So the main advantage of using here Jack seems to be that Luvie can auto-detect it's       
 presence and connect to it. Is there any way Luvie could perform the patching required for   

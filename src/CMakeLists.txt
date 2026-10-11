@@ -8,7 +8,8 @@ add_library(luvie_core STATIC
     selectionContextPopup.cpp pasteContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
     transports/simpleTransport.cpp transports/sequencer.cpp transports/jackTransport.cpp
-    transports/jackObserver.cpp transports/playhead.cpp songEditor/markerPopup.cpp
+    transports/jackObserver.cpp transports/oscTransport.cpp transports/oscObserver.cpp
+    transports/playhead.cpp songEditor/markerPopup.cpp
     songEditor/markerRuler.cpp songEditor/loopRuler.cpp songEditor/loopRulerContextPopup.cpp
     songEditor/observableSong.cpp songEditor/observablePattern.cpp
     songEditor/patternNames.cpp
@@ -40,7 +41,9 @@ if(LUVIE_NSM)
     # carry no liblo.so dependency (see NOTICE on the LGPL-2.1 section 6 obligations
     # that come with that).
     target_link_libraries(luvie_core PUBLIC liblo_static)
-    target_compile_definitions(luvie_core PUBLIC LUVIE_HAVE_NSM)
+    # liblo also carries the plugin's Ardour OSC transport control
+    # (transports/oscTransport.cpp), which compiles to no-ops without it.
+    target_compile_definitions(luvie_core PUBLIC LUVIE_HAVE_NSM LUVIE_HAVE_OSC)
 else()
     target_sources(luvie_core PRIVATE nsmStub.cpp)
 endif()

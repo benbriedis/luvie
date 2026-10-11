@@ -35,6 +35,10 @@ public:
     void start();
     // Stop requesting JACK / cancel any in-flight poll.
     void stop();
+    // Stop requesting JACK and close the client if one is open, ending in Down.
+    // For when JACK is no longer wanted at all (unlike stop(), which keeps an open
+    // client so a later start() can re-attach to it).
+    void release();
 
     // The JACK server went away while we were Up: close the dead client and
     // resume polling so we reconnect when a server returns. Call on the UI

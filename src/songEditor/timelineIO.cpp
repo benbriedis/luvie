@@ -459,6 +459,8 @@ std::string appStateToJsonString(const AppState& state) {
     json j = {
         {"version",         1},
         {"transport",       state.transport},
+        {"transportControl", state.transportControl},
+        {"oscPort",         state.oscPort},
         {"defaultPortBackend", backendToString(state.defaultPortBackend)},
         {"timeline",        timelineToJson(state.timeline)},
         {"jackOutputs",     jconns},
@@ -492,6 +494,8 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
         return false;
     }
     state.transport = j.value("transport", -1);
+    state.transportControl = j.value("transportControl", -1);
+    state.oscPort          = j.value("oscPort", 3819);
     state.defaultPortBackend = backendFromString(j.value("defaultPortBackend", "jack"));
     // Absent in projects saved before loop state was persisted: they load as Song
     // mode with no loops running, which is what those sessions started as anyway.

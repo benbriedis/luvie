@@ -17,7 +17,19 @@ and painless - the codebase is small and almost all dependencies are static.
 Modern Linux installations ship with PipeWire that provides a mock Jack server.
 Jack is an optional, but recommended, dependency for other platforms.
 
-Jack (or PipeWire) is required for full transport support when Luvie is used as a LV2 plugin.
+When Luvie is used as a LV2 plugin, its transport buttons need a way to control the host's
+transport. Choose it with **Control** in the Transport window:
+
+- **Jack** — uses the Jack (or PipeWire) transport. The host must be set to follow Jack transport.
+  The default on Linux.
+- **Ardour OSC** — uses Ardour's OSC control surface, so no Jack is needed. The default on
+  Windows and macOS. Enable it in Ardour under *Preferences > Control Surfaces > Open Sound
+  Control*, and make sure **OSC port** in Luvie's Transport window matches Ardour's (3819 by
+  default). Ardour's default Port Mode ("Manual", reply port 8000) works; if anything else is
+  already using port 8000, set Ardour's Port Mode to "Auto" instead.
+- **None** — Luvie's transport buttons are disabled and Luvie simply follows the host's transport.
+
+The choice is saved with the project.
 
 ## Luvie standalone vs Luvie as an LV2 plugin
 
@@ -105,7 +117,8 @@ Luvie can be run in Carla as a plugin. Here's a quick walk through.
 
 ## Running in Ardour
 
-TODO clean up this stuff:
+### Running with Jack
+TODO check whether Jack is used in Windows and Mac
 
 Ardour - click the Int. / Jack button in the top left to show 'Jack'.
 
@@ -115,6 +128,10 @@ Session > Properties > Timecode > JACK Transport /Time Settings
    Uncheck 'Ardour is JACK Time Master'
    
 TODO check 'Strict I/O' setting in the bus
+
+### Running without Jack
+
+TODO maybe support transport control via MIDI or other mechanisms
 
 ## Simple Luvie test
 1. Create a quick song in the Song Editor (TODO screenshot)

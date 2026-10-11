@@ -87,7 +87,8 @@ FetchContent_Declare(rtmidi
     EXCLUDE_FROM_ALL
 )
 
-# liblo — OSC, used only by the NSM session-management client (src/nsm.cpp).
+# liblo — OSC, used by the NSM session-management client (src/nsm.cpp) and by the
+# plugin's Ardour OSC transport control (src/transports/oscTransport.cpp).
 # Fetched and linked statically rather than taken from the system, so NSM works on every
 # platform without a distro package and the binaries carry no liblo.so dependency.
 #
@@ -182,7 +183,9 @@ target_include_directories(jack_headers INTERFACE ${jack_hdrs_SOURCE_DIR}/common
 #
 # The option exists to build without it; src/nsmStub.cpp then stands in for src/nsm.cpp
 # and no liblo is linked at all.
-option(LUVIE_NSM "Build the NSM session-management client (links liblo)" ON)
+# Turning it off also removes the plugin's Ardour OSC transport control, which is the
+# other liblo user.
+option(LUVIE_NSM "Build the NSM session-management client and Ardour OSC control (links liblo)" ON)
 
 # ---- Licences ----
 # Assembles build/LICENSES/ from LICENSE, NOTICE and the fetched dependency sources.

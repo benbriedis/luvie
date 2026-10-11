@@ -311,18 +311,18 @@ void Transport::syncPlayState()
 
 void Transport::disableButtons()
 {
-	rewindBtn->deactivate();
-	playPauseBtn->deactivate();
-	rewindBtn->redraw();
-	playPauseBtn->redraw();
+	for (TransportButton* b : {loopBtn, rewindBtn, playPauseBtn}) {
+		b->deactivate();
+		b->redraw();
+	}
 }
 
 void Transport::enableButtons()
 {
-	rewindBtn->activate();
-	playPauseBtn->activate();
-	rewindBtn->redraw();
-	playPauseBtn->redraw();
+	for (TransportButton* b : {loopBtn, rewindBtn, playPauseBtn}) {
+		b->activate();
+		b->redraw();
+	}
 }
 
 void Transport::pressPlayPause()

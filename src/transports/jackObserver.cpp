@@ -27,6 +27,14 @@ void JackObserver::stop() {
     if (state_ == State::Polling) setState(State::Down);
 }
 
+void JackObserver::release() {
+    stop();
+    if (!up_) return;
+    up_ = false;
+    jack_->close();
+    setState(State::Down);
+}
+
 void JackObserver::serverLost() {
     if (!up_) return;          // already down / polling — nothing to tear down
     up_ = false;

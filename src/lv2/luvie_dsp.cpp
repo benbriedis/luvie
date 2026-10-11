@@ -601,6 +601,7 @@ static void mapURIs(LV2_URID_Map* map, URIs* uris)
     uris->time_beatsPerMinute= map->map(map->handle, LV2_TIME__beatsPerMinute);
     uris->time_speed         = map->map(map->handle, LV2_TIME__speed);
     uris->time_frame         = map->map(map->handle, LV2_TIME__frame);
+    uris->param_sampleRate   = map->map(map->handle, LV2_PARAMETERS__sampleRate);
     uris->midi_MidiEvent     = map->map(map->handle, LV2_MIDI__MidiEvent);
     uris->luvie_state        = map->map(map->handle, LUVIE_STATE_URI);
     uris->luvie_midi         = map->map(map->handle, LUVIE_MIDI_URI);
@@ -885,6 +886,10 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                 lv2_atom_forge_float(&p->forge, barBeat);
                 lv2_atom_forge_key(&p->forge, uris->time_beatsPerBar);
                 lv2_atom_forge_float(&p->forge, bpb);
+                /* Not a time: property, but the UI needs it to turn a bar into the
+                   sample position Ardour's OSC /locate takes, and nothing else tells it. */
+                lv2_atom_forge_key(&p->forge, uris->param_sampleRate);
+                lv2_atom_forge_float(&p->forge, (float)p->engine->sampleRateHz());
                 lv2_atom_forge_pop(&p->forge, &posFrame);
             }
 

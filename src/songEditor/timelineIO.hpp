@@ -117,6 +117,11 @@ struct JackInstrument {
 struct AppState {
     Timeline timeline;
     int  transport = -1;  // clock source: 0=Host, 1=Internal, 2=Jack; -1=unset
+    // Plugin mode: how the transport buttons reach the host (TransportOverlay::Control:
+    // 0=Jack, 1=Ardour OSC, 2=None; -1=unset, i.e. the platform default) and the
+    // port of Ardour's OSC surface.
+    int  transportControl = -1;
+    int  oscPort          = 3819;
     MidiBackend defaultPortBackend = MidiBackend::Jack;  // type assigned to newly added ports
     std::vector<JackOutput> jackOutputs;
     std::vector<JackInstrument> jackInstruments;

@@ -8,6 +8,7 @@
 #include <lv2/atom/atom.h>
 #include <lv2/atom/util.h>
 #include <lv2/time/time.h>
+#include <lv2/parameters/parameters.h>
 #include <cstdio>
 #include "stateFile.hpp"
 
@@ -34,6 +35,9 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "simpleTransport.hpp"
 #include "jackTransport.hpp"
 #include "jackObserver.hpp"
+#include "oscTransport.hpp"
+#include "oscObserver.hpp"
+#include "transportOverlay.hpp"
 #include "observableSong.hpp"
 #include "observablePattern.hpp"
 #include "observableInstrument.hpp"
@@ -124,6 +128,8 @@ static std::string serializeStateToString(LuvieUI* ui);
 static void sendState(LuvieUI* ui);
 static void sendLoopState(LuvieUI* ui);
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size);
+static void applyTransportControl(LuvieUI* ui);
+static void refreshTransportControl(LuvieUI* ui);
 
 /* -----------------------------------------------------------------------
    LuvieUI — the ExternalUI instance.
@@ -153,6 +159,7 @@ struct LuvieUI {
     LV2_URID                time_beatsPerBar    = 0;
     LV2_URID                time_beatsPerMinute = 0;
     LV2_URID                time_speed          = 0;
+    LV2_URID                param_sampleRate    = 0;
 
     /* Owned heap objects */
     AppWindow*            window         = nullptr;
@@ -171,6 +178,12 @@ struct LuvieUI {
        JACK server appearing/disappearing and enables/disables the UI buttons. */
     JackTransport*       jackControl     = nullptr;
     JackObserver*        jackObserver    = nullptr;
+
+    /* The alternative to jackControl for hosts without JACK: drives Ardour's
+       transport through its OSC surface. Which of the two is used (or neither) is
+       the Transport overlay's Control setting; see applyTransportControl(). */
+    OscTransport*        oscControl      = nullptr;
+    OscObserver*         oscObserver     = nullptr;
 
     /* UI layout (owns FLTK widgets via window) */
     LuvieApp            app;
@@ -221,6 +234,9 @@ struct LuvieUI {
         if (jackObserver) jackObserver->stop();
         delete jackObserver;
         delete jackControl;
+        if (oscObserver) oscObserver->stop();   /* closes the socket's fd watch */
+        delete oscObserver;
+        delete oscControl;
         /* app destructor removes timeline observers */
         /* Widgets are owned by window (added via add()), deleted with window */
         delete window;
@@ -305,6 +321,10 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
     state.sceneTriggers = ui->app.sceneTriggers.triggers();
     state.patternTriggers = ui->app.sceneTriggers.patternTriggers();
     state.harmonyRootTrigger = ui->app.harmonyRootTrigger();
+    if (auto* ov = ui->app.transportOverlay) {
+        state.transportControl = ov->control();
+        state.oscPort          = ov->oscPort();
+    }
     return true;
 }
 
@@ -511,6 +531,92 @@ static void sendAuditionMidi(LuvieUI* ui, int portIdx, const uint8_t* bytes, int
                   ui->atom_eventTransfer, buf);
 }
 
+/* -----------------------------------------------------------------------
+   Transport control: Jack / Ardour OSC / None (see instantiate)
+   ----------------------------------------------------------------------- */
+
+/* Start the mechanism the Transport overlay selects and stop the other. */
+static void applyTransportControl(LuvieUI* ui)
+{
+    auto* ov = ui->app.transportOverlay;
+    if (!ov || !ui->jackObserver || !ui->oscObserver) return;
+    switch (ov->control()) {
+    case TransportOverlay::ControlJack:
+        ui->oscObserver->stop();
+        ui->jackObserver->start();
+        break;
+    case TransportOverlay::ControlArdourOsc:
+        ui->jackObserver->release();
+        ui->oscObserver->start(ov->oscPort());
+        break;
+    default:   // None
+        ui->jackObserver->release();
+        ui->oscObserver->stop();
+        break;
+    }
+    refreshTransportControl(ui);
+}
+
+/* Route commands to the selected mechanism if it is live, and show its state: the
+   buttons, the bottom-pane alert and the overlay's status line. Called on every
+   observer change. */
+static void refreshTransportControl(LuvieUI* ui)
+{
+    auto*      ov = ui->app.transportOverlay;
+    Transport* bp = ui->app.bottomPane;
+    if (!ov || !bp) return;
+
+    ITransport* command = nullptr;
+    std::string alert, status;
+    switch (ov->control()) {
+    case TransportOverlay::ControlJack:
+        if (ui->jackObserver->state() == JackObserver::State::Up) {
+            command = ui->jackControl;
+        } else {
+            alert  = "JACK unavailable \xe2\x80\x94 transport control disabled";
+            status = "Waiting for JACK server\xe2\x80\xa6";
+        }
+        break;
+    case TransportOverlay::ControlArdourOsc:
+        switch (ui->oscObserver->state()) {
+        case OscObserver::State::Up:
+            command = ui->oscControl;
+            break;
+        case OscObserver::State::Unavailable:
+            alert  = "Ardour OSC unavailable \xe2\x80\x94 transport control disabled";
+            status = OscTransport::available()
+                   ? "Could not open a socket for Ardour's OSC replies."
+                   : "This build of Luvie has no OSC support.";
+            break;
+        default:
+            alert  = "Ardour OSC not responding \xe2\x80\x94 transport control disabled";
+            status = "Waiting for Ardour on OSC port " + std::to_string(ov->oscPort())
+                   + "\xe2\x80\xa6 Enable it in Ardour: Preferences > Control Surfaces"
+                     " > Open Sound Control.";
+            /* We could not listen on Ardour's default reply port, so its replies
+               only reach us if it answers the sender. */
+            if (ui->oscControl->replyPort() != OscTransport::kDefaultReplyPort)
+                status += " Set its Port Mode to Auto.";
+            break;
+        }
+        break;
+    default:   // None: the host's transport drives Luvie; nothing to report
+        break;
+    }
+
+    ui->hostTransport->setCommand(command);
+    if (command) {
+        bp->enableButtons();
+        bp->setAlerts({});
+        bp->syncPlayState();
+    } else {
+        bp->disableButtons();
+        bp->setAlerts(alert.empty() ? std::vector<std::string>{}
+                                    : std::vector<std::string>{alert});
+    }
+    ov->setStatus(status);
+}
+
 static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size)
 {
     if (!ui->song || !ui->app.patternPanel || size == 0) return;
@@ -549,6 +655,12 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
        one authoritative send just after. */
     ui->app.applySongLoop(state.songLoopEnabled, state.songLoopStartCol,
                           state.songLoopEndCol);
+    /* Only the overlay's selection here: instantiate starts the mechanism once the
+       restore is done. Unset (-1) keeps the platform default already selected. */
+    if (auto* ov = ui->app.transportOverlay) {
+        if (state.transportControl >= 0) ov->setControl(state.transportControl);
+        ov->setOscPort(state.oscPort);
+    }
     ui->restoringState = false;
     /* One loop-state message now that the mode and the active set agree. This the
        DSP does need even though dsp_restore applied the same values: the editor can
@@ -646,6 +758,7 @@ static LV2UI_Handle instantiate(
         ui->time_beatsPerBar    = m(LV2_TIME__beatsPerBar);
         ui->time_beatsPerMinute = m(LV2_TIME__beatsPerMinute);
         ui->time_speed          = m(LV2_TIME__speed);
+        ui->param_sampleRate    = m(LV2_PARAMETERS__sampleRate);
     }
 
     /* ---- Window ---- */
@@ -780,35 +893,51 @@ static LV2UI_Handle instantiate(
             sendAuditionMidi(ui, portIdx, m, len);
         });
 
-    /* ---- JACK transport control (Issue #2) ----
-       The transport buttons start disabled (disableTransportButtons above). When a
-       JACK server is available, route them through a transport-only JACK client so
-       pressing Play here starts the JACK transport — a host set to follow JACK
-       transport then rolls and, via its time:Position, the DSP plays. The buttons are
-       re-disabled (with an alert) whenever JACK is unavailable. The poll runs on the
-       FLTK timer pumped by ui_run()'s Fl::check(). */
+    /* ---- Transport control (Issue #2) ----
+       The transport buttons start disabled (disableTransportButtons above). The
+       Transport overlay's Control setting picks how they reach the host:
+         Jack       — a transport-only JACK client: pressing Play starts the JACK
+                      transport, and a host set to follow it rolls.
+         Ardour OSC — Ardour's OSC control surface, for Ardour without JACK
+                      (typically Windows / macOS).
+         None       — the buttons stay disabled; the host's own transport drives us.
+       Either way the DSP's time:Position, not the command path, moves the playhead.
+       Only the selected mechanism runs: the other observer is stopped, so nothing
+       polls for a JACK server while OSC is in use. Both observers run on FLTK timers
+       and fd watches pumped by ui_run()'s Fl::check(). The selection is applied once
+       the saved state has been restored, at the end of instantiate. */
     JackTransport::silenceLogging();
     ui->jackControl = new JackTransport;
     ui->jackControl->setTimeline(ui->song);                 // for seek() bar->frame
     ui->jackControl->awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
     ui->jackControl->onShutdown = [ui]() { ui->jackObserver->serverLost(); };
-
     ui->jackObserver = new JackObserver(ui->jackControl);
-    ui->jackObserver->addListener([ui](JackObserver::State s) {
-        Transport* bp = ui->app.bottomPane;
-        if (!bp) return;
-        if (s == JackObserver::State::Up) {
-            ui->hostTransport->setCommand(ui->jackControl);   // route commands to JACK
-            bp->enableButtons();
-            bp->setAlerts({});
-            bp->syncPlayState();
-        } else {
-            ui->hostTransport->setCommand(nullptr);           // commands become no-ops
-            bp->disableButtons();
-            bp->setAlerts({"JACK unavailable — transport control disabled"});
-        }
-    });
-    ui->jackObserver->start();
+    ui->jackObserver->addListener([ui](JackObserver::State) { refreshTransportControl(ui); });
+
+    ui->oscControl = new OscTransport;
+    ui->oscControl->setTimeline(ui->song);                  // for seek() bar->sample
+    ui->oscControl->isRolling = [ui]() { return ui->simpleTransport->isPlaying(); };
+    ui->oscObserver = new OscObserver(ui->oscControl);
+    ui->oscObserver->addListener([ui](OscObserver::State) { refreshTransportControl(ui); });
+
+    if (auto* ov = ui->app.transportOverlay) {
+        /* Unset in the project: JACK is the norm on Linux, and rare elsewhere. */
+#if defined(_WIN32) || defined(__APPLE__)
+        ov->setControl(TransportOverlay::ControlArdourOsc);
+#else
+        ov->setControl(TransportOverlay::ControlJack);
+#endif
+        ov->setOscPort(OscTransport::kDefaultArdourPort);
+        /* Part of the project, so a change marks the session dirty via sendState. */
+        ov->onControlChanged = [ui](int) {
+            applyTransportControl(ui);
+            if (!ui->restoringState) sendState(ui);
+        };
+        ov->onOscPortChanged = [ui](int) {
+            applyTransportControl(ui);
+            if (!ui->restoringState) sendState(ui);
+        };
+    }
 
     /* ---- Wire port management ---- */
     if (auto* overlay = ui->app.outputsOverlay) {
@@ -871,6 +1000,7 @@ static LV2UI_Handle instantiate(
     ui->restoringState = false;
     sendState(ui);
     ui->app.pushSongLoopState();   // seed the DSP with the current song-loop region
+    applyTransportControl(ui);     // start the Control mechanism the project selects
 
     /* Return the widget pointer as the LV2UI handle */
     *widget = &ui->widget;
@@ -947,12 +1077,18 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
     const LV2_Atom_Float* aBeat  = nullptr;
     const LV2_Atom_Float* aBpb   = nullptr;
     const LV2_Atom_Float* aSpeed = nullptr;
+    const LV2_Atom_Float* aRate  = nullptr;
     lv2_atom_object_get(obj,
         ui->time_bar,         &aBar,
         ui->time_barBeat,     &aBeat,
         ui->time_beatsPerBar, &aBpb,
         ui->time_speed,       &aSpeed,
+        ui->param_sampleRate, &aRate,
         0);
+
+    /* Added by our DSP so an OSC seek can be given in samples. */
+    if (aRate && ui->oscControl)
+        ui->oscControl->setSampleRate(aRate->body);
 
     if (!aBar && !aBeat)
         return;
