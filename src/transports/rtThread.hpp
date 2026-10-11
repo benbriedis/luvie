@@ -32,6 +32,10 @@ void rtSleepUntil(int64_t deadlineNs);
 // Audio". Returns false (and changes nothing) where the OS refuses.
 bool rtPromoteCurrentThread(int64_t periodNs);
 
+// What the user can do when rtPromoteCurrentThread() is refused, for a warning.
+// Empty where there is nothing to configure.
+const char* rtPromotionAdvice();
+
 // Counting semaphore. post() is async-signal/RT-safe on every platform (it neither
 // allocates nor takes a lock a non-RT thread could hold); the waits are for the
 // non-RT side, or for an RT thread that has nothing to do.

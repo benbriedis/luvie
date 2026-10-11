@@ -13,6 +13,7 @@
 #include "appWindow.hpp"
 #include "internalTransport.hpp"
 #include "midiScheduler.hpp"
+#include "rtThread.hpp"
 #include "jackTransport.hpp"
 #include "transportRouter.hpp"
 #include "jackObserver.hpp"
@@ -232,6 +233,7 @@ int main(int argc, char **argv) {
     app.build(&window, &songTimeline, &patternObs, &instrObs, transport);
     internalTransport.setLoopManager(&app.loopMgr);
 
+
     // --- JACK port management ---------------------------------------------
     OutputsOverlay* connOverlay = app.outputsOverlay;
 
@@ -271,10 +273,21 @@ int main(int argc, char **argv) {
         else          jackObserver.stop();
     };
 
+    // Whether the engine or sender thread was refused real-time priority (known once
+    // both have started). Said once on stderr, as Ardour's backends do; the alert
+    // below appears only while timing actually depends on those threads.
+    const bool rtRefused = !internalTransport.realtime() || !midiSched.realtime();
+    std::string rtAlert = "No real-time priority: MIDI timing may suffer under load.";
+    if (*rtPromotionAdvice()) rtAlert += std::string(" ") + rtPromotionAdvice();
+    if (rtRefused) fprintf(stderr, "[luvie] %s\n", rtAlert.c_str());
+
     // Refresh the transport-bar alert indicator. Three JACK-related alerts can be
     // active; each clears once JACK connects or its own trigger goes away: the clock
     // source moves off Jack, the last Jack MIDI output goes away, or the MIDI input
-    // moves off Jack / Record is disarmed.
+    // moves off Jack / Record is disarmed. A fourth reports missing real-time
+    // priority while Luvie's own threads time the output: under the Internal clock
+    // (every port), or under JACK for any Native/Debug port. JACK ports under the
+    // JACK clock are written by JACK's own thread, whose priority JACK sees to.
     auto updateAlerts = [&]() {
         if (!app.bottomPane) return;
         bool jackDown    = jackObserver.state() != JackObserver::State::Up;
@@ -286,6 +299,8 @@ int main(int argc, char **argv) {
             alerts.push_back("Jack MIDI output in use but JACK is not running");
         if (midiInIsJack() && app.anyRecordArmed() && jackDown)
             alerts.push_back("Recording from Jack MIDI input but JACK is not running");
+        if (rtRefused && (router.active() != &jackTransport || portReg.anyNonJack()))
+            alerts.push_back(rtAlert);
         app.bottomPane->setAlerts(alerts);
     };
 

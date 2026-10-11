@@ -20,6 +20,7 @@ MidiScheduler::MidiScheduler(Sink sink) : sink_(std::move(sink))
 {
     heap_.reserve(Ring::kSize * kProducers);
     thread_ = std::thread([this] { run(); });
+    started_.wait();
 }
 
 MidiScheduler::~MidiScheduler()
@@ -64,7 +65,8 @@ bool MidiScheduler::ringsEmpty() const
 
 void MidiScheduler::run()
 {
-    rtPromoteCurrentThread(1000000);
+    realtime_ = rtPromoteCurrentThread(1000000);
+    started_.post();
 
     while (running_.load()) {
         // Take everything queued into the time-ordered heap. Arrival order across

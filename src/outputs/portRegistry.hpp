@@ -39,6 +39,7 @@ public:
     // Send one raw message on the named port, if it still exists. Sender thread.
     void  sendRaw(const char* name, const uint8_t* data, int len);
     bool  anyJack() const;
+    bool  anyNonJack() const;   // a Native or Debug port: sent by the MidiScheduler
 
     // Applied to every DebugPort as it is created (render pitch → note name).
     std::function<std::string(int)> debugPitchName;

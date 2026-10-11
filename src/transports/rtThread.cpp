@@ -103,6 +103,8 @@ bool rtPromoteCurrentThread(int64_t /*periodNs*/)
     return SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL) != 0;
 }
 
+const char* rtPromotionAdvice() { return ""; }
+
 RtSemaphore::RtSemaphore()  { impl_ = CreateSemaphoreW(nullptr, 0, 0x7FFFFFFF, nullptr); }
 RtSemaphore::~RtSemaphore() { if (impl_) CloseHandle((HANDLE)impl_); }
 void RtSemaphore::post()    { ReleaseSemaphore((HANDLE)impl_, 1, nullptr); }
@@ -177,6 +179,8 @@ bool rtPromoteCurrentThread(int64_t periodNs)
                              THREAD_TIME_CONSTRAINT_POLICY_COUNT) == KERN_SUCCESS;
 }
 
+const char* rtPromotionAdvice() { return ""; }
+
 RtSemaphore::RtSemaphore()  { impl_ = (void*)dispatch_semaphore_create(0); }
 RtSemaphore::~RtSemaphore() { if (impl_) dispatch_release((dispatch_semaphore_t)impl_); }
 void RtSemaphore::post()    { dispatch_semaphore_signal((dispatch_semaphore_t)impl_); }
@@ -226,6 +230,14 @@ bool rtPromoteCurrentThread(int64_t /*periodNs*/)
     const int maxPrio = sched_get_priority_max(SCHED_FIFO);
     p.sched_priority = kLinuxRtPriority < maxPrio ? kLinuxRtPriority : maxPrio;
     return pthread_setschedparam(pthread_self(), SCHED_FIFO, &p) == 0;
+}
+
+const char* rtPromotionAdvice()
+{
+    // As for JACK: real-time scheduling needs an rtprio limit, which distributions
+    // grant to the "audio" group (see 'ulimit -r', /etc/security/limits.d).
+    return "Add yourself to the 'audio' group and log in again "
+           "('ulimit -r' should then be non-zero).";
 }
 
 RtSemaphore::RtSemaphore()

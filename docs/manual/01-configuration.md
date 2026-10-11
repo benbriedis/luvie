@@ -150,3 +150,9 @@ choice between "Internal" and "Jack". When the Jack server is available you will
 that - see [Configuration](configuration.md)
 
 
+
+Luvie asks the operating system for real-time priority for its playback threads, as Jack does. On
+Linux this needs permission: if it is refused, an alert appears in the transport bar and timing
+may suffer when the computer is busy. The usual fix is to add yourself to the `audio` group
+(`sudo usermod -aG audio $USER`), then log out and back in; `ulimit -r` should then show a non-zero
+value. Windows and macOS need no setup.

@@ -51,6 +51,9 @@ public:
     // A full ring drops the message (false) rather than block.
     bool push(Producer from, const char* port, int64_t dueNs, const uint8_t* data, int len);
 
+    // Whether the sender thread got real-time priority (known once constructed).
+    bool realtime() const { return realtime_; }
+
 private:
     struct Event {
         int64_t  dueNs;
@@ -85,6 +88,8 @@ private:
     std::atomic<int64_t> nextDeadline_{INT64_MAX};
     std::atomic<bool>    running_{true};
     RtSemaphore          wake_;
+    RtSemaphore          started_;          // posted once the sender has promoted itself
+    bool                 realtime_ = false; // written before started_ is posted
     std::thread          thread_;
 };
 

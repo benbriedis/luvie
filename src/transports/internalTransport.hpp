@@ -50,6 +50,8 @@ public:
     // must outlive it.
     void start(MidiScheduler* sched);
     void stop();
+    // Whether the engine thread got real-time priority (known once start() returns).
+    bool realtime() const { return realtime_; }
 
     // ITransport — called from the UI thread
     void  play()             override;
@@ -88,6 +90,8 @@ private:
     MidiScheduler* sched_ = nullptr;
     std::thread    thread_;
     RtSemaphore    wake_;
+    RtSemaphore    started_;           // posted once the engine has promoted itself
+    bool           realtime_ = false;  // written before started_ is posted
     std::atomic<bool> running_{false};
 
     // ── Commands (UI thread writes, engine reads) ─────────────────────────────

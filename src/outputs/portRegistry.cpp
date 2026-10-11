@@ -86,3 +86,10 @@ bool PortRegistry::anyJack() const
         if (p && p->backend() == MidiBackend::Jack) return true;
     return false;
 }
+
+bool PortRegistry::anyNonJack() const
+{
+    for (const auto& p : ports_)
+        if (p && p->backend() != MidiBackend::Jack) return true;
+    return false;
+}

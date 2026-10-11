@@ -21,6 +21,7 @@ void InternalTransport::start(MidiScheduler* sched)
     sched_ = sched;
     running_.store(true);
     thread_ = std::thread([this] { run(); });
+    started_.wait();
 }
 
 void InternalTransport::stop()
@@ -82,7 +83,8 @@ float InternalTransport::position() const
 
 void InternalTransport::run()
 {
-    rtPromoteCurrentThread(kPeriodNs);
+    realtime_ = rtPromoteCurrentThread(kPeriodNs);
+    started_.post();
 
     const auto periodFrames = static_cast<int64_t>(kSampleRate * kPeriodNs / 1e9);
     auto frameToNs = [this](int64_t f) {
