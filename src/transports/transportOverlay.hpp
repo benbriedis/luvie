@@ -22,14 +22,15 @@
 // shows a red status line beneath the dropdown.
 //
 // Plugin mode adds a "Control" dropdown choosing how Luvie's transport buttons
-// reach the host — Jack, Ardour OSC or None — and, for Ardour OSC, the port of
-// Ardour's OSC surface. setStatus() shows the chosen mechanism's state in the
-// same red line.
+// reach the host — Jack, Ardour OSC, Carla OSC or None — and, for the OSC ones,
+// the host's OSC port, remembered separately for each. setStatus() shows the
+// chosen mechanism's state in the same red line.
 //
-//   control index 0 = Jack, 1 = Ardour OSC, 2 = None
+//   Control values (saved in projects): 0 = Jack, 1 = Ardour OSC, 2 = None,
+//   3 = Carla OSC. The menu lists None last, so its order differs; see kMenu.
 class TransportOverlay : public OverlayWindow {
 public:
-    enum Control { ControlJack = 0, ControlArdourOsc = 1, ControlNone = 2 };
+    enum Control { ControlJack = 0, ControlArdourOsc = 1, ControlNone = 2, ControlCarlaOsc = 3 };
 
 private:
     static constexpr int pad       = 16;
@@ -50,10 +51,24 @@ private:
     ModernValueInput* oscPortInput_    = nullptr;   // plugin mode only
     bool              pluginMode_      = false;
     std::string       status_;
+    int               ardourPort_      = 3819;    // OscTransport::kDefaultArdourPort
+    int               carlaPort_       = 22752;   // CarlaOscTransport::kDefaultCarlaPort
 
-    bool oscPortShown() const {
-        return controlChoice_ && controlChoice_->value() == ControlArdourOsc;
+    // The Control menu's order, as Control values.
+    static constexpr int kMenu[] = {ControlJack, ControlArdourOsc, ControlCarlaOsc, ControlNone};
+    static int menuIndex(int control) {
+        for (int i = 0; i < 4; ++i) if (kMenu[i] == control) return i;
+        return -1;
     }
+    static bool isOsc(int control) {
+        return control == ControlArdourOsc || control == ControlCarlaOsc;
+    }
+    int* portFor(int control) {
+        return control == ControlCarlaOsc ? &carlaPort_
+             : control == ControlArdourOsc ? &ardourPort_ : nullptr;
+    }
+
+    bool oscPortShown() const { return isOsc(control()); }
     int rowCount() const { return pluginMode_ ? (oscPortShown() ? 3 : 2) : 1; }
     int rowY(int row) const { return fieldTopY + row * rowStep; }
 
@@ -66,10 +81,15 @@ private:
         c->setHoverColor(0xF3F4F600);
     }
 
-    void updatePortVisibility() {
+    // Show the port field for an OSC control, holding that host's port.
+    void updatePortField() {
         if (!oscPortInput_) return;
-        if (oscPortShown()) oscPortInput_->show();
-        else                oscPortInput_->hide();
+        if (int* port = portFor(control())) {
+            oscPortInput_->value(*port);
+            oscPortInput_->show();
+        } else {
+            oscPortInput_->hide();
+        }
         redraw();
     }
 
@@ -144,15 +164,15 @@ public:
         if (pluginMode_) {
             controlChoice_ = new ModernChoice(choiceX, rowY(1), choiceW, choiceH);
             styleChoice(controlChoice_);
-            controlChoice_->add("Jack");         // ControlJack
-            controlChoice_->add("Ardour OSC");   // ControlArdourOsc
-            controlChoice_->add("None");         // ControlNone
-            controlChoice_->value(ControlJack);
-            controlChoice_->callback([](Fl_Widget* wd, void* d) {
+            controlChoice_->add("Jack");         // in kMenu order
+            controlChoice_->add("Ardour OSC");
+            controlChoice_->add("Carla OSC");
+            controlChoice_->add("None");
+            controlChoice_->value(menuIndex(ControlJack));
+            controlChoice_->callback([](Fl_Widget*, void* d) {
                 auto* self = static_cast<TransportOverlay*>(d);
-                self->updatePortVisibility();
-                if (self->onControlChanged)
-                    self->onControlChanged(static_cast<Fl_Choice*>(wd)->value());
+                self->updatePortField();
+                if (self->onControlChanged) self->onControlChanged(self->control());
             }, this);
 
             oscPortInput_ = new ModernValueInput(choiceX, rowY(2), portW, choiceH);
@@ -163,14 +183,15 @@ public:
             oscPortInput_->textsize(12);
             oscPortInput_->range(1, 65535);
             oscPortInput_->step(1);
-            oscPortInput_->value(3819);
             oscPortInput_->when(FL_WHEN_RELEASE);
             oscPortInput_->callback([](Fl_Widget* wd, void* d) {
                 auto* self = static_cast<TransportOverlay*>(d);
-                if (self->onOscPortChanged)
-                    self->onOscPortChanged(static_cast<int>(static_cast<Fl_Valuator*>(wd)->value()));
+                int* port = self->portFor(self->control());
+                if (!port) return;
+                *port = static_cast<int>(static_cast<Fl_Valuator*>(wd)->value());
+                if (self->onOscPortChanged) self->onOscPortChanged(*port);
             }, this);
-            updatePortVisibility();
+            updatePortField();
         }
         end();
 
@@ -197,13 +218,23 @@ public:
         redraw();
     }
 
-    // Plugin mode: the transport control mechanism and Ardour's OSC port.
-    int  control() const { return controlChoice_ ? controlChoice_->value() : ControlNone; }
-    void setControl(int c) {
-        if (!controlChoice_ || c < ControlJack || c > ControlNone) return;
-        controlChoice_->value(c);
-        updatePortVisibility();
+    // Plugin mode: the transport control mechanism (a Control).
+    int  control() const {
+        if (!controlChoice_) return ControlNone;
+        const int i = controlChoice_->value();
+        return i >= 0 && i < 4 ? kMenu[i] : ControlNone;
     }
-    int  oscPort() const { return oscPortInput_ ? static_cast<int>(oscPortInput_->value()) : 0; }
-    void setOscPort(int port) { if (oscPortInput_) oscPortInput_->value(port); }
+    void setControl(int c) {
+        const int i = menuIndex(c);
+        if (!controlChoice_ || i < 0) return;
+        controlChoice_->value(i);
+        updatePortField();
+    }
+    // The OSC port for an OSC control (0 for any other), and setting it.
+    int  oscPort(int c) const {
+        return c == ControlCarlaOsc ? carlaPort_ : c == ControlArdourOsc ? ardourPort_ : 0;
+    }
+    void setOscPort(int c, int port) {
+        if (int* p = portFor(c)) { *p = port; updatePortField(); }
+    }
 };

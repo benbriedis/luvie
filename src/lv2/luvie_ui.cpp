@@ -36,6 +36,7 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "jackTransport.hpp"
 #include "jackObserver.hpp"
 #include "oscTransport.hpp"
+#include "carlaOscTransport.hpp"
 #include "oscObserver.hpp"
 #include "transportOverlay.hpp"
 #include "observableSong.hpp"
@@ -179,11 +180,13 @@ struct LuvieUI {
     JackTransport*       jackControl     = nullptr;
     JackObserver*        jackObserver    = nullptr;
 
-    /* The alternative to jackControl for hosts without JACK: drives Ardour's
-       transport through its OSC surface. Which of the two is used (or neither) is
-       the Transport overlay's Control setting; see applyTransportControl(). */
+    /* The alternatives to jackControl for hosts without JACK: Ardour's OSC surface
+       and Carla's OSC. Which one is used (or none) is the Transport overlay's
+       Control setting; see applyTransportControl(). */
     OscTransport*        oscControl      = nullptr;
     OscObserver*         oscObserver     = nullptr;
+    CarlaOscTransport*   carlaControl    = nullptr;
+    OscObserver*         carlaObserver   = nullptr;
 
     /* UI layout (owns FLTK widgets via window) */
     LuvieApp            app;
@@ -237,6 +240,9 @@ struct LuvieUI {
         if (oscObserver) oscObserver->stop();   /* closes the socket's fd watch */
         delete oscObserver;
         delete oscControl;
+        if (carlaObserver) carlaObserver->stop();   /* joins its I/O thread */
+        delete carlaObserver;
+        delete carlaControl;
         /* app destructor removes timeline observers */
         /* Widgets are owned by window (added via add()), deleted with window */
         delete window;
@@ -323,7 +329,8 @@ static bool buildAppState(LuvieUI* ui, AppState& state)
     state.harmonyRootTrigger = ui->app.harmonyRootTrigger();
     if (auto* ov = ui->app.transportOverlay) {
         state.transportControl = ov->control();
-        state.oscPort          = ov->oscPort();
+        state.oscPort          = ov->oscPort(TransportOverlay::ControlArdourOsc);
+        state.carlaOscPort     = ov->oscPort(TransportOverlay::ControlCarlaOsc);
     }
     return true;
 }
@@ -539,20 +546,16 @@ static void sendAuditionMidi(LuvieUI* ui, int portIdx, const uint8_t* bytes, int
 static void applyTransportControl(LuvieUI* ui)
 {
     auto* ov = ui->app.transportOverlay;
-    if (!ov || !ui->jackObserver || !ui->oscObserver) return;
-    switch (ov->control()) {
-    case TransportOverlay::ControlJack:
-        ui->oscObserver->stop();
-        ui->jackObserver->start();
-        break;
-    case TransportOverlay::ControlArdourOsc:
-        ui->jackObserver->release();
-        ui->oscObserver->start(ov->oscPort());
-        break;
-    default:   // None
-        ui->jackObserver->release();
-        ui->oscObserver->stop();
-        break;
+    if (!ov || !ui->jackObserver || !ui->oscObserver || !ui->carlaObserver) return;
+    const int c = ov->control();
+    if (c != TransportOverlay::ControlJack)      ui->jackObserver->release();
+    if (c != TransportOverlay::ControlArdourOsc) ui->oscObserver->stop();
+    if (c != TransportOverlay::ControlCarlaOsc)  ui->carlaObserver->stop();
+    switch (c) {
+    case TransportOverlay::ControlJack:      ui->jackObserver->start(); break;
+    case TransportOverlay::ControlArdourOsc: ui->oscObserver->start(ov->oscPort(c)); break;
+    case TransportOverlay::ControlCarlaOsc:  ui->carlaObserver->start(ov->oscPort(c)); break;
+    default: break;   // None
     }
     refreshTransportControl(ui);
 }
@@ -590,13 +593,34 @@ static void refreshTransportControl(LuvieUI* ui)
             break;
         default:
             alert  = "Ardour OSC not responding \xe2\x80\x94 transport control disabled";
-            status = "Waiting for Ardour on OSC port " + std::to_string(ov->oscPort())
+            status = "Waiting for Ardour on OSC port "
+                   + std::to_string(ov->oscPort(TransportOverlay::ControlArdourOsc))
                    + "\xe2\x80\xa6 Enable it in Ardour: Preferences > Control"
                      " Surfaces > Novation > Open Sound Control.";
             /* We could not listen on Ardour's default reply port, so its replies
                only reach us if it answers the sender. */
             if (ui->oscControl->replyPort() != OscTransport::kDefaultReplyPort)
                 status += " Set its Port Mode to Auto.";
+            break;
+        }
+        break;
+    case TransportOverlay::ControlCarlaOsc:
+        switch (ui->carlaObserver->state()) {
+        case OscObserver::State::Up:
+            command = ui->carlaControl;
+            break;
+        case OscObserver::State::Unavailable:
+            alert  = "Carla OSC unavailable \xe2\x80\x94 transport control disabled";
+            status = OscTransport::available()
+                   ? "Could not open sockets to talk to Carla."
+                   : "This build of Luvie has no OSC support.";
+            break;
+        default:
+            alert  = "Carla OSC not responding \xe2\x80\x94 transport control disabled";
+            status = "Waiting for Carla on OSC port "
+                   + std::to_string(ov->oscPort(TransportOverlay::ControlCarlaOsc))
+                   + "\xe2\x80\xa6 Enable it in Carla: Settings > Configure Carla > OSC"
+                     " > Enable OSC, then restart Carla.";
             break;
         }
         break;
@@ -659,7 +683,8 @@ static void deserializeFullState(LuvieUI* ui, const uint8_t* data, uint32_t size
        restore is done. Unset (-1) keeps the platform default already selected. */
     if (auto* ov = ui->app.transportOverlay) {
         if (state.transportControl >= 0) ov->setControl(state.transportControl);
-        ov->setOscPort(state.oscPort);
+        ov->setOscPort(TransportOverlay::ControlArdourOsc, state.oscPort);
+        ov->setOscPort(TransportOverlay::ControlCarlaOsc,  state.carlaOscPort);
     }
     ui->restoringState = false;
     /* One loop-state message now that the mode and the active set agree. This the
@@ -900,6 +925,7 @@ static LV2UI_Handle instantiate(
                       transport, and a host set to follow it rolls.
          Ardour OSC — Ardour's OSC control surface, for Ardour without JACK
                       (typically Windows / macOS).
+         Carla OSC  — Carla's OSC remote control, likewise for Carla.
          None       — the buttons stay disabled; the host's own transport drives us.
        Either way the DSP's time:Position, not the command path, moves the playhead.
        Only the selected mechanism runs: the other observer is stopped, so nothing
@@ -920,6 +946,11 @@ static LV2UI_Handle instantiate(
     ui->oscObserver = new OscObserver(ui->oscControl);
     ui->oscObserver->addListener([ui](OscObserver::State) { refreshTransportControl(ui); });
 
+    ui->carlaControl = new CarlaOscTransport;
+    ui->carlaControl->setTimeline(ui->song);                // for seek() bar->frame
+    ui->carlaObserver = new OscObserver(ui->carlaControl);
+    ui->carlaObserver->addListener([ui](OscObserver::State) { refreshTransportControl(ui); });
+
     if (auto* ov = ui->app.transportOverlay) {
         /* Unset in the project: JACK is the norm on Linux, and rare elsewhere. */
 #if defined(_WIN32) || defined(__APPLE__)
@@ -927,7 +958,8 @@ static LV2UI_Handle instantiate(
 #else
         ov->setControl(TransportOverlay::ControlJack);
 #endif
-        ov->setOscPort(OscTransport::kDefaultArdourPort);
+        ov->setOscPort(TransportOverlay::ControlArdourOsc, OscTransport::kDefaultArdourPort);
+        ov->setOscPort(TransportOverlay::ControlCarlaOsc,  CarlaOscTransport::kDefaultCarlaPort);
         /* Part of the project, so a change marks the session dirty via sendState. */
         ov->onControlChanged = [ui](int) {
             applyTransportControl(ui);
@@ -1089,6 +1121,8 @@ static void port_event(LV2UI_Handle handle, uint32_t port_index,
     /* Added by our DSP so an OSC seek can be given in samples. */
     if (aRate && ui->oscControl)
         ui->oscControl->setSampleRate(aRate->body);
+    if (aRate && ui->carlaControl)
+        ui->carlaControl->setSampleRate(aRate->body);
 
     if (!aBar && !aBeat)
         return;

@@ -4,18 +4,16 @@
 #ifndef OSC_TRANSPORT_HPP
 #define OSC_TRANSPORT_HPP
 
-#include "itransport.hpp"
+#include "oscControl.hpp"
 #include <functional>
 
 class ObservableSong;
 
 /*
- * OscTransport — a command-only ITransport that drives Ardour's transport through
+ * OscTransport — the OscControl for Ardour: drives Ardour's transport through
  * Ardour's OSC control surface (Preferences > Control Surfaces > Novation >
- * Open Sound Control).
- * Used by the LV2 UI when no JACK server is available to carry transport commands
- * (typically Ardour on Windows / macOS). The playhead is still displayed from the
- * DSP's time:Position, so position() / isPlaying() are not meaningful here.
+ * Open Sound Control). Used by the LV2 UI when no JACK server is available to
+ * carry transport commands (typically Ardour on Windows / macOS).
  *
  * Ardour's surface must be enabled; it listens on UDP 3819 by default. Ardour only
  * answers queries, so liveness is checked with probe(): a /transport_frame query
@@ -27,7 +25,7 @@ class ObservableSong;
  * Everything runs on the UI thread: the reply socket is watched with Fl::add_fd,
  * so no thread or timer is needed here.
  */
-class OscTransport : public ITransport {
+class OscTransport : public OscControl {
 public:
     static constexpr int kDefaultArdourPort = 3819;
     static constexpr int kDefaultReplyPort  = 8000;   // Ardour's default manual reply port
@@ -43,9 +41,9 @@ public:
     // Target Ardour on localhost:ardourPort and open the reply socket. Reopens if
     // already open. False when the socket cannot be created or this build has no
     // OSC support (see available()).
-    bool open(int ardourPort);
-    void close();
-    bool isOpen() const { return server_ != nullptr; }
+    bool open(int ardourPort) override;
+    void close() override;
+    bool isOpen() const override { return server_ != nullptr; }
 
     // Whether this build includes OSC support (liblo).
     static bool available();
@@ -54,12 +52,7 @@ public:
     int  replyPort() const { return replyPort_; }
 
     // Ask Ardour for its transport position. An answer fires onReply.
-    void probe();
-    std::function<void()> onReply;
-
-    // Fired after each transport command is sent, so OscObserver can confirm that
-    // Ardour is still listening without having to poll while all is well.
-    std::function<void()> onCommandSent;
+    void probe() override;
 
     // Whether the host is rolling, as last reported by the DSP. A locate passes it on
     // as /locate's roll flag: Ardour's roll = 0 means "roll only if Auto Play is on",
@@ -71,8 +64,6 @@ public:
     void  pause()            override;
     void  rewind()           override;
     void  seek(float bars)   override;
-    float position()  const override { return 0.0f; }
-    bool  isPlaying() const override { return false; }
 
 private:
     void* server_   = nullptr;   // lo_server (opaque, so no liblo header leaks)

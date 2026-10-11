@@ -28,6 +28,11 @@ transport. Choose it with **Control** in the Transport window:
   matches Ardour's (3819 by default). Ardour's default Port Mode ("Manual", reply port
   8000) works; if anything else is already using port 8000, set Ardour's Port Mode to
   "Auto" instead.
+- **Carla OSC** — uses Carla's OSC remote control, so no Jack is needed. It is on by
+  default in Carla on Linux but off on Windows and macOS: enable it under *Settings >
+  Configure Carla > OSC > Enable OSC*, then restart Carla. Make sure **OSC port** in
+  Luvie's Transport window matches Carla's TCP port (22752 by default). Only one program
+  at a time can control Carla this way, so close `carla-control` if it is running.
 - **None** — Luvie's transport buttons are disabled and Luvie simply follows the host's transport.
 
 The choice is saved with the project.

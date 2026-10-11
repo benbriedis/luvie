@@ -94,6 +94,23 @@ The full set of realistic options:
    - Position still comes from the DSP's time:Position; the DSP adds param:sampleRate to it
      so the UI can convert bars to samples for /locate.
 
+  UPDATE (Oct 2026): "Carla OSC" added as a further Control choice (saved value 3; the menu
+  shows it before None). See src/transports/carlaOscTransport.*; OscObserver drives both via
+  the OscControl base. Checked against Carla 2.5.10 with a headless engine:
+   - Commands over TCP (default port 22752): /ctrl/transport_play i, /ctrl/transport_pause i,
+     /ctrl/transport_relocate ih (msg id, int64 frame; keeps rolling/stopped state).
+   - Carla refuses /ctrl/ commands ("OSC backend is not registered yet") until a client sends
+     /register <tcp url>. It then sends that client /ctrl/cb state and /ctrl/resp (id, error)
+     per command — always over TCP to a connection it opens, even if given a UDP URL.
+   - One registration; "ownership" is checked by sender IP only, so a second local client's
+     commands work but answers go to the first, and anyone's /unregister drops the owner.
+   - OSC is enabled by default only on Linux (CARLA_DEFAULT_OSC_ENABLED); a settings checkbox.
+  Design: liveness = a TCP send to Carla succeeding (register when probing). A refused connect
+  blocks ~2 s on Windows, and the TCP replies can't be watched by FLTK, so an I/O thread owns
+  the Carla side, blocked in lo_servers_wait() (liblo caps it at 100 s); the UI talks to it
+  over a UDP socket pair, the UI end watched with Fl::add_fd. Not lo_server_thread: that
+  wakes every 100 ms.
+
 
 ❯ So the main advantage of using here Jack seems to be that Luvie can auto-detect it's       
 presence and connect to it. Is there any way Luvie could perform the patching required for   

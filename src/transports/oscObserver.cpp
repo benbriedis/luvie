@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "oscObserver.hpp"
-#include "oscTransport.hpp"
+#include "oscControl.hpp"
 #include <FL/Fl.H>
 
-// How long Ardour has to answer a probe. It answers from its own event loop, so
-// this is generous; it is also the retry interval while Waiting.
+// How long the host has to answer a probe. Hosts answer from their own event
+// loops, so this is generous; it is also the retry interval while Waiting.
 static constexpr double kProbeTimeout = 1.0;
 
-OscObserver::OscObserver(OscTransport* osc) : osc_(osc) {
+OscObserver::OscObserver(OscControl* osc) : osc_(osc) {
     osc_->onReply = [this]() { answered(); };
     osc_->onCommandSent = [this]() {
         // Only re-check from Up: while Waiting the retry timer is already probing.
