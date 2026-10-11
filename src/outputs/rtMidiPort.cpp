@@ -23,6 +23,7 @@ RtMidiPort::~RtMidiPort() = default;   // unique_ptr closes the virtual port
 void RtMidiPort::rename(const std::string& n)
 {
     name_ = n;
+    std::lock_guard<std::mutex> lk(sendMutex_);
     if (!out_) return;
     // Renames the live virtual port in place, preserving its connections.
     try { out_->setPortName(n); }
@@ -37,6 +38,7 @@ void RtMidiPort::send3(int status, int d1, int d2)
         (unsigned char)(d1 & 0x7F),
         (unsigned char)(d2 & 0x7F),
     };
+    std::lock_guard<std::mutex> lk(sendMutex_);
     try { out_->sendMessage(msg, 3); }
     catch (const RtMidiError&) {}
 }
@@ -56,6 +58,7 @@ void RtMidiPort::raw(const uint8_t* msg, int len)
     // Sent as given, unlike programChange() above, which also emits bank select:
     // pass-through forwards what arrived and nothing more.
     if (!out_ || len <= 0) return;
+    std::lock_guard<std::mutex> lk(sendMutex_);
     try { out_->sendMessage(msg, (size_t)len); }
     catch (const RtMidiError&) {}
 }
@@ -70,6 +73,7 @@ void RtMidiPort::programChange(int ch, int bankMsb, int bankLsb, int program)
             (unsigned char)(0xC0 | (ch & 0x0F)),
             (unsigned char)(program & 0x7F),
         };
+        std::lock_guard<std::mutex> lk(sendMutex_);
         try { out_->sendMessage(msg, 2); }
         catch (const RtMidiError&) {}
     }

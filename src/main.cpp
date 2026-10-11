@@ -11,7 +11,8 @@
 #include <string>
 #include "appIcon.hpp"
 #include "appWindow.hpp"
-#include "simpleTransport.hpp"
+#include "internalTransport.hpp"
+#include "midiScheduler.hpp"
 #include "jackTransport.hpp"
 #include "transportRouter.hpp"
 #include "jackObserver.hpp"
@@ -152,15 +153,26 @@ int main(int argc, char **argv) {
     if (!verbose) JackTransport::silenceLogging();
 
     JackTransport   jackTransport;
-    SimpleTransport simpleTransport;
     TransportRouter router;
     JackObserver    jackObserver(&jackTransport);
     PortRegistry    portReg(&jackTransport);   // owns the live Port objects (Jack/Native/Debug)
+    // Delivers the engines' timestamped MIDI to every port without a JACK buffer of
+    // its own (Native/Debug always; Jack ports too under the Internal clock). After
+    // portReg, which its sender thread sends through, so it is destroyed first.
+    MidiScheduler   midiSched([&portReg](const char* port, const uint8_t* data, int len) {
+        portReg.sendRaw(port, data, len);
+    });
+    // The Internal clock: the same Sequencer engine as JACK's, on its own RT thread.
+    // It observes the timeline as jackTransport does, so an edit rebuilds a snapshot
+    // for each engine — cheap next to the edit, and it keeps both ready to take over.
+    InternalTransport internalTransport;
     bool            jackUp = false;   // set once JACK has been opened + wired up
     bool            newProject = true;   // cleared once an existing project loads
 
-    simpleTransport.setTimeline(&songTimeline);
-    router.setActive(&simpleTransport);
+    jackTransport.setScheduler(&midiSched);
+    internalTransport.setTimeline(&songTimeline);
+    internalTransport.start(&midiSched);
+    router.setActive(&internalTransport);
     ITransport* transport = &router;
     // Keep the playhead musically anchored across tempo edits (see
     // ObservableSong::reanchoringTempo). The stable router pointer is used so
@@ -168,6 +180,24 @@ int main(int argc, char **argv) {
     songTimeline.setTransport(&router);
 
     LuvieApp app;
+
+    // Shuts both engines down while everything they touch still exists. Declared
+    // after app (and before the window, which must stay last), so it is destroyed
+    // before app and before the transports and scheduler declared above:
+    //   - their threads stop first: jackTransport.close() ends JACK's process
+    //     callbacks, which with the Internal engine are the scheduler's only producers;
+    //   - they let go of app.loopMgr, whose observer list a Sequencer's destructor
+    //     would otherwise reach into after app has gone.
+    struct EngineStopper {
+        InternalTransport& internal;
+        JackTransport&     jack;
+        ~EngineStopper() {
+            internal.stop();
+            jack.close();
+            internal.setLoopManager(nullptr);
+            jack.setLoopManager(nullptr);
+        }
+    } engineStopper{internalTransport, jackTransport};
 
     // Declared after everything the widget tree points at — the observables, the
     // transports, the port registry, and app itself (whose LoopManager member the
@@ -189,8 +219,8 @@ int main(int argc, char **argv) {
         };
     }
 
-    // Soft (Native/Debug) output routing for the song playhead. Lambdas read live
-    // state at playback time, so they're safe to set before build() populates widgets.
+    // Output routing for one-off sends (auditioning, MIDI pass-through). Lambdas read
+    // live state at send time, so they're safe to set before build() populates widgets.
     app.portRegistry = &portReg;
     app.instrRoute = [&app](int instrumentId) -> MidiInstrRoute {
         if (!app.outputsOverlay) return {};
@@ -200,6 +230,7 @@ int main(int argc, char **argv) {
     };
 
     app.build(&window, &songTimeline, &patternObs, &instrObs, transport);
+    internalTransport.setLoopManager(&app.loopMgr);
 
     // --- JACK port management ---------------------------------------------
     OutputsOverlay* connOverlay = app.outputsOverlay;
@@ -282,37 +313,26 @@ int main(int argc, char **argv) {
     app.midiIn.awakeFn = [](void (*f)(void*), void* d) { Fl::awake(f, d); };
     app.onRecordArmChanged = [&]() { updateAlerts(); };
 
-    // Reconcile the Port set with the overlay, then refresh JACK want/warning state
-    // and tell the song playhead whether any soft (Native/Debug) ports need driving.
+    // Reconcile the Port set with the overlay, then refresh JACK want/warning state.
+    // Messages still queued for a port that goes away are dropped by sendRaw().
     auto syncPorts = [&]() {
         if (!connOverlay) return;
-        if (app.songEd) app.songEd->playheadPanicSoftNotes();   // release notes before teardown
         portReg.reconcile(connOverlay->getOutputsFull());
-        if (app.songEd) {
-            app.songEd->setPlayheadHasSoftPorts(portReg.anySoft());
-            app.songEd->setPlayheadHasJackPorts(portReg.anyJack());
-        }
         updateJackWanted();
         updateJackWarning();
     };
 
-    // Tell the song playhead whether the Jack RT engine is the active clock. When it
-    // isn't, the playhead soft-sequences Jack ports too; release held notes first so
-    // none hang across the switch.
-    auto applyClockMode = [&]() {
-        if (!app.songEd) return;
-        app.songEd->playheadPanicSoftNotes();
-        app.songEd->setPlayheadJackClockActive(router.active() == &jackTransport);
-    };
 
-    // JACK-specific instrument callback: push routings to jackTransport.
+    // Instrument routing for both engines. The Internal one always; JACK's once its
+    // client is up (activateJack re-runs this then).
     app.onInstrumentsChanged = [&]() {
-        if (!jackUp || !connOverlay) return;
-        std::vector<JackTransport::InstrumentRouting> routings;
+        if (!connOverlay) return;
+        std::vector<Sequencer::InstrumentRouting> routings;
         for (const auto& ci : connOverlay->getInstruments())
             routings.push_back({ci.id, ci.portName, ci.midiChannel,
                                 ci.programNumber, ci.bankMsb, ci.bankLsb});
-        jackTransport.setInstruments(routings);
+        internalTransport.setInstruments(routings);
+        if (jackUp) jackTransport.setInstruments(routings);
     };
 
     if (connOverlay) {
@@ -459,7 +479,6 @@ int main(int argc, char **argv) {
             activateJack();
             if (clockIsJack) {
                 router.setActive(&jackTransport);
-                applyClockMode();
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {
                     app.bottomPane->enableButtons();
@@ -471,8 +490,7 @@ int main(int argc, char **argv) {
             // Waiting for the JACK server: disable the transport controls until
             // it comes up (only relevant when the clock is Jack).
             if (clockIsJack) {
-                router.setActive(&simpleTransport);
-                applyClockMode();
+                router.setActive(&internalTransport);
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(true);
                 if (app.bottomPane) {
                     app.bottomPane->disableButtons();
@@ -502,8 +520,7 @@ int main(int argc, char **argv) {
             if (index == 2) {
                 updateJackWanted();   // ensure JACK is up; Up-listener wires the clock
             } else {
-                router.setActive(&simpleTransport);
-                applyClockMode();
+                router.setActive(&internalTransport);
                 updateJackWanted();   // keep JACK only if an output port still needs it
                 if (app.transportOverlay) app.transportOverlay->setJackWaiting(false);
                 if (app.bottomPane) {
@@ -527,6 +544,9 @@ int main(int argc, char **argv) {
 
     // Initial reconcile of the default port set (and JACK want/warning state).
     syncPorts();
+    // ...and route the default instruments, which until now only JACK's activation
+    // pushed — the Internal engine needs them from the start.
+    if (app.onInstrumentsChanged) app.onInstrumentsChanged();
     // The smoke test runs headless with no JACK server and no one to play into
     // it, so it opens no input — Plugin is the one backend that opens nothing.
     if (testMode) {

@@ -615,11 +615,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         if (getPitchName)
             og2->setPitchName(getPitchName);
     }
-    // Soft (Native/Debug) MIDI output: drive non-Jack ports from the song playhead.
-    og2->setPlayheadPortRegistry(portRegistry);
-    if (instrRoute)
-        og2->setPlayheadSoftRouting(instrRoute);
-
     // Clicking a pattern-editor row label auditions that note on the selected
     // track's instrument port.
     auditioner.setPortRegistry(portRegistry);
@@ -1062,11 +1057,9 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     });
 
     // A recorded note quantised just ahead of the playhead has already been heard
-    // live; both sequencing paths drop that one firing. The RT engine plays Jack
-    // ports under the Jack clock, the song playhead everything else.
-    auto skipNoteOnce = [transport, og2](int instrumentId, int pitch, double bar, double tol) {
+    // live; the sequencing engine drops that one firing.
+    auto skipNoteOnce = [transport](int instrumentId, int pitch, double bar, double tol) {
         transport->skipNoteOnce(instrumentId, pitch, bar, tol);
-        og2->playheadSkipNoteOnce(instrumentId, pitch, (float)bar, (float)tol);
     };
     recorders.setContext(pattern, transport, &loopMgr);
     // Only an instrument with Pass through on was heard live; without it the

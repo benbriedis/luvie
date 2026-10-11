@@ -6,10 +6,9 @@
 
 #include <cmath>
 
-// Shared sequencing helpers used by every clock path: the JACK real-time engine
-// (jackTransport), the internal chrono clock and the LV2 host-driven clock (the
-// latter two both sequence through Playhead's soft output). Keeping the wrap
-// math in one place stops the JACK and soft paths from drifting apart.
+// Shared sequencing helpers: the Sequencer engine (JACK, Internal and LV2 clocks)
+// and Playhead's --verbose report both use them. Keeping the wrap math in one place
+// stops what is reported from drifting apart from what is played.
 
 // A pattern's notes/params repeat every `patternLen` beats. Given a firing
 // window in pattern-relative beats [windowStart, windowEnd), invoke
@@ -38,7 +37,7 @@ inline void forEachFiring(double eventBeat, double patternLen,
 }
 
 // Note length given to drum hits, which carry no explicit length (beats).
-// Shared so the JACK and soft paths use an identical value.
+// Shared so the engine and the verbose report use an identical value.
 inline constexpr float drumNoteLen = 0.1f;
 
 #endif

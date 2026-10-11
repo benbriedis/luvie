@@ -3,8 +3,6 @@
 
 #include "playhead.hpp"
 #include "luvieDebug.hpp"
-#include "port.hpp"
-#include "portRegistry.hpp"
 #include "chords.hpp"
 #include "loopFiring.hpp"
 #include "paramLaneTypes.hpp"
@@ -110,47 +108,28 @@ void Playhead::tick()
 {
 	if (patternTrack < 0 && transport) {
 		const bool playing   = transport->isPlaying();
-		const bool runChecks = verbose || anySoftPort || (!jackClock && anyJackPort);
 		if (playing) {
-			// Position folded into the song-loop region (song mode): the RT
-			// sequencer wraps playback at the seam, and this keeps the drawn
-			// playhead and the soft-port sequencing below in step with it.
+			// Position folded into the song-loop region (song mode): the sequencing
+			// engine wraps playback at the seam, and this keeps the drawn playhead and
+			// the verbose report below in step with it. Nothing here sends MIDI: every
+			// output is driven by an engine (InternalTransport or JackTransport).
 			float curPos = livePosition();
-			// A skip the window has already gone past was never matched; a backward
-			// move (seek, loop wrap) makes every pending one meaningless.
-			if (curPos < lastPosition) softSkips.clear();
-			else std::erase_if(softSkips, [&](const SoftSkip& k) {
-				return k.bar + k.tol < lastPosition;
-			});
-			// Release expiring notes BEFORE emitting this window's note-ons, so a
-			// flush same-pitch note (note1 off == note2 on) gets off-then-on and
-			// re-attacks instead of being cancelled by the stale off.
 			if (loopActive) {
 				// An armed scene change has reached its bar line. This watches for a
 				// switch the engine has already landed sample-accurately rather than
-				// timing one — the same role LoopModeController::poll() plays — and it
-				// is what lands the change for the soft (Native/Debug) path, which
-				// reads LoopManager directly. It rides the tick that is already here;
-				// no new timer.
+				// timing one — the same role LoopModeController::poll() plays — so the
+				// UI's LoopManager catches up with what is sounding. It rides the tick
+				// that is already here; no new timer.
 				if (loopMgr && loopMgr->scenePending()
 				    && curPos >= loopMgr->sceneAtBar() - 1.0e-4f)
 					loopMgr->commitScene();
-				if (curPos >= lastPosition) {
-					flushSoftNoteOffs(curPos);
-					if (runChecks && obsTl) checkLoopVerboseNotes(lastPosition, curPos);
-				} else {
-					allSoftNotesOff();   // loop wrapped — silence anything still on
-				}
+				if (verbose && obsTl && curPos >= lastPosition)
+					checkLoopVerboseNotes(lastPosition, curPos);
 			} else {
 				if (loopMgr && obsTl) loopMgr->sync(*obsTl, curPos);
-				if (curPos >= lastPosition) {
-					flushSoftNoteOffs(curPos);
-					if (runChecks && obsTl) {
-						checkVerboseNotes(lastPosition, curPos);
-						checkVerboseSongParams(lastPosition, curPos);
-					}
-				} else {
-					allSoftNotesOff();   // seeked backward, or the song loop wrapped
+				if (verbose && obsTl && curPos >= lastPosition) {
+					checkVerboseNotes(lastPosition, curPos);
+					checkVerboseSongParams(lastPosition, curPos);
 				}
 				// curPos is folded into the loop region when looping, so it never
 				// reaches numCols and this stop path stays disarmed mid-loop.
@@ -170,8 +149,6 @@ void Playhead::tick()
 		} else {
 			float curPos = livePosition();
 			if (wasPlaying) {
-				allSoftNotesOff();   // stopped — release held notes
-				softSkips.clear();
 				// Stopping ends the stretch a Loop-Editor tempo was jammed for, so the
 				// register goes back to whatever the song's markers say where the
 				// playhead is parked — the same thing a user reposition does, and for
@@ -242,7 +219,6 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 
 		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
-			int midi = patternNoteMidi(*pat, note, chordIndex);
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
@@ -251,8 +227,6 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 					       bar, beat, label.c_str(), noteLabel(*pat, note, chordIndex).c_str(),
 					       note.beat, note.length);
-				emitSoftNoteOn(instrumentId, midi, note.velocity,
-				               note.length, beatsPerBar, songBar);
 			});
 		}
 
@@ -269,8 +243,6 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
 						       bar, beat, label.c_str(), dn.note, dn.beat);
-					emitSoftNoteOn(instrumentId, dn.note, dn.velocity,
-					               drumNoteLen, beatsPerBar, songBar);
 				});
 			}
 		}
@@ -278,7 +250,6 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 		for (const auto& lane : pat->paramLanes) {
 			ParamDef def;
 			if (!tl.paramDef(instrumentId, lane.type, def)) continue;
-			const int outCode = paramOutCode(def);
 			auto checkFire = [&](float evtBeat, int value) {
 				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
@@ -287,7 +258,6 @@ void Playhead::checkVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
-					emitSoftParam(instrumentId, outCode, paramOutValue(def, value));
 				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
@@ -534,7 +504,6 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 
 		int chordIndex = chordIndexForHash(pat->chordHash);
 		for (const Note& note : pat->notes) {
-			int midi = patternNoteMidi(*pat, note, chordIndex);
 			forEachFiring(note.beat, len, prevBeats, curBeats, [&](float firstFire) {
 				float songBar = anchorBar + firstFire / beatsPerBar;
 				int   bar     = (int)songBar + 1;
@@ -543,8 +512,6 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					printf("[verbose] bar %d beat %d | track \"%s\"  note=%-4s  beat=%.2f  len=%.2f\n",
 					       bar, beat, label.c_str(), noteLabel(*pat, note, chordIndex).c_str(),
 					       note.beat, note.length);
-				emitSoftNoteOn(instrumentId, midi, note.velocity,
-				               note.length, beatsPerBar, songBar);
 			});
 		}
 
@@ -561,8 +528,6 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  drum=%d  beat=%.2f\n",
 						       bar, beat, label.c_str(), dn.note, dn.beat);
-					emitSoftNoteOn(instrumentId, dn.note, dn.velocity,
-					               drumNoteLen, beatsPerBar, songBar);
 				});
 			}
 		}
@@ -570,7 +535,6 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 		for (const auto& lane : pat->paramLanes) {
 			ParamDef def;
 			if (!tl.paramDef(instrumentId, lane.type, def)) continue;
-			const int outCode = paramOutCode(def);
 			auto checkFire = [&](float evtBeat, int value) {
 				forEachFiring(evtBeat, len, prevBeats, curBeats, [&](float firstFire) {
 					float songBar = anchorBar + firstFire / beatsPerBar;
@@ -579,7 +543,6 @@ void Playhead::checkLoopVerboseNotes(float prevPos, float curPos)
 					if (verbose)
 						printf("[verbose] bar %d beat %d | track \"%s\"  param=%-12s  value=%d\n",
 						       bar, beat, label.c_str(), lane.type.c_str(), value);
-					emitSoftParam(instrumentId, outCode, paramOutValue(def, value));
 				});
 			};
 			for (int i = 0; i < (int)lane.points.size(); i++) {
@@ -597,13 +560,9 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 	if (!obsTl) return;
 	const Timeline& tl = obsTl->get();
 
-	// Each song-level param lane routes only to its owning instrument's port —
-	// emitSoftParam filters to ports that need soft sequencing, so Jack-clock-driven
-	// ports are left to JackTransport.
 	for (const auto& lane : tl.paramLanes) {
 		ParamDef def;
 		if (!tl.paramDef(lane.instrumentId, lane.type, def)) continue;
-		const int outCode = paramOutCode(def);
 		auto report = [&](float barPos, int value) {
 			if (barPos < prevPos || barPos >= curPos) return;
 			if (verbose) {
@@ -611,7 +570,6 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 				printf("[verbose] bar %d | song  param=%-12s  value=%d\n",
 				       bar, lane.type.c_str(), value);
 			}
-			emitSoftParam(lane.instrumentId, outCode, paramOutValue(def, value));
 		};
 		for (int i = 0; i < (int)lane.points.size(); i++) {
 			report(lane.points[i].beat, lane.points[i].value);
@@ -620,77 +578,6 @@ void Playhead::checkVerboseSongParams(float prevPos, float curPos)
 				                 lane.points[i].value, lane.points[i+1].value, report);
 		}
 	}
-}
-
-// ── Soft (Native/Debug, plus Jack when it isn't the clock) output ─────────────
-
-bool Playhead::portNeedsSoftSeq(const Port* p) const
-{
-	return p->softSequenced() || (!jackClock && p->backend() == MidiBackend::Jack);
-}
-
-void Playhead::emitSoftNoteOn(int instrumentId, int midi, float velocity,
-                              float lenBeats, float beatsPerBar, float onBar)
-{
-	if (!portReg || !instrRoute) return;
-	MidiInstrRoute r = instrRoute(instrumentId);
-	if (r.portName.empty()) return;
-	Port* p = portReg->find(r.portName);
-	if (!p || !portNeedsSoftSeq(p)) return;
-	// Already heard: the recorder played it live (skipNoteOnce).
-	for (auto it = softSkips.begin(); it != softSkips.end(); ++it) {
-		if (it->pitch != midi) continue;
-		if (it->instrumentId != 0 && it->instrumentId != instrumentId) continue;
-		if (std::fabs(onBar - it->bar) > it->tol) continue;
-		softSkips.erase(it);
-		return;
-	}
-	// The same pitch still sounding here ends now, or its note-off would cut this
-	// note short. See Sequencer::fireNoteEvents.
-	for (auto it = softNotes.begin(); it != softNotes.end(); ++it) {
-		if (it->pitch != midi || it->channel != r.channel0 || it->portName != r.portName)
-			continue;
-		p->noteOff(it->channel, it->pitch);
-		softNotes.erase(it);
-		break;
-	}
-	int vel = (int)(velocity * 127.0f);
-	vel = std::clamp(vel, 1, 127);
-	p->noteOn(r.channel0, midi, vel);
-	float offBar = onBar + (beatsPerBar > 0.0f ? lenBeats / beatsPerBar : 0.0f);
-	softNotes.push_back({r.portName, r.channel0, midi, offBar});
-}
-
-void Playhead::emitSoftParam(int instrumentId, int outCode, int value)
-{
-	if (!portReg || !instrRoute) return;
-	MidiInstrRoute r = instrRoute(instrumentId);
-	if (r.portName.empty()) return;
-	Port* p = portReg->find(r.portName);
-	if (!p || !portNeedsSoftSeq(p)) return;
-	uint8_t m[3];
-	p->raw(m, encodeParamMessage(outCode, r.channel0, value, m));
-}
-
-void Playhead::flushSoftNoteOffs(float curPos)
-{
-	for (auto it = softNotes.begin(); it != softNotes.end(); ) {
-		if (it->offBar <= curPos) {
-			if (Port* p = portReg ? portReg->find(it->portName) : nullptr)
-				p->noteOff(it->channel, it->pitch);
-			it = softNotes.erase(it);
-		} else {
-			++it;
-		}
-	}
-}
-
-void Playhead::allSoftNotesOff()
-{
-	if (portReg)
-		for (const auto& n : softNotes)
-			if (Port* p = portReg->find(n.portName)) p->noteOff(n.channel, n.pitch);
-	softNotes.clear();
 }
 
 void Playhead::seek(int mouseX, int rulerX)

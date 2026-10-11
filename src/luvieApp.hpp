@@ -81,7 +81,7 @@ public:
     bool disableTransportButtons            = false;
     bool pluginMode                         = false;  // true when hosted as an LV2 plugin
     std::function<std::string(int)> getPitchName;
-    // Soft (Native/Debug) MIDI output routing for the song playhead.
+    // Output routing for one-off sends (auditioning, MIDI pass-through).
     PortRegistry*                      portRegistry = nullptr;
     std::function<MidiInstrRoute(int)> instrRoute;   // instrument id → port/channel
     std::function<void()>           onExtraSeek;

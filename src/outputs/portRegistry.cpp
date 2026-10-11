@@ -30,6 +30,7 @@ std::unique_ptr<Port> PortRegistry::make(const JackOutput& o)
 
 void PortRegistry::reconcile(const std::vector<JackOutput>& ports)
 {
+    std::lock_guard<std::mutex> lk(mutex_);
     std::vector<std::unique_ptr<Port>> next;
     next.reserve(ports.size());
 
@@ -52,12 +53,14 @@ void PortRegistry::reconcile(const std::vector<JackOutput>& ports)
 
 void PortRegistry::rename(const std::string& oldName, const std::string& newName)
 {
+    std::lock_guard<std::mutex> lk(mutex_);
     if (Port* p = find(oldName)) p->rename(newName);
 }
 
 void PortRegistry::reregisterJack()
 {
     if (!jack_) return;
+    std::lock_guard<std::mutex> lk(mutex_);
     for (auto& p : ports_)
         if (p && p->backend() == MidiBackend::Jack)
             jack_->addMidiPort(p->name());
@@ -70,16 +73,16 @@ Port* PortRegistry::find(const std::string& name) const
     return nullptr;
 }
 
+void PortRegistry::sendRaw(const char* name, const uint8_t* data, int len)
+{
+    std::lock_guard<std::mutex> lk(mutex_);
+    for (const auto& p : ports_)
+        if (p && p->name() == name) { p->raw(data, len); return; }
+}
+
 bool PortRegistry::anyJack() const
 {
     for (const auto& p : ports_)
         if (p && p->backend() == MidiBackend::Jack) return true;
-    return false;
-}
-
-bool PortRegistry::anySoft() const
-{
-    for (const auto& p : ports_)
-        if (p && p->softSequenced()) return true;
     return false;
 }

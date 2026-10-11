@@ -14,7 +14,6 @@ public:
     explicit PluginOutPort(std::string name) : Port(std::move(name)) {}
 
     MidiBackend backend()       const override { return MidiBackend::Plugin; }
-    bool        softSequenced() const override { return false; }
 
     void noteOn (int, int, int) override {}
     void noteOff(int, int)      override {}

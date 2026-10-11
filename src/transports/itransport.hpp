@@ -54,8 +54,8 @@ public:
 	// sounding the set it has until then, and swaps to LoopManager::pendingPatterns()
 	// there. Backends must not relocate the clock, must not change the tempo map and
 	// must not reset controllers: nothing moves but which patterns fire. The default
-	// ignores it — a clock that does not sequence has no content to swap, and the
-	// soft playback path lands the change from Playhead::tick instead.
+	// ignores it — a clock that does not sequence has no content to swap; the
+	// UI's LoopManager then catches up from Playhead::tick.
 	virtual void armScene(float /*atBar*/) {}
 
 	// Recording has already sounded this note live, and quantising put it just ahead

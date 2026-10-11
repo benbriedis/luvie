@@ -56,19 +56,8 @@ public:
     void setPlayheadHandoff(bool on, float offsetBars = 0.0f) { playhead.setHandoff(on, offsetBars); }
     void setVerbose(bool v)                                  { playhead.setVerbose(v); }
     void setPitchName(std::function<std::string(int)> fn)    { playhead.pitchName = std::move(fn); }
-    void setPlayheadPortRegistry(PortRegistry* r)            { playhead.setPortRegistry(r); }
-    void setPlayheadHasSoftPorts(bool b)                     { playhead.setHasSoftPorts(b); }
-    void setPlayheadHasJackPorts(bool b)                     { playhead.setHasJackPorts(b); }
-    void setPlayheadJackClockActive(bool b)                  { playhead.setJackClockActive(b); }
-    void playheadPanicSoftNotes()                           { playhead.panicSoftNotes(); }
-    void playheadSkipNoteOnce(int instrumentId, int midi, float bar, float tol) {
-        playhead.skipNoteOnce(instrumentId, midi, bar, tol);
-    }
     void setPlayheadSongLoop(std::function<bool(float&,float&)> fn) {
         playhead.songLoopRange = std::move(fn);
-    }
-    void setPlayheadSoftRouting(std::function<MidiInstrRoute(int)> ir) {
-        playhead.setSoftRouting(std::move(ir));
     }
 };
 

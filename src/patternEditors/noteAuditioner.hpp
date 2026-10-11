@@ -4,7 +4,6 @@
 #ifndef NOTE_AUDITIONER_HPP
 #define NOTE_AUDITIONER_HPP
 
-#include "playhead.hpp"   // MidiInstrRoute
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -12,10 +11,16 @@
 
 class PortRegistry;
 
+// Routing for an instrument's output: which port + 0-based channel.
+struct MidiInstrRoute {
+    std::string portName;
+    int         channel0 = 0;
+};
+
 // Plays one-off audition notes — e.g. clicking a row label in a pattern editor.
 // Sends note-on immediately and schedules the matching note-off after a wall-clock
 // duration via an FLTK timeout. Routes through the same PortRegistry + instrument
-// routing as the song playhead, so a click sounds on the selected instrument's port.
+// routing as playback, so a click sounds on the selected instrument's port.
 class NoteAuditioner {
 public:
     ~NoteAuditioner();

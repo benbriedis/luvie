@@ -12,15 +12,6 @@
 #include <string>
 #include <vector>
 
-class Port;
-class PortRegistry;
-
-// Routing for an instrument's soft (non-Jack) output: which port + 0-based channel.
-struct MidiInstrRoute {
-    std::string portName;
-    int         channel0 = 0;
-};
-
 class Playhead : public ITimelineObserver {
 	ITransport*         transport    = nullptr;
 	ObservableSong* obsTl        = nullptr;
@@ -60,28 +51,7 @@ class Playhead : public ITimelineObserver {
 	float freeAnchorFor(int patId) const;
 	void  setFreeAnchor(int patId, float anchorBar);
 
-	// ── Soft (Native/Debug) output, driven from the same crossing logic ──────────
-	PortRegistry* portReg     = nullptr;
-	bool          anySoftPort = false;   // are any Native/Debug ports present?
-	bool          anyJackPort = false;   // are any Jack ports present?
-	bool          jackClock   = false;   // is the Jack RT engine the active clock?
-	bool          wasPlaying  = false;
-	std::function<MidiInstrRoute(int)>      instrRoute;  // instrument id → port/channel
-	struct SoftActiveNote { std::string portName; int channel; int pitch; float offBar; };
-	std::vector<SoftActiveNote> softNotes;
-	// Pending skipNoteOnce() entries for the soft output. See ITransport::skipNoteOnce.
-	struct SoftSkip { int instrumentId; int pitch; float bar; float tol; };
-	std::vector<SoftSkip> softSkips;
-
-	// A port must be soft-sequenced unless the Jack RT engine is driving it (which
-	// only happens for Jack ports while the Jack clock is active).
-	bool portNeedsSoftSeq(const Port* p) const;
-
-	void emitSoftNoteOn(int instrumentId, int midi, float velocity,
-	                    float lenBeats, float beatsPerBar, float onBar);
-	void emitSoftParam (int instrumentId, int outCode, int value);
-	void flushSoftNoteOffs(float curPos);
-	void allSoftNotesOff();
+	bool  wasPlaying   = false;
 
 	static void timerCb(void* data);
 	void tick();
@@ -122,21 +92,6 @@ public:
 	void setLoopManager(LoopManager* a) { loopMgr = a; }
 	void setOwner(Fl_Widget* w)   { owner   = w; }
 	void setVerbose(bool v)       { verbose = v; }
-	void setPortRegistry(PortRegistry* r) { portReg = r; }
-	void setHasSoftPorts(bool b)          { anySoftPort = b; }
-	void setHasJackPorts(bool b)          { anyJackPort = b; }
-	void setJackClockActive(bool b)       { jackClock   = b; }
-	void setSoftRouting(std::function<MidiInstrRoute(int)> ir) {
-		instrRoute = std::move(ir);
-	}
-	// Release all held soft notes; call before the Port set is reconciled so notes
-	// don't hang when a port is destroyed or changes backend.
-	void panicSoftNotes() { allSoftNotesOff(); }
-	// Soft-output counterpart of ITransport::skipNoteOnce: drop the one firing of
-	// (instrument, pitch) within `tol` bars of `bar`. instrumentId 0 matches any.
-	void skipNoteOnce(int instrumentId, int midi, float bar, float tol) {
-		softSkips.push_back({instrumentId, midi, bar, tol});
-	}
 	void setLoopActive(bool a, std::function<bool(int)> enabledFn = nullptr);
 	bool isLoopActive() const { return loopActive; }
 	// Song view only: freeze the playhead greyed at `bar` (Song→Loop) instead of

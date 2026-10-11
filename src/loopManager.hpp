@@ -54,8 +54,7 @@ public:
 	//
 	// The wait itself is the engine's, not ours: the RT thread picks the frame (see
 	// Sequencer's Pending::Scene). commitScene() is the UI catching up with a switch
-	// that has already happened, which is also what lands it for the soft playback
-	// path. Both notify.
+	// that has already happened. Both notify.
 	void armScene(const std::set<int>& next, float atBar);
 	void commitScene();
 	void cancelScene();

@@ -3,6 +3,8 @@
 
 #include "jackTransport.hpp"
 #include "midiInPort.hpp"
+#include "midiScheduler.hpp"
+#include "rtThread.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -213,6 +215,7 @@ static void* findBuf(const std::vector<std::pair<const std::string*, void*>>& bu
 
 int JackTransport::process(jack_nframes_t nframes)
 {
+    cycleStartNs = rtNowNs();
     jack_position_t        pos;
     jack_transport_state_t state = jack_transport_query(client, &pos);
     bool nowPlaying = (state == JackTransportRolling);
@@ -327,9 +330,6 @@ int JackTransport::process(jack_nframes_t nframes)
 void JackTransport::emit(const std::string& port, double bar,
                           const uint8_t* data, int len)
 {
-    void* buf = findBuf(namedBufs, port.c_str());
-    if (!buf) return;
-
     // Frame offset within this cycle for `bar`, honouring the current sub-segment's
     // time base (so events after a loop wrap land past the seam, not at frame 0) and
     // the tempo re-anchor offset.
@@ -338,6 +338,19 @@ void JackTransport::emit(const std::string& port, double bar,
     if (off < 0) off = 0;
     if (curNframes > 0 && off > static_cast<long>(curNframes) - 1)
         off = static_cast<long>(curNframes) - 1;
+
+    void* buf = findBuf(namedBufs, port.c_str());
+    if (!buf) {
+        // Not one of our JACK ports: hand it to the scheduler, due when this frame is
+        // heard — the cycle's start plus the offset, plus one period, which is when
+        // JACK plays out what this cycle writes, so both kinds of port line up.
+        if (scheduler_) {
+            const int64_t dueNs = cycleStartNs +
+                static_cast<int64_t>((off + static_cast<long>(curNframes)) * 1e9 / sampleRate);
+            scheduler_->push(MidiScheduler::Producer::Jack, port.c_str(), dueNs, data, len);
+        }
+        return;
+    }
 
     OutEvent e{buf, static_cast<jack_nframes_t>(off),
                static_cast<uint32_t>(outEvents.size()), {}, len};

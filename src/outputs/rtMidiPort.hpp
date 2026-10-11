@@ -4,12 +4,14 @@
 #pragma once
 #include "port.hpp"
 #include <memory>
+#include <mutex>
 
 class RtMidiOut;
 
 // A "native" MIDI output port backed by RtMidi (ALSA sequencer on Linux,
 // CoreMIDI on macOS). It exposes a virtual port that other applications can
-// connect to. Driven note-by-note by the Playhead (soft-sequenced). If RtMidi
+// connect to. Playback reaches it through the MidiScheduler, at each message's due
+// time. If RtMidi
 // can't open, the port becomes a no-op.
 class RtMidiPort : public Port {
 public:
@@ -19,7 +21,6 @@ public:
     void rename(const std::string& n) override;
 
     MidiBackend backend()       const override { return MidiBackend::Native; }
-    bool        softSequenced() const override { return true; }
 
     void noteOn (int ch, int pitch, int vel) override;
     void noteOff(int ch, int pitch)          override;
@@ -32,4 +33,8 @@ private:
     void send3(int status, int d1, int d2);
 
     std::unique_ptr<RtMidiOut> out_;   // null if RtMidi could not be opened
+    // RtMidiOut is not thread-safe, and two threads send: the MidiScheduler's sender
+    // (playback) and the UI thread (auditioning, pass-through, program changes).
+    // Neither is a real-time thread, so a plain mutex is fine.
+    std::mutex sendMutex_;
 };

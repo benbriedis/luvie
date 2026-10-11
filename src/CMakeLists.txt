@@ -9,6 +9,7 @@ add_library(luvie_core STATIC
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
     transports/simpleTransport.cpp transports/sequencer.cpp transports/jackTransport.cpp
     transports/jackObserver.cpp transports/oscTransport.cpp transports/oscObserver.cpp
+    transports/internalTransport.cpp transports/rtThread.cpp outputs/midiScheduler.cpp
     transports/playhead.cpp songEditor/markerPopup.cpp
     songEditor/markerRuler.cpp songEditor/loopRuler.cpp songEditor/loopRulerContextPopup.cpp
     songEditor/observableSong.cpp songEditor/observablePattern.cpp
@@ -57,8 +58,12 @@ target_include_directories(luvie_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/songEditor
 )
 
+# The Internal transport's engine thread and the MIDI scheduler's sender thread.
+find_package(Threads REQUIRED)
+
 # PUBLIC so the plugin (which links luvie_core) inherits these too
 target_link_libraries(luvie_core PUBLIC
+    Threads::Threads
     fltk::fltk
     fltk::images          # Fl_SVG_Image (dotted-note glyphs in the time-sig control)
     jack_headers          # JACK headers only; the library is dlopen'd at runtime (jackShim.cpp)
@@ -249,4 +254,13 @@ endif()
 # order main.cpp warns about above, and is what CI runs on all three platforms
 # (under xvfb-run on Linux). --test keeps it off JACK and routes MIDI to the console.
 add_test(NAME smoke COMMAND luvie --test --exit-after 5)
+
+# ---- Internal transport timing test -------------------------------------------
+# Plays a small song through InternalTransport + MidiScheduler into a capturing sink
+# and checks the notes, the song-loop wrap, seek and stop, and delivery timing. No
+# window, no MIDI devices. Takes about five seconds.
+add_executable(internal_transport_test tests/internalTransportTest.cpp)
+target_link_libraries(internal_transport_test PRIVATE luvie_core)
+add_test(NAME internal_transport COMMAND internal_transport_test)
+set_tests_properties(internal_transport PROPERTIES TIMEOUT 60)
 set_tests_properties(smoke PROPERTIES TIMEOUT 120)

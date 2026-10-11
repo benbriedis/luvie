@@ -29,6 +29,7 @@
  *   - processCallback() runs on the JACK real-time thread and calls renderCycle().
  */
 class MidiInputManager;
+class MidiScheduler;
 
 class JackTransport : public Sequencer, public ITransport {
 public:
@@ -99,6 +100,14 @@ public:
     // True once a JACK client is open and live (so port registration / MIDI work).
     bool  isOpen() const { return client != nullptr && jackAlive.load(); }
 
+    // Messages for ports this client has no JACK buffer for (Native and Debug ports)
+    // go to `sched`, timestamped, rather than being dropped. This engine only renders
+    // while the JACK transport rolls, and the TransportRouter stops it whenever JACK
+    // stops being the clock, so in practice that is "while JACK is the clock" — and the
+    // stop it renders then still reaches those ports, releasing their notes. Set once,
+    // before the client opens. Standalone only.
+    void setScheduler(MidiScheduler* sched) { scheduler_ = sched; }
+
 protected:
     // Sequencer output hook (RT thread): resolve the port's cycle buffer and queue
     // the message at the bar's frame offset for the ordered end-of-cycle flush.
@@ -137,6 +146,9 @@ private:
     using NamedBuf = std::pair<const std::string*, void*>;
     std::vector<NamedBuf> namedBufs;
     jack_nframes_t        curNframes    = 0;
+    int64_t               cycleStartNs  = 0;   // rtNowNs() at the top of process()
+
+    MidiScheduler* scheduler_ = nullptr;
 
     // All MIDI output for a cycle is collected here, then sorted by frame per
     // buffer and written at the end of process(). JACK drops any event whose frame
