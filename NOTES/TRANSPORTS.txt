@@ -54,10 +54,16 @@ PROPER SETTINGS:
 
 The full set of realistic options:
 
-  1. JACK transport.  Bidirectional, clean. The strong choice for serious Linux DAW users.
+  1. JACK transport - implemented
 
-  2. MIDI Machine Control (MMC)
+  2. OSC (Open Sound Control) 
 
+     Implemented for Ardour and Carla.
+
+	 Useful when Jack is not present (often the case for MacOS and Windows).
+	 Requires custom code for each host unfortunately, but does generally integrate well into the hosts.
+
+  3. MIDI Machine Control (MMC)
   A standard SysEx protocol that many DAWs (Ardour, Reaper, Bitwig, Cubase…) implement for
   transport control. Commands include Stop, Play, and crucially Locate — which repositions the
   transport to a specific SMPTE timecode.
@@ -71,116 +77,7 @@ The full set of realistic options:
   (in Ardour: Preferences → MIDI → MMC, then patch in the JACK/ALSA MIDI graph). This is doable
    but awkward, and some users won't know to do it.
 
-   BENS THOUGHT: may be useful in cases where Jack is not available, and/or we not using LV2.
-
-  3. OSC (Open Sound Control)
-
-  Ardour has a full OSC interface including /ardour/transport_play, /ardour/transport_stop,
-  /ardour/locate. But this requires UDP networking even on localhost, needs to know Ardour's
-  OSC port, is entirely Ardour-specific, and has no standard LV2 integration point. Not worth
-  pursuing.
-
-  UPDATE (Oct 2026): IMPLEMENTED as the "Ardour OSC" choice of the Transport overlay's Control
-  setting (Jack / Ardour OSC / None, saved in the project). Since Ardour 5 there is no /ardour/
-  prefix. See src/transports/oscTransport.* and oscObserver.*. Notes from Ardour 9.8's source
-  (libs/surfaces/osc/osc.cc):
-   - /transport_play, /transport_stop, /locate ii (int32 sample, roll; roll=0 = "roll if
-     appropriate", so a rolling transport keeps rolling).
-   - Liveness: /transport_frame is answered with /transport_frame h. In Port Mode "Manual"
-     (the default) Ardour replies to its Reply Manual Port (default 8000), not the sender, so
-     Luvie listens on 8000 when it can, else an ephemeral port (then Ardour needs "Auto").
-   - No polling while Up: each command is followed by a probe; no answer within 1 s → Waiting,
-     re-probed every second on an FLTK timer.
-   - Position still comes from the DSP's time:Position; the DSP adds param:sampleRate to it
-     so the UI can convert bars to samples for /locate.
-
-  UPDATE (Oct 2026): "Carla OSC" added as a further Control choice (saved value 3; the menu
-  shows it before None). See src/transports/carlaOscTransport.*; OscObserver drives both via
-  the OscControl base. Checked against Carla 2.5.10 with a headless engine:
-   - Commands over TCP (default port 22752): /ctrl/transport_play i, /ctrl/transport_pause i,
-     /ctrl/transport_relocate ih (msg id, int64 frame; keeps rolling/stopped state).
-   - Carla refuses /ctrl/ commands ("OSC backend is not registered yet") until a client sends
-     /register <tcp url>. It then sends that client /ctrl/cb state and /ctrl/resp (id, error)
-     per command — always over TCP to a connection it opens, even if given a UDP URL.
-   - One registration; "ownership" is checked by sender IP only, so a second local client's
-     commands work but answers go to the first, and anyone's /unregister drops the owner.
-   - OSC is enabled by default only on Linux (CARLA_DEFAULT_OSC_ENABLED); a settings checkbox.
-  Design: liveness = a TCP send to Carla succeeding (register when probing). A refused connect
-  blocks ~2 s on Windows, and the TCP replies can't be watched by FLTK, so an I/O thread owns
-  the Carla side, blocked in lo_servers_wait() (liblo caps it at 100 s); the UI talks to it
-  over a UDP socket pair, the UI end watched with Fl::add_fd. Not lo_server_thread: that
-  wakes every 100 ms.
-
-
-❯ So the main advantage of using here Jack seems to be that Luvie can auto-detect it's       
-presence and connect to it. Is there any way Luvie could perform the patching required for   
-the MMC solution?                                                                            
-                                                                                             
-● Technically yes — if JACK is present, the JACK API has jack_get_ports() to enumerate MIDI  
-  ports and jack_connect() to wire them up. Luvie could search for a port matching a pattern 
-  like "ardour:MMC*" and connect automatically.                                              
-   
-  But this reveals the circular problem: auto-patching MIDI via JACK requires JACK, at which 
-  point you'd just use JACK transport directly and skip MMC entirely.
-                                                                                             
-  In non-JACK environments (PipeWire native mode, plain ALSA) the ALSA sequencer API can     
-  enumerate and connect ports, but it's significantly more complex, less reliable, and you'd
-  still need to guess the right port name pattern per-host. It also only helps hosts that    
-  expose a named MMC input port in a discoverable way — not all do.
-
-  So the realistic picture collapses to:
-
-  - JACK/PipeWire-with-JACK-compat (covers most serious Linux DAW setups): use JACK          
-  transport, auto-detect, auto-connect. MMC irrelevant.
-  - Everything else: no reliable auto-patching, MMC requires manual user setup, and the user 
-  base is probably small enough that "configure it yourself" is acceptable documentation.    
-   
-  The main practical advantage of JACK transport isn't really the auto-detection — it's that 
-  it's a transport protocol rather than a MIDI protocol routed through the DAW's instrument 
-  graph. JACK transport operates at the session level; both Ardour and Luvie are peers       
-  talking to the same JACK server. MMC requires Ardour to be specifically configured to act
-  on it, which is an extra step regardless of patching.
-
-  Given all this, JACK transport as primary with a manual-setup MMC fallback documented for  
-  non-JACK users seems like the right call.
-
-
-BENS PLAN:
-==========
-Use LV2 to control the Luvie transport.
-Probably require Jack for full functionality.
-Disable transport.
-Keep MMC in mind as a possible backend solution in future, but would require instructions.
-
-
-● That's a sensible design. A few things worth keeping in mind for when you implement it:
-
-  JACK client in the UI, not the DSP
-
-  The UI process is the right place to open the JACK client (just for transport — not audio). The
-  DSP already runs inside the host's JACK graph and you don't control that client. Opening a
-  separate lightweight JACK client from the UI just for jack_transport_* calls is the standard
-  approach.
-
-  PipeWire compatibility
-
-  On modern Ubuntu/Fedora/etc., libjack is typically provided by pipewire-jack and
-  jack_client_open() will succeed even without a "real" JACK server running. So your auto-detect
-  will work on most current Linux desktops, not just dedicated JACK setups. Worth testing, but it's
-   likely better coverage than you might expect.
-
-  Ardour needs to be a JACK transport slave
-
-  Ardour defaults to being transport master. The user needs Session → Properties (or Preferences,
-  depending on version) → Sync → "JACK Transport" to make it follow external transport commands.
-  Worth documenting as a one-time setup step.
-
-  Seek granularity
-
-  jack_transport_locate() takes a frame position (samples). You'll need the sample rate and current
-   BPM/time-sig to convert a bar/beat position to frames. The DSP already receives all of this via
-  time:Position, so you'll need to forward it to the UI (via the notify_out port discussed earlier)
-   before seeking can work correctly. Play/stop needs nothing extra.
+   BENS THOUGHT: for the moment let's try Jack and OSC.
 
 
 
@@ -211,60 +108,4 @@ Occurs when using Ardour & Jack, but not when using Jack via standalone or Ardou
 There is a latency correction thing happening, so the report frame is always > 0 when rewinding.
 We don't actually know what the true frame is.
 
-
-On creating a RT-safe standalone transport
-==========================================
-
- I'm curious... when Ardour runs in Windows or MacOS without Jack does it do so in a RT safe fashion, and if so how does it do this and are the there any      
-  lessons for Luvie when running in standalone mode using an internal transport?                                                                                
-
-  Ran 5 shell commands 
-
-● Yes. Without JACK, Ardour runs its own audio engine and applies the same real-time rules itself. Luvie's standalone Internal transport currently sends notes
-  from the UI thread, so its timing can only be as steady as the UI.
- 
-  How Ardour does it (Ardour 9.8 source, libs/backends/)
- 
-  1. The audio device drives a high-priority process thread.
-  - Windows (portaudio_backend.cc): Ardour creates a "PortAudio Main" thread with pbd_realtime_pthread_create(... PBD_SCHED_FIFO, PBD_RT_PRI_MAIN ...). It
-    registers that thread with MMCSS as "Pro Audio" (AvSetMmThreadCharacteristics), which is the Windows scheduler class meant for audio. The loop uses
-    PortAudio's blocking API (Pa_ReadStream/Pa_WriteStream), so the sound card's buffer clock paces each cycle.
-  - macOS (coreaudio_backend.cc): Ardour sets Mach THREAD_TIME_CONSTRAINT_POLICY on its process threads (pbd_mach_set_realtime_policy), with the period equal to
-    one buffer's duration. This is the same guarantee CoreAudio's own I/O thread gets.
- 
-  2. The OS doesn't make it RT-safe; Ardour's own discipline does. The process cycle never allocates, locks or blocks: buffers are pre-allocated, other threads
-  talk to it through lock-free ring buffers, and disk work runs on a separate "butler" thread. These are the same rules as under JACK, and the same rules
-  Luvie's DSP and JackTransport already follow.
-  
-  3. MIDI output gets a timestamp and is delivered at that time, not when the cycle produces it.
-  - Windows (winmmemidi_output_device.cc): the process thread writes timestamped events into a lock-free ring buffer. A dedicated "WinMME Output" thread runs at
-    MIDI real-time priority (PBD_RT_PRI_MIDI). It waits on a waitable timer until each event's time, then sends it. The process thread never calls the Windows
-    MIDI API, which can block.
-  - macOS (coremidi_io.cc): each packet carries a CoreMIDI host-time timestamp, and the OS delivers it on time.
- 
-  Luvie standalone with the Internal transport today
-
-  - SimpleTransport is a steady_clock plus an offset.
-  - Notes go out from Playhead::tick() on an FLTK timer every 16–50 ms (playhead.cpp:82), on the UI thread.
-  - RtMidi sendMessage() sends each note immediately (rtMidiPort.cpp).
-  
-  So timing is quantised to the timer interval, and anything that holds up the UI delays notes: a redraw, a dialog, loading a file.
-  
- Lessons for Luvie
-  
-  1. Move sequencing off the UI thread, and reuse the existing engine. Sequencer::renderCycle() is already RT-safe and drives both the JACK and LV2 paths.
-     Internal mode could run it on its own high-priority thread over short windows of the steady clock, so all three modes would share one engine. The soft
-     Playhead::tick sending path could then go, and Playhead would only display.
-  2. Copy Ardour's split between rendering and sending. The sequencer thread renders slightly ahead (a few ms) and puts timestamped events in a lock-free queue.
-     A sender thread sleeps until each event is due and calls RtMidi, so a slow MIDI driver can't hold up the render. The sender can wait for the next due time
-     rather than wake on a fixed tick, which keeps within the "avoid polling threads" rule. The render thread does need a steady cadence; 
-     wait-until-next-window with clock_nanosleep/mach_wait_until/a waitable timer is the cleanest form of that.
-  3. Ask the OS for real-time scheduling. On Windows, MMCSS "Pro Audio" plus a high-resolution waitable timer (CREATE_WAITABLE_TIMER_HIGH_RESOLUTION; plain
-     Windows sleeps are coarse by default). On macOS, the time-constraint policy. On Linux, SCHED_FIFO where allowed, falling back quietly.
-  4. Use OS timestamps where the platform has them. CoreMIDI and ALSA sequencer queues can deliver at a timestamp, which beats any sleeping thread. RtMidi
-     doesn't expose that, so you'd need small native paths per platform. That's optional polish once 1–3 are in place.
-  5. Optional: clock it from an audio device (an RtAudio/PortAudio stream outputting silence), as Ardour does. You get a sample-accurate clock and an OS-blessed
-     RT thread, but it adds a dependency and claims an audio device just to make MIDI.
-    
-  Doing 1 and 2 together would give the biggest improvement, mostly by reusing code that already exists. Want me to sketch a plan for it?
 

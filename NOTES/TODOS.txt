@@ -40,6 +40,8 @@ Suggestions for LV2
 
 - Is there some way to avoid the blank-bar-at-the-front workaround? Whose responsibility is that?
 
+- Dynamically adding or renaming ports would be useful
+
 FUTURE FUNCTIONALITY
 ====================
 
@@ -104,6 +106,11 @@ Currently only one Luvie instance per Ardour will work.
    cf checking to see if any others exist.
    Otherwise options exist I think. Look a bit involved.
 
+
+NOTE TESTED ON
+==============
+Ardour 9.2  on Ubuntu 26.04
+Carla XX    on Ubuntu 26.04
 
 Monitor preformance
 -------------------
@@ -419,8 +426,6 @@ cf Cut and insert slice. Also wrt Song Editor.
 
 Manual: 
    multi-select move, copy, delete descriptions.
-   Note that I support a right click on the grid, but not showing context menu. Ctrl-V also works.
-   + Alt-click-sweep slice selection and copying
 
 	USE IN CARLA - re parameters etc...	 
 	  click Luvie's Edit button (wrench), go to the Edit tab → Settings group, and tick "Send Control Changes". While
@@ -445,7 +450,24 @@ Manual:
 	Maybe allow some key mapping - esp wrt the 'Alt-click'.
 		Generally prefer to have 1 good set of bindings though...
 
+	OSC Ardour enable in: Edit > Preferences > Control Surfaces > Novation > Open Sound Control     (NB useful when no Jack)
+		[cf stability of this hardcoded instruction in the UI...] 
+	   [ ALSO missing Edit >   & Novation]
 
-Still have problems with clipped notes/missing notes in Loop Mode in LV2 mode
-     Any refactoring useful wrt to the DSP, and the song and patterns that feed it?
+	OSC Carla support (NB useful when no Jack)
+
+    Use this:
+		sudo usermod -aG audio ben
+	in Linux when use internal transport or native MIDI ports
+
+
+Luvie could be transport master now...
+  - Probably most straightforward when in standalone mode.
+  - Should probably support in LV2 mode too, but possibly only if using Jack control.
+
+
+Do I really need/want to compile across and older X library (NB I am using Wayland and FLTK1.5)... is this just a 
+   plugin thing
+   
+Suspected bug - playing keyboard thru Luvie while playing arpeggio - think the arpeggio occasionally loses a note.
 
