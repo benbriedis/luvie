@@ -11,7 +11,8 @@ class ObservableSong;
 
 /*
  * OscTransport — a command-only ITransport that drives Ardour's transport through
- * Ardour's OSC control surface (Preferences > Control Surfaces > Open Sound Control).
+ * Ardour's OSC control surface (Preferences > Control Surfaces > Novation >
+ * Open Sound Control).
  * Used by the LV2 UI when no JACK server is available to carry transport commands
  * (typically Ardour on Windows / macOS). The playhead is still displayed from the
  * DSP's time:Position, so position() / isPlaying() are not meaningful here.

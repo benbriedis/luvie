@@ -591,8 +591,8 @@ static void refreshTransportControl(LuvieUI* ui)
         default:
             alert  = "Ardour OSC not responding \xe2\x80\x94 transport control disabled";
             status = "Waiting for Ardour on OSC port " + std::to_string(ov->oscPort())
-                   + "\xe2\x80\xa6 Enable it in Ardour: Preferences > Control Surfaces"
-                     " > Open Sound Control.";
+                   + "\xe2\x80\xa6 Enable it in Ardour: Preferences > Control"
+                     " Surfaces > Novation > Open Sound Control.";
             /* We could not listen on Ardour's default reply port, so its replies
                only reach us if it answers the sender. */
             if (ui->oscControl->replyPort() != OscTransport::kDefaultReplyPort)

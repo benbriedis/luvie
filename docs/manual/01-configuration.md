@@ -23,10 +23,11 @@ transport. Choose it with **Control** in the Transport window:
 - **Jack** — uses the Jack (or PipeWire) transport. The host must be set to follow Jack transport.
   The default on Linux.
 - **Ardour OSC** — uses Ardour's OSC control surface, so no Jack is needed. The default on
-  Windows and macOS. Enable it in Ardour under *Preferences > Control Surfaces > Open Sound
-  Control*, and make sure **OSC port** in Luvie's Transport window matches Ardour's (3819 by
-  default). Ardour's default Port Mode ("Manual", reply port 8000) works; if anything else is
-  already using port 8000, set Ardour's Port Mode to "Auto" instead.
+  Windows and macOS. Enable it in Ardour under *Preferences > Control Surfaces >
+  Novation > Open Sound Control*, and make sure **OSC port** in Luvie's Transport window
+  matches Ardour's (3819 by default). Ardour's default Port Mode ("Manual", reply port
+  8000) works; if anything else is already using port 8000, set Ardour's Port Mode to
+  "Auto" instead.
 - **None** — Luvie's transport buttons are disabled and Luvie simply follows the host's transport.
 
 The choice is saved with the project.
