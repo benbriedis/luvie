@@ -66,10 +66,13 @@ protected:
     virtual void labelsResize(int x, int y, int w, int h) = 0;
     virtual void labelsSetOnRightClick(std::function<void()> fn) = 0;
     virtual void labelsSetOnRowClicked(std::function<void(int midi)> fn) = 0;
-    // Editors whose labels can be renamed (the drum editor) return a closure
+    // Editors whose labels can be renamed (drum and pianoroll) return a closure
     // that renames the row under the current event; others leave it empty and
     // the context menu omits its "Rename" item.
     virtual std::function<void()> labelsRenameHandler() { return {}; }
+    // Editors whose unnamed rows can show MIDI numbers or note names (drum and
+    // pianoroll; see Pattern::rowLabels) offer switching them in the menu.
+    virtual bool labelsHaveRowLabelsToggle() const { return false; }
     // The label column's lights for notes arriving on the MIDI input.
     virtual LiveNoteLights& labelsLiveNotes() = 0;
 

@@ -29,6 +29,11 @@ inline const char* patternKindLabel(PatternType type)
 	}
 }
 
+// What the drum and pianoroll editors label a row with when the instrument has no
+// name of its own for that note. Auto is the pattern type's default: MIDI numbers
+// for drums, note names (C4) for a pianoroll.
+enum class RowLabels { Auto = 0, Numbers = 1, NoteNames = 2 };
+
 struct DrumNote {
 	int   id;
 	int   note;        // MIDI note number (0–127)
@@ -84,7 +89,15 @@ struct Pattern {
 	int  divisions = 0;      // index into kPatternDivisors; 0 = None
 	bool snapEnabled = true; // snap new notes and resized edges to the divisions
 	int  zoomPct   = 200;    // horizontal zoom, % of the x1 column width (kZoomPercents in patternPanel.cpp)
+	RowLabels rowLabels = RowLabels::Auto;  // unnamed rows' labels
 };
+
+// Whether unnamed rows show note names rather than MIDI numbers.
+inline bool patternShowsNoteNames(const Pattern& p)
+{
+	if (p.rowLabels == RowLabels::Auto) return p.type != PatternType::DRUM;
+	return p.rowLabels == RowLabels::NoteNames;
+}
 
 // The beat subdivisions the Div control offers, indexed by Pattern::divisions.
 inline constexpr int kPatternDivisors[]  = { 1, 2, 3, 4, 5, 6, 7 };

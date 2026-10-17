@@ -1226,9 +1226,18 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
             sceneTriggers.cancelLearn();
         };
         outputsOverlay->setObservableInstrument(instruments_);
+        // Both editors name notes from the instrument's one drum map, so a
+        // rename in either shows in the other too.
         if (drumEd) {
             drumEd->onDrumLabelChanged = [this](int instrId, int midiNote, const std::string& label) {
                 outputsOverlay->updateInstrumentDrumMap(instrId, midiNote, label);
+                if (pianorollEd) pianorollEd->setNoteName(instrId, midiNote, label);
+            };
+        }
+        if (pianorollEd) {
+            pianorollEd->onNoteLabelChanged = [this](int instrId, int midiNote, const std::string& label) {
+                outputsOverlay->updateInstrumentDrumMap(instrId, midiNote, label);
+                if (drumEd) drumEd->setDrumLabel(instrId, midiNote, label);
             };
         }
         window->add(outputsOverlay);
@@ -1295,8 +1304,8 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         int id1 = instruments_->add("Instrument A", false);
         int id2 = instruments_->add("Drums A", true);
         outputsOverlay->setInstruments({
-            {id1, "Instrument A", port,      1, {}, false, false, -1, -1, -1, -1, input},
-            {id2, "Drums A",      drumPort, 10, {}, true,  false, -1, -1, -1, -1, input}
+            {id1, "Instrument A", port,      1, {}, false, -1, -1, -1, -1, input},
+            {id2, "Drums A",      drumPort, 10, {}, true,  -1, -1, -1, -1, input}
         });
     }
     pushInstruments();
@@ -1366,12 +1375,13 @@ void LuvieApp::pushInstruments() {
 
     if (drumEd) {
         std::map<int, std::map<int, std::string>> allMaps;
-        std::map<int, bool> allFallbacks;
-        for (const auto& ci : instrs) {
-            allMaps[ci.id]      = ci.drumMap;
-            allFallbacks[ci.id] = ci.fallbackNoteNames;
-        }
-        drumEd->setAllDrumMaps(allMaps, allFallbacks);
+        for (const auto& ci : instrs) allMaps[ci.id] = ci.drumMap;
+        drumEd->setAllDrumMaps(allMaps);
+    }
+    if (pianorollEd) {
+        std::map<int, std::map<int, std::string>> allNames;
+        for (const auto& ci : instrs) allNames[ci.id] = ci.drumMap;
+        pianorollEd->setAllNoteNames(allNames);
     }
     outputsOverlay->refreshInstrumentButtons();
 }

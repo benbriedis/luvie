@@ -364,6 +364,7 @@ int ObservablePattern::copyPattern(int srcPatId)
     copy.useSharp  = src->useSharp;
     copy.divisions   = src->divisions;
     copy.snapEnabled = src->snapEnabled;
+    copy.rowLabels   = src->rowLabels;
     song_->patternNames.assignDerived(copy, src->name);
     for (auto n : src->notes) {
         n.id = song_->nextId++;
@@ -458,6 +459,17 @@ void ObservablePattern::setPatternSnapEnabled(int patId, bool enabled)
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
             p.snapEnabled = enabled;
+            song_->notifyViewState();
+            return;
+        }
+    }
+}
+
+void ObservablePattern::setPatternRowLabels(int patId, RowLabels labels)
+{
+    for (auto& p : song_->data.patterns) {
+        if (p.id == patId) {
+            p.rowLabels = labels;
             song_->notifyViewState();
             return;
         }

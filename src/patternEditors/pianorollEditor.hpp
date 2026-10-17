@@ -7,16 +7,22 @@
 #include "basePatternEditor.hpp"
 #include "pianorollGrid.hpp"
 #include "noteContextPopup.hpp"
+#include "inlineInput.hpp"
 #include "liveNoteLights.hpp"
 #include <FL/Fl_Widget.H>
 #include <functional>
+#include <map>
+#include <string>
 
-// Left-panel widget showing MIDI note names (C0, C#0, …) for each row
+// Left-panel widget showing MIDI note names (C0, C#0, …) for each row, or the
+// instrument's own name for a note where it has one
 class PianorollLabels : public Fl_Widget {
     int numRows;
     int rowHeight;
     int rowOffset = 0;
     int flashMidi = -1;   // MIDI pitch briefly lit after a click
+    std::map<int, std::string> noteNames;
+    bool fallbackNoteNames = true;   // unnamed rows: note names, else MIDI numbers
 
     void        flash(int midi);
     static void clearFlashCb(void* self);
@@ -32,6 +38,12 @@ public:
     ~PianorollLabels();
     void setRowOffset(int offset) { rowOffset = offset; redraw(); }
     void setNumRows(int n)        { numRows   = n;       redraw(); }
+    void setNoteNames(const std::map<int, std::string>& m) { noteNames = m; redraw(); }
+    void setFallbackNoteNames(bool b) { fallbackNoteNames = b; redraw(); }
+
+    // Resolve an absolute y to the row it falls on: its MIDI pitch and the
+    // row's screen rectangle. Returns false outside the labelled range.
+    bool rowAt(int ey, int& midiNote, int& rowY, int& rowH) const;
 };
 
 // ---------------------------------------------------------------------------
@@ -44,6 +56,16 @@ class PianorollEditor : public BasePatternEditor {
 public:
     ISelectionHost* selectionHost() { return &grid; }
 private:
+    InlineInput     labelInput;
+    int             editingMidiNote = -1;
+
+    std::map<int, std::map<int, std::string>> allNoteNames;
+
+    void applyCurrentNoteNames();
+    void startLabelEdit(int midiNote, int rowY, int rowH);
+    void commitLabelEdit();
+    void cancelLabelEdit();
+    int  handle(int event) override;
 
     int  labelsWidth()      const override { return labelsW; }
     int  totalRows()        const override { return PianorollGrid::totalRows; }
@@ -64,9 +86,12 @@ private:
     void labelsResize(int x, int y, int w, int h) override { labels.resize(x, y, w, h); }
     void labelsSetOnRightClick(std::function<void()> fn) override { labels.onRightClick = std::move(fn); }
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { labels.onRowClicked = std::move(fn); }
+    std::function<void()> labelsRenameHandler() override;
+    bool labelsHaveRowLabelsToggle() const override { return true; }
     LiveNoteLights& labelsLiveNotes() override { return labels.liveNotes; }
 
     void setGridPattern(int patId) override;
+    void afterTimelineChanged(int patId) override;
 
 public:
     void focusPattern() override;
@@ -75,6 +100,13 @@ public:
     PianorollEditor(int x, int y, int visibleW, int numRows, int numCols,
                     int rowHeight, int colWidth, float snap, NoteContextPopup& popup);
     ~PianorollEditor();
+
+    std::function<void(int instrId, int midiNote, const std::string& label)> onNoteLabelChanged;
+
+    // Each instrument's note names, shared with the drum editor's drum maps.
+    void setAllNoteNames(const std::map<int, std::map<int, std::string>>& names);
+    void setNoteName(int instrId, int midiNote, const std::string& label);
+    void resize(int x, int y, int w, int h) override;
 };
 
 #endif

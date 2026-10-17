@@ -80,6 +80,7 @@ public:
     void setPatternDivisions(int patId, int divisions);
     void setPatternSnapEnabled(int patId, bool enabled);
     void setPatternZoom(int patId, int zoomPct);
+    void setPatternRowLabels(int patId, RowLabels labels);
     void setPatternInstrument(int patId, int instrumentId);
 
     // Pattern-level param lanes

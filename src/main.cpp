@@ -382,7 +382,7 @@ int main(int argc, char **argv) {
         std::vector<OutputsOverlay::InstrumentInfo> instrs;
         for (const auto& c : state.jackInstruments)
             instrs.push_back({c.id, c.name, c.portName, c.midiChannel, c.drumMap,
-                              c.isDrum, c.fallbackNoteNames, c.programNumber, c.bankMsb, c.bankLsb,
+                              c.isDrum, c.programNumber, c.bankMsb, c.bankLsb,
                               c.gm1Instrument, c.inputName, c.inputChannel,
                               c.split, c.splitNote, c.passThrough});
         connOverlay->setInstruments(instrs);
@@ -402,7 +402,7 @@ int main(int argc, char **argv) {
         state.jackInstruments.clear();
         for (const auto& ci : connOverlay->getInstruments())
             state.jackInstruments.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
-                                             ci.isDrum, ci.fallbackNoteNames,
+                                             ci.isDrum,
                                              ci.programNumber, ci.bankMsb, ci.bankLsb,
                                              ci.gm1Instrument, ci.inputName, ci.inputChannel,
                                              ci.split, ci.splitNote, ci.passThrough});

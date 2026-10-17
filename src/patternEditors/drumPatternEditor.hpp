@@ -80,7 +80,6 @@ private:
     int             editingMidiNote = -1;
 
     std::map<int, std::map<int, std::string>> allDrumMaps;
-    std::map<int, bool>                       allFallbackModes;
 
     void applyCurrentDrumMap();
     void startDrumLabelEdit(int midiNote, int rowY, int rowH);
@@ -117,6 +116,7 @@ private:
     void labelsSetOnRightClick(std::function<void()> fn) override { drumLabels.onRightClick = std::move(fn); }
     void labelsSetOnRowClicked(std::function<void(int)> fn) override { drumLabels.onRowClicked = std::move(fn); }
     std::function<void()> labelsRenameHandler() override;
+    bool labelsHaveRowLabelsToggle() const override { return true; }
     LiveNoteLights& labelsLiveNotes() override { return drumLabels.liveNotes; }
 
     void setGridPattern(int patId) override;
@@ -132,8 +132,8 @@ public:
     void focusPattern() override;
     void setSnap(float s) override { drumGrid.setSnap(s); BasePatternEditor::setSnap(s); }
     void setDivisions(int d) override { drumGrid.setDivisions(d); }
-    void setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps,
-                        const std::map<int, bool>& fallbacks);
+    void setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps);
+    void setDrumLabel(int instrId, int midiNote, const std::string& label);
     void resize(int x, int y, int w, int h) override;
 };
 

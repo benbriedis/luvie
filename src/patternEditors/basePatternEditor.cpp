@@ -148,6 +148,17 @@ void BasePatternEditor::setNoteLabelsContextPopup(NoteLabelsContextPopup* popup)
         if (lastSelectedTrack >= (int)pattern->get().tracks.size()) return;
         int patId = pattern->get().patternIdForSelectedLane();
         setParamTarget(popup, patId);
+        std::function<void()> onToggleLabels;
+        bool showingNoteNames = false;
+        if (labelsHaveRowLabelsToggle()) {
+            for (const auto& p : pattern->get().patterns)
+                if (p.id == patId) showingNoteNames = patternShowsNoteNames(p);
+            onToggleLabels = [this, patId, showingNoteNames]() {
+                pattern->setPatternRowLabels(patId, showingNoteNames ? RowLabels::Numbers
+                                                                     : RowLabels::NoteNames);
+            };
+        }
+        popup->setLabelsToggle(std::move(onToggleLabels), showingNoteNames);
         popup->open(
             Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },
@@ -182,6 +193,7 @@ void BasePatternEditor::setParamLabelsContextPopup(NoteLabelsContextPopup* popup
                     if (l.id == laneId) laneType = l.type;
         }
         setParamTarget(popup, patId);
+        popup->setLabelsToggle({}, false);   // nor a row label style
         popup->open(
             Fl::event_x(), Fl::event_y(),
             [this, patId](const char* type) { return pattern->hasPatternParamLane(patId, type); },

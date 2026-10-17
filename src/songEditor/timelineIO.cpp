@@ -95,6 +95,7 @@ static json patternToJson(const Pattern& p) {
         {"divisions",    p.divisions},
         {"snapEnabled",  p.snapEnabled},
         {"zoomPct",      p.zoomPct},
+        {"rowLabels",    (int)p.rowLabels},
     };
 }
 
@@ -113,6 +114,7 @@ static Pattern patternFromJson(const json& j) {
     p.useSharp     = j.value("useSharp",  false);
     p.divisions    = j.value("divisions",   0);
     p.snapEnabled  = j.value("snapEnabled", true);
+    p.rowLabels    = (RowLabels)std::clamp(j.value("rowLabels", 0), 0, 2);
     // Zoom was once stored as an index into the panel's dropdown, which adding
     // x0.5 and x0.2 reordered. A song saved before that carries "zoom" instead,
     // so map its index back to the percentage it stood for.
@@ -403,7 +405,7 @@ std::string appStateToJsonString(const AppState& state) {
             jmap[std::to_string(note)] = name;
         jinstrs.push_back({{"id", c.id}, {"name", c.name}, {"portName", c.portName},
                            {"midiChannel", c.midiChannel}, {"drumMap", jmap},
-                           {"isDrum", c.isDrum}, {"fallbackNoteNames", c.fallbackNoteNames},
+                           {"isDrum", c.isDrum},
                            {"programNumber", c.programNumber},
                            {"bankMsb", c.bankMsb}, {"bankLsb", c.bankLsb},
                            {"gm1Instrument", c.gm1Instrument},
@@ -614,7 +616,6 @@ bool appStateFromJsonString(const std::string& jsonStr, AppState& state) {
             for (auto& [k, v] : jc["drumMap"].items())
                 ch.drumMap[std::stoi(k)] = v.get<std::string>();
         ch.isDrum            = jc.value("isDrum",            false);
-        ch.fallbackNoteNames = jc.value("fallbackNoteNames", false);
         ch.programNumber     = jc.value("programNumber",     -1);
         ch.bankMsb           = jc.value("bankMsb",           -1);
         ch.bankLsb           = jc.value("bankLsb",           -1);

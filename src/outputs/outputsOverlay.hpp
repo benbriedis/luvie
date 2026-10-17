@@ -62,7 +62,6 @@ class OutputsOverlay : public OverlayWindow {
         int midiChannel = 1;
         std::map<int, std::string> drumMap;
         bool isDrum            = false;
-        bool fallbackNoteNames = false;
         int  programNumber     = -1;
         int  bankMsb           = -1;
         int  bankLsb           = -1;
@@ -84,8 +83,6 @@ class OutputsOverlay : public OverlayWindow {
         ModernButton* gsBtn           = nullptr;
         ModernButton* exportBtn       = nullptr;
         ModernButton* clearBtn        = nullptr;
-        Fl_Box*       fallbackLabel   = nullptr;
-        Fl_Choice*    fallbackChoice  = nullptr;
         Fl_Input*     programInput    = nullptr;
         Fl_Choice*    programDropdown = nullptr;
         Fl_Input*     bankMsbInput    = nullptr;
@@ -203,7 +200,6 @@ class OutputsOverlay : public OverlayWindow {
     static void loadGsMapCb       (Fl_Widget*, void*);
     static void exportDrumMapCb   (Fl_Widget*, void*);
     static void clearDrumMapCb    (Fl_Widget*, void*);
-    static void fallbackChoiceCb  (Fl_Widget*, void*);
     static void programInputCb    (Fl_Widget*, void*);
     static void programDropdownCb (Fl_Widget*, void*);
     static void bankMsbInputCb    (Fl_Widget*, void*);
@@ -247,7 +243,6 @@ public:
         int         midiChannel;
         std::map<int, std::string> drumMap;
         bool        isDrum            = false;
-        bool        fallbackNoteNames = false;
         int         programNumber     = -1;
         int         bankMsb           = -1;
         int         bankLsb           = -1;

@@ -63,8 +63,6 @@ static constexpr int drumGmW           = 105;
 static constexpr int drumGsW           = 100;
 static constexpr int drumExportW       = 115;
 static constexpr int drumClearW        = 65;
-static constexpr int drumFallbackLabelW = 58;
-static constexpr int drumFallbackChoiceW = 90;
 static constexpr int drumBtnGap        = 8;
 static constexpr int scrollbarW        = OverlayWindow::scrollbarW;
 
@@ -482,7 +480,7 @@ void OutputsOverlay::setInstruments(const std::vector<InstrumentInfo>& instrs) {
     instruments_.clear();
     for (const auto& ci : instrs)
         instruments_.push_back({ci.id, ci.name, ci.portName, ci.midiChannel, ci.drumMap,
-                                ci.isDrum, ci.fallbackNoteNames, ci.programNumber, ci.bankMsb, ci.bankLsb,
+                                ci.isDrum, ci.programNumber, ci.bankMsb, ci.bankLsb,
                                 ci.gm1Instrument,
                                 ci.inputName,
                                 std::clamp(ci.inputChannel, 0, 16),
@@ -499,7 +497,7 @@ std::vector<OutputsOverlay::InstrumentInfo> OutputsOverlay::getInstruments() con
     std::vector<InstrumentInfo> result;
     for (const auto& instr : instruments_)
         result.push_back({instr.id, instr.name, instr.portName, instr.midiChannel, instr.drumMap,
-                          instr.isDrum, instr.fallbackNoteNames, instr.programNumber, instr.bankMsb, instr.bankLsb,
+                          instr.isDrum, instr.programNumber, instr.bankMsb, instr.bankLsb,
                           instr.gm1Instrument, instr.inputName, instr.inputChannel,
                           instr.split, instr.splitNote, instr.passThrough});
     return result;
@@ -912,8 +910,6 @@ void OutputsOverlay::rebuildInstrumentRows() {
         if (row.gsBtn)          discard(row.gsBtn);
         if (row.exportBtn)      discard(row.exportBtn);
         if (row.clearBtn)       discard(row.clearBtn);
-        if (row.fallbackLabel)   discard(row.fallbackLabel);
-        if (row.fallbackChoice)  discard(row.fallbackChoice);
         if (row.programInput)    discard(row.programInput);
         if (row.programDropdown) discard(row.programDropdown);
         if (row.bankMsbInput)    discard(row.bankMsbInput);
@@ -989,8 +985,6 @@ void OutputsOverlay::rebuildInstrumentRows() {
         ModernButton* gs   = nullptr;
         ModernButton* exp  = nullptr;
         ModernButton* clr  = nullptr;
-        Fl_Box*       fbLbl = nullptr;
-        Fl_Choice*    fbCh  = nullptr;
         if (drum) {
             const int drumBtnY = y + rowH + 4 * progRowH + (drumRowH - drumBtnH) / 2;
 
@@ -1038,27 +1032,6 @@ void OutputsOverlay::rebuildInstrumentRows() {
             clr->setBorderWidth(1);
             clr->setBorderColor(borderCol);
             clr->callback(clearDrumMapCb, this);
-
-            const int fbLabelX  = clrX + drumClearW + drumBtnGap;
-            const int fbChoiceX = fbLabelX + drumFallbackLabelW;
-            fbLbl = new Fl_Box(fbLabelX, drumBtnY, drumFallbackLabelW, drumBtnH, "Fallback");
-            fbLbl->box(FL_NO_BOX);
-            fbLbl->labelcolor(subTextCol);
-            fbLbl->labelsize(11);
-            fbLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-            auto* fbMc = new ModernChoice(fbChoiceX, drumBtnY, drumFallbackChoiceW, drumBtnH);
-            fbMc->color(inputBgCol);
-            fbMc->labelcolor(textCol);
-            fbMc->textsize(11);
-            fbMc->setBorderColor(borderCol);
-            fbMc->setArrowColor(subTextCol);
-            fbMc->setHoverColor(0xF3F4F600);
-            fbMc->add("Notes");
-            fbMc->add("Numbers");
-            fbMc->value(instruments_[i].fallbackNoteNames ? 0 : 1);
-            fbMc->callback(fallbackChoiceCb, this);
-            fbCh = fbMc;
         }
 
         // MIDI input sub-row — where the instrument is played from, all channels
@@ -1265,7 +1238,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         progDrop->value(instruments_[i].gm1Instrument >= 0 ? instruments_[i].gm1Instrument + 1 : 0);
         progDrop->callback(programDropdownCb, this);
 
-        instrRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr, fbLbl, fbCh,
+        instrRows_.push_back({typeLbl, nameInp, portCh, midiCh, del, imp, gm, gs, exp, clr,
                               progInp, progDrop, msbInp, lsbInp,
                               bankLbl, msbLbl, lsbLbl, progLbl, gm1Lbl,
                               inLbl, inCh, inChanLbl, inChanCh,
@@ -1728,17 +1701,6 @@ void OutputsOverlay::clearDrumMapCb(Fl_Widget* w, void* d) {
     for (int i = 0; i < (int)self->instrRows_.size(); i++) {
         if (w != self->instrRows_[i].clearBtn) continue;
         self->instruments_[i].drumMap.clear();
-        if (self->onInstrumentsChanged) self->onInstrumentsChanged();
-        return;
-    }
-}
-
-void OutputsOverlay::fallbackChoiceCb(Fl_Widget* w, void* d) {
-    auto* self = static_cast<OutputsOverlay*>(d);
-    for (int i = 0; i < (int)self->instrRows_.size(); i++) {
-        if (w != self->instrRows_[i].fallbackChoice) continue;
-        // index 0 = "Notes" (show note names), index 1 = "Numbers" (show MIDI numbers)
-        self->instruments_[i].fallbackNoteNames = (static_cast<Fl_Choice*>(w)->value() == 0);
         if (self->onInstrumentsChanged) self->onInstrumentsChanged();
         return;
     }

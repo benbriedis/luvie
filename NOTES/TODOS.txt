@@ -460,6 +460,14 @@ Manual:
 		sudo usermod -aG audio ben
 	in Linux when use internal transport or native MIDI ports
 
+	Use for sample triggers.
+		- Use Pianoroll editor.
+		- Can rename notes
+		- Can toggle to show note names/numbers
+		- Maybe use with Linux Sampler
+		- NB 'Chunky'
+    
+
 
 Luvie could be transport master now...
   - Probably most straightforward when in standalone mode.

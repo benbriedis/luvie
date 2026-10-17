@@ -15,8 +15,10 @@ class NoteLabelsContextPopup : public ContextMenuPopup {
     std::function<void(const char*)> pendingOnSelect;
     std::function<void()>            pendingOnRemove;
     std::function<void()>            pendingOnRename;
+    std::function<void()>            pendingOnToggleLabels;
     std::function<bool(const char*)> hasFn_;
     ModernButton*                    renameBtn = nullptr;
+    ModernButton*                    labelsBtn = nullptr;
     ModernButton*                    addBtn    = nullptr;
     ModernButton*                    removeBtn = nullptr;
     ModernButton*                    editBtn       = nullptr;
@@ -52,14 +54,15 @@ public:
     // "Edit parameter" and "New (MIDI learn)". Without it they never show.
     ParamMenuActions* paramActions = nullptr;
 
-    NoteLabelsContextPopup() : ContextMenuPopup(popW, 6*30+2) {
+    NoteLabelsContextPopup() : ContextMenuPopup(popW, 7*30+2) {
         renameBtn = addItem(0, "Rename");
-        addBtn    = addItem(1, "Add automation");
+        labelsBtn = addItem(1, "Show note names");
+        addBtn    = addItem(2, "Add automation");
         addBtn->setSubmenuArrow(true);
-        removeBtn = addItem(2, "Remove automation");
-        editBtn       = addItem(3, "Edit parameter");
-        learnBtn      = addItem(4, "MIDI learn");
-        clearLearnBtn = addItem(5, "Clear MIDI learn");
+        removeBtn = addItem(3, "Remove automation");
+        editBtn       = addItem(4, "Edit parameter");
+        learnBtn      = addItem(5, "MIDI learn");
+        clearLearnBtn = addItem(6, "Clear MIDI learn");
 
         editBtn->callback([](Fl_Widget*, void* d) {
             auto* self = static_cast<NoteLabelsContextPopup*>(d);
@@ -72,6 +75,11 @@ public:
             auto* self = static_cast<NoteLabelsContextPopup*>(d);
             self->hide();
             if (self->pendingOnRename) self->pendingOnRename();
+        }, this);
+        labelsBtn->callback([](Fl_Widget*, void* d) {
+            auto* self = static_cast<NoteLabelsContextPopup*>(d);
+            self->hide();
+            if (self->pendingOnToggleLabels) self->pendingOnToggleLabels();
         }, this);
         addBtn->callback([](Fl_Widget*, void* d) {
             static_cast<NoteLabelsContextPopup*>(d)->doShowParamSubmenu();
@@ -112,6 +120,14 @@ public:
         hide();
     }
 
+    // Switching unnamed rows between MIDI numbers and note names, for the
+    // editors that have them; empty hides the item. Set before each open().
+    // showingNoteNames picks the item's label.
+    void setLabelsToggle(std::function<void()> onToggle, bool showingNoteNames) {
+        pendingOnToggleLabels = std::move(onToggle);
+        labelsBtn->label(showingNoteNames ? "Show MIDI numbers" : "Show note names");
+    }
+
     // The instrument the pattern plays and its own parameters, for the parameter
     // submenu and "Edit parameter". Set before each open(); 0 for none.
     void setParamTarget(int instrumentId, std::vector<std::string> ownNames) {
@@ -138,7 +154,7 @@ public:
         if (canLearn) learnBtn->copy_label(midiLearn->learnMenuLabel(learnType_).c_str());
 
         // Stack the visible rows from the top with no gaps. "Rename" only shows
-        // for editors that supply a rename handler (the drum editor); "Remove
+        // for editors that supply a rename handler (drum and pianoroll); "Remove
         // automation" only when there's an existing param lane to remove.
         // popH must be updated too: ContextMenuPopup::resize() snaps the window
         // back to popH, so size() alone won't stick.
@@ -151,6 +167,7 @@ public:
             shown++;
         };
         place(renameBtn, (bool)pendingOnRename);
+        place(labelsBtn, (bool)pendingOnToggleLabels);
         place(addBtn,    true);
         place(removeBtn, (bool)pendingOnRemove);
         place(editBtn,       canEdit);

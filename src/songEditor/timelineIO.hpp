@@ -97,7 +97,6 @@ struct JackInstrument {
     int         midiChannel       = 1;
     std::map<int, std::string> drumMap;
     bool        isDrum            = false;
-    bool        fallbackNoteNames = false;
     int         programNumber     = -1;  // -1 = not set; 0-127 = MIDI program
     int         bankMsb           = -1;  // -1 = not set; 0-127 = CC#0 value
     int         bankLsb           = -1;  // -1 = not set; 0-127 = CC#32 value

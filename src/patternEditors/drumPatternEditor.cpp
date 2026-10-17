@@ -261,11 +261,18 @@ void DrumPatternEditor::focusPattern()
     setRowOffset(std::max(0, lowest - 1));
 }
 
-void DrumPatternEditor::setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps,
-                                       const std::map<int, bool>& fallbacks)
+void DrumPatternEditor::setAllDrumMaps(const std::map<int, std::map<int, std::string>>& maps)
 {
-    allDrumMaps      = maps;
-    allFallbackModes = fallbacks;
+    allDrumMaps = maps;
+    applyCurrentDrumMap();
+}
+
+void DrumPatternEditor::setDrumLabel(int instrId, int midiNote, const std::string& label)
+{
+    if (label.empty())
+        allDrumMaps[instrId].erase(midiNote);
+    else
+        allDrumMaps[instrId][midiNote] = label;
     applyCurrentDrumMap();
 }
 
@@ -313,11 +320,7 @@ void DrumPatternEditor::commitDrumLabelEdit()
 
     int instrId = currentInstrumentId();
     if (instrId != 0) {
-        if (newLabel.empty())
-            allDrumMaps[instrId].erase(note);
-        else
-            allDrumMaps[instrId][note] = newLabel;
-        applyCurrentDrumMap();
+        setDrumLabel(instrId, note, newLabel);
         if (onDrumLabelChanged) onDrumLabelChanged(instrId, note, newLabel);
     }
     redraw();
@@ -334,23 +337,18 @@ void DrumPatternEditor::cancelDrumLabelEdit()
 
 void DrumPatternEditor::applyCurrentDrumMap()
 {
-    if (!pattern) { drumLabels.setDrumMap({}); drumLabels.setFallbackNoteNames(false); return; }
-    int sel = pattern->get().selectedTrackIndex;
-    const auto& tracks = pattern->get().tracks;
-    if (sel < 0 || sel >= (int)tracks.size()) { drumLabels.setDrumMap({}); drumLabels.setFallbackNoteNames(false); return; }
-    int patId = tracks[sel].lanes.empty() ? 0 : tracks[sel].lanes[0].patternId;
-    for (const auto& p : pattern->get().patterns) {
-        if (p.id == patId) {
-            auto mit = allDrumMaps.find(p.instrumentId);
-            drumLabels.setDrumMap(mit != allDrumMaps.end()
-                ? mit->second : std::map<int, std::string>{});
-            auto fit = allFallbackModes.find(p.instrumentId);
-            drumLabels.setFallbackNoteNames(fit != allFallbackModes.end() && fit->second);
-            return;
-        }
+    // The pattern on screen: the selected lane's, as the editors and the
+    // label menu's row label toggle use.
+    const Pattern* pat = nullptr;
+    if (pattern) {
+        int patId = pattern->get().patternIdForSelectedLane();
+        for (const auto& p : pattern->get().patterns)
+            if (p.id == patId) { pat = &p; break; }
     }
-    drumLabels.setDrumMap({});
-    drumLabels.setFallbackNoteNames(false);
+    if (!pat) { drumLabels.setDrumMap({}); drumLabels.setFallbackNoteNames(false); return; }
+    auto mit = allDrumMaps.find(pat->instrumentId);
+    drumLabels.setDrumMap(mit != allDrumMaps.end() ? mit->second : std::map<int, std::string>{});
+    drumLabels.setFallbackNoteNames(patternShowsNoteNames(*pat));
 }
 
 void DrumPatternEditor::setGridPattern(int patId)
