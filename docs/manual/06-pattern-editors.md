@@ -30,6 +30,9 @@ timing panel, or click on 'Snap' to disable it. The same two settings quantise n
 played in from a MIDI keyboard — see
 [Recording from a MIDI keyboard](#recording-from-a-midi-keyboard) below.
 
+Note that it is possible to hear what a note sounds like immediately by clicking on the note
+name in the column on the left of the grid. This is called 'auditioning'.
+
 ## Velocity
 
 The 'velocity' of a note is how loud the note is in MIDI-speak. 
