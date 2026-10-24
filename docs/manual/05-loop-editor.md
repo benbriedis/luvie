@@ -39,3 +39,8 @@ there as the next barline is reached. At that point control over the output of n
 
 If the transport is stopped the switch happens immediately. Clicking the mode button again while it is
 yellow cancels the switch.
+
+## Scenes
+TODO
+
+Include description of triggers
