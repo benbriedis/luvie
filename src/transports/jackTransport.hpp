@@ -5,7 +5,7 @@
 #define JACK_TRANSPORT_HPP
 
 #include "itransport.hpp"
-#include "sequencer.hpp"
+#include "cycleDriver.hpp"
 #include "midiBackend.hpp"   // kMaxMidiInputs
 #include <jack/jack.h>
 #include <jack/midiport.h>
@@ -17,12 +17,12 @@
 #include <vector>
 
 /*
- * JackTransport — an ITransport that drives the shared Sequencer from the JACK
+ * JackTransport — an ITransport that drives the shared CycleDriver from the JACK
  * transport and writes its MIDI to JACK MIDI output ports (used by the standalone
  * app / NSM client). It:
  *   - Drives play/pause/seek via the JACK transport API (so all JACK apps stay in sync)
- *   - Converts each Sequencer emit() (port + bar) into a JACK MIDI event on the
- *     matching port, collected and written in frame order per cycle.
+ *   - Resolves each emitted message's port to this cycle's JACK buffer; the driver
+ *     collects them, and process() writes them out in frame order.
  *
  * Thread model:
  *   - Public ITransport methods and the inherited Sequencer setters run on the UI thread.
@@ -31,7 +31,7 @@
 class MidiInputManager;
 class MidiScheduler;
 
-class JackTransport : public Sequencer, public ITransport {
+class JackTransport : public CycleDriver, public ITransport {
 public:
     JackTransport();
     ~JackTransport() override;
@@ -109,15 +109,17 @@ public:
     void setScheduler(MidiScheduler* sched) { scheduler_ = sched; }
 
 protected:
-    // Sequencer output hook (RT thread): resolve the port's cycle buffer and queue
-    // the message at the bar's frame offset for the ordered end-of-cycle flush.
-    void emit(const std::string& port, double bar,
-              const uint8_t* data, int len) override;
+    // CycleDriver hooks (RT thread): a port with a JACK buffer this cycle is
+    // buffered and flushed in frame order; any other goes to the scheduler.
+    int  resolvePort(const std::string& port) override;
+    void emitUnbuffered(const std::string& port, long offset,
+                        const uint8_t* data, int len) override;
+    // The server shut the client down: no process callback will drain the queue.
+    bool rtAlive() const override { return jackAlive.load(); }
 
 private:
     // ── JACK handles ──────────────────────────────────────────────────────────
     jack_client_t* client      = nullptr;
-    jack_nframes_t sampleRate  = 48000;
     bool           midiEnabled = true;
 
     std::mutex                           portsMutex;
@@ -125,7 +127,8 @@ private:
     jack_port_t*                         midiInPorts_[kMaxMidiInputs] = {};   // by slot; guarded by portsMutex
     std::atomic<MidiInputManager*>       midiInSink_{nullptr};
 
-    struct PendingMsg { std::string portName; uint8_t data[3]; int len; };
+    // Trivially destructible, so the RT thread's clear() frees nothing.
+    struct PendingMsg { char portName[64]; uint8_t data[3]; int len; };
     std::mutex              pendingMutex_;
     std::vector<PendingMsg> pendingMsgs_;
 
@@ -139,29 +142,17 @@ private:
     // re-establishes the identity frame<->bar mapping.
 
     // ── RT-thread-only state ──────────────────────────────────────────────────
-    jack_nframes_t lastFrame  = 0;
-    bool           firstCall  = true;
+    jack_nframes_t lastFrame   = 0;
+    bool           lastRolling = false;   // the transport's state last cycle
+    bool           firstCall   = true;
 
-    // Per-cycle context for emit(): the port buffers and this cycle's length.
+    // Per-cycle context for the CycleDriver hooks: the port buffers, indexed by
+    // what resolvePort() returns, and when the cycle started.
     using NamedBuf = std::pair<const std::string*, void*>;
     std::vector<NamedBuf> namedBufs;
-    jack_nframes_t        curNframes    = 0;
     int64_t               cycleStartNs  = 0;   // rtNowNs() at the top of process()
 
     MidiScheduler* scheduler_ = nullptr;
-
-    // All MIDI output for a cycle is collected here, then sorted by frame per
-    // buffer and written at the end of process(). JACK drops any event whose frame
-    // is earlier than the last one already written to a buffer. Reused across
-    // cycles to avoid per-cycle allocation on the RT thread.
-    struct OutEvent {
-        void*          buf;
-        jack_nframes_t frame;
-        uint32_t       seq;      // insertion order; tiebreak so sort stays in-place
-        uint8_t        data[3];
-        int            len;
-    };
-    std::vector<OutEvent> outEvents;
 
     // ── JACK process callback ─────────────────────────────────────────────────
     static int processCallback(jack_nframes_t nframes, void* arg);

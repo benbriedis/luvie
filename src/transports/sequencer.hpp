@@ -8,12 +8,13 @@
 #include "observableSong.hpp"
 #include "loopManager.hpp"
 #include "timeline.hpp"
+#include "spscRing.hpp"
 #include <array>
 #include <atomic>
 #include <cstdint>
 #include <map>
-#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 // A MIDI note-off has status nibble 0x80. Backends use this to end a note one
@@ -26,7 +27,7 @@ inline bool isNoteOff(const uint8_t* data, int len)
 /*
  * Sequencer — backend-agnostic MIDI sequencing core shared by every output path.
  *
- * It owns the timeline "snapshot" (a lock-free-ish RT-readable copy of everything
+ * It owns the timeline "snapshot" (an RT-owned copy of everything
  * needed to generate MIDI) and the firing logic that, given a bar window
  * [prevBars, curBars), produces note-on/off and CC/pitch-bend messages. It does
  * NOT know how those messages reach the world: each message is handed to the
@@ -37,15 +38,18 @@ inline bool isNoteOff(const uint8_t* data, int len)
  *   - The LV2 DSP drives it from the host's time:Position and forges the messages
  *     into an atom MIDI output port.
  *
- * Thread model (identical to the old JackTransport):
+ * Thread model:
  *   - All setters (setTimeline/setInstruments/...) run on the owner thread that is
  *     the single writer of the snapshot (UI thread standalone; LV2 worker thread in
  *     the plugin).
- *   - renderCycle() runs on the real-time thread. It try_locks snapMutex once for
- *     the whole cycle; on failure it does nothing and returns false so the caller
- *     leaves wasPlaying untouched (the missed stop/jump is handled next cycle). It
- *     also owns the song-loop wrap, splitting the cycle at the loop seam, and the
- *     Loop -> Song hand-off.
+ *   - renderCycle() runs on the real-time thread. It owns the snapshot outright and
+ *     never waits for, or skips a cycle because of, the owner. Owner changes reach
+ *     it as commands on a lock-free queue (see "Owner -> RT commands" below), which
+ *     it applies at the top of the next cycle, in order; whatever a command
+ *     displaces goes back to the owner to free. It also owns the song-loop wrap,
+ *     splitting the cycle at the loop seam, and the Loop <-> Song hand-offs.
+ *   - With no RT thread running (attachRt(false), the default) commands apply on
+ *     the spot, so a backend whose clock is not running yet still sees its setters.
  *   - emit() is called only from renderCycle() (RT thread) and must not allocate.
  */
 class Sequencer : public ITimelineObserver, public ILoopObserver,
@@ -116,7 +120,7 @@ public:
     // Drop a switch that is armed but has not landed yet — the user clicked back
     // into Loop mode, seeked, or chose a different scene. setLoopMode(), endLoopMode()
     // and armScene() all call it, so arming anything supersedes whatever was pending.
-    // Owner thread; briefly blocks on snapMutex.
+    // Owner thread.
     void cancelPending();
 
     // Suspend snapshot rebuilds while a multi-step change is applied (the mode and
@@ -125,22 +129,21 @@ public:
     // rebuildSnapshot() or endLoopMode(), which commit regardless. Owner thread.
     void suspendRebuilds(bool on) { rebuildsSuspended = on; }
 
-    // The musical bar the engine currently reads `secs` as, under the live snapshot
-    // and clock offset. Owner-thread counterpart to barInfo(): it blocks on the
-    // snapshot lock rather than skipping the way the RT path does, because a
-    // re-anchor has to have an answer.
+    // The musical bar the engine currently reads `secs` as, under the live tempo map
+    // and clock offset. Owner thread: it reads the owner's copy of the map last
+    // published as live, which is the one the RT thread is on once it has caught up
+    // with the queue — a cycle at most.
     double barAtSeconds(double secs);
 
     // Publish a new tempo table and clock offset as one commit, leaving the rest of
     // the snapshot in place. Two reasons it is not a rebuildSnapshot():
     //   * a tempo change moves no note, track or routing data, so copying the whole
     //     song for one would be waste — and a dragged BPM spinner fires this many
-    //     times a second, holding the lock long enough for the RT thread's try_lock
-    //     to start failing, which is a skipped cycle and an audible dropout;
+    //     times a second;
     //   * the map and the offset have to land together. A cycle that saw the new map
     //     with the old offset — or the reverse — would read the same frame as a
-    //     different bar and playback would jump. renderCycle() loads the offset after
-    //     taking the snapshot lock, so storing it here is atomic against a cycle.
+    //     different bar and playback would jump. Both travel in one command, which
+    //     the RT thread applies between cycles.
     // Owner thread.
     void retempoSnapshot(std::vector<timeSettings::TempoSegment> segs,
                          double newSecsOffset);
@@ -149,7 +152,7 @@ public:
     // — a recorded note that was already heard live and was quantised just ahead of
     // the playhead (see ITransport::skipNoteOnce). An entry that is never matched
     // expires once the window has passed it, and any reset clears them all. Owner
-    // thread; briefly blocks on snapMutex.
+    // thread.
     void skipNoteOnce(int instrumentId, int midiPitch, double bar, double tolBars);
 
     // ITimelineObserver / ILoopObserver / IGlobalTempoObserver
@@ -206,12 +209,13 @@ protected:
         bool                       loopMode = false;
     };
 
-    mutable std::mutex snapMutex;
+    // RT-thread-owned. The owner never touches these: its changes arrive as commands
+    // (see applyCommand) that swap new content in.
     Snapshot           snap;
     // The snapshot a pending hand-off will switch to, built ahead of the switch so the
     // RT thread can adopt it mid-cycle without allocating. While a hand-off is armed,
     // rebuildSnapshot() refreshes this one instead of `snap` — the loops are still the
-    // thing playing. Guarded by snapMutex.
+    // thing playing.
     Snapshot           pendingSnap;
 
     // The data model. Set via setTimeline(); read by backends (e.g. for UI-thread
@@ -241,27 +245,46 @@ protected:
     float  loopedPosition() const { return loopedBar.load(std::memory_order_relaxed); }
 
     void   rebuildSnapshot();
-    // Exchange `snap` and `pendingSnap`. RT-safe: swaps each vector member (a pointer
+    // Exchange two snapshots' contents. RT-safe: swaps each vector member (a pointer
     // exchange), never a move-assignment, which would free the old snapshot's memory
-    // on the audio thread. snapMutex must be held.
-    void   swapSnapshots();
+    // on the audio thread.
+    static void swapContent(Snapshot& a, Snapshot& b);
+    void   swapSnapshots() { swapContent(snap, pendingSnap); }
     // Both directions stay in double. timeSettings' maps are double throughout, and
     // narrowing here used to cost real samples: the per-cycle advance is computed as
     // the difference of two absolute bar positions, so a float's rounding at bar N
     // lands directly on the musical position and accumulates over the ~700 cycles a
     // loop iteration takes. Measured at 34 samples of error on an 8-bar loop.
-    double snapBarToSeconds(double bar)  const;   // reads snap.segs; hold snapMutex
+    double snapBarToSeconds(double bar)  const;   // reads snap.segs; RT thread
     double snapSecondsToBar(double secs) const;
+
+    // ── Owner -> RT commands ──────────────────────────────────────────────────
+    // Whether an RT thread is consuming commands. Off (the default), every command
+    // is applied on the spot, on the owner thread — right only while nothing else is
+    // rendering. A backend turns it on just before its RT thread can first run and
+    // off once it is sure it has stopped; turning it off applies anything still
+    // queued. Owner thread.
+    void   attachRt(bool on);
+    // Called after a command is queued, and while the owner waits for room: a
+    // backend whose RT thread sleeps when idle must wake it (InternalTransport).
+    virtual void wakeRt() {}
+    // False once the backend knows its RT thread will never run another cycle (the
+    // JACK server went away) even though it has not detached yet. The owner then stops
+    // waiting for room in the queue and detaches, rather than waiting for ever.
+    virtual bool rtAlive() const { return true; }
+    // Queue a backend-defined change for the RT thread: `apply(*this, payload)` runs
+    // there, between cycles, and `payload` is then handed back to the owner and freed
+    // with `del`. apply must not allocate or free; swapping the payload's contents
+    // with the RT-owned state is the usual trick. Owner thread.
+    void   postCustom(void* payload, void (*apply)(Sequencer&, void*), void (*del)(void*));
 
     // ── RT firing ─────────────────────────────────────────────────────────────
     // Render one RT cycle spanning [cycleStartSecs, cycleEndSecs) on Luvie's
-    // timeline; the bar offset above is applied on top. Acquires snapMutex once for
-    // the whole cycle, adopts any pending hand-off, converts the clock window to a
-    // musical window, and — when the song loop is armed and playing — splits it at
-    // the loop seam so playback wraps seamlessly. Returns true if the snapshot was
-    // readable and at least one sub-window rendered; false means the caller should
-    // leave wasPlaying unchanged (missed stop/jump retried next cycle). Calls emit()
-    // for every message produced.
+    // timeline; the bar offset above is applied on top. Applies the owner's queued
+    // commands, adopts any pending hand-off, converts the clock window to a musical
+    // window, and — when the song loop is armed and playing — splits it at the loop
+    // seam so playback wraps seamlessly. Always renders: nothing the owner does can
+    // make it skip. Calls emit() for every message produced.
     //
     // Both ends are passed in rather than start + duration, and each backend must
     // derive them from its integer frame counter with the *same* expression
@@ -269,7 +292,7 @@ protected:
     // cycle's start differ by an ULP, and the windows — which are half-open — leave
     // a gap that silently swallows any event landing exactly on a buffer boundary
     // (or overlap, firing it twice).
-    bool renderCycle(bool nowPlaying, bool jumped,
+    void renderCycle(bool nowPlaying, bool jumped,
                      double cycleStartSecs, double cycleEndSecs);
 
     // Frame offset within the current cycle for an emitted musical `bar`, honouring
@@ -295,21 +318,19 @@ private:
     //          channel. A *transport* break (stop, user seek, host relocate).
     enum class Reset { None, Soft, Hard };
 
-    // Generate all MIDI for one musical bar window [prevBars, curBars). The caller
-    // (renderCycle) must already hold snapMutex. Always returns true.
-    bool renderWindowLocked(bool nowPlaying, Reset reset, double prevBars, double curBars);
+    // Generate all MIDI for one musical bar window [prevBars, curBars). RT thread.
+    void renderWindow(bool nowPlaying, Reset reset, double prevBars, double curBars);
 
     // Where in the musical window [prevBars, curBars) an armed switch should land:
     // the first position whose intra-bar phase matches pendingAtPhase, so the switch
     // is a whole number of bars and the beat never moves. False if this cycle does
-    // not contain one (the switch simply waits — at most one bar). snapMutex must be
-    // held.
+    // not contain one (the switch simply waits — at most one bar). RT thread.
     bool handoffPoint(double prevBars, double curBars, double& at) const;
 
-    // Fill `out` with the current timeline + mode. Owner thread, no lock held: all
-    // allocation happens here so the commit under snapMutex is a cheap move. Returns
-    // false when there is nothing to publish, in which case the live snapshot must
-    // be left alone rather than replaced with an empty one.
+    // Fill `out` with the current timeline + mode. Owner thread: all allocation
+    // happens here, so publishing it is a pointer hand-over. Returns false when there
+    // is nothing to publish, in which case the live snapshot must be left alone
+    // rather than replaced with an empty one.
     bool buildSnapshot(Snapshot& out);
 
     // ── Owner-thread state ────────────────────────────────────────────────────
@@ -327,14 +348,14 @@ private:
     std::atomic<double> secsOffset{0.0};
 
     // An armed switch: pendingSnap is built and parked, and the RT thread adopts it
-    // at the next frame whose intra-bar phase matches pendingAtPhase. All three are
-    // armed under snapMutex together with pendingSnap, so the RT thread can never
-    // adopt one half of a switch.
+    // at the next frame whose intra-bar phase matches pendingAtPhase. All three
+    // arrive in the one Arm command that carries pendingSnap, so the RT thread can
+    // never adopt one half of a switch. RT-thread-owned, like the snapshots.
     //
     // There is one slot, and that is deliberate. Every arm comes from a user action
     // and a second one supersedes rather than queues — there is no musical meaning to
     // "scene 3 next bar, then scene 4 two bars later" — and more slots would mean
-    // several full Snapshot copies held under the lock for nothing.
+    // several full Snapshot copies parked for nothing.
     //
     //   ToSong  the Loop -> Song hand-off: new tempo map, clock slid onto it
     //   ToLoop  the Song -> Loop hand-off: its mirror
@@ -358,7 +379,7 @@ private:
     std::atomic<float> loopedBar{0.0f};
 
     // RT-thread-only sub-segment time base, set by renderCycle() before each
-    // renderWindowLocked() call and read by segFrameOffset() via emit().
+    // renderWindow() call and read by segFrameOffset() via emit().
     double segCycleStartSecs = 0.0;   // seconds from the cycle's first frame to segment start
     double segMusicalStart   = 0.0;   // musical bar at that instant
     double musicalPos        = 0.0;   // current wrapped musical position
@@ -375,7 +396,7 @@ private:
 
     // Pending skipNoteOnce() entries. Fixed-size so the RT thread never allocates;
     // with more in flight than this the oldest is overwritten, which only brings the
-    // echo back. Guarded by snapMutex.
+    // echo back. RT-thread-owned.
     struct SkipNote {
         bool   live = false;
         char   portName[64] = {};   // empty: any port
@@ -385,7 +406,7 @@ private:
         double tol       = 0.0;
     };
     std::array<SkipNote, 16> skipNotes{};
-    // Consume the entry matching this firing, if any. snapMutex must be held.
+    // Consume the entry matching this firing, if any. RT thread.
     bool consumeSkip(const std::string& port, int channel, int midiPitch, double onBar);
 
     // Reused scratch (pre-reserved in ctor; no per-cycle allocation).
@@ -402,6 +423,76 @@ private:
 
     void fireNoteEvents (double prevBars, double curBars);
     void fireParamEvents(double prevBars, double curBars);
+
+    // ── Command queue ─────────────────────────────────────────────────────────
+    // Every owner change that the RT thread must see atomically, in order. Each is
+    // what used to be one critical section under the snapshot lock.
+    //   Content  a rebuilt snapshot: to the parked one if `seq` is still the armed
+    //            switch, else to the live one
+    //   Retempo  a new tempo map (segsA; segsB the parked scene's copy) + offset
+    //   Arm      park `snap` as the switch `kind` lands on, at pendingAtPhase
+    //   Cancel   drop whatever is armed
+    //   Skip     a skipNoteOnce() entry
+    //   Custom   a backend's own change (postCustom)
+    struct Command {
+        enum class Type : uint8_t { Content, Retempo, Arm, Cancel, Skip, Custom };
+        Type      type      = Type::Content;
+        Pending   kind      = Pending::None;
+        uint32_t  seq       = 0;
+        float     phase     = 0.0f;
+        float     resumeBar = 0.0f;
+        double    offset    = 0.0;
+        Snapshot* snapPtr   = nullptr;
+        std::vector<TimeSegment>* segsA = nullptr;
+        std::vector<TimeSegment>* segsB = nullptr;
+        SkipNote  skip{};
+        void*     payload   = nullptr;
+        void    (*apply)(Sequencer&, void*) = nullptr;
+        void    (*del)(void*)               = nullptr;
+    };
+    // Something the RT thread has finished with, for the owner to free.
+    struct Retired { void* p = nullptr; void (*del)(void*) = nullptr; };
+
+    // At most this many commands are queued and not yet applied; posting more waits
+    // for the RT thread (at most a cycle). It bounds how many whole snapshots can be
+    // alive at once, which is the memory cost of not locking.
+    static constexpr uint32_t kMaxInFlight = 16;
+    SpscRing<Command, 32>  commands;   // owner -> RT
+    // Each command retires at most three objects; with kMaxInFlight queued, and the
+    // owner draining before every post, this cannot fill.
+    SpscRing<Retired, 64>  retired;    // RT -> owner
+    std::atomic<bool>      rtAttached{false};
+    // The thread that last drained the queue. A post from that very thread — an LV2
+    // host running work() synchronously inside run(), as hosts may when exporting —
+    // is between cycles by definition, so it applies on the spot: queueing it would
+    // have the thread wait for itself.
+    std::atomic<std::thread::id> rtThread{};
+    uint32_t               posted = 0;           // owner: commands queued so far
+    std::atomic<uint32_t>  consumed{0};          // RT: commands applied so far
+
+    void post(const Command& c);       // owner thread
+    void collectRetired();             // owner thread: free what the RT handed back
+    void drainCommands();              // RT thread, top of each cycle
+    void applyCommand(const Command& c);   // RT thread (or owner, when detached)
+    template <typename T> void retire(T* p) {
+        if (p && !retired.push({p, [](void* q) { delete static_cast<T*>(q); }})) {
+            // Unreachable by construction (see `retired`); leaking beats freeing here.
+        }
+    }
+    static void freeCommand(const Command& c);   // a command that was never applied
+
+    // ── Owner's view of the switch ────────────────────────────────────────────
+    // The owner arms switches, so it knows what it armed; the RT thread tells it
+    // when one has landed (or been cancelled) through landedSeq.
+    Pending  ownerPendingKind = Pending::None;
+    uint32_t ownerArmSeq      = 0;   // last arm posted; arms count from 1
+    uint32_t rtArmSeq         = 0;   // RT: the arm pendingSnap belongs to
+    std::atomic<uint32_t> landedSeq{0};
+    // The tempo maps last published as live and as parked, for barAtSeconds().
+    std::vector<TimeSegment> ownerLiveSegs, ownerParkedSegs;
+    // Bring the owner's view up to date with what the RT thread has landed.
+    void syncOwnerView();
+    bool ownerPending() { syncOwnerView(); return ownerPendingKind != Pending::None; }
 };
 
 #endif

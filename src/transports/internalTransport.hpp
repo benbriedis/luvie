@@ -5,7 +5,7 @@
 #define INTERNAL_TRANSPORT_HPP
 
 #include "itransport.hpp"
-#include "sequencer.hpp"
+#include "cycleDriver.hpp"
 #include "rtThread.hpp"
 #include <atomic>
 #include <cstdint>
@@ -15,7 +15,7 @@ class MidiScheduler;
 
 /*
  * InternalTransport — the standalone app's own clock, for when JACK is not the
- * transport. It runs the shared Sequencer on a real-time thread exactly the way
+ * transport. It runs the shared CycleDriver on a real-time thread exactly the way
  * JackTransport does from JACK's process callback, so both clocks generate MIDI
  * with the same engine and the same guarantees; only the clock source differs.
  *
@@ -32,11 +32,11 @@ class MidiScheduler;
  *
  * Thread model, as for JackTransport:
  *   - ITransport methods and the Sequencer setters run on the UI thread.
- *   - The engine thread calls renderCycle() and emit(). It never allocates, never
- *     takes a lock it can wait on (renderCycle only try_locks), and never calls
+ *   - The engine thread calls runCycle(). It never allocates, never
+ *     takes a lock (owner changes reach it through a lock-free queue), and never calls
  *     into a MIDI driver.
  */
-class InternalTransport : public Sequencer, public ITransport {
+class InternalTransport : public CycleDriver, public ITransport {
 public:
     static constexpr double  kSampleRate  = 48000.0;    // nominal: frames are only a unit
     static constexpr int64_t kPeriodNs    = 1000000;    // engine wake-up while playing
@@ -78,10 +78,14 @@ public:
     }
 
 protected:
-    // Sequencer output hook (engine thread): stamp the message with the time its
-    // frame falls at and queue it for the scheduler.
-    void emit(const std::string& port, double bar,
-              const uint8_t* data, int len) override;
+    // CycleDriver hooks (engine thread): nothing is buffered here — every message
+    // is stamped with the time its frame falls at and queued for the scheduler.
+    int  resolvePort(const std::string&) override { return -1; }
+    // Stopped, the engine sleeps until kicked; a queued setter has to wake it so the
+    // change lands (and the owner is not left waiting for room in the queue).
+    void wakeRt() override { kick(); }
+    void emitUnbuffered(const std::string& port, long offset,
+                        const uint8_t* data, int len) override;
 
 private:
     void run();
@@ -107,10 +111,7 @@ private:
     int64_t anchorNs_      = 0;
     int64_t anchorFrame_   = 0;
     int64_t frame_         = 0;      // start of the next window to render
-    int64_t cycleFrame_    = 0;      // start of the window being rendered (for emit)
-    int64_t cycleFrames_   = 0;      // its length
     bool    rolling_       = false;  // what the engine last rendered
-    bool    pendingJump_   = false;  // a relocate renderCycle has not yet consumed
 };
 
 #endif

@@ -6,8 +6,8 @@
 #include <algorithm>
 
 InternalTransport::InternalTransport()
+    : CycleDriver(kSampleRate, 0)   // no buffer: everything goes to the scheduler
 {
-    setSampleRate(kSampleRate);
 }
 
 InternalTransport::~InternalTransport()
@@ -19,6 +19,8 @@ void InternalTransport::start(MidiScheduler* sched)
 {
     if (running_.load()) return;
     sched_ = sched;
+    // From here the engine thread owns the snapshot; setters reach it as commands.
+    attachRt(true);
     running_.store(true);
     thread_ = std::thread([this] { run(); });
     started_.wait();
@@ -29,6 +31,7 @@ void InternalTransport::stop()
     if (!running_.exchange(false)) return;
     kick();
     if (thread_.joinable()) thread_.join();
+    attachRt(false);
 }
 
 // ── ITransport (UI thread) ────────────────────────────────────────────────────
@@ -100,7 +103,6 @@ void InternalTransport::run()
         if (target >= 0) {
             if (rolling_) anchorNs_ = frameToNs(frame_);
             frame_ = anchorFrame_ = target;
-            pendingJump_ = true;
         }
 
         const bool want = wantPlaying_.load();
@@ -123,19 +125,7 @@ void InternalTransport::run()
             end = std::max(frame_, anchorFrame_ +
                                    static_cast<int64_t>(horizon * kSampleRate / 1e9));
         }
-        cycleFrame_  = frame_;
-        cycleFrames_ = want ? end - frame_ : periodFrames;
-        const int64_t windowEnd = want ? end : frame_ + periodFrames;
-
-        const bool ran = renderCycle(want, pendingJump_,
-                                     static_cast<double>(frame_)    / kSampleRate,
-                                     static_cast<double>(windowEnd) / kSampleRate);
-        // Only a cycle that actually rendered consumes the stop/jump; otherwise the
-        // snapshot was busy and the next cycle retries (as for JACK).
-        if (ran) {
-            wasPlaying   = want;
-            pendingJump_ = false;
-        }
+        runCycle({frame_, want ? end - frame_ : periodFrames, want, target >= 0});
         frame_   = end;
         rolling_ = want;
         posFrames_.store(frame_);
@@ -145,26 +135,17 @@ void InternalTransport::run()
             const int64_t now = rtNowNs();
             if (nextWake < now) nextWake = now + kPeriodNs;   // overran: don't sprint
             rtSleepUntil(nextWake);
-        } else if (!ran) {
-            rtSleepUntil(rtNowNs() + kPeriodNs);               // retry the busy cycle
         } else {
             wake_.wait();                                      // idle until a command
         }
     }
 }
 
-void InternalTransport::emit(const std::string& port, double bar,
-                             const uint8_t* data, int len)
+void InternalTransport::emitUnbuffered(const std::string& port, long offset,
+                                       const uint8_t* data, int len)
 {
     if (!sched_) return;
-    // As JackTransport::emit: the frame within this window, honouring the active
-    // sub-segment's time base; a note-off ends one frame early (half-open interval).
-    long off = segFrameOffset(bar);
-    if (isNoteOff(data, len)) off -= 1;
-    if (off < 0) off = 0;
-    if (cycleFrames_ > 0 && off > cycleFrames_ - 1) off = static_cast<long>(cycleFrames_ - 1);
-
-    const int64_t frame = cycleFrame_ + off;
+    const int64_t frame = cycleFrame() + offset;
     const int64_t dueNs = anchorNs_ + static_cast<int64_t>((frame - anchorFrame_) * 1e9 / kSampleRate);
     sched_->push(MidiScheduler::Producer::Internal, port.c_str(), dueNs, data, len);
 }

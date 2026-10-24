@@ -13,13 +13,13 @@
 // ── Construction / destruction ────────────────────────────────────────────────
 
 JackTransport::JackTransport()
+    // The event buffer is sized for the worst dense window a JACK cycle can produce
+    // (param-ramp densification is capped per segment) and never grows on the RT
+    // thread. The Sequencer base pre-reserves its own scratch.
+    : CycleDriver(48000.0, 4096)
 {
-    // Pre-reserve the RT-thread output buffers so process() never allocates. The
-    // bound matches the worst dense window a JACK cycle can produce (param-ramp
-    // densification is capped per segment). The Sequencer base pre-reserves its own
-    // scratch (activeNotes / paramScratch / resetScratch).
     namedBufs.reserve(64);
-    outEvents.reserve(4096);
+    pendingMsgs_.reserve(64);
 }
 
 JackTransport::~JackTransport()
@@ -30,6 +30,7 @@ JackTransport::~JackTransport()
             jack_port_unregister(client, port);
         jack_client_close(client);
     }
+    attachRt(false);
 }
 
 // ── Open ──────────────────────────────────────────────────────────────────────
@@ -55,10 +56,12 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
     if (!client)
         return false;
 
-    sampleRate = jack_get_sample_rate(client);
-    setSampleRate((double)sampleRate);
+    setDriverSampleRate(static_cast<double>(jack_get_sample_rate(client)));
 
     jack_set_process_callback(client, processCallback, this);
+    // From the first process callback on, the RT thread owns the snapshot and the
+    // setters reach it as commands.
+    attachRt(true);
 
     // Detect the server going away without polling: JACK invokes this from one
     // of its own threads, so the thunk only flips an atomic and hands off to the
@@ -69,6 +72,7 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
         fprintf(stderr, "JackTransport: could not activate JACK client\n");
         jack_client_close(client);
         client = nullptr;
+        attachRt(false);
         return false;
     }
 
@@ -104,6 +108,8 @@ void JackTransport::close()
         jack_client_close(client);
         client = nullptr;
     }
+    // No process callback can run now: setters apply directly again.
+    attachRt(false);
     {
         std::lock_guard<std::mutex> lk(portsMutex);
         midiPorts_.clear();
@@ -114,9 +120,10 @@ void JackTransport::close()
     // Reset RT-thread state so a reconnected client starts clean. activeNotes is
     // owned by the Sequencer base; a fresh transport drops any sustained notes
     // along with the client, so leave them — the next stop/jump path resets cleanly.
-    lastFrame  = 0;
-    wasPlaying = false;
-    firstCall  = true;
+    lastFrame   = 0;
+    lastRolling = false;
+    wasPlaying  = false;
+    firstCall   = true;
 }
 
 // ── Pending raw-MIDI queue (UI thread) ─────────────────────────────────────────
@@ -124,7 +131,8 @@ void JackTransport::close()
 void JackTransport::enqueue(const std::string& portName, const uint8_t* data, int len)
 {
     if (!client || !midiEnabled || len < 1 || len > 3) return;
-    PendingMsg m{portName, {0, 0, 0}, len};
+    PendingMsg m{{}, {0, 0, 0}, len};
+    std::snprintf(m.portName, sizeof(m.portName), "%s", portName.c_str());
     for (int i = 0; i < len; i++) m.data[i] = data[i];
     std::lock_guard<std::mutex> lk(pendingMutex_);
     pendingMsgs_.push_back(std::move(m));
@@ -167,7 +175,7 @@ void JackTransport::seek(float bars)
     setSecsOffset(0.0);
     cancelPending();
     double secs  = timeline->barToSeconds(std::max(0.0f, bars));
-    auto   frame = static_cast<jack_nframes_t>(secs * sampleRate);
+    auto   frame = static_cast<jack_nframes_t>(secs * sampleRate());
     jack_transport_locate(client, frame);
 }
 
@@ -181,7 +189,7 @@ void JackTransport::reanchor(float bars)
     // frame still reads as `bars` (the pre-change position sampled by the caller).
     // Future frames then advance at the new tempo. No reposition, so the RT thread
     // sees a contiguous window and keeps its notes sounding.
-    double secs = static_cast<double>(posFrames.load()) / sampleRate;
+    double secs = static_cast<double>(posFrames.load()) / sampleRate();
     setSecsOffset(secs - timeline->barToSeconds(bars));
 }
 
@@ -193,7 +201,7 @@ float JackTransport::position() const
     // wrapped musical bar it publishes each cycle, not the raw frame->bar mapping.
     if (songLoopActive())
         return loopedPosition();
-    double secs = static_cast<double>(posFrames.load()) / sampleRate;
+    double secs = static_cast<double>(posFrames.load()) / sampleRate();
     return static_cast<float>(timeline->secondsToBar(secs - secsOffsetSecs()));
 }
 
@@ -204,13 +212,13 @@ int JackTransport::processCallback(jack_nframes_t nframes, void* arg)
     return static_cast<JackTransport*>(arg)->process(nframes);
 }
 
-// Find the namedBufs buffer for a port; nullptr if not found.
-static void* findBuf(const std::vector<std::pair<const std::string*, void*>>& bufs,
-                     const char* name)
+// Index of a port's namedBufs entry; -1 if it has none this cycle.
+static int findBuf(const std::vector<std::pair<const std::string*, void*>>& bufs,
+                   const char* name)
 {
-    for (const auto& e : bufs)
-        if (*e.first == name) return e.second;
-    return nullptr;
+    for (size_t i = 0; i < bufs.size(); i++)
+        if (*bufs[i].first == name) return static_cast<int>(i);
+    return -1;
 }
 
 int JackTransport::process(jack_nframes_t nframes)
@@ -259,18 +267,14 @@ int JackTransport::process(jack_nframes_t nframes)
         }
     }
 
-    outEvents.clear();
-    curNframes    = nframes;
+    events.clear();
 
-    // Raw pending messages (program changes etc.) at frame 0.
+    // Raw pending messages (program changes etc.) at frame 0. Queued before the
+    // engine renders, so they sort ahead of its frame-0 events.
     if (!namedBufs.empty() && pendingMutex_.try_lock()) {
         for (const auto& pm : pendingMsgs_) {
-            void* b = findBuf(namedBufs, pm.portName.c_str());
-            if (b) {
-                OutEvent e{b, 0, static_cast<uint32_t>(outEvents.size()), {}, pm.len};
-                for (int i = 0; i < pm.len && i < 3; i++) e.data[i] = pm.data[i];
-                outEvents.push_back(e);
-            }
+            const int idx = findBuf(namedBufs, pm.portName);
+            if (idx >= 0) events.push(idx, 0, pm.data, pm.len);
         }
         pendingMsgs_.clear();
         pendingMutex_.unlock();
@@ -279,84 +283,54 @@ int JackTransport::process(jack_nframes_t nframes)
     // A relocate: the frame counter did not land where simply playing on (or standing
     // still) would have put it. Stopped cycles count too — seeking with the transport
     // paused is a jump the engine has to see, otherwise its musical position stays at
-    // the frame the user just left.
-    bool jumped = !firstCall &&
-                  (pos.frame != lastFrame + (wasPlaying ? nframes : 0));
+    // the frame the user just left. The driver holds on to it until a cycle renders.
+    const bool jumped = !firstCall &&
+                        (pos.frame != lastFrame + (lastRolling ? nframes : 0));
 
-    // Render this buffer's window. renderCycle() converts [pos.frame, +nframes) to
-    // a musical window, splits it at the song-loop seam when looping, and calls
-    // emit() (below) for each message; the Sequencer's bar offset shifts frame<->bar
-    // so a tempo re-anchor or a Loop -> Song hand-off keeps playback rolling without
-    // a reposition (see reanchor() / endLoopMode()).
-    // Both ends from the integer frame counter, so this cycle's end is bit-identical
-    // to the next cycle's start and no event falls between two buffers.
-    bool ran = renderCycle(nowPlaying, jumped,
-                           static_cast<double>(pos.frame)           / sampleRate,
-                           static_cast<double>(pos.frame + nframes) / sampleRate);
+    // renderCycle() converts the window to musical time, splits it at the song-loop
+    // seam when looping, and emits each message; the Sequencer's bar offset shifts
+    // frame<->bar so a tempo re-anchor or a Loop -> Song hand-off keeps playback
+    // rolling without a reposition (see reanchor() / endLoopMode()).
+    const bool wasRolling = wasPlaying;
+    runCycle({static_cast<int64_t>(pos.frame), static_cast<int64_t>(nframes),
+              nowPlaying, jumped});
 
-    // Flush the cycle's events in non-decreasing frame order per buffer. JACK
-    // drops any event written out of frame order, so this single ordered pass
-    // merges the pending / note-off / note-on / param writes. seq is the insertion
-    // index, a total-order tiebreaker so the sort can be in-place (no temp-buffer
-    // allocation, unlike stable_sort) while keeping same-frame insertion order.
-    std::sort(outEvents.begin(), outEvents.end(),
-        [](const OutEvent& a, const OutEvent& b) {
-            if (a.buf   != b.buf)   return a.buf   < b.buf;
-            if (a.frame != b.frame) return a.frame < b.frame;
-            return a.seq < b.seq;
-        });
-    for (const OutEvent& e : outEvents)
-        jack_midi_event_write(e.buf, e.frame, e.data, e.len);
+    // The driver leaves the events sorted by buffer and then frame. JACK drops any
+    // event written out of frame order, so this single ordered pass is what merges
+    // the pending / note-off / note-on / param writes.
+    for (const auto& e : events)
+        jack_midi_event_write(namedBufs[e.port].second, e.frame, e.data, e.len);
 
     posFrames.store(pos.frame + nframes);
     playing_.store(nowPlaying);
 
-    // Only commit wasPlaying when renderCycle actually ran (it skips on a failed
-    // snapMutex try_lock); leaving it stale lets the missed stop/jump retry next cycle.
-    if (ran) {
-        if ((nowPlaying != wasPlaying || jumped) && onTransportEvent)
-            onTransportEvent();
-        wasPlaying = nowPlaying;
-    }
+    if ((nowPlaying != wasRolling || jumped) && onTransportEvent)
+        onTransportEvent();
 
-    lastFrame  = pos.frame;
-    firstCall  = false;
+    lastFrame   = pos.frame;
+    lastRolling = nowPlaying;
+    firstCall   = false;
 
     return 0;
 }
 
-// ── Sequencer output hook (RT thread, snapMutex held by renderCycle) ─────────
+// ── CycleDriver hooks (RT thread, inside renderCycle) ─────────────────────────
 
-void JackTransport::emit(const std::string& port, double bar,
-                          const uint8_t* data, int len)
+int JackTransport::resolvePort(const std::string& port)
 {
-    // Frame offset within this cycle for `bar`, honouring the current sub-segment's
-    // time base (so events after a loop wrap land past the seam, not at frame 0) and
-    // the tempo re-anchor offset.
-    long off = segFrameOffset(bar);
-    if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
-    if (off < 0) off = 0;
-    if (curNframes > 0 && off > static_cast<long>(curNframes) - 1)
-        off = static_cast<long>(curNframes) - 1;
+    return findBuf(namedBufs, port.c_str());
+}
 
-    void* buf = findBuf(namedBufs, port.c_str());
-    if (!buf) {
-        // Not one of our JACK ports: hand it to the scheduler, due when this frame is
-        // heard — the cycle's start plus the offset, plus one period, which is when
-        // JACK plays out what this cycle writes, so both kinds of port line up.
-        if (scheduler_) {
-            const int64_t dueNs = cycleStartNs +
-                static_cast<int64_t>((off + static_cast<long>(curNframes)) * 1e9 / sampleRate);
-            scheduler_->push(MidiScheduler::Producer::Jack, port.c_str(), dueNs, data, len);
-        }
-        return;
-    }
-
-    OutEvent e{buf, static_cast<jack_nframes_t>(off),
-               static_cast<uint32_t>(outEvents.size()), {}, len};
-    for (int i = 0; i < len && i < 3; ++i)
-        e.data[i] = data[i];
-    outEvents.push_back(e);
+void JackTransport::emitUnbuffered(const std::string& port, long offset,
+                                   const uint8_t* data, int len)
+{
+    // Not one of our JACK ports: hand it to the scheduler, due when this frame is
+    // heard — the cycle's start plus the offset, plus one period, which is when JACK
+    // plays out what this cycle writes, so both kinds of port line up.
+    if (!scheduler_) return;
+    const int64_t dueNs = cycleStartNs +
+        static_cast<int64_t>((offset + cycleFrames()) * 1e9 / sampleRate());
+    scheduler_->push(MidiScheduler::Producer::Jack, port.c_str(), dueNs, data, len);
 }
 
 // ── Port management (UI thread) ───────────────────────────────────────────────

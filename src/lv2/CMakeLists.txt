@@ -12,6 +12,7 @@ find_package(Threads REQUIRED)
 add_library(luvie_dsp MODULE
     luvie_dsp.cpp
     ${SRC}/transports/sequencer.cpp
+    ${SRC}/transports/cycleDriver.cpp
     ${SRC}/songEditor/observableSong.cpp
     ${SRC}/songEditor/patternNames.cpp
     ${SRC}/songEditor/timelineIO.cpp
@@ -32,7 +33,7 @@ target_link_libraries(luvie_dsp PRIVATE
 #   cmake --build build --target test_host
 #   ./build/test_host build/luvie.lv2/luvie_dsp.so <state.json> --loop 1 --unloop 400 --resume 2
 add_executable(test_host EXCLUDE_FROM_ALL test_host.cpp)
-target_include_directories(test_host PRIVATE ${SRC} ${SRC}/outputs)
+target_include_directories(test_host PRIVATE ${SRC} ${SRC}/outputs ${SRC}/transports)
 target_link_libraries(test_host PRIVATE lv2_headers ${CMAKE_DL_LIBS})
 set_target_properties(test_host PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")

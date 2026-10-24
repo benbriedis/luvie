@@ -70,7 +70,7 @@ FUTURE FUNCTIONALITY
 
 - Add a dark theme
 
-- More MIDI parameters and features - see MIDI_EXTENSIONS.txt
+- More MIDI parameters and features - see MIDI_EXTENSIONS.txt   [MUCH OF THIS HAS LIKELY BEEN DONE... CHECK]
 
 THINK ABOUT when in song mode when rewinding:  reset all loops (ie any manual changes should disappear)
       - but want if repositioning playhead manually or the song loops due to looping being on?
@@ -95,7 +95,7 @@ MIDI 2:
 
 OUT OF SCOPE
 ============
-Sampler... could allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
+Inbuilt sampler... could allow samples to be loaded. Would reduce some friction, but Ardour can glue things together I guess.
 	Likely to lead on to sample filters, envelopes, trimming, ...
 
 NOTE pressure parameter currently not working with Pipewire. ALSA inputs OK.
@@ -200,15 +200,6 @@ MINOR BUG: clicking on Instrument selector highlights it as if it were a text fi
 -------------------------------------------
 
 
-Pipewire:
- - I think its working in "bridge mode" on top of Jack.
- - cf using pw-jack qjackctl instead ?  / pipewire-jack
- - To launch under Pipewire... try:    pw-jack luvie
- - Polling for Jack may not be necessary on Linux in time as Pipewire should always be there.
-   The same may not be true for Windows and mac.
-
-   Write some instructions about how to connect some of this stuff up.
-
 Distro and Build:
 	- Probably build .deb, .rpm, maybe .aur for Linux. 
 	  AppImage is a possibility, but not that interested personally (going to need a build process for Windows and Mac eventually anyway).
@@ -264,13 +255,9 @@ Add more hover over notes for controls
 
 ------------------------------------
 
-Deb installer says 'Unknown license'.  Also, no screenshots
-
 TEST Windows manually 
 TEST MacOS manually somehow?
 
-
-------------------------------------
 
 Deb installer says 'Unknown license'.  Also, no screenshots
 Icon is missing in the system sidebar tray thingy.
@@ -301,7 +288,7 @@ BUG: clicking a dragging two blocks in a collapsed track can be dragged into a s
 Check out Entropictron
 
 
-TAG distro
+TAG distro with v1.0.0 when ready...
 
 ISSUE: Start and end markers - the combine loop functionality with song functionality.
     Rewind always goes to Start.
@@ -318,8 +305,6 @@ BUG: There's may be a sample or two off on looping when in song mode...
 	 I have had Claude look at it.
    (probably since fix to song looping)
 
-
-cf a metronome for recording - visual and auditory.
 
 cf overdub /replace toggle
 
@@ -395,9 +380,6 @@ Recording - cf disable snap by default? enable grow by default?
   Maybe disable snap by default for everything?
   
   
-cf slice selection - allow deletion of a blank selected portion. 
-     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
-
 How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
 
 May be good idea to be able to view current set of MIDI triggers in a list somewhere. Otherwise could get a bit lost. 
@@ -413,15 +395,14 @@ Click and drag parameter scroll and note scroll in Pattern Editors
 
 cf possibility of having a section in the instrument settings showing bound (?) parameters
 
-CC20–31 and CC102–119 are undefined in the MIDI spec and are the usual choice.  DOCUMENT?
-
-It was made for expressive controllers like the ROLI Seaboard, LinnStrument and Osmose, where each finger can slide or press on its own.
-
 Allow parameter recording sensitivity to be set for those Axiom 49 knobs? 
 
 Copy scene content to other scenes/move scenes?
 
-cf Cut and insert slice. Also wrt Song Editor.
+cf slice selection - allow deletion of a blank selected portion. 
+     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
+	 cf Insertion too.
+	 cf wrt Song Editor too.
 
 
 Manual: 
@@ -460,12 +441,14 @@ Manual:
 		sudo usermod -aG audio ben
 	in Linux when use internal transport or native MIDI ports
 
-	Use for sample triggers.
-		- Use Pianoroll editor.
-		- Can rename notes
-		- Can toggle to show note names/numbers
-		- Maybe use with Linux Sampler
-		- NB 'Chunky'
+    Maybe as part of a 'Workflows' chapter?
+		Use for sample triggers.
+			- Use Pianoroll editor.
+			- Can rename notes
+			- Can toggle to show note names/numbers
+			- Maybe use with Linux Sampler
+			- NB 'Chunky'
+		- Could describe incoming MIDI triggers in the chapter too, maybe...
     
 
 
@@ -478,4 +461,6 @@ Do I really need/want to compile across and older X library (NB I am using Wayla
    plugin thing
    
 Suspected bug - playing keyboard thru Luvie while playing arpeggio - think the arpeggio occasionally loses a note.
+
+cf a metronome for recording - visual and auditory.
 

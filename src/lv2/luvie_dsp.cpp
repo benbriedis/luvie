@@ -46,7 +46,8 @@
 #include <lv2/state/state.h>
 #include <lv2/worker/worker.h>
 
-#include "sequencer.hpp"
+#include "cycleDriver.hpp"
+#include "hostClockFollower.hpp"
 #include "loopManager.hpp"
 #include "observableSong.hpp"
 #include "timelineIO.hpp"
@@ -55,10 +56,12 @@
    transport/MIDI activity on stderr. The UI half of a hosted session reads
    the same variable, so one setting covers both processes. */
 #include "luvieDebug.hpp"
+#include "midiInvariantChecker.hpp"
 
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -74,109 +77,101 @@
 #define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
 
 /* -----------------------------------------------------------------------
-   Lv2Engine — Sequencer whose emit() forges MIDI into the LV2 MIDI output ports.
+   Lv2Engine — the shared CycleDriver, writing into the LV2 MIDI output ports.
 
    Routing: the snapshot carries the project's port NAME per instrument, which
-   setPortMap() (worker thread) resolves to an LV2 output index. emit() then does
-   a strcmp scan of that small table — the same approach as JackTransport::findBuf,
-   and allocation-free, which emit() must be.
+   setPortMap() (worker thread) resolves to an LV2 output index. resolvePort() then
+   does a strcmp scan of that small table — allocation-free, as it must be.
 
-   Like the JACK backend it collects the cycle's events and sorts them by frame
-   before writing, because the atom forge (and consumers) require non-decreasing
-   event times. render() produces the events once; forgePort() then writes one
-   port's share into that port's sequence.
+   render() produces the cycle's events once, sorted by output and frame (the atom
+   forge, and consumers, require non-decreasing event times); forgePort() then
+   writes one output's share into that output's sequence.
    ----------------------------------------------------------------------- */
 static_assert(kMaxPluginOutputs == LUVIE_NUM_MIDI_OUTS,
               "pluginPorts.hpp and the TTL must declare the same output count");
 static_assert(kMaxPluginInputs == LUVIE_NUM_MIDI_INS,
               "pluginPorts.hpp and the TTL must declare the same input count");
 
-class Lv2Engine : public Sequencer {
+class Lv2Engine : public CycleDriver {
 public:
-    explicit Lv2Engine(double sr) : sampleRate(sr)
-    {
-        Sequencer::setSampleRate(sr);
-        evs.reserve(4096);
-    }
+    explicit Lv2Engine(double sr) : CycleDriver(sr, 4096) {}
 
-    void   setSampleRate(double sr) { sampleRate = sr; Sequencer::setSampleRate(sr); }
-    double sampleRateHz() const     { return sampleRate; }
+    double sampleRateHz() const { return sampleRate(); }
 
     /* Port name -> LV2 output index, resolved off the audio thread. Called on the
-       worker thread only (like every other setter); takes snapMutex because emit()
-       reads the table on the RT thread with that lock held. */
+       worker thread only (like every other setter). The table is RT-owned, so the
+       new one travels as a command and is copied in between cycles. */
     void setPortMap(const std::vector<JackOutput>& outs)
     {
-        std::lock_guard<std::mutex> lock(snapMutex);
-        slotCount = 0;
+        auto* m = new PortMap;
         for (const auto& o : outs) {
             if (o.backend != MidiBackend::Plugin) continue;   // routed to output 0
-            if (slotCount >= kMaxPluginOutputs) break;
-            std::snprintf(slots[slotCount].name, sizeof(slots[slotCount].name),
+            if (m->count >= kMaxPluginOutputs) break;
+            std::snprintf(m->slots[m->count].name, sizeof(m->slots[m->count].name),
                           "%s", o.portName.c_str());
-            slotCount++;
+            m->count++;
         }
+        postCustom(m,
+                   [](Sequencer& seq, void* p) {
+                       auto& self = static_cast<Lv2Engine&>(seq);
+                       self.ports = *static_cast<const PortMap*>(p);
+                   },
+                   [](void* p) { delete static_cast<PortMap*>(p); });
     }
 
-    /* Generate this cycle's MIDI for host frames [startFrame, startFrame + nf).
-       Writing is a separate step (forgePort) because each output port has its own
-       sequence to forge into. */
-    void render(int64_t startFrame, uint32_t nf, bool nowPlaying, bool jumped)
+    /* The RT thread exists between activate() and deactivate(); outside them the
+       setters apply directly. */
+    void setRtRunning(bool on) { attachRt(on); }
+
+    /* Generate this cycle's MIDI. Writing is a separate step (forgePort) because each
+       output port has its own sequence to forge into. */
+    void render(const ClockSample& c)
     {
-        nframes = nf;
-        evs.clear();
+        events.clear();
+        const uint32_t clampedBefore = stats.clamped.load(std::memory_order_relaxed);
+        runCycle(c);
+        lastEmitted = (int)events.size();
 
-        // renderCycle() maps the frame window -> Luvie bars, splits it at the
-        // song-loop seam when looping, and calls emit() for each message. Both ends
-        // come from the integer frame counter so consecutive cycles abut exactly.
-        bool ran = renderCycle(nowPlaying, jumped,
-                               (double)startFrame        / sampleRate,
-                               (double)(startFrame + nf) / sampleRate);
-
-        std::sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) {
-            if (a.frame != b.frame) return a.frame < b.frame;
-            return a.seq < b.seq;
-        });
-        lastEmitted = (int)evs.size();
-
-        if (ran) wasPlaying = nowPlaying;
-        else if (nowPlaying && luvieDebug())
-            fprintf(stderr, "[luvie] render skipped (snapshot locked) at frame %ld\n",
-                    (long)startFrame);
-        if (clampedEvents > 0 && luvieDebug())
-            fprintf(stderr, "[luvie] %d event(s) clamped into cycle at frame %ld "
-                    "(nframes=%u)\n", clampedEvents, (long)startFrame, nf);
-        clampedEvents = 0;
+        const uint32_t clamped = stats.clamped.load(std::memory_order_relaxed) - clampedBefore;
+        if (clamped > 0 && luvieDebug())
+            fprintf(stderr, "[luvie] %u event(s) clamped into cycle at frame %ld "
+                    "(nframes=%ld)\n", clamped, (long)c.frame, (long)c.nframes);
     }
 
     /* Write the events routed to `portIdx` into an already-opened forge sequence.
-       evs is sorted, so filtering preserves non-decreasing frame order. */
+       The buffer is sorted, so each output's run is in non-decreasing frame order. */
     void forgePort(LV2_Atom_Forge* fg, const URIs* u, int portIdx) const
     {
         int dropped = 0;
-        for (const Ev& e : evs) {
-            if (e.port != portIdx) continue;
+        events.forEachOnPort(portIdx, [&](const CycleEventBuffer::Event& e) {
             if (!lv2_atom_forge_frame_time(fg, e.frame)
                 || !lv2_atom_forge_atom(fg, e.len, u->midi_MidiEvent)
                 || !lv2_atom_forge_write(fg, e.data, e.len))
                 dropped++;
-        }
+        });
         if (dropped > 0 && luvieDebug())
             fprintf(stderr, "[luvie] output %d overflowed: %d event(s) dropped\n",
                     portIdx, dropped);
+    }
+
+    /* Feed every event this cycle produced, at its absolute frame, to a checker
+       (LUVIE_DEBUG only). Returns the violations found. */
+    uint32_t checkEvents(MidiInvariantChecker& chk, int64_t cycleStart) const
+    {
+        uint32_t bad = 0;
+        for (const auto& e : events)
+            bad += chk.onEvent(e.port, cycleStart + e.frame, e.data, e.len);
+        return bad;
     }
 
     int  lastEmittedCount() const { return lastEmitted; }
 
     /* Fill bar / barBeat / beatsPerBar for a position on Luvie's own timeline, so
        the UI playhead can be driven from the DSP's authoritative tempo map (the same
-       map that times the notes) rather than the host's bar fields. RT-safe: reads the
-       snapshot under a try_lock and returns false if a rebuild is in progress (the
-       caller then skips authoring a Position this cycle). */
-    bool barInfo(double secs, int64_t& bar, float& barBeat, float& bpb)
+       map that times the notes) rather than the host's bar fields. RT thread, after
+       render(): the snapshot is the RT thread's own, so this always has an answer. */
+    void barInfo(double secs, int64_t& bar, float& barBeat, float& bpb)
     {
-        if (!snapMutex.try_lock())
-            return false;
         // The honest playhead position is the sequencer's musical one, not the raw
         // host frame: a Loop -> Song hand-off slides the song's timeline in time, and
         // the song loop wraps it inside the RT cycle. In both cases the host frame
@@ -189,54 +184,31 @@ public:
         if (const TimeSegment* seg =
                 timeSettings::segmentAtSeconds(snap.segs, snapBarToSeconds(barsTotal)))
             beatsPerBar = (float)seg->beatsPerBar;
-        snapMutex.unlock();
         if (barsTotal < 0.0f) barsTotal = 0.0f;
         bar     = (int64_t)barsTotal;
         barBeat = (barsTotal - (float)bar) * beatsPerBar;
         bpb     = beatsPerBar;
-        return true;
     }
 
 protected:
-    void emit(const std::string& port, double bar,
-              const uint8_t* data, int len) override
+    /* RT thread, inside renderCycle(). Unmapped names go to output 0 — see
+       pluginPorts.hpp for why. */
+    int resolvePort(const std::string& name) override
     {
-        // Frame offset within this cycle, honouring the current sub-segment's time
-        // base so events after a song-loop wrap land past the seam, not at frame 0.
-        long off = segFrameOffset(bar);
-        if (isNoteOff(data, len)) off -= 1;   // end one frame early (half-open interval)
-        if (off < -1 || (nframes > 0 && off > static_cast<long>(nframes))) clampedEvents++;
-        if (off < 0) off = 0;
-        if (nframes > 0 && off > static_cast<long>(nframes) - 1)
-            off = static_cast<long>(nframes) - 1;
-
-        Ev e{static_cast<uint32_t>(off), static_cast<uint32_t>(evs.size()),
-             portIndex(port.c_str()), {}, len};
-        for (int i = 0; i < len && i < 3; ++i) e.data[i] = data[i];
-        evs.push_back(e);
-    }
-
-private:
-    /* RT thread, snapMutex held (renderCycle holds it for the whole cycle).
-       Unmapped names go to output 0 — see pluginPorts.hpp for why. */
-    int portIndex(const char* name) const
-    {
-        for (int i = 0; i < slotCount; i++)
-            if (std::strcmp(slots[i].name, name) == 0) return i;
+        for (int i = 0; i < ports.count; i++)
+            if (std::strcmp(ports.slots[i].name, name.c_str()) == 0) return i;
         return 0;
     }
 
-    double          sampleRate     = 48000.0;
-    uint32_t        nframes        = 0;
-    int             lastEmitted    = 0;
-    int             clampedEvents  = 0;   // diagnostics: emit() offsets outside the cycle
+private:
+    int lastEmitted = 0;
 
     struct PortSlot { char name[64]; };
-    PortSlot slots[kMaxPluginOutputs]{};
-    int      slotCount = 0;
-
-    struct Ev { uint32_t frame; uint32_t seq; int port; uint8_t data[3]; int len; };
-    std::vector<Ev> evs;   // reused across cycles; pre-reserved in ctor
+    struct PortMap {
+        PortSlot slots[kMaxPluginOutputs]{};
+        int      count = 0;
+    };
+    PortMap ports;   // RT-owned; replaced by setPortMap()'s command
 };
 
 /* -----------------------------------------------------------------------
@@ -265,14 +237,22 @@ struct Plugin {
        engine observes it exactly as the standalone engine observes the real one. */
     LoopManager     loopMgr;
 
-    /* Transport position tracking. The host sends time:Position only on transport
-       changes, so between updates we advance curFrame ourselves while playing. */
-    int64_t curFrame = 0;
-    bool    playing  = false;
+    /* The host transport, as a clock: see hostClockFollower.hpp. RT thread only. */
+    HostClockFollower clock{48000.0};
+    /* The frame the current cycle started on, published for the worker thread's
+       tempo re-anchor (applyLoopState). A cycle or so stale there, which is fine. */
+    std::atomic<int64_t> publishedFrame{0};
 
     /* LUVIE_DEBUG only: totals since the last per-second run() summary, so an event
        arriving in any cycle shows up, not just one in the cycle that prints. */
     int dbgFrames = 0, dbgCtrlEvents = 0, dbgPositions = 0, dbgMidiIn = 0;
+    int dbgJitter = 0; int64_t dbgJitterMax = 0;
+    uint32_t dbgLastRelocates = 0, dbgLastClamped = 0, dbgLastDropped = 0;
+    /* LUVIE_DEBUG only: watches the forged MIDI for double note-ons, orphan or
+       zero-length note-offs and notes clipped by a reset. Allocated at instantiate
+       (it is a few hundred KB of tables), never on the RT thread. */
+    MidiInvariantChecker* checker = nullptr;
+    uint32_t dbgLastCut = 0;
 
     /* LV2 Worker: run() hands the incoming JSON blob to schedule_work(); the host
        runs work() on a non-RT thread, which parses it and applies it to the engine.
@@ -290,6 +270,9 @@ struct Plugin {
     std::string stateJson;
 
     std::string stateFilePath;
+
+    /* Between activate() and deactivate(): run() may be called. */
+    bool active = false;
 
     /* Chunk reassembly — worker-thread-only state. run() forwards each incoming
        luvie_state chunk to the worker in order; work() appends payloads here until a
@@ -477,7 +460,7 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
        Standalone avoids that through ObservableSong::reanchoringTempo pinning the
        transport; the DSP has no transport to pin — its clock IS the host's frame — so
        it pins the frame->bar mapping instead: read the bar now, change the map, then
-       slide the clock offset until that same bar lands on that same frame. curFrame is
+       slide the clock offset until that same bar lands on that same frame. The frame is
        a cycle or so stale on this thread, which keeps the error under one buffer. */
     const bool loopNow = hdr.loopMode != 0;
     /* The meter counts here as much as the tempo does: it moves every bar boundary
@@ -494,7 +477,8 @@ static void applyLoopState(Plugin* p, const void* body, uint32_t size)
                            || (int)curSigBeat != hdr.loopSigBeat;
     double nowSecs = 0.0, curBar = 0.0;
     if (tempoChanged) {
-        nowSecs = (double)p->curFrame / p->engine->sampleRateHz();
+        nowSecs = (double)p->publishedFrame.load(std::memory_order_relaxed)
+                / p->engine->sampleRateHz();
         curBar  = p->engine->barAtSeconds(nowSecs);
     }
 
@@ -646,6 +630,8 @@ static LV2_Handle instantiate(
 
     p->song   = new ObservableSong(120.0f, 4, 4);
     p->engine = new Lv2Engine(sampleRate);
+    p->clock.setSampleRate(sampleRate);
+    if (luvieDebug()) p->checker = new MidiInvariantChecker;
     p->engine->setTimeline(p->song);
     p->engine->setLoopManager(&p->loopMgr);
 
@@ -663,8 +649,21 @@ static void connect_port(LV2_Handle instance, uint32_t port, void* data)
         p->midiIn[port - (uint32_t)PORT_IN_EXTRA] = (const LV2_Atom_Sequence*)data;
 }
 
-static void activate(LV2_Handle instance)   { (void)instance; }
-static void deactivate(LV2_Handle instance) { (void)instance; }
+/* run() is only called between these, so they bracket the RT thread's ownership of
+   the engine snapshot: outside them (instantiate, a restore before activation) the
+   engine's setters apply directly. */
+static void activate(LV2_Handle instance)
+{
+    Plugin* p = (Plugin*)instance;
+    p->active = true;
+    p->engine->setRtRunning(true);
+}
+static void deactivate(LV2_Handle instance)
+{
+    Plugin* p = (Plugin*)instance;
+    p->active = false;
+    p->engine->setRtRunning(false);
+}
 
 /* Read an integer-valued atom (Int or Long) into out; returns true if recognised. */
 static bool atomToI64(const URIs* uris, const LV2_Atom* a, int64_t& out)
@@ -684,7 +683,6 @@ static void run(LV2_Handle instance, uint32_t sample_count)
        time:Position coalesces to the latest (only the newest matters); luvie_state
        chunks must each be forwarded to the worker, in order, so it can reassemble a
        multi-chunk project. We never parse on this (RT) thread. */
-    bool jumped = false;
     const LV2_Atom_Object* lastPos = nullptr;
     int ctrlEvents = 0;   // raw events seen on control_in this cycle (diagnostics)
 
@@ -775,38 +773,26 @@ static void run(LV2_Handle instance, uint32_t sample_count)
             uris->time_speed, &speedAtom,
             0);
 
-        int64_t hostFrame = p->curFrame;
-        if (atomToI64(uris, frameAtom, hostFrame)) {
-            /* A host frame that disagrees with our own count is normally a relocate.
-               But Carla on PipeWire-JACK, while rolling, reports frames that wander a
-               buffer either side of the true position — sometimes for one cycle,
-               sometimes for a stretch of several — before settling back. Taking those
-               as relocates means hard resets (All Notes Off) plus re-rendered and
-               skipped windows, which clips and drops notes at random. So while rolling,
-               a discrepancy of a couple of buffers or less is treated as jitter and our
-               own counter kept, however long it lasts: an offset that small is
-               inaudible, whereas acting on it is not. Stopped, or beyond the window,
-               the host is followed as before — no real seek is that small. */
-            const int64_t delta     = hostFrame - p->curFrame;
-            const int64_t tolerance = 2 * (int64_t)sample_count;
-            if (delta != 0 && p->playing && delta >= -tolerance && delta <= tolerance) {
-                if (luvieDebug())
-                    fprintf(stderr, "[luvie] ignoring host frame jitter: expected %ld, "
-                            "host says %ld (delta %ld)\n", (long)p->curFrame,
-                            (long)hostFrame, (long)delta);
-            } else {
-                if (delta != 0) {
-                    jumped = true;   // relocate
-                    if (luvieDebug())
-                        fprintf(stderr, "[luvie] host relocate: expected frame %ld, host "
-                                "says %ld (delta %ld)\n", (long)p->curFrame,
-                                (long)hostFrame, (long)delta);
-                }
-                p->curFrame = hostFrame;
-            }
+        int64_t hostFrame = p->clock.currentFrame();
+        const bool hasFrame = atomToI64(uris, frameAtom, hostFrame);
+        const bool hasSpeed = speedAtom && speedAtom->type == uris->atom_Float;
+        int64_t delta = 0;
+        const auto verdict = p->clock.onPosition(
+            hasFrame, hostFrame, hasSpeed,
+            hasSpeed ? ((const LV2_Atom_Float*)speedAtom)->body : 0.0f,
+            sample_count, delta);
+        if (verdict == HostClockFollower::Verdict::Jitter) {
+            p->dbgJitter++;
+            if (std::abs(delta) > p->dbgJitterMax) p->dbgJitterMax = std::abs(delta);
+            if (luvieDebug())
+                fprintf(stderr, "[luvie] ignoring host frame jitter: expected %ld, "
+                        "host says %ld (delta %ld)\n", (long)(hostFrame - delta),
+                        (long)hostFrame, (long)delta);
+        } else if (verdict == HostClockFollower::Verdict::Relocate && luvieDebug()) {
+            fprintf(stderr, "[luvie] host relocate: expected frame %ld, host "
+                    "says %ld (delta %ld)\n", (long)(hostFrame - delta),
+                    (long)hostFrame, (long)delta);
         }
-        if (speedAtom && speedAtom->type == uris->atom_Float)
-            p->playing = ((const LV2_Atom_Float*)speedAtom)->body != 0.0f;
         /* Hosts send a Position only on change, so the per-second summary below
            would almost always miss it: report each one as it arrives. */
         if (luvieDebug())
@@ -831,14 +817,18 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     /* ── Generate this cycle's MIDI once, then hand each output port its share.
        Rendering must happen before the forge loop because a port's events are only
        known after renderCycle() has run. ─────────────────────────────────────── */
-    double startSecs = (double)p->curFrame / (double)p->engine->sampleRateHz();
-    p->engine->render(p->curFrame, sample_count, p->playing, jumped);
+    const ClockSample cs = p->clock.sample(sample_count);
+    p->publishedFrame.store(cs.frame, std::memory_order_relaxed);
+    double startSecs = (double)cs.frame / (double)p->engine->sampleRateHz();
+    p->engine->render(cs);
+    if (p->checker && p->engine->checkEvents(*p->checker, cs.frame) > 0)
+        fprintf(stderr, "[luvie] MIDI invariant violated at frame %ld\n", (long)cs.frame);
 
     /* Position/StateChanged are authored on output 0 only — they exist for the UI
        and the host, not for the instrument, and duplicating them on eight ports
        would have every one of them report the transport. */
     int64_t bar = 0; float barBeat = 0.0f, bpb = 4.0f;
-    const bool havePos = p->engine->barInfo(startSecs, bar, barBeat, bpb);
+    p->engine->barInfo(startSecs, bar, barBeat, bpb);
     /* Only consume the dirty flag if there is somewhere to report it — otherwise a
        host that left output 0 unconnected would swallow the notification. */
     const bool dirty   = p->out[0] && p->stateDirty.exchange(false);
@@ -872,14 +862,14 @@ static void run(LV2_Handle instance, uint32_t sample_count)
                the UI playhead in lock-step with the notes, and always carries
                bar/barBeat so the UI never has to depend on which fields the host
                happened to populate. */
-            if (havePos) {
+            {
                 LV2_Atom_Forge_Frame posFrame;
                 lv2_atom_forge_frame_time(&p->forge, 0);
                 lv2_atom_forge_object(&p->forge, &posFrame, 0, uris->time_Position);
                 lv2_atom_forge_key(&p->forge, uris->time_frame);
-                lv2_atom_forge_long(&p->forge, p->curFrame);
+                lv2_atom_forge_long(&p->forge, cs.frame);
                 lv2_atom_forge_key(&p->forge, uris->time_speed);
-                lv2_atom_forge_float(&p->forge, p->playing ? 1.0f : 0.0f);
+                lv2_atom_forge_float(&p->forge, cs.rolling ? 1.0f : 0.0f);
                 lv2_atom_forge_key(&p->forge, uris->time_bar);
                 lv2_atom_forge_long(&p->forge, bar);
                 lv2_atom_forge_key(&p->forge, uris->time_barBeat);
@@ -939,8 +929,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
     }
 
     /* Advance our own frame cursor while playing (host only sends position on change). */
-    if (p->playing)
-        p->curFrame += sample_count;
+    p->clock.endCycle(sample_count);
 
     if (luvieDebug()) {
         p->dbgFrames     += (int)sample_count;
@@ -954,8 +943,23 @@ static void run(LV2_Handle instance, uint32_t sample_count)
             fprintf(stderr, "[luvie] run(%p): ctrlIn=%s ctrlEvents=%d positions=%d "
                     "midiIn=%d playing=%d frame=%ld emitted=%d outs=%d/%d\n",
                     (void*)p, p->controlIn ? "connected" : "NULL", p->dbgCtrlEvents,
-                    p->dbgPositions, p->dbgMidiIn, p->playing, (long)p->curFrame,
+                    p->dbgPositions, p->dbgMidiIn, (int)cs.rolling, (long)cs.frame,
                     emitted, outsConnected, LUVIE_NUM_MIDI_OUTS);
+            /* The RT health line: anything but zeros here, other than relocates you
+               made yourself, is a fault worth reporting. */
+            const RtStats& st = p->engine->rtStats();
+            const uint32_t rl = st.relocates.load(),
+                           cl = st.clamped.load(),   dr = st.dropped.load();
+            const uint32_t cut = p->checker ? p->checker->noteStats().cutByReset : 0;
+            const uint32_t bad = p->checker ? p->checker->violations().total() : 0;
+            fprintf(stderr, "[luvie] rt: relocates=%u clamped=%u dropped=%u "
+                    "jitter=%d (max %ld frames) clippedByReset=%u violations=%u\n",
+                    rl - p->dbgLastRelocates,
+                    cl - p->dbgLastClamped, dr - p->dbgLastDropped, p->dbgJitter,
+                    (long)p->dbgJitterMax, cut - p->dbgLastCut, bad);
+            p->dbgLastRelocates = rl;
+            p->dbgLastClamped = cl; p->dbgLastDropped   = dr; p->dbgLastCut = cut;
+            p->dbgJitter = 0; p->dbgJitterMax = 0;
             p->dbgFrames = p->dbgCtrlEvents = p->dbgPositions = p->dbgMidiIn = 0;
         }
     }
@@ -964,6 +968,7 @@ static void run(LV2_Handle instance, uint32_t sample_count)
 static void cleanup(LV2_Handle instance)
 {
     Plugin* p = (Plugin*)instance;
+    delete p->checker;
     delete p->engine;
     delete p->song;
     delete p;
@@ -1017,8 +1022,13 @@ static LV2_State_Status dsp_restore(
     size_t jsonLen = size > 0 ? size - 1 : 0;
 
     /* Restore runs on the host thread at load time with no concurrent worker, so
-       apply directly (applyState also stores stateJson for a later dsp_save). */
+       apply directly (applyState also stores stateJson for a later dsp_save). It is
+       never concurrent with run() either (LV2's Instantiation class), so while it runs
+       the engine's setters apply on the spot rather than queueing for a run() that
+       cannot come until this returns. */
+    if (p->active) p->engine->setRtRunning(false);
     applyState(p, std::string((const char*)data, jsonLen), /*restoreLoopState=*/true);
+    if (p->active) p->engine->setRtRunning(true);
 
     /* Also write the JSON to the state file so the UI repaints this project when its
        editor is next opened. A plain write is fine: no concurrent writer at load. */

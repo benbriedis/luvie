@@ -30,6 +30,7 @@
 #include <lv2/worker/worker.h>
 
 #include "luvie_dsp.h"   // LuvieStateChunk
+#include "midiInvariantChecker.hpp"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_LOOP_URI  "https://github.com/benbriedis/luvie#LoopState"
@@ -202,6 +203,17 @@ int main(int argc, char** argv) {
     int      scenePattern  = -1;
     float    sceneBar      = 0.0f;
     int      sceneCycle    = -1;
+    // --check runs every MIDI event forged onto the outputs through the invariant
+    // checker (double note-ons, orphan or zero-length note-offs, frames running
+    // backwards) and reports the violations; the exit status is non-zero if there
+    // were any, so a script can loop over buffer sizes and host behaviours.
+    // --quiet drops the per-event dump, which a long --cycles run makes unreadable.
+    bool     check         = false;
+    bool     quiet         = false;
+    // --pos-trace FILE replays a recorded host: each line is "<cycle> <delta>", and on
+    // that cycle the host reports its frame <delta> frames away from the true one —
+    // the shape LUVIE_DEBUG's "host relocate"/"ignoring host frame jitter" lines give.
+    std::map<int, long> posTrace;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--pos-every-cycle")) posEveryCycle = true;
         else if (!strcmp(argv[i], "--chunk") && i + 1 < argc) chunkBytes = (uint32_t)atoi(argv[++i]);
@@ -231,6 +243,15 @@ int main(int argc, char** argv) {
             scenePattern = atoi(argv[++i]);
             sceneBar     = (float)atof(argv[++i]);
             sceneCycle   = atoi(argv[++i]);
+        }
+        else if (!strcmp(argv[i], "--check")) check = true;
+        else if (!strcmp(argv[i], "--quiet")) quiet = true;
+        else if (!strcmp(argv[i], "--pos-trace") && i + 1 < argc) {
+            FILE* tf = fopen(argv[++i], "r");
+            if (!tf) { perror("pos-trace"); return 1; }
+            int tc; long td;
+            while (fscanf(tf, "%d %ld", &tc, &td) == 2) posTrace[tc] = td;
+            fclose(tf);
         }
         else if (!strcmp(argv[i], "--song-loop") && i + 2 < argc) {
             songLoopStart = (float)atof(argv[++i]);
@@ -284,6 +305,9 @@ int main(int argc, char** argv) {
     int totalMidiInRelayed = 0;   // luvie_midi_in atoms seen coming back out
     int totalResets  = 0;   // CC 121 / CC 123: the signature of a transport relocate
     int perPort[LUVIE_NUM_MIDI_OUTS] = {};
+    // Heap: the checker is a few hundred KB of tables.
+    auto* checker = new MidiInvariantChecker;
+    int   firstViolationCycle = -1;
     // ~5.3 s at 256 frames / 48 kHz; --cycles runs longer, e.g. to watch a song loop
     // repeat enough times to measure whether its period drifts.
     cycles = cycles > 0 ? cycles : 1000;
@@ -361,13 +385,18 @@ int main(int argc, char** argv) {
         // correct again. The DSP must ride through it without resetting or
         // re-rendering.
         const bool stale = jitterEvery > 0 && c > 0 && c % jitterEvery < jitterLen;
-        if (posEveryCycle || c == 0 || c == relocateCycle || stale
+        auto       tr    = posTrace.find(c);
+        const bool traced = tr != posTrace.end();
+        int64_t    reportFrame = stale ? frame - (int64_t)nframes : frame;
+        if (traced) reportFrame = frame + tr->second;
+        if (posEveryCycle || c == 0 || c == relocateCycle || stale || traced
+            || posTrace.count(c - 1)
             || (jitterEvery > 0 && c > 1 && c % jitterEvery == jitterLen)) {
             lv2_atom_forge_frame_time(&forge, 0);
             LV2_Atom_Forge_Frame objF;
             lv2_atom_forge_object(&forge, &objF, 0, uPos);
             lv2_atom_forge_key(&forge, uFrame);
-            lv2_atom_forge_long(&forge, stale ? frame - (int64_t)nframes : frame);
+            lv2_atom_forge_long(&forge, reportFrame);
             lv2_atom_forge_key(&forge, uSpeed);
             lv2_atom_forge_float(&forge, 1.0f);
             lv2_atom_forge_pop(&forge, &objF);
@@ -426,10 +455,16 @@ int main(int argc, char** argv) {
                     if (ev->body.size >= 2 && (m[0] & 0xF0) == 0xB0 &&
                         (m[1] == 121 || m[1] == 123))
                         totalResets++;
-                    printf("cycle %d frame %ld @%ld out%d: ",
-                           c, (long)frame, (long)ev->time.frames, o + 1);
-                    for (uint32_t i = 0; i < ev->body.size; i++) printf("%02X ", m[i]);
-                    printf("\n");
+                    const uint32_t bad = check
+                        ? checker->onEvent(o, frame + ev->time.frames, m, (int)ev->body.size)
+                        : 0;
+                    if (bad && firstViolationCycle < 0) firstViolationCycle = c;
+                    if (!quiet || bad) {
+                        printf("cycle %d frame %ld @%ld out%d: ",
+                               c, (long)frame, (long)ev->time.frames, o + 1);
+                        for (uint32_t i = 0; i < ev->body.size; i++) printf("%02X ", m[i]);
+                        printf(bad ? " <-- VIOLATION\n" : "\n");
+                    }
                     totalEmitted++;
                     perPort[o]++;
                 } else if (ev->body.type == uObj &&
@@ -481,7 +516,19 @@ int main(int argc, char** argv) {
     printf("Reset All Controllers / All Notes Off messages: %d\n", totalResets);
     for (int o = 0; o < LUVIE_NUM_MIDI_OUTS; o++)
         if (perPort[o]) printf("  midi_out %d: %d events\n", o + 1, perPort[o]);
+    int rc = 0;
+    if (check) {
+        const auto& v = checker->violations();
+        printf("CHECK: doubleOn=%u orphanOff=%u zeroLength=%u backwards=%u "
+               "held-at-end=%d noteOns=%u cutByReset=%u", v.doubleOn, v.orphanOff,
+               v.zeroLength, v.backwards, checker->heldCount(),
+               checker->noteStats().noteOns, checker->noteStats().cutByReset);
+        if (firstViolationCycle >= 0) printf(" (first at cycle %d)", firstViolationCycle);
+        printf("\n");
+        rc = v.total() ? 2 : 0;
+    }
+    delete checker;
     if (d->cleanup) d->cleanup(inst);
     dlclose(h);
-    return 0;
+    return rc;
 }

@@ -1,0 +1,907 @@
+{
+  "activeLoopPatterns": [],
+  "carlaOscPort": 22752,
+  "currentScene": 0,
+  "defaultPortBackend": "plugin",
+  "harmonyRootTrigger": -1,
+  "jackInstruments": [
+    {
+      "bankLsb": -1,
+      "bankMsb": -1,
+      "drumMap": null,
+      "gm1Instrument": -1,
+      "id": 1,
+      "inputChannel": 0,
+      "inputName": "midi_in",
+      "isDrum": false,
+      "midiChannel": 1,
+      "name": "Bass",
+      "passThrough": true,
+      "portName": "inst1",
+      "programNumber": -1,
+      "split": "none",
+      "splitNote": 60
+    },
+    {
+      "bankLsb": -1,
+      "bankMsb": -1,
+      "drumMap": null,
+      "gm1Instrument": -1,
+      "id": 2,
+      "inputChannel": 0,
+      "inputName": "midi_in",
+      "isDrum": true,
+      "midiChannel": 10,
+      "name": "Drums A",
+      "passThrough": true,
+      "portName": "drums1",
+      "programNumber": -1,
+      "split": "none",
+      "splitNote": 60
+    },
+    {
+      "bankLsb": -1,
+      "bankMsb": -1,
+      "drumMap": null,
+      "gm1Instrument": -1,
+      "id": 59,
+      "inputChannel": 0,
+      "inputName": "midi_in",
+      "isDrum": false,
+      "midiChannel": 1,
+      "name": "Arpeggios",
+      "passThrough": true,
+      "portName": "inst2",
+      "programNumber": -1,
+      "split": "none",
+      "splitNote": 60
+    }
+  ],
+  "jackOutputs": [
+    {
+      "backend": "plugin",
+      "portName": "inst1"
+    },
+    {
+      "backend": "plugin",
+      "portName": "drums1"
+    },
+    {
+      "backend": "plugin",
+      "portName": "inst2"
+    }
+  ],
+  "loopMode": false,
+  "loopSigBeat": 0,
+  "loopSigBottom": 4,
+  "loopSigTop": -1,
+  "midiInputs": [
+    {
+      "backend": "plugin",
+      "name": "midi_in"
+    }
+  ],
+  "midiLearn": {
+    "Modulation": {
+      "kind": "cc",
+      "num": 1
+    },
+    "Pitch": {
+      "kind": "bend"
+    }
+  },
+  "oscPort": 3819,
+  "patternTriggers": [],
+  "sceneNavTriggers": {},
+  "sceneTriggers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "scenes": [
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    []
+  ],
+  "songLoopEnabled": true,
+  "songLoopEndCol": 4,
+  "songLoopStartCol": 1,
+  "timeline": {
+    "bpms": [
+      {
+        "bar": 0,
+        "bpm": 80.0
+      }
+    ],
+    "instruments": [
+      {
+        "id": 1,
+        "isDrum": false,
+        "name": "Bass"
+      },
+      {
+        "id": 2,
+        "isDrum": true,
+        "name": "Drums A"
+      },
+      {
+        "id": 59,
+        "isDrum": false,
+        "name": "Arpeggios"
+      }
+    ],
+    "loopOrder": [
+      4,
+      7,
+      61
+    ],
+    "paramLanes": [],
+    "patterns": [
+      {
+        "beat": 0,
+        "chordHash": "oct8wh",
+        "divisions": 2,
+        "drumMute": [],
+        "drumNotes": [],
+        "drumSolo": [],
+        "id": 3,
+        "instrumentId": 1,
+        "lengthBeats": 8.0,
+        "name": "BassUp",
+        "notes": [
+          {
+            "beat": 0.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 9,
+            "length": 0.6666666865348816,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 20,
+            "length": 0.6666667461395264,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 22,
+            "length": 0.6666669845581055,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 6.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 24,
+            "length": 0.6666669845581055,
+            "row": 30,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 0.6666666865348816,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 38,
+            "length": 0.3333333432674408,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 40,
+            "length": 0.3333333432674408,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 42,
+            "length": 0.3333333432674408,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 6.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 45,
+            "length": 0.3333333432674408,
+            "row": 30,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.666666507720947,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 58,
+            "length": 0.3333333432674408,
+            "row": 32,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 101,
+            "length": 0.6666669845581055,
+            "row": 31,
+            "velocity": 0.800000011920929
+          }
+        ],
+        "rootPitch": 0,
+        "rowLabels": 0,
+        "snapEnabled": true,
+        "timeSigBottom": 4,
+        "timeSigTop": 4,
+        "type": 0,
+        "useSharp": false,
+        "zoomPct": 200
+      },
+      {
+        "beat": 0,
+        "chordHash": "",
+        "divisions": 0,
+        "drumMute": [],
+        "drumNotes": [],
+        "drumSolo": [],
+        "id": 6,
+        "instrumentId": 2,
+        "lengthBeats": 4.0,
+        "name": "Drums A 1",
+        "notes": [],
+        "rootPitch": 0,
+        "rowLabels": 0,
+        "snapEnabled": true,
+        "timeSigBottom": 4,
+        "timeSigTop": 4,
+        "type": 1,
+        "useSharp": false,
+        "zoomPct": 200
+      },
+      {
+        "beat": 0,
+        "chordHash": "oct8hw",
+        "divisions": 2,
+        "drumMute": [],
+        "drumNotes": [],
+        "drumSolo": [],
+        "id": 26,
+        "instrumentId": 1,
+        "lengthBeats": 8.0,
+        "name": "BassDown",
+        "notes": [
+          {
+            "beat": -0.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 27,
+            "length": 0.6666666865348816,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 3.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 30,
+            "length": 0.6666667461395264,
+            "row": 28,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 5.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 32,
+            "length": 0.6666669845581055,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.333333492279053,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 34,
+            "length": 0.6666665077209473,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 0.6666666865348816,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 47,
+            "length": 0.3333333432674408,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 3.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 50,
+            "length": 0.3333333432674408,
+            "row": 28,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 5.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 52,
+            "length": 0.3333333432674408,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 102,
+            "length": 0.6666667461395264,
+            "row": 30,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 103,
+            "length": 0.3333333432674408,
+            "row": 29,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 117,
+            "length": 0.6666669845581055,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 118,
+            "length": 0.3333333432674408,
+            "row": 25,
+            "velocity": 0.800000011920929
+          }
+        ],
+        "rootPitch": 0,
+        "rowLabels": 0,
+        "snapEnabled": true,
+        "timeSigBottom": 4,
+        "timeSigTop": 4,
+        "type": 0,
+        "useSharp": false,
+        "zoomPct": 200
+      },
+      {
+        "beat": 0,
+        "chordHash": "oct8wh",
+        "divisions": 2,
+        "drumMute": [],
+        "drumNotes": [],
+        "drumSolo": [],
+        "id": 63,
+        "instrumentId": 59,
+        "lengthBeats": 8.0,
+        "name": "ArgUp",
+        "notes": [
+          {
+            "beat": 0.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 64,
+            "length": 0.3333333432674408,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 1.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 65,
+            "length": 0.6666667461395264,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 66,
+            "length": 0.33333349227905273,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 68,
+            "length": 0.6666669845581055,
+            "row": 28,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 5.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 69,
+            "length": 0.6666669845581055,
+            "row": 29,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 6.333333492279053,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 71,
+            "length": 0.6666665077209473,
+            "row": 31,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 0.3333333432674408,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 72,
+            "length": 0.3333333432674408,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 74,
+            "length": 0.33333325386047363,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 3.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 75,
+            "length": 0.33333325386047363,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 76,
+            "length": 0.3333333432674408,
+            "row": 28,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 5.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 77,
+            "length": 0.3333333432674408,
+            "row": 29,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 79,
+            "length": 1.0,
+            "row": 32,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 0.6666666865348816,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 105,
+            "length": 0.3333333432674408,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 1.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 107,
+            "length": 0.3333333432674408,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.3333334922790527,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 108,
+            "length": 0.3333333432674408,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 3.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 109,
+            "length": 0.6666667461395264,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 6.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 110,
+            "length": 0.3333333432674408,
+            "row": 30,
+            "velocity": 0.800000011920929
+          }
+        ],
+        "rootPitch": 0,
+        "rowLabels": 0,
+        "snapEnabled": true,
+        "timeSigBottom": 4,
+        "timeSigTop": 4,
+        "type": 0,
+        "useSharp": false,
+        "zoomPct": 200
+      },
+      {
+        "beat": 0,
+        "chordHash": "oct8hw",
+        "divisions": 2,
+        "drumMute": [],
+        "drumNotes": [],
+        "drumSolo": [],
+        "id": 81,
+        "instrumentId": 59,
+        "lengthBeats": 8.0,
+        "name": "ArpDown",
+        "notes": [
+          {
+            "beat": 2.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 84,
+            "length": 0.6666667461395264,
+            "row": 29,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 3.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 85,
+            "length": 0.6666667461395264,
+            "row": 28,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 86,
+            "length": 0.6666669845581055,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 5.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 87,
+            "length": 0.6666669845581055,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 88,
+            "length": 0.6666669845581055,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 1.3333333730697632,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 90,
+            "length": 0.6666666269302368,
+            "row": 30,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 2.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 91,
+            "length": 0.3333333432674408,
+            "row": 29,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 3.6666667461395264,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 92,
+            "length": 0.3333333432674408,
+            "row": 28,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 4.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 93,
+            "length": 0.3333333432674408,
+            "row": 27,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 5.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 94,
+            "length": 0.3333333432674408,
+            "row": 26,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 6.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 95,
+            "length": 0.6666669845581055,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 6.6666669845581055,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 96,
+            "length": 0.3333333432674408,
+            "row": 25,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 7.666666507720947,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 97,
+            "length": 0.3333333432674408,
+            "row": 24,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 0.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 114,
+            "length": 0.6666666865348816,
+            "row": 32,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 0.6666666865348816,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 115,
+            "length": 0.3333333432674408,
+            "row": 32,
+            "velocity": 0.800000011920929
+          },
+          {
+            "beat": 1.0,
+            "bonus": false,
+            "bonusDegree": -1,
+            "id": 116,
+            "length": 0.3333333432674408,
+            "row": 31,
+            "velocity": 0.800000011920929
+          }
+        ],
+        "rootPitch": 0,
+        "rowLabels": 0,
+        "snapEnabled": true,
+        "timeSigBottom": 4,
+        "timeSigTop": 4,
+        "type": 0,
+        "useSharp": false,
+        "zoomPct": 200
+      }
+    ],
+    "rowOrder": [
+      {
+        "id": 5,
+        "isTrack": true
+      },
+      {
+        "id": 35,
+        "isTrack": true
+      },
+      {
+        "id": 8,
+        "isTrack": true
+      },
+      {
+        "id": 80,
+        "isTrack": true
+      },
+      {
+        "id": 98,
+        "isTrack": true
+      }
+    ],
+    "selectedLaneId": 35,
+    "selectedTrackIndex": 0,
+    "timeSigs": [
+      {
+        "bar": 0,
+        "beat": 0,
+        "bottom": 4,
+        "top": 4
+      }
+    ],
+    "tracks": [
+      {
+        "id": 4,
+        "instrumentId": 1,
+        "lanes": [
+          {
+            "id": 5,
+            "mute": false,
+            "patternId": 3,
+            "patterns": [
+              {
+                "id": 36,
+                "length": 2.0,
+                "patternId": 3,
+                "startBar": 1.0,
+                "startOffset": 0.0
+              }
+            ],
+            "solo": false
+          },
+          {
+            "id": 35,
+            "mute": false,
+            "patternId": 26,
+            "patterns": [
+              {
+                "id": 37,
+                "length": 2.0,
+                "patternId": 26,
+                "startBar": 3.0,
+                "startOffset": 0.0
+              }
+            ],
+            "solo": false
+          }
+        ],
+        "loopLanes": [
+          35,
+          5
+        ],
+        "patternId": 3,
+        "patterns": [
+          {
+            "id": 36,
+            "length": 2.0,
+            "patternId": 3,
+            "startBar": 1.0,
+            "startOffset": 0.0
+          }
+        ],
+        "stackedLanes": false
+      },
+      {
+        "id": 7,
+        "instrumentId": 2,
+        "lanes": [
+          {
+            "id": 8,
+            "mute": false,
+            "patternId": 6,
+            "patterns": [],
+            "solo": false
+          }
+        ],
+        "loopLanes": [
+          8
+        ],
+        "patternId": 6,
+        "patterns": [],
+        "stackedLanes": false
+      },
+      {
+        "id": 61,
+        "instrumentId": 59,
+        "lanes": [
+          {
+            "id": 80,
+            "mute": false,
+            "patternId": 63,
+            "patterns": [
+              {
+                "id": 99,
+                "length": 2.0,
+                "patternId": 63,
+                "startBar": 1.0,
+                "startOffset": 0.0
+              }
+            ],
+            "solo": false
+          },
+          {
+            "id": 98,
+            "mute": false,
+            "patternId": 81,
+            "patterns": [
+              {
+                "id": 100,
+                "length": 2.0,
+                "patternId": 81,
+                "startBar": 3.0,
+                "startOffset": 0.0
+              }
+            ],
+            "solo": false
+          }
+        ],
+        "loopLanes": [
+          80,
+          98
+        ],
+        "patternId": 63,
+        "patterns": [
+          {
+            "id": 99,
+            "length": 2.0,
+            "patternId": 63,
+            "startBar": 1.0,
+            "startOffset": 0.0
+          }
+        ],
+        "stackedLanes": false
+      }
+    ]
+  },
+  "transport": -1,
+  "transportControl": 0,
+  "transportTriggers": {},
+  "version": 1
+}

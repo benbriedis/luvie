@@ -7,7 +7,8 @@ add_library(luvie_core STATIC
     patternEditors/noteContextPopup.cpp songEditor/patternInstanceContextPopup.cpp
     selectionContextPopup.cpp pasteContextPopup.cpp
     modern/modernTabs.cpp modern/cursors.cpp transports/transport.cpp
-    transports/simpleTransport.cpp transports/sequencer.cpp transports/jackTransport.cpp
+    transports/simpleTransport.cpp transports/sequencer.cpp transports/cycleDriver.cpp
+    transports/jackTransport.cpp
     transports/jackObserver.cpp transports/oscTransport.cpp transports/oscObserver.cpp
     transports/carlaOscTransport.cpp
     transports/internalTransport.cpp transports/rtThread.cpp outputs/midiScheduler.cpp
@@ -265,4 +266,17 @@ add_executable(internal_transport_test tests/internalTransportTest.cpp)
 target_link_libraries(internal_transport_test PRIVATE luvie_core)
 add_test(NAME internal_transport COMMAND internal_transport_test)
 set_tests_properties(internal_transport PROPERTIES TIMEOUT 60)
+
+# ---- RT engine conformance test -----------------------------------------------
+# Renders a song-loop fixture through the shared Sequencer/CycleDriver under a fake
+# clock, in many buffer sizes, with a wandering host clock, rebuilds racing the RT
+# thread, a relocate and the Loop <-> Song hand-offs, and checks the MIDI against a
+# reference render and MidiInvariantChecker. No devices, no window; a few seconds.
+add_executable(sequencer_conformance_test tests/sequencerConformanceTest.cpp)
+target_link_libraries(sequencer_conformance_test PRIVATE luvie_core)
+target_include_directories(sequencer_conformance_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lv2)
+add_test(NAME sequencer_conformance
+         COMMAND sequencer_conformance_test
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/songLoopTriplets.json)
+set_tests_properties(sequencer_conformance PROPERTIES TIMEOUT 120)
 set_tests_properties(smoke PROPERTIES TIMEOUT 120)
