@@ -14,10 +14,6 @@
 #include <algorithm>
 #include <cmath>
 
-static constexpr Fl_Color kRowLine = 0xEE888800;
-static constexpr Fl_Color kBarCol  = 0x00660000;
-static constexpr Fl_Color kBeatCol = 0x00EE0000;
-
 DrumGrid::DrumGrid(int numRows, int numCols, int rowHeight, int colWidth, float snap, NoteContextPopup& popup)
     : Fl_Box(0, 0, numCols * colWidth, numRows * rowHeight),
       snap(snap), popup(popup),
@@ -104,7 +100,7 @@ void DrumGrid::draw()
     Fl_Box::draw();
     fl_push_clip(x(), y(), w() + 1, h() + 1);
 
-    fl_color(bgColor);
+    fl_color(bgColor());
     fl_rectf(x(), y(), w(), h());
 
     int gridRight = std::min(w(), padX + (numCols - colOffset) * colWidth);
@@ -112,7 +108,7 @@ void DrumGrid::draw()
 
     // Subdivision lines first, so the row lines and column lines draw over them.
     if (divisions > 1) {
-        fl_color(subdivLineColor);
+        fl_color(subdivLineColor());
         for (int i = colOffset; i < std::min(endCol, numCols); i++)
             for (int k = 1; k < divisions; k++) {
                 int x0 = x() + padX + (i - colOffset) * colWidth + k * colWidth / divisions;
@@ -122,7 +118,7 @@ void DrumGrid::draw()
 
     // Horizontal row lines — uniform (no pitch-group colouring)
     for (int i = 0; i <= numRows; i++) {
-        fl_color(kRowLine);
+        fl_color(theme().gridRowLine);
         fl_line(x(), y() + i * rowHeight, x() + gridRight, y() + i * rowHeight);
     }
 
@@ -134,7 +130,7 @@ void DrumGrid::draw()
         if (pattern)
             if (const Pattern* p = pattern->song()->patternById(patternId))
                 isBar = p->timeSigTop > 0 && (i % p->timeSigTop == 0);
-        fl_color(isBar ? kBarCol : kBeatCol);
+        fl_color(isBar ? theme().gridBar : theme().gridBeat);
         fl_line(x0, y(), x0, y() + h());
     }
 

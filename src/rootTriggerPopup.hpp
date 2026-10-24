@@ -41,7 +41,7 @@ public:
         heading = new Fl_Box(1, 1, popW - 2, headingH, "Set base note from instrument");
         heading->box(FL_NO_BOX);
         heading->labelsize(11);
-        heading->labelcolor(0x6B728000);
+        onTheme([this] { heading->labelcolor(theme().popupHeading); });
         heading->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         end();
         hide();

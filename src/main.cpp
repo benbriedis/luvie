@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
     // on those objects, which is a use-after-free once they have gone. Keep this
     // declaration last of the group.
     AppWindow window(LuvieApp::winW, LuvieApp::defaultWinH());
-    window.color(bgColor);
+    window.color(bgColor());
     window.end();
 
     app.verbose = verbose;

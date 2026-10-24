@@ -43,7 +43,6 @@ private:
     static constexpr int rowStep   = choiceH + 12;
     static constexpr int portW     = 80;
 
-    static constexpr Fl_Color inputBgCol = 0xF9FAFB00;
     static constexpr Fl_Color waitCol    = 0xDC262600;  // red
 
     ModernChoice*     transportChoice_ = nullptr;
@@ -73,12 +72,14 @@ private:
     int rowY(int row) const { return fieldTopY + row * rowStep; }
 
     void styleChoice(ModernChoice* c) {
-        c->color(inputBgCol);
-        c->labelcolor(textCol);
         c->textsize(12);
-        c->setBorderColor(borderCol);
-        c->setArrowColor(subTextCol);
-        c->setHoverColor(0xF3F4F600);
+        onTheme([c] {
+            c->color(inputBgCol());
+            c->labelcolor(textCol());
+            c->setBorderColor(borderCol());
+            c->setArrowColor(subTextCol());
+            c->setHoverColor(buttonBgCol());
+        });
     }
 
     // Show the port field for an OSC control, holding that host's port.
@@ -112,7 +113,7 @@ private:
 
     void drawStaticContent(int sy, int /*sbW*/) override {
         fl_font(FL_HELVETICA, 12);
-        fl_color(textCol);
+        fl_color(textCol());
         fl_draw("Transport", pad, rowY(0) - sy, labelW, choiceH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         if (pluginMode_)
@@ -176,10 +177,12 @@ public:
             }, this);
 
             oscPortInput_ = new ModernValueInput(choiceX, rowY(2), portW, choiceH);
-            oscPortInput_->color(inputBgCol);
-            oscPortInput_->setBorderColor(borderCol);
-            oscPortInput_->textcolor(textCol);
-            oscPortInput_->cursor_color(textCol);
+            onTheme([this] {
+                oscPortInput_->color(inputBgCol());
+                oscPortInput_->setBorderColor(borderCol());
+                oscPortInput_->textcolor(textCol());
+                oscPortInput_->cursor_color(textCol());
+            });
             oscPortInput_->textsize(12);
             oscPortInput_->range(1, 65535);
             oscPortInput_->step(1);

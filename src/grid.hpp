@@ -9,6 +9,7 @@
 #include "pasteContextPopup.hpp"
 #include "selection.hpp"
 #include "selectionContextPopup.hpp"
+#include "theme.hpp"
 #include "timeline.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
@@ -19,7 +20,7 @@ class Playhead;
 class SliceController;
 
 // Faint grey used for the beat-subdivision lines, drawn under the row lines.
-constexpr Fl_Color subdivLineColor = 0xDDDDDD00;
+inline Fl_Color subdivLineColor() { return theme().gridSubdiv; }
 
 // Rubber band and the outline on selected items. Amber reads clearly against
 // both the blue velocity fills and the song editor's greys, and does not
@@ -299,9 +300,9 @@ protected:
     virtual bool     isRowBlocked(int visualRow) const { (void)visualRow; return false; }
     // Rows that suppress the vertical bar/subdivision lines (the playhead still draws over them)
     virtual bool     rowHidesColumnLines(int row) const { (void)row;      return false; }
-    virtual Fl_Color columnColor(int col)      const { (void)col;      return 0x00EE0000; }
-    virtual Fl_Color rowLineColor(int lineIdx) const { (void)lineIdx;  return 0xEE888800; }
-    virtual Fl_Color rowBgColor(int row)       const { (void)row;      return FL_WHITE; }
+    virtual Fl_Color columnColor(int col)      const { (void)col;      return theme().gridBeat; }
+    virtual Fl_Color rowLineColor(int lineIdx) const { (void)lineIdx;  return theme().gridRowLine; }
+    virtual Fl_Color rowBgColor(int row)       const { (void)row;      return theme().editorBg; }
     virtual std::function<void()> makeDeleteCallback(int noteIdx) { (void)noteIdx; return nullptr; }
     virtual std::function<void(float)> makeVelocityCallback(int noteIdx) { (void)noteIdx; return nullptr; }
     virtual void openContextMenu(int idx);

@@ -29,20 +29,24 @@ MarkerPopup::MarkerPopup(Kind k)
 	: InputEditorPopup(popupWMax, row2Y + row2H + pad), kind(k)
 {
 
-	auto styleInput = [](Fl_Value_Input* inp) {
+	auto styleInput = [this](Fl_Value_Input* inp) {
 		inp->box(FL_FLAT_BOX);
-		inp->color(popupInputBg);
-		inp->textcolor(popupText);
-		inp->cursor_color(popupText);
-		inp->labelcolor(popupText);
+		onTheme([inp] {
+			inp->color(popupInputBg());
+			inp->textcolor(popupText());
+			inp->cursor_color(popupText());
+			inp->labelcolor(popupText());
+		});
 	};
 
-	auto styleChoice = [](ModernChoice* c) {
-		c->color(popupInputBg);
-		c->labelcolor(popupText);
-		c->textcolor(popupText);
-		c->setBorderColor(0x4B556300);
-		c->setArrowColor(popupText);
+	auto styleChoice = [this](ModernChoice* c) {
+		onTheme([c] {
+			c->color(popupInputBg());
+			c->labelcolor(popupText());
+			c->textcolor(popupText());
+			c->setBorderColor(theme().popupCtrlBorder);
+			c->setArrowColor(popupText());
+		});
 	};
 
 	// The window hugs its content; the time-sig row shrinks it once the denominator
@@ -55,7 +59,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		const int fieldW = tempoW - fieldX - pad;
 
 		auto* curveLbl = new Fl_Box(pad, curveY, labelW, row1H, "Type");
-		curveLbl->labelcolor(popupText);
+		onTheme([w = curveLbl] { w->labelcolor(popupText()); });
 		curveLbl->box(FL_NO_BOX);
 		curveLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 		curveChoice = new ModernChoice(fieldX, curveY, fieldW, row1H);
@@ -69,7 +73,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		}, this);
 
 		bpmLabel = new Fl_Box(pad, startY, labelW, row1H, "BPM");
-		bpmLabel->labelcolor(popupText);
+		onTheme([w = bpmLabel] { w->labelcolor(popupText()); });
 		bpmLabel->box(FL_NO_BOX);
 		bpmLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 		input1 = new Fl_Value_Input(fieldX, startY, fieldW, row1H);
@@ -80,13 +84,13 @@ MarkerPopup::MarkerPopup(Kind k)
 		// A ramp starts from the tempo already in force, so there is nothing to
 		// type: this stands in for input1 and shows that tempo (see layoutTempo).
 		startValue = new Fl_Box(fieldX, startY, fieldW, row1H);
-		startValue->labelcolor(popupText);
+		onTheme([w = startValue] { w->labelcolor(popupText()); });
 		startValue->box(FL_NO_BOX);
 		startValue->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 		startValue->hide();
 
 		endLabel = new Fl_Box(pad, endY, labelW, row1H, "End");
-		endLabel->labelcolor(popupText);
+		onTheme([w = endLabel] { w->labelcolor(popupText()); });
 		endLabel->box(FL_NO_BOX);
 		endLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 		endBpmInput = new Fl_Value_Input(fieldX, endY, fieldW, row1H);
@@ -97,7 +101,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		discardY = endY + row1H + pad;
 	} else {
 		auto* lbl = new Fl_Box(pad, row1Y, 25, row1H, "Sig");
-		lbl->labelcolor(popupText);
+		onTheme([w = lbl] { w->labelcolor(popupText()); });
 		lbl->box(FL_NO_BOX);
 		constexpr int numW = 32;
 		input1 = new Fl_Value_Input(pad + 29, row1Y, numW, row1H);
@@ -106,7 +110,7 @@ MarkerPopup::MarkerPopup(Kind k)
 		styleInput(input1);
 		constexpr int denomX = pad + 29 + numW + 16;
 		auto* slash = new Fl_Box(pad + 29 + numW + 2, row1Y, 10, row1H, "/");
-		slash->labelcolor(popupText);
+		onTheme([w = slash] { w->labelcolor(popupText()); });
 		slash->box(FL_NO_BOX);
 		denomChoice = new DenomBeatChoice(denomX, row1Y, 0, row1H);
 		styleChoice(denomChoice);
@@ -131,8 +135,10 @@ MarkerPopup::MarkerPopup(Kind k)
 	fl_font(FL_HELVETICA, FL_NORMAL_SIZE);
 	int btnW = (int)std::max(fl_width("Delete"), fl_width("Cancel")) + 24;
 	discardBtn = new ModernButton(pad, discardY, btnW, row2H, "Delete");
-	discardBtn->color(FL_WHITE);
-	discardBtn->labelcolor(popupText);
+	onTheme([this] {
+		discardBtn->color(popupBg());
+		discardBtn->labelcolor(popupText());
+	});
 
 	end();
 

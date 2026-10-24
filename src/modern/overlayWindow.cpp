@@ -18,8 +18,10 @@ OverlayWindow::OverlayWindow(int x, int y, int w, int h, std::string title)
         w - closePad - closeSz, (headerH - closeSz) / 2,
         closeSz, closeSz, "\xc3\x97");
     closeBtn_->labelsize(22);
-    closeBtn_->labelcolor(textCol);
-    closeBtn_->color(bgCol);
+    onTheme([this] {
+        closeBtn_->labelcolor(textCol());
+        closeBtn_->color(bgCol());
+    });
     closeBtn_->setBorderWidth(0);
     closeBtn_->callback([](Fl_Widget*, void* d) {
         static_cast<OverlayWindow*>(d)->hide();
@@ -111,22 +113,22 @@ void OverlayWindow::draw() {
 
     if (full) {
         // Background + border
-        fl_color(bgCol);
+        fl_color(bgCol());
         fl_rectf(0, 0, w(), h());
 
-        fl_color(borderCol);
+        fl_color(borderCol());
         fl_line_style(FL_SOLID, 1);
         fl_rect(0, 0, w(), h());
         fl_line_style(0);
 
         // Header divider + title
-        fl_color(dividerCol);
+        fl_color(dividerCol());
         fl_line_style(FL_SOLID, 1);
         fl_line(0, headerH, w(), headerH);
         fl_line_style(0);
 
         fl_font(FL_HELVETICA_BOLD, 17);
-        fl_color(textCol);
+        fl_color(textCol());
         fl_draw(title_.c_str(), titlePad, 0, w() - 2*titlePad, headerH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 

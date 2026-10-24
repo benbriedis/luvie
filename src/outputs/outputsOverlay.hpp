@@ -206,6 +206,7 @@ class OutputsOverlay : public OverlayWindow {
     static void bankLsbInputCb    (Fl_Widget*, void*);
 
     void onResized() override;
+    void onThemeChanged() override;
     void onScroll(int delta) override;
     int  handle(int event) override;
 

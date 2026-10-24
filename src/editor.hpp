@@ -7,10 +7,11 @@
 #include "playhead.hpp"
 #include "loopManager.hpp"
 #include "gridScrollPane.hpp"
+#include "theme.hpp"
 #include <FL/Fl_Group.H>
 #include <functional>
 
-inline constexpr Fl_Color bgColor = FL_WHITE;
+inline Fl_Color bgColor() { return theme().editorBg; }
 
 class Editor : public Fl_Group {
 public:
@@ -18,8 +19,8 @@ public:
     static constexpr int hScrollH = 14;
 
 protected:
-    static constexpr Fl_Color rulerBg     = 0xFEFCE800;
-    static constexpr Fl_Color rulerBorder = 0xD1D5DB00;
+    static Fl_Color rulerBg()     { return theme().rulerBg; }
+    static Fl_Color rulerBorder() { return theme().rulerBorder; }
 
     Playhead        playhead;
     GridScrollPane* hScrollbar   = nullptr;

@@ -3,6 +3,7 @@
 
 #include "loopRuler.hpp"
 #include "loopRulerContextPopup.hpp"
+#include "theme.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -33,10 +34,10 @@ void LoopRuler::setNumCols(int n)
 
 void LoopRuler::draw()
 {
-	fl_color(loopBg);
+	fl_color(theme().loopRulerBg);
 	fl_rectf(x(), y(), w(), h());
 
-	fl_color(0xD1D5DB00);
+	fl_color(theme().rulerBorder);
 	fl_line(x(), y() + h() - 1, x() + w() - 1, y() + h() - 1);
 
 	fl_push_clip(x() + clipLeft, y(), w() - clipLeft, h() - 1);

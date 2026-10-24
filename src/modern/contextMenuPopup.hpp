@@ -29,7 +29,7 @@ class ContextMenuPopup : public BasePopup {
 public:
     // Background tint an item takes on hover; public so rows built outside a
     // popup class (e.g. the velocity row) can match it.
-    static constexpr Fl_Color hoverCol = 0xDDEEFF00;
+    static Fl_Color hoverCol() { return theme().popupHover; }
 
 protected:
     static constexpr int      btnH     = 30;
@@ -38,12 +38,17 @@ protected:
 
     ModernButton* addItem(int idx, const char* label) {
         auto* btn = new ModernButton(1, 1 + idx * btnH, popW - 2, btnH, label);
-        btn->color(popupBg);
-        btn->labelcolor(popupText);
-        btn->setHoverColor(hoverCol);
+        btn->setMenuItem(true);
+        styleItem(btn);
         btn->setBorderWidth(0);
         btn->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         return btn;
+    }
+
+    static void styleItem(ModernButton* btn) {
+        btn->color(popupBg());
+        btn->labelcolor(popupText());
+        btn->setHoverColor(hoverCol());
     }
 
     void openAt(int wx, int wy) {
@@ -74,8 +79,18 @@ public:
     ContextMenuPopup(int width, int height)
         : BasePopup(0, 0, width, height), popW(width), popH(height)
     {
-        color(popupBg);
+        color(popupBg());
         box(FL_BORDER_BOX);
+    }
+
+    // Items come and go (submenus rebuild theirs), so they are found by walking
+    // the children rather than each being registered with onTheme().
+    void onThemeChanged() override {
+        color(popupBg());
+        for (int i = 0; i < children(); ++i)
+            if (auto* b = dynamic_cast<ModernButton*>(child(i)); b && b->isMenuItem())
+                styleItem(b);
+        BasePopup::onThemeChanged();
     }
 
     // Escape: close without acting. A plain menu has nothing to undo, so it just

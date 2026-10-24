@@ -4,12 +4,12 @@
 #ifndef POPUP_STYLE_HPP
 #define POPUP_STYLE_HPP
 
+#include "theme.hpp"
 #include <FL/Enumerations.H>
 
-static constexpr Fl_Color popupBg   = 0xFFFFFF00;
-static constexpr Fl_Color popupInputBg = 0xe4f9e900;
-//static constexpr Fl_Color popupInputBg = 0xedfff200;
-static constexpr Fl_Color popupText = 0x37415100;
+inline Fl_Color popupBg()      { return theme().popupBg; }
+inline Fl_Color popupInputBg() { return theme().popupInputBg; }
+inline Fl_Color popupText()    { return theme().popupText; }
 static constexpr Fl_Color popupAccent = 0xF59E0B00;
 
 

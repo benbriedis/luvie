@@ -4,11 +4,13 @@
 #ifndef BASE_POPUP_HPP
 #define BASE_POPUP_HPP
 
+#include "../theme.hpp"
 #include <FL/Fl_Window.H>
 
 // Common base for all popup windows. Ensures clicks in gaps between child
-// widgets are never propagated to widgets underneath the popup.
-class BasePopup : public Fl_Window {
+// widgets are never propagated to widgets underneath the popup. A ThemeObserver
+// so subclasses can colour their widgets with onTheme().
+class BasePopup : public Fl_Window, public ThemeObserver {
 public:
     using Fl_Window::Fl_Window;
 

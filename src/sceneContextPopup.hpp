@@ -61,7 +61,7 @@ public:
                 ("Clear " + SceneTriggerMap::slotName(rows[i].slot)).c_str());
         divider = new Fl_Box(1, 0, popW - 2, 1);
         divider->box(FL_FLAT_BOX);
-        divider->color(0xCBD5E100);
+        onTheme([this] { divider->color(theme().popupDivider); });
 
         end();
         hide();

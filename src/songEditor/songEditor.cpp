@@ -69,7 +69,7 @@ void SongEditor::drawRulerLabels()
     if (songGrid.colWidth <= 0) return;
 
     fl_font(FL_HELVETICA, 9);
-    fl_color(0xA0906000);   // dim warm tone on yellow ruler bg
+    fl_color(theme().rulerText);
 
     int gridLeft     = x() + rulerOffsetX;
     int gridRight    = x() + w();

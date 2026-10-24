@@ -9,9 +9,7 @@
 #include <vector>
 
 class ModernTabs : public Fl_Tabs {
-	static constexpr Fl_Color inactiveTab  = 0xF3F4F600;
 	static constexpr Fl_Color defaultAccent = 0x3B82F600;
-	static constexpr Fl_Color separator    = 0xD1D5DB00;
 	static constexpr int      accentH      = 3;
 	static constexpr int      toggleW      = 70;
 

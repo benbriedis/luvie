@@ -5,15 +5,12 @@
 #include "midiLearnBadge.hpp"
 #include "cursors.hpp"
 #include "sliceController.hpp"
+#include "theme.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
 
-static constexpr Fl_Color kParamRowBg  = 0xF0F4FF00;
-// The centre a Centre-resting parameter (Pitch, Pan) returns to.
-static constexpr Fl_Color kParamCentre = 0xD0D0E000;
-static constexpr Fl_Color kParamLine   = 0x8888CC00;
 static constexpr Fl_Color kParamDotFill = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim  = 0x1111EE00;
 static constexpr Fl_Color kRowSep      = 0xCCCCEE00;
@@ -150,13 +147,13 @@ void PatternParamGrid::draw()
 
     // Row backgrounds
     for (int r = 0; r < visRows; r++) {
-        fl_color(kParamRowBg);
+        fl_color(theme().paramRowBg);
         fl_rectf(x(), y() + r * kParamRowH, gridRight, kParamRowH);
     }
 
     // Horizontal separators
     for (int r = 0; r <= visRows; r++) {
-        fl_color(kRowSep);
+        fl_color(theme().paramRowSep);
         fl_line(x(), y() + r * kParamRowH, x() + gridRight, y() + r * kParamRowH);
     }
 
@@ -170,7 +167,7 @@ void PatternParamGrid::draw()
     for (int i = colOffset_; i <= std::min(endCol, numCols_); i++) {
         int x0 = x() + padX_ + (i - colOffset_) * colWidth_;
         bool isBar = timeSigTop > 0 && i % timeSigTop == 0;
-        fl_color(isBar ? (Fl_Color)0x00660000 : (Fl_Color)0x00EE0000);
+        fl_color(isBar ? theme().gridBar : theme().gridBeat);
         fl_line(x0, y(), x0, y() + h());
     }
 
@@ -217,13 +214,13 @@ void PatternParamGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
 
     if (lane.centred) {
         const int cy = dotYFor((maxVal + 1) / 2);
-        fl_color(kParamCentre);
+        fl_color(theme().paramCentre);  // the centre a Centre-resting parameter (Pitch, Pan) returns to
         fl_line_style(FL_DOT);
         fl_line(x() + padX_, cy, x() + gridRight, cy);
         fl_line_style(0);
     }
 
-    fl_color(kParamLine);
+    fl_color(theme().paramLine);
 
     for (int i = 0; i + 1 < (int)lane.points.size(); i++) {
         const auto& a = lane.points[i];

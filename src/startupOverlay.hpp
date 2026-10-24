@@ -40,7 +40,6 @@ class StartupOverlay : public OverlayWindow {
     static constexpr int btnW    = 130;
     static constexpr int btnH    = 30;
 
-    static constexpr Fl_Color inputBgCol = 0xF9FAFB00;
 
     ModernChoice* transportChoice_ = nullptr;
     ModernChoice* backendChoice_   = nullptr;
@@ -50,14 +49,14 @@ class StartupOverlay : public OverlayWindow {
 
     void drawStaticContent(int sy, int /*sbW*/) override {
         fl_font(FL_HELVETICA, 12);
-        fl_color(subTextCol);
+        fl_color(subTextCol());
         fl_draw("Please select the transport and MIDI types to use for your "
                 "new project.",
                 pad, msgY - sy, w() - 2*pad, msgH,
                 FL_ALIGN_LEFT | FL_ALIGN_TOP | FL_ALIGN_WRAP | FL_ALIGN_INSIDE);
 
         fl_font(FL_HELVETICA, 12);
-        fl_color(textCol);
+        fl_color(textCol());
         fl_draw("Transport", pad, row0Y - sy, labelW, choiceH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         fl_draw("MIDI input", pad, row1Y - sy, labelW, choiceH,
@@ -68,12 +67,14 @@ class StartupOverlay : public OverlayWindow {
 
     ModernChoice* makeChoice(int x, int y) {
         auto* c = new ModernChoice(x, y, choiceW, choiceH);
-        c->color(inputBgCol);
-        c->labelcolor(textCol);
         c->textsize(12);
-        c->setBorderColor(borderCol);
-        c->setArrowColor(subTextCol);
-        c->setHoverColor(0xF3F4F600);
+        onTheme([c] {
+            c->color(inputBgCol());
+            c->labelcolor(textCol());
+            c->setBorderColor(borderCol());
+            c->setArrowColor(subTextCol());
+            c->setHoverColor(buttonBgCol());
+        });
         return c;
     }
 
@@ -136,10 +137,12 @@ public:
 
         confirmBtn_ = new ModernButton(w - pad - btnW, btnY, btnW, btnH, "Confirm Settings");
         confirmBtn_->labelsize(12);
-        confirmBtn_->labelcolor(textCol);
-        confirmBtn_->color(0xF3F4F600);
         confirmBtn_->setBorderWidth(1);
-        confirmBtn_->setBorderColor(borderCol);
+        onTheme([this] {
+            confirmBtn_->labelcolor(textCol());
+            confirmBtn_->color(buttonBgCol());
+            confirmBtn_->setBorderColor(borderCol());
+        });
         confirmBtn_->callback([](Fl_Widget*, void* d) {
             static_cast<StartupOverlay*>(d)->hide();
         }, this);

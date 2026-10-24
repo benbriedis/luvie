@@ -4,6 +4,7 @@
 #include "markerRuler.hpp"
 #include "noteContextPopup.hpp"
 #include "cursors.hpp"
+#include "theme.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -32,10 +33,10 @@ MarkerRuler::~MarkerRuler()
 
 void MarkerRuler::draw()
 {
-	fl_color(kind == TEMPO ? tempoBg : timeSigBg);
+	fl_color(kind == TEMPO ? theme().tempoRulerBg : theme().timeSigRulerBg);
 	fl_rectf(x(), y(), w(), h());
 
-	fl_color(0xD1D5DB00);
+	fl_color(theme().rulerBorder);
 	fl_line(x(), y() + h() - 1, x() + w() - 1, y() + h() - 1);
 
 	fl_push_clip(x() + clipLeft, y(), w() - clipLeft, h() - 1);
@@ -57,7 +58,7 @@ void MarkerRuler::draw()
 	auto drawRamp = [&](const BpmMarker& m, const char* label) {
 		int lx = barToPixel(m.bar);
 		int rx = barToPixel(m.rampEndBar());
-		fl_color(fl_color_average(mc, tempoBg, 0.75f));
+		fl_color(fl_color_average(mc, theme().tempoRulerBg, 0.75f));
 		fl_rectf(lx + 1, y() + 1, std::max(1, rx - lx - 1), flagH);
 		fl_color(mc);
 		fl_line(lx, y(), lx, y() + h() - 2);

@@ -8,16 +8,18 @@
 #include <FL/fl_draw.H>
 #include "menuGlyphs.hpp"
 #include "cursors.hpp"
+#include "../theme.hpp"
 #include <functional>
 
 class ModernButton : public Fl_Button {
     bool      hovered     = false;
     int       borderWidth = 2;
-    Fl_Color  borderCol   = 0xCBD5E100;  // matches transport buttons by default
+    Fl_Color  borderCol   = 0;           // 0 = the theme's overlay border, as the transport buttons
     Fl_Color  hoverCol    = 0;           // 0 = auto-derive (lighter of bg)
     bool      arrow       = false;       // trailing "opens a submenu" triangle
     bool      tickSlot    = false;       // leading gutter kept free for a tick
     bool      ticked      = false;       // and a tick drawn in it
+    bool      menuItem    = false;       // a ContextMenuPopup row, restyled with the theme
 
 public:
     std::function<void()> onEnter;
@@ -35,7 +37,7 @@ private:
         fl_rectf(x(), y(), w(), h());
 
         if (borderWidth > 0) {
-            fl_color(borderCol);
+            fl_color(borderCol ? borderCol : theme().overlayBorder);
             fl_line_style(FL_SOLID, borderWidth);
             fl_rect(x(), y(), w(), h());
             fl_line_style(0);
@@ -118,6 +120,9 @@ public:
     void setSubmenuArrow(bool on) { arrow    = on; redraw(); }
     void reserveTick(bool on)     { tickSlot = on; redraw(); }
     void setTicked(bool on)       { ticked   = on; redraw(); }
+
+    void setMenuItem(bool on) { menuItem = on; }
+    bool isMenuItem() const   { return menuItem; }
 };
 
 #endif

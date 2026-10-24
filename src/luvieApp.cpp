@@ -40,6 +40,7 @@
 #include "outputsOverlay.hpp"
 #include "transportOverlay.hpp"
 #include "keyBindingsOverlay.hpp"
+#include "themesOverlay.hpp"
 #include "startupOverlay.hpp"
 #include "paramDotPopup.hpp"
 #include "paramDefPopup.hpp"
@@ -428,11 +429,11 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     settingsPop->onTransport = [this] { transportCb(nullptr, this); };
     settingsPop->onOutputs   = [this] { outputsCb  (nullptr, this); };
     settingsPop->onKeyBindings = [this] { keyBindingsCb(nullptr, this); };
+    settingsPop->onThemes      = [this] { themesCb     (nullptr, this); };
 
     // ---- Song Editor tab ----
     auto* tab1 = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Song Editor");
     tab1->end();
-    tab1->color(bgColor);
 
     auto* timeSigRuler = new MarkerRuler(0, off + tabBarH, winW, markerRulerH,
         60, 60, MarkerRuler::TIME_SIG, song, tPop, tsPop);
@@ -466,7 +467,6 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Loop Editor tab ----
     auto* tabLoop = new Fl_Group(0, off + tabBarH, winW, tabsH - tabBarH, "Loop Editor");
     tabLoop->end();
-    tabLoop->color(bgColor);
 
     loopEd = new LoopEditor(0, off + tabBarH, winW, tabsH - tabBarH);
     tabLoop->add(loopEd);
@@ -476,8 +476,12 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     // ---- Pattern Editor tab ----
     auto* tab2 = new PatternTabGroup(0, off + tabBarH, winW, tabsH - tabBarH, "Pattern Editor");
     tab2->end();
-    tab2->color(bgColor);
     patternTab = tab2;
+
+    onTheme([window, tab1, tabLoop, tab2] {
+        for (Fl_Widget* w : {(Fl_Widget*)window, (Fl_Widget*)tab1, (Fl_Widget*)tabLoop, (Fl_Widget*)tab2})
+            w->color(bgColor());
+    });
 
     harmonyEd = new HarmonyEditor(0, off + tabBarH, winW, numRows,
                                   numPatternBeats, rowHeight, 40, 1.0f, *p1);
@@ -1262,6 +1266,15 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         window->registerPopup(keyBindingsOverlay);
     }
 
+    // Themes overlay — same footprint again.
+    {
+        const int oy = 20;
+        const int om = 20;
+        themesOverlay = new ThemesOverlay(om, oy, winW - 2*om, window->h() - oy - om);
+        window->add(themesOverlay);
+        window->registerPopup(themesOverlay);
+    }
+
     // New-project startup dialog — centred over the main window. main() shows it
     // (and wires its callbacks) only for a fresh project. Deliberately NOT
     // registered as a popup: it must be dismissed via its Confirm button, not by
@@ -1330,6 +1343,11 @@ void LuvieApp::transportCb(Fl_Widget* w, void* data) {
 void LuvieApp::keyBindingsCb(Fl_Widget* w, void* data) {
     auto* app = static_cast<LuvieApp*>(data);
     if (app->keyBindingsOverlay) app->keyBindingsOverlay->show();
+}
+
+void LuvieApp::themesCb(Fl_Widget* w, void* data) {
+    auto* app = static_cast<LuvieApp*>(data);
+    if (app->themesOverlay) app->themesOverlay->show();
 }
 
 void LuvieApp::pushInstruments() {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "modernTabs.hpp"
+#include "theme.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
 
@@ -72,7 +73,7 @@ void ModernTabs::drawModeToggle(int tbH)
 	fl_draw(modeIsLoop ? "Loop" : "Song", x(), y(), toggleW, tbH, FL_ALIGN_CENTER);
 
 	// Separator
-	fl_color(separator);
+	fl_color(theme().tabSeparator);
 	fl_yxline(x() + toggleW, y() + 4, y() + tbH - 2);
 }
 
@@ -93,11 +94,11 @@ void ModernTabs::draw() {
 	if (!(damage() & ~FL_DAMAGE_CHILD)) return;
 
 	// Tab bar background
-	fl_color(FL_WHITE);
+	fl_color(theme().tabBarBg);
 	fl_rectf(x(), y(), w(), tbH);
 
 	// Bottom separator
-	fl_color(separator);
+	fl_color(theme().tabSeparator);
 	fl_xyline(x(), y() + tbH - 1, x() + w() - 1);
 
 	// Mode toggle button (if enabled)
@@ -119,17 +120,17 @@ void ModernTabs::draw() {
 		Fl_Color ac = (i < (int)tabAccents.size()) ? tabAccents[i] : defaultAccent;
 
 		// Tab background
-		fl_color(active ? FL_WHITE : inactiveTab);
+		fl_color(active ? theme().editorBg : theme().tabInactive);
 		fl_rectf(tx, y(), tw, tbH - 1);
 
 		// Vertical divider between tabs
 		if (i > 0) {
-			fl_color(separator);
+			fl_color(theme().tabSeparator);
 			fl_yxline(tx, y() + 4, y() + tbH - 2);
 		}
 
 		// Label
-		fl_color(FL_FOREGROUND_COLOR);
+		fl_color(theme().tabText);
 		fl_font(active ? FL_HELVETICA_BOLD : FL_HELVETICA, labelsize());
 		fl_draw(c->label(), tx, y(), tw, tbH, FL_ALIGN_CENTER);
 

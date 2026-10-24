@@ -47,6 +47,7 @@ class TrackContextPopup;
 class OutputsOverlay;
 class TransportOverlay;
 class KeyBindingsOverlay;
+class ThemesOverlay;
 class StartupOverlay;
 
 // Builds and wires the shared Luvie UI layout (tabs, editors, transport bar, popups).
@@ -54,7 +55,7 @@ class StartupOverlay;
 // configure the optional callbacks, then call build().
 class BasePatternEditor;
 
-class LuvieApp {
+class LuvieApp : public ThemeObserver {
 public:
     LuvieApp() = default;
     LuvieApp(const LuvieApp&) = delete;
@@ -240,6 +241,7 @@ public:
     OutputsOverlay*    outputsOverlay = nullptr;
     TransportOverlay*  transportOverlay = nullptr;
     KeyBindingsOverlay* keyBindingsOverlay = nullptr;
+    ThemesOverlay*     themesOverlay = nullptr;
     StartupOverlay*    startupOverlay = nullptr;
 
     // ── MIDI input routing ───────────────────────────────────────────────────
@@ -337,6 +339,7 @@ private:
     static void outputsCb   (Fl_Widget*, void* data);
     static void transportCb (Fl_Widget*, void* data);
     static void keyBindingsCb(Fl_Widget*, void* data);
+    static void themesCb    (Fl_Widget*, void* data);
 
     struct EditorSwitcher : ITimelineObserver {
         LuvieApp* app;

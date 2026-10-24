@@ -40,14 +40,14 @@ void Grid::draw()
 
     fl_push_clip(x(), y(), w() + 1, h() + 1);
 
-    fl_color(bgColor);
+    fl_color(bgColor());
     fl_rectf(x(), y(), w(), h());
 
     int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
 
     for (int r = 0; r < numRows; r++) {
         Fl_Color rc = rowBgColor(r);
-        if (rc != bgColor) {
+        if (rc != bgColor()) {
             fl_color(rc);
             fl_rectf(x(), y() + rowY(r), gridRight, rowH(r));
         }
@@ -82,7 +82,7 @@ void Grid::draw()
 
     // Subdivision lines first, so the row lines and column lines draw over them.
     if (divisions > 1) {
-        fl_color(subdivLineColor);
+        fl_color(subdivLineColor());
         for (int i = colOffset; i < std::min(endCol, numCols); i++)
             for (int k = 1; k < divisions; k++) {
                 // Round (not truncate) so these guide lines coincide with the
@@ -764,7 +764,7 @@ void drawBandWash(int bx, int by, int bw, int bh)
         wash.draw(bx, by);
     }
     else {
-        fl_color(fl_color_average(bandColor, bgColor, 0.18f));
+        fl_color(fl_color_average(bandColor, bgColor(), 0.18f));
         fl_rectf(bx, by, bw, bh);
     }
 }

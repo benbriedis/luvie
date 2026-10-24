@@ -32,7 +32,6 @@ class VelocityRow : public Fl_Group {
 public:
 	VelocityRow(int x, int y, int w, int h) : Fl_Group(x, y, w, h) {
 		box(FL_NO_BOX);
-		color(popupBg);
 	}
 
 	// The slider paints its own background from its parent's colour, so the
@@ -40,7 +39,7 @@ public:
 	void setHovered(bool h) {
 		if (h == hovered) return;
 		hovered = h;
-		Fl_Color c = h ? ContextMenuPopup::hoverCol : popupBg;
+		Fl_Color c = h ? ContextMenuPopup::hoverCol() : popupBg();
 		color(c);
 		for (int i = 0; i < children(); i++)
 			child(i)->color(c);
@@ -56,7 +55,6 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 2 * btnH
 	velRow->begin();
 
 	Fl_Box *velLabel = new Fl_Box(1 + rowPad, 1, velLabelW, btnH, "Vel");
-	velLabel->labelcolor(popupText);
 	velLabel->box(FL_NO_BOX);
 	velLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
@@ -64,7 +62,6 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 2 * btnH
 	velSlider = new ModernSlider(sliderX, 1 + sliderInsetY,
 	                             popW - 1 - rowPad - sliderX, btnH - 2 * sliderInsetY);
 	velSlider->type(FL_HORIZONTAL);
-	velSlider->color(popupBg);
 	// Thumb uses the 80%-velocity reference blue; the filled bar tracks the
 	// note's velocity colour (light blue = soft, dark blue = loud).
 	velSlider->selection_color(velocityFill(0.8f));
@@ -77,6 +74,12 @@ NoteContextPopup::NoteContextPopup() : ContextMenuPopup(popupWidth, 2 + 2 * btnH
 	}, this);
 
 	velRow->end();
+	onTheme([this, velLabel] {
+		velRow->color(popupBg());
+		velSlider->color(popupBg());
+		velSlider->setTrackColor(theme().sliderTrack);
+		velLabel->labelcolor(popupText());
+	});
 
 	ModernButton *deleteItem = addItem(1, "Delete");
 	end();

@@ -17,21 +17,24 @@ ParamDotPopup::ParamDotPopup()
 {
 
     auto* lbl = new Fl_Box(pad, row1Y, 26, row1H, "Val");
-    lbl->labelcolor(popupText);
     lbl->box(FL_NO_BOX);
 
     input = new Fl_Value_Input(pad + 30, row1Y, popupW - pad - 30 - pad, row1H);
     input->range(0, 16383);
     input->step(1);
     input->box(FL_FLAT_BOX);
-    input->color(popupInputBg);
-    input->textcolor(popupText);
-    input->cursor_color(popupText);
-    input->labelcolor(popupText);
 
     deleteBtn = new ModernButton(pad, row2Y, popupW - 2 * pad, row2H, "Delete");
-    deleteBtn->color(FL_WHITE);
-    deleteBtn->labelcolor(popupText);
+
+    onTheme([this, lbl] {
+        lbl->labelcolor(popupText());
+        input->color(popupInputBg());
+        input->textcolor(popupText());
+        input->cursor_color(popupText());
+        input->labelcolor(popupText());
+        deleteBtn->color(popupBg());
+        deleteBtn->labelcolor(popupText());
+    });
 
     end();
 

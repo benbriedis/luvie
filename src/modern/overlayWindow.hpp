@@ -16,18 +16,20 @@ class GridScrollPane;
 // below to relayout / reposition that content.
 class OverlayWindow : public BasePopup {
 public:
-    // Shared layout + colour constants (also used by subclass content code).
+    // Shared layout constants and theme colours (also used by subclass content code).
     static constexpr int headerH    = 52;
     static constexpr int scrollbarW = 14;
     static constexpr int titlePad   = 16;
     static constexpr int closeSz    = 36;
     static constexpr int closePad   = 10;
 
-    static constexpr Fl_Color bgCol      = 0xFFFFFF00;
-    static constexpr Fl_Color borderCol  = 0xCBD5E100;
-    static constexpr Fl_Color dividerCol = 0xE5E7EB00;
-    static constexpr Fl_Color textCol    = 0x37415100;
-    static constexpr Fl_Color subTextCol = 0x6B728000;
+    static Fl_Color bgCol()       { return theme().overlayBg; }
+    static Fl_Color borderCol()   { return theme().overlayBorder; }
+    static Fl_Color dividerCol()  { return theme().overlayDivider; }
+    static Fl_Color textCol()     { return theme().overlayText; }
+    static Fl_Color subTextCol()  { return theme().overlaySubText; }
+    static Fl_Color inputBgCol()  { return theme().overlayInputBg; }
+    static Fl_Color buttonBgCol() { return theme().overlayButtonBg; }
 
     OverlayWindow(int x, int y, int w, int h, std::string title);
 

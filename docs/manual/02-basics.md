@@ -71,6 +71,12 @@ view any current alerts. The most common alerts relate to the Jack server not be
 Project-wide settings are to be found in the Settings Menu. To display it click on the
 gear icon at the top right of the window.
 
+## Themes
+
+Choose 'Themes' from the Settings Menu to change the colour of the UI. 'Light' is the
+default, while 'Dark' is loosely modelled on Ardour's default theme. The new theme takes
+effect immediately. The choice isn't remembered, so Luvie always starts in 'Light'.
+
 ## Export and import
 
 So you started a project in Carla and now decide you want to move over to Ardour? Or maybe as a standalone?

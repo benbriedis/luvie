@@ -267,10 +267,10 @@ void PianorollGrid::setRowOffset(int offset)
 // Octave boundaries every 12 semitones (bottom of group = multiple of 12 from rowOffset)
 Fl_Color PianorollGrid::rowLineColor(int i) const
 {
-    if (i <= 0 || i >= numRows) return 0xEE888800;
+    if (i <= 0 || i >= numRows) return theme().gridRowLine;
     if ((rowOffset + numRows - i) % 12 == 0)
-        return 0x33110000;
-    return 0xEE888800;
+        return theme().gridGroupLine;
+    return theme().gridRowLine;
 }
 
 // Subtle grey tint for black-key rows
@@ -279,17 +279,17 @@ Fl_Color PianorollGrid::rowBgColor(int row) const
     int midiNote = rowOffset + numRows - 1 - row;
     int semitone = ((midiNote % 12) + 12) % 12;
     static constexpr bool isBlack[12] = {false,true,false,true,false,false,true,false,true,false,true,false};
-    return isBlack[semitone] ? 0xE8E8E800 : bgColor;
+    return isBlack[semitone] ? theme().pianoBlackRow : bgColor();
 }
 
 Fl_Color PianorollGrid::columnColor(int col) const
 {
-    if (!pattern) return 0x00EE0000;
+    if (!pattern) return theme().gridBeat;
     for (const auto& p : pattern->get().patterns) {
         if (p.id == patternId) {
             bool isBarStart = p.timeSigTop > 0 && col % p.timeSigTop == 0;
-            return isBarStart ? 0x00660000 : 0x00EE0000;
+            return isBarStart ? theme().gridBar : theme().gridBeat;
         }
     }
-    return 0x00EE0000;
+    return theme().gridBeat;
 }

@@ -69,14 +69,9 @@ static constexpr int scrollbarW        = OverlayWindow::scrollbarW;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-static constexpr Fl_Color bgCol      = OverlayWindow::bgCol;
-static constexpr Fl_Color borderCol  = OverlayWindow::borderCol;
-static constexpr Fl_Color dividerCol = OverlayWindow::dividerCol;
-static constexpr Fl_Color textCol    = OverlayWindow::textCol;
-static constexpr Fl_Color subTextCol = OverlayWindow::subTextCol;
-static constexpr Fl_Color inputBgCol = 0xF9FAFB00;
+// The theme colours come from OverlayWindow (bgCol() etc.). Rows are built with
+// whatever theme is current, and rebuilt when it changes; see onThemeChanged().
 static constexpr Fl_Color delRedCol  = 0xEF444400;
-static constexpr Fl_Color addBtnBg   = 0xF3F4F600;
 static constexpr Fl_Color learningBorderCol = 0xF59E0B00;   // as the scene buttons' learn
 
 // ── GM1 instrument list ───────────────────────────────────────────────────────
@@ -156,7 +151,7 @@ class NameInput : public Fl_Input {
         // Fl_Input greys its own text when deactivated; the border is ours, so it has
         // to be greyed to match or a read-only field still looks editable.
         const bool foc = Fl::focus() == this;
-        fl_color(!active_r() ? fl_inactive(borderCol) : (foc ? 0x3B82F600 : borderCol));
+        fl_color(!active_r() ? fl_inactive(OverlayWindow::borderCol()) : (foc ? 0x3B82F600 : OverlayWindow::borderCol()));
         fl_line_style(FL_SOLID, foc ? 2 : 1);
         fl_rect(x(), y(), w(), h());
         fl_line_style(0);
@@ -219,12 +214,19 @@ static void fillInputChanChoice(ModernChoice* c)
 
 static void styleChoice(ModernChoice* c)
 {
-    c->color(inputBgCol);
-    c->labelcolor(textCol);
     c->textsize(12);
-    c->setBorderColor(borderCol);
-    c->setArrowColor(subTextCol);
-    c->setHoverColor(0xF3F4F600);
+    c->color(OverlayWindow::inputBgCol());
+    c->labelcolor(OverlayWindow::textCol());
+    c->setBorderColor(OverlayWindow::borderCol());
+    c->setArrowColor(OverlayWindow::subTextCol());
+    c->setHoverColor(OverlayWindow::buttonBgCol());
+}
+
+static void styleAddBtn(ModernButton* b)
+{
+    b->labelcolor(OverlayWindow::textCol());
+    b->color(OverlayWindow::buttonBgCol());
+    b->setBorderColor(OverlayWindow::borderCol());
 }
 
 static ModernButton* makeDeleteBtn(int x, int y)
@@ -232,7 +234,7 @@ static ModernButton* makeDeleteBtn(int x, int y)
     auto* del = new ModernButton(x, y, delBtnSz, delBtnSz, "\xc3\x97");
     del->labelsize(14);
     del->labelcolor(delRedCol);
-    del->color(bgCol);
+    del->color(OverlayWindow::bgCol());
     del->setBorderWidth(0);
     return del;
 }
@@ -246,7 +248,7 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
     auto makePane = [this](const char* title) {
         // Inset by the border, so the panes' backgrounds leave it showing.
         auto* p = new CollapsiblePane(1, headerH, this->w() - scrollbarW - 1, title);
-        p->setColors(bgCol, textCol, subTextCol, dividerCol);
+        onTheme([p] { p->setColors(bgCol(), textCol(), subTextCol(), dividerCol()); });
         p->setExpanded(false);   // everything starts folded away
         p->callback([](Fl_Widget*, void* d) {
             auto* self = static_cast<OutputsOverlay*>(d);
@@ -264,12 +266,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
 
     portsPane_->begin();
     auto* dtc = new ModernChoice(0, 0, backendW, inputH);
-    dtc->color(inputBgCol);
-    dtc->labelcolor(textCol);
     dtc->textsize(12);
-    dtc->setBorderColor(borderCol);
-    dtc->setArrowColor(subTextCol);
-    dtc->setHoverColor(0xF3F4F600);
+    onTheme([dtc] { styleChoice(dtc); });
     fillBackendChoice(dtc, pluginMode_);
     dtc->value(static_cast<int>(defaultBackend_));
     dtc->callback(defaultTypeChoiceCb, this);
@@ -277,10 +275,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
 
     addBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Port");
     addBtn->labelsize(12);
-    addBtn->labelcolor(textCol);
-    addBtn->color(addBtnBg);
     addBtn->setBorderWidth(1);
-    addBtn->setBorderColor(borderCol);
+    onTheme([this] { styleAddBtn(addBtn); });
     addBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<OutputsOverlay*>(d);
         std::string name = self->nextDefaultPortName();
@@ -294,10 +290,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
     instrPane_->begin();
     addInstrBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Instrument");
     addInstrBtn->labelsize(12);
-    addInstrBtn->labelcolor(textCol);
-    addInstrBtn->color(addBtnBg);
     addInstrBtn->setBorderWidth(1);
-    addInstrBtn->setBorderColor(borderCol);
+    onTheme([this] { styleAddBtn(addInstrBtn); });
     addInstrBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<OutputsOverlay*>(d);
         const std::string portName = self->outputs_.empty()
@@ -312,10 +306,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
 
     addDrumInstrBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Drumkit");
     addDrumInstrBtn->labelsize(12);
-    addDrumInstrBtn->labelcolor(textCol);
-    addDrumInstrBtn->color(addBtnBg);
     addDrumInstrBtn->setBorderWidth(1);
-    addDrumInstrBtn->setBorderColor(borderCol);
+    onTheme([this] { styleAddBtn(addDrumInstrBtn); });
     addDrumInstrBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<OutputsOverlay*>(d);
         const std::string portName = self->outputs_.empty()
@@ -333,10 +325,8 @@ OutputsOverlay::OutputsOverlay(int x, int y, int w, int h, bool pluginMode)
     inPane_->begin();
     addInputBtn = new ModernButton(0, 0, addBtnW, addBtnH, "+ Add Input");
     addInputBtn->labelsize(12);
-    addInputBtn->labelcolor(textCol);
-    addInputBtn->color(addBtnBg);
     addInputBtn->setBorderWidth(1);
-    addInputBtn->setBorderColor(borderCol);
+    onTheme([this] { styleAddBtn(addInputBtn); });
     addInputBtn->callback([](Fl_Widget*, void* d) {
         auto* self = static_cast<OutputsOverlay*>(d);
         if ((int)self->inputs_.size() >= kMaxMidiInputs) return;
@@ -405,6 +395,14 @@ void OutputsOverlay::hide() {
 }
 
 void OutputsOverlay::onResized() {
+    rebuildAll();
+}
+
+// The rows are rebuilt rather than restyled: they come and go, and building
+// them already reads the current theme.
+void OutputsOverlay::onThemeChanged() {
+    OverlayWindow::onThemeChanged();
+    syncFromInputs();
     rebuildAll();
 }
 
@@ -598,7 +596,7 @@ void OutputsOverlay::updateSplitRow(int i)
             : ("Plays " + splitNoteName(instr.splitNote) + " and the keys below it").c_str());
 
     row.splitLearnBtn->label(learning ? "Press a key..." : "MIDI Learn");
-    row.splitLearnBtn->setBorderColor(learning ? learningBorderCol : borderCol);
+    row.splitLearnBtn->setBorderColor(learning ? learningBorderCol : borderCol());
     row.splitLearnBtn->setBorderWidth(learning ? 2 : 1);
     row.splitLearnBtn->tooltip(instr.split == KeySplit::Lower
         ? "Sets the highest key this instrument plays: press it on the instrument's MIDI input"
@@ -795,11 +793,11 @@ void OutputsOverlay::relayoutPanes() {
 void OutputsOverlay::buildPaneBodies() {
     auto colHeading = [](const char* text, int x, int y, int w) {
         fl_font(FL_HELVETICA, 10);
-        fl_color(subTextCol);
+        fl_color(subTextCol());
         fl_draw(text, x, y, w, chanColH2, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     };
     auto rule = [this](int y) {
-        fl_color(dividerCol);
+        fl_color(dividerCol());
         fl_line_style(FL_SOLID, 1);
         fl_line(pad, y, w() - scrollbarW - pad, y);
         fl_line_style(0);
@@ -813,7 +811,7 @@ void OutputsOverlay::buildPaneBodies() {
     portsPane_->drawBody = [=]() {
         const int top = portsPane_->bodyY();
         fl_font(FL_HELVETICA, 11);
-        fl_color(subTextCol);
+        fl_color(subTextCol());
         fl_draw("Default port type", pad, top, defaultLabelW, inputH,
                 FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         colHeading("PORT NAME", pad, top + defaultTypeRowH, w() - 2*pad);
@@ -847,8 +845,8 @@ void OutputsOverlay::rebuildRows() {
         const int iy = y + (rowH - inputH) / 2;
 
         auto* inp = new NameInput(pad, iy, inputW, inputH);
-        inp->color(inputBgCol);
-        inp->textcolor(textCol);
+        inp->color(inputBgCol());
+        inp->textcolor(textCol());
         inp->textsize(12);
         inp->value(displayPortName(i).c_str());
         inp->callback(inputCb, this);
@@ -860,12 +858,12 @@ void OutputsOverlay::rebuildRows() {
 
         const int backendX = pad + inputW + backendGap;
         auto* be = new ModernChoice(backendX, iy, backendW, inputH);
-        be->color(inputBgCol);
-        be->labelcolor(textCol);
+        be->color(inputBgCol());
+        be->labelcolor(textCol());
         be->textsize(12);
-        be->setBorderColor(borderCol);
-        be->setArrowColor(subTextCol);
-        be->setHoverColor(0xF3F4F600);
+        be->setBorderColor(borderCol());
+        be->setArrowColor(subTextCol());
+        be->setHoverColor(buttonBgCol());
         fillBackendChoice(be, pluginMode_);
         be->value(static_cast<int>(outputs_[i].backend));
         be->callback(backendChoiceCb, this);
@@ -875,7 +873,7 @@ void OutputsOverlay::rebuildRows() {
             delBtnSz, delBtnSz, "\xc3\x97");
         del->labelsize(14);
         del->labelcolor(delRedCol);
-        del->color(bgCol);
+        del->color(bgCol());
         del->setBorderWidth(0);
         del->callback(deleteCb, this);
 
@@ -949,7 +947,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         auto* typeLbl = new Fl_Box(pad, iy, typeLabelW, inputH,
             drum ? "Drum" : "Standard");
         typeLbl->box(FL_NO_BOX);
-        typeLbl->labelcolor(subTextCol);
+        typeLbl->labelcolor(subTextCol());
         typeLbl->labelsize(10);
         // Flush with the TYPE heading: centred, a short word like "Drum" would
         // look indented next to "Standard".
@@ -957,8 +955,8 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         const int nameX = pad + typeLabelW + chanGap;
         auto* nameInp = new NameInput(nameX, iy, instrNameW_, inputH);
-        nameInp->color(inputBgCol);
-        nameInp->textcolor(textCol);
+        nameInp->color(inputBgCol());
+        nameInp->textcolor(textCol());
         nameInp->textsize(12);
         nameInp->value(instruments_[i].name.c_str());
         nameInp->callback(instrNameCb, this);
@@ -968,7 +966,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
             delBtnSz, delBtnSz, "\xc3\x97");
         del->labelsize(14);
         del->labelcolor(delRedCol);
-        del->color(bgCol);
+        del->color(bgCol());
         del->setBorderWidth(0);
         del->callback(instrDeleteCb, this);
 
@@ -991,46 +989,46 @@ void OutputsOverlay::rebuildInstrumentRows() {
             const int drumStartX = subChildX;
             imp = new ModernButton(drumStartX, drumBtnY, drumImportW, drumBtnH, "Import drum map");
             imp->labelsize(11);
-            imp->labelcolor(textCol);
-            imp->color(addBtnBg);
+            imp->labelcolor(textCol());
+            imp->color(buttonBgCol());
             imp->setBorderWidth(1);
-            imp->setBorderColor(borderCol);
+            imp->setBorderColor(borderCol());
             imp->callback(importDrumMapCb, this);
 
             const int gmX = drumStartX + drumImportW + drumBtnGap;
             gm = new ModernButton(gmX, drumBtnY, drumGmW, drumBtnH, "Load GM map");
             gm->labelsize(11);
-            gm->labelcolor(textCol);
-            gm->color(addBtnBg);
+            gm->labelcolor(textCol());
+            gm->color(buttonBgCol());
             gm->setBorderWidth(1);
-            gm->setBorderColor(borderCol);
+            gm->setBorderColor(borderCol());
             gm->callback(loadGmMapCb, this);
 
             const int gsX = gmX + drumGmW + drumBtnGap;
             gs = new ModernButton(gsX, drumBtnY, drumGsW, drumBtnH, "Load GS map");
             gs->labelsize(11);
-            gs->labelcolor(textCol);
-            gs->color(addBtnBg);
+            gs->labelcolor(textCol());
+            gs->color(buttonBgCol());
             gs->setBorderWidth(1);
-            gs->setBorderColor(borderCol);
+            gs->setBorderColor(borderCol());
             gs->callback(loadGsMapCb, this);
 
             const int expX = gsX + drumGsW + drumBtnGap;
             exp = new ModernButton(expX, drumBtnY, drumExportW, drumBtnH, "Export drum map");
             exp->labelsize(11);
-            exp->labelcolor(textCol);
-            exp->color(addBtnBg);
+            exp->labelcolor(textCol());
+            exp->color(buttonBgCol());
             exp->setBorderWidth(1);
-            exp->setBorderColor(borderCol);
+            exp->setBorderColor(borderCol());
             exp->callback(exportDrumMapCb, this);
 
             const int clrX = expX + drumExportW + drumBtnGap;
             clr = new ModernButton(clrX, drumBtnY, drumClearW, drumBtnH, "Clear");
             clr->labelsize(11);
-            clr->labelcolor(textCol);
-            clr->color(addBtnBg);
+            clr->labelcolor(textCol());
+            clr->color(buttonBgCol());
             clr->setBorderWidth(1);
-            clr->setBorderColor(borderCol);
+            clr->setBorderColor(borderCol());
             clr->callback(clearDrumMapCb, this);
         }
 
@@ -1041,7 +1039,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         int ix = subRowX;
         auto* inLbl = new Fl_Box(ix, inWidY, subLabelW, progBtnH, "MIDI input");
         inLbl->box(FL_NO_BOX);
-        inLbl->labelcolor(subTextCol);
+        inLbl->labelcolor(subTextCol());
         inLbl->labelsize(11);
         inLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         ix += subLabelW;
@@ -1054,7 +1052,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         auto* inChanLbl = new Fl_Box(ix, inWidY, 50, progBtnH, "Channel");
         inChanLbl->box(FL_NO_BOX);
-        inChanLbl->labelcolor(subTextCol);
+        inChanLbl->labelcolor(subTextCol());
         inChanLbl->labelsize(11);
         inChanLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
         ix += 50 + 4;
@@ -1070,7 +1068,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         // Keyboard split: which side of the split point this instrument plays.
         auto* splitLbl = new Fl_Box(ix, inWidY, splitLabelW, progBtnH, "Split");
         splitLbl->box(FL_NO_BOX);
-        splitLbl->labelcolor(subTextCol);
+        splitLbl->labelcolor(subTextCol());
         splitLbl->labelsize(11);
         splitLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
         ix += splitLabelW + 4;
@@ -1087,27 +1085,27 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         auto* splitNoteLbl = new Fl_Box(ix, inWidY, splitNoteW, progBtnH);
         splitNoteLbl->box(FL_NO_BOX);
-        splitNoteLbl->labelcolor(textCol);
+        splitNoteLbl->labelcolor(textCol());
         splitNoteLbl->labelsize(11);
         splitNoteLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         ix += splitNoteW + 4;
 
         auto* splitLearn = new ModernButton(ix, inWidY, splitLearnW, progBtnH, "MIDI Learn");
         splitLearn->labelsize(11);
-        splitLearn->labelcolor(textCol);
-        splitLearn->color(addBtnBg);
+        splitLearn->labelcolor(textCol());
+        splitLearn->color(buttonBgCol());
         splitLearn->setBorderWidth(1);
-        splitLearn->setBorderColor(borderCol);
+        splitLearn->setBorderColor(borderCol());
         splitLearn->callback(splitLearnCb, this);
         ix += splitLearnW + 16;
 
         // Pass through: what is played here goes straight on to the output, as played.
         auto* passThru = new Fl_Check_Button(ix, inWidY, passThroughW, progBtnH, "Pass through");
         passThru->labelsize(11);
-        passThru->labelcolor(subTextCol);
+        passThru->labelcolor(subTextCol());
         passThru->down_box(FL_DOWN_BOX);
-        passThru->color(inputBgCol);
-        passThru->selection_color(textCol);
+        passThru->color(inputBgCol());
+        passThru->selection_color(textCol());
         passThru->value(instruments_[i].passThrough ? 1 : 0);
         passThru->tooltip("Send the notes played on this input straight to the MIDI output, "
                           "unquantised. With a split, only this instrument's side of it.");
@@ -1120,7 +1118,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
         int ox = subRowX;
         auto* outLbl = new Fl_Box(ox, outWidY, subLabelW, progBtnH, "MIDI output");
         outLbl->box(FL_NO_BOX);
-        outLbl->labelcolor(subTextCol);
+        outLbl->labelcolor(subTextCol());
         outLbl->labelsize(11);
         outLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         ox += subLabelW;
@@ -1139,7 +1137,7 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         auto* outChanLbl = new Fl_Box(ox, outWidY, 50, progBtnH, "Channel");
         outChanLbl->box(FL_NO_BOX);
-        outChanLbl->labelcolor(subTextCol);
+        outChanLbl->labelcolor(subTextCol());
         outChanLbl->labelsize(11);
         outChanLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
         ox += 50 + 4;
@@ -1159,21 +1157,21 @@ void OutputsOverlay::rebuildInstrumentRows() {
         int bx = subChildX;
         auto* bankLbl = new Fl_Box(bx, bankWidY, 40, progBtnH, "Bank:");
         bankLbl->box(FL_NO_BOX);
-        bankLbl->labelcolor(subTextCol);
+        bankLbl->labelcolor(subTextCol());
         bankLbl->labelsize(11);
         bankLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         bx += 40;
 
         auto* msbLbl = new Fl_Box(bx, bankWidY, 28, progBtnH, "MSB");
         msbLbl->box(FL_NO_BOX);
-        msbLbl->labelcolor(subTextCol);
+        msbLbl->labelcolor(subTextCol());
         msbLbl->labelsize(11);
         msbLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
         bx += 28 + 4;
 
         auto* msbInp = new NameInput(bx, bankWidY, 38, progBtnH);
-        msbInp->color(inputBgCol);
-        msbInp->textcolor(textCol);
+        msbInp->color(inputBgCol());
+        msbInp->textcolor(textCol());
         msbInp->textsize(11);
         msbInp->callback(bankMsbInputCb, this);
         if (instruments_[i].bankMsb >= 0)
@@ -1182,14 +1180,14 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         auto* lsbLbl = new Fl_Box(bx, bankWidY, 28, progBtnH, "LSB");
         lsbLbl->box(FL_NO_BOX);
-        lsbLbl->labelcolor(subTextCol);
+        lsbLbl->labelcolor(subTextCol());
         lsbLbl->labelsize(11);
         lsbLbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
         bx += 28 + 4;
 
         auto* lsbInp = new NameInput(bx, bankWidY, 38, progBtnH);
-        lsbInp->color(inputBgCol);
-        lsbInp->textcolor(textCol);
+        lsbInp->color(inputBgCol());
+        lsbInp->textcolor(textCol());
         lsbInp->textsize(11);
         lsbInp->callback(bankLsbInputCb, this);
         if (instruments_[i].bankLsb >= 0)
@@ -1202,14 +1200,14 @@ void OutputsOverlay::rebuildInstrumentRows() {
         int px = subChildX;
         auto* progLbl = new Fl_Box(px, progWidY, 100, progBtnH, "Program number");
         progLbl->box(FL_NO_BOX);
-        progLbl->labelcolor(subTextCol);
+        progLbl->labelcolor(subTextCol());
         progLbl->labelsize(11);
         progLbl->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         px += 100;
 
         auto* progInp = new NameInput(px, progWidY, 40, progBtnH);
-        progInp->color(inputBgCol);
-        progInp->textcolor(textCol);
+        progInp->color(inputBgCol());
+        progInp->textcolor(textCol());
         progInp->textsize(11);
         progInp->callback(programInputCb, this);
         if (instruments_[i].programNumber >= 0)
@@ -1218,18 +1216,18 @@ void OutputsOverlay::rebuildInstrumentRows() {
 
         auto* gm1Lbl = new Fl_Box(px, progWidY, 125, progBtnH, "Set to GM1 instrument");
         gm1Lbl->box(FL_NO_BOX);
-        gm1Lbl->labelcolor(subTextCol);
+        gm1Lbl->labelcolor(subTextCol());
         gm1Lbl->labelsize(11);
         gm1Lbl->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
         px += 125 + 4;
 
         auto* progDrop = new ModernChoice(px, progWidY, 170, progBtnH);
-        progDrop->color(inputBgCol);
-        progDrop->labelcolor(textCol);
+        progDrop->color(inputBgCol());
+        progDrop->labelcolor(textCol());
         progDrop->textsize(11);
-        progDrop->setBorderColor(borderCol);
-        progDrop->setArrowColor(subTextCol);
-        progDrop->setHoverColor(0xF3F4F600);
+        progDrop->setBorderColor(borderCol());
+        progDrop->setArrowColor(subTextCol());
+        progDrop->setHoverColor(buttonBgCol());
         progDrop->add("(none)");
         for (int n = 0; n < 128; n++) {
             std::string item = std::to_string(n + 1) + " \xe2\x80\x93 " + kGm1Names[n];
@@ -1279,8 +1277,8 @@ void OutputsOverlay::rebuildInputRows() {
         const int iy = y + (rowH - inputH) / 2;
 
         auto* inp = new NameInput(pad, iy, inputW, inputH);
-        inp->color(inputBgCol);
-        inp->textcolor(textCol);
+        inp->color(inputBgCol());
+        inp->textcolor(textCol());
         inp->textsize(12);
         inp->value(displayInputName(i).c_str());
         inp->callback(inputNameCb, this);

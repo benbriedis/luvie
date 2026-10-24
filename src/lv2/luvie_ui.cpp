@@ -791,7 +791,7 @@ static LV2UI_Handle instantiate(
                         ? ui->extHost->plugin_human_id : "Luvie";
     ui->window = new AppWindow(LuvieApp::winW, LuvieApp::defaultWinH());
     ui->window->label(title);
-    ui->window->color(bgColor);
+    ui->window->color(bgColor());
     ui->window->callback(window_close_cb, ui);
     ui->window->end();
 

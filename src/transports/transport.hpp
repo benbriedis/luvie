@@ -74,7 +74,7 @@ public:
 };
 
 
-class Transport : public Fl_Group, public ITimelineObserver {
+class Transport : public Fl_Group, public ITimelineObserver, public ThemeObserver {
 	AlertIndicator*     alertIndicator;
 	TransportButton*    loopBtn;
 	TransportButton*    rewindBtn;

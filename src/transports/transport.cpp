@@ -9,9 +9,7 @@
 #include <FL/fl_draw.H>
 #include <algorithm>
 
-static constexpr Fl_Color borderColor = 0xCBD5E100;  // slate blue-grey
 static constexpr Fl_Color pressedColor = 0x3B82F600; // blue accent
-static constexpr Fl_Color iconColor = 0x37415100;    // dark slate
 // Outline of a button waiting for its MIDI trigger: the amber param labels and
 // scene buttons use for "Learning…".
 static constexpr Fl_Color learningColor = 0xF59E0B00;
@@ -29,7 +27,6 @@ AlertPopup::AlertPopup()
 	: BasePopup(0, 0, 10, 10)
 {
 	box(FL_NO_BOX);   // draw() paints the background and border
-	color(popupBg);
 	end();
 }
 
@@ -43,13 +40,13 @@ void AlertPopup::setLines(const std::vector<std::string>& l) {
 }
 
 void AlertPopup::draw() {
-	fl_color(popupBg);
+	fl_color(popupBg());
 	fl_rectf(0, 0, w(), h());
 	fl_color(bubbleBorder);
 	fl_rect(0, 0, w(), h());
 
 	fl_font(FL_HELVETICA, alertFontSize);
-	fl_color(popupText);
+	fl_color(popupText());
 	int ty = alertPad;
 	for (const auto& s : lines) {
 		fl_draw(s.c_str(), alertPad, ty, w() - 2 * alertPad, alertLineH,
@@ -95,7 +92,7 @@ void AlertIndicator::showPopup() {
 void AlertIndicator::draw() {
 	// Clear our slice of the bar first so a previous (larger) glyph doesn't
 	// show through when the state changes.
-	fl_color(bgColor);
+	fl_color(bgColor());
 	fl_rectf(x(), y(), w(), h());
 
 	int cx = x() + w() / 2;
@@ -114,11 +111,11 @@ void AlertIndicator::draw() {
 		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
 	} else {
 		// Same warning triangle as the alert state, but with a white background.
-		fl_color(popupBg);
+		fl_color(popupBg());
 		fl_polygon(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
 		fl_color(bubbleBorder);
 		fl_loop(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
-		fl_color(iconColor);
+		fl_color(theme().transportIcon);
 		fl_font(FL_HELVETICA_BOLD, s + 4);
 		// Centre on the triangle's axis (+1 optical nudge for the glyph's bearing).
 		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
@@ -205,21 +202,23 @@ void TransportButton::draw() {
 	int  cx = x() + w() / 2;
 	int  cy = y() + h() / 2;
 
-	fl_color(bgColor);
+	fl_color(bgColor());
 	fl_rectf(x(), y(), w(), h());
 
+	const Fl_Color borderColor = theme().transportBorder;
+	const Fl_Color iconColor   = theme().transportIcon;
 	Fl_Color border = inactive
-	    ? fl_color_average(borderColor, bgColor, 0.35f)
+	    ? fl_color_average(borderColor, bgColor(), 0.35f)
 	    : borderColor;
 	Fl_Color icon_col = inactive
-	    ? fl_color_average(iconColor, bgColor, 0.35f)
+	    ? fl_color_average(iconColor, bgColor(), 0.35f)
 	    : (pressed ? FL_WHITE : iconColor);
 
 	if (pressed && !inactive) {
 		fl_color(pressedColor);
 		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
 	} else {
-		fl_color(bgColor);
+		fl_color(bgColor());
 		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
 		fl_color(border);
 		fl_line_style(FL_SOLID, 2);
@@ -385,7 +384,7 @@ Transport::Transport(int x, int y, int w, int h, ITransport* t)
 	: Fl_Group(x, y, w, h), transport(t)
 {
 	box(FL_FLAT_BOX);
-	color(bgColor);
+	onTheme([this] { color(bgColor()); });
 
 	const int btnSize = h - 10;
 	const int gap     = 12;

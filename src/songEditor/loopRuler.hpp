@@ -48,7 +48,6 @@ private:
 	LoopRulerContextPopup* contextPopup = nullptr;
 
 	static constexpr Fl_Color loopColor = 0x10B98100;  // emerald-500
-	static constexpr Fl_Color loopBg    = 0xECFDF500;  // emerald-50
 
 	void draw()            override;
 	int  handle(int event) override;

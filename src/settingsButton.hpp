@@ -7,6 +7,7 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
+#include "theme.hpp"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -28,7 +29,7 @@ class SettingsButton : public Fl_Box {
         const double r  = R * 0.72;                     // tooth-valley radius
         const int    teeth = 8;
 
-        fl_color(active() ? 0x4B556300 : 0x9CA3AF00);
+        fl_color(active() ? theme().gearIcon : theme().gearIconInactive);
         fl_begin_complex_polygon();
         for (int i = 0; i < teeth * 2; ++i) {
             double a0  = (i)     * std::numbers::pi / teeth;
@@ -53,7 +54,7 @@ class SettingsButton : public Fl_Box {
     }
 
     Fl_Color bg() const {
-        return hovered ? fl_color_average(color(), FL_WHITE, 0.7f) : color();
+        return hovered ? fl_color_average(theme().tabBarBg, FL_WHITE, 0.7f) : theme().tabBarBg;
     }
 
     void draw() override {
@@ -61,7 +62,7 @@ class SettingsButton : public Fl_Box {
         fl_rectf(x(), y(), w(), h());
 
         // Left divider, matching the tab separators.
-        fl_color(0xD1D5DB00);
+        fl_color(theme().tabSeparator);
         fl_yxline(x(), y() + 4, y() + h() - 2);
 
         drawGear();
@@ -84,7 +85,6 @@ public:
     SettingsButton(int x, int y, int w, int h)
         : Fl_Box(x, y, w, h) {
         box(FL_NO_BOX);
-        color(FL_WHITE);
     }
 };
 

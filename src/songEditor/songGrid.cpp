@@ -11,10 +11,6 @@
 #include <algorithm>
 #include <cmath>
 
-static constexpr Fl_Color kParamRowBg      = 0xF0F4FF00;
-// The centre a Centre-resting parameter (Pitch, Pan) returns to.
-static constexpr Fl_Color kParamCentre     = 0xD0D0E000;
-static constexpr Fl_Color kParamLine       = 0x8888CC00;
 static constexpr Fl_Color kParamDotFill    = 0x5555EE00;
 static constexpr Fl_Color kParamDotRim     = 0x1111EE00;
 static constexpr Fl_Color kTrackDiv        = 0x64748B00;
@@ -136,9 +132,9 @@ void SongGrid::draw()
     // K=2 opacity (two overlapping layers): 1-(1-α)^2
     if (!stackedNoteIds.empty()) {
         int gridRight = std::min(w(), (numCols - colOffset) * colWidth);
-        const Fl_Color k1Fill = fl_color_average(kBlockFill, bgColor, kStackOpacity);
-        const Fl_Color k2Fill = fl_color_average(kBlockFill, bgColor, 1.0f - (1.0f - kStackOpacity) * (1.0f - kStackOpacity));
-        const Fl_Color k1Bar  = fl_color_average(kBlockBar,  bgColor, kStackOpacity);
+        const Fl_Color k1Fill = fl_color_average(kBlockFill, bgColor(), kStackOpacity);
+        const Fl_Color k2Fill = fl_color_average(kBlockFill, bgColor(), 1.0f - (1.0f - kStackOpacity) * (1.0f - kStackOpacity));
+        const Fl_Color k1Bar  = fl_color_average(kBlockBar,  bgColor(), kStackOpacity);
         const int barWidth = 5;
 
         // Pass 1: overwrite stacked fills with K=1 opacity color
@@ -389,14 +385,14 @@ bool SongGrid::isRowBlocked(int visualRow) const
 
 Fl_Color SongGrid::rowBgColor(int visualRow) const
 {
-    if (!timeline) return bgColor;
+    if (!timeline) return bgColor();
     int absRow = visualRow + rowOffset;
     const auto& ro = timeline->get().rowOrder;
     if (absRow >= 0 && absRow < (int)ro.size()) {
         if (ro[absRow].kind == RowKind::Header) return kInstrHeaderBg;
-        if (ro[absRow].kind == RowKind::Param)  return kParamRowBg;
+        if (ro[absRow].kind == RowKind::Param)  return theme().paramRowBg;
     }
-    return bgColor;
+    return bgColor();
 }
 
 
@@ -431,13 +427,13 @@ void SongGrid::drawParamRow(int laneIdx, int rowY, int gridRight)
 
     if (lane.centred) {
         const int cy = dotYFor((maxVal + 1) / 2);
-        fl_color(kParamCentre);
+        fl_color(theme().paramCentre);  // the centre a Centre-resting parameter (Pitch, Pan) returns to
         fl_line_style(FL_DOT);
         fl_line(x(), cy, x() + gridRight, cy);
         fl_line_style(0);
     }
 
-    fl_color(kParamLine);
+    fl_color(theme().paramLine);
 
     // Rubber band lines between consecutive dots
     for (int i = 0; i + 1 < (int)lane.points.size(); i++) {

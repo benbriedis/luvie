@@ -28,26 +28,27 @@ public:
     std::function<void()> onTransport;
     std::function<void()> onOutputs;
     std::function<void()> onKeyBindings;
+    std::function<void()> onThemes;
 
     static constexpr int dividerH = 9;
 
-    SettingsMenuPopup() : ContextMenuPopup(popW, 6 * btnH + dividerH + 2) {
+    SettingsMenuPopup() : ContextMenuPopup(popW, 7 * btnH + dividerH + 2) {
         saveAsBtn         = addItem(0, "Save As");
         auto* importBtn   = addItem(1, "Import");
         auto* exportBtn   = addItem(2, "Export");
         auto* transportBtn= addItem(3, "Transport");
         auto* outputsBtn  = addItem(4, "Instruments and I/O");
         auto* keysBtn     = addItem(5, "Key Bindings");
+        auto* themesBtn   = addItem(6, "Themes");
 
         // Separate the file items (Save As/Import/Export) from the view items
-        // (Transport/Outputs/Key Bindings), as the old menu's divider did: nudge the view
-        // items down by the gap and draw a thin rule through the middle of it.
-        transportBtn->position(transportBtn->x(), transportBtn->y() + dividerH);
-        outputsBtn  ->position(outputsBtn->x(),   outputsBtn->y()   + dividerH);
-        keysBtn     ->position(keysBtn->x(),      keysBtn->y()      + dividerH);
+        // (Transport/Outputs/Key Bindings/Themes), as the old menu's divider did: nudge
+        // the view items down by the gap and draw a thin rule through the middle of it.
+        for (auto* b : {transportBtn, outputsBtn, keysBtn, themesBtn})
+            b->position(b->x(), b->y() + dividerH);
         auto* divider = new Fl_Box(1, 1 + 3 * btnH + dividerH / 2, popW - 2, 1);
         divider->box(FL_FLAT_BOX);
-        divider->color(0xCBD5E100);
+        onTheme([divider] { divider->color(theme().popupDivider); });
 
         saveAsBtn->callback([](Fl_Widget*, void* d) {
             auto* s = static_cast<SettingsMenuPopup*>(d); s->pick(s->onSaveAs);
@@ -66,6 +67,9 @@ public:
         }, this);
         keysBtn->callback([](Fl_Widget*, void* d) {
             auto* s = static_cast<SettingsMenuPopup*>(d); s->pick(s->onKeyBindings);
+        }, this);
+        themesBtn->callback([](Fl_Widget*, void* d) {
+            auto* s = static_cast<SettingsMenuPopup*>(d); s->pick(s->onThemes);
         }, this);
 
         end();

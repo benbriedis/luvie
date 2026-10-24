@@ -537,10 +537,10 @@ int HarmonyGrid::handle(int event)
 // Dark if that position is the bottom of a pitch group (virtualPos % pitchGroupSize == 0).
 Fl_Color HarmonyGrid::rowLineColor(int i) const
 {
-    if (i <= 0 || i >= numRows || pitchGroupSize <= 0) return 0xEE888800;
+    if (i <= 0 || i >= numRows || pitchGroupSize <= 0) return theme().gridRowLine;
     if ((rowOffset + numRows - i) % pitchGroupSize == 0)
-        return 0x33110000;  // dark pitch-group boundary
-    return 0xEE888800;
+        return theme().gridGroupLine;  // dark pitch-group boundary
+    return theme().gridRowLine;
 }
 
 // Grey background for every bonus row, in every pitch group — not just the ones a
@@ -548,20 +548,20 @@ Fl_Color HarmonyGrid::rowLineColor(int i) const
 // read as continuous stripes running the height of the grid.
 Fl_Color HarmonyGrid::rowBgColor(int row) const
 {
-    if (pitchGroupSize <= 0) return bgColor;
+    if (pitchGroupSize <= 0) return bgColor();
     int virtualPos = rowOffset + numRows - 1 - row;
-    if (virtualPos < 0 || (totalTones > 0 && virtualPos >= totalTones)) return bgColor;
-    return virtualToAbsRow(virtualPos) < 0 ? 0xCCCCCC00 : bgColor;
+    if (virtualPos < 0 || (totalTones > 0 && virtualPos >= totalTones)) return bgColor();
+    return virtualToAbsRow(virtualPos) < 0 ? theme().unusedRow : bgColor();
 }
 
 Fl_Color HarmonyGrid::columnColor(int col) const
 {
-    if (!pattern) return 0x00EE0000;
+    if (!pattern) return theme().gridBeat;
     for (const auto& p : pattern->get().patterns) {
         if (p.id == patternId) {
             bool isBarStart = p.timeSigTop > 0 && col % p.timeSigTop == 0;
-            return isBarStart ? 0x00660000 : 0x00EE0000;
+            return isBarStart ? theme().gridBar : theme().gridBeat;
         }
     }
-    return 0x00EE0000;
+    return theme().gridBeat;
 }

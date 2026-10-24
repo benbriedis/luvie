@@ -35,9 +35,9 @@ static constexpr const char* kInLabels[]   = {"Nothing", "CC", "Pitch bend", "Pr
 ParamDefPopup::ParamDefPopup()
     : InputEditorPopup(popupW, popupH)
 {
-    auto label = [](int y, const char* text) {
+    auto label = [this](int y, const char* text) {
         auto* b = new Fl_Box(pad, y, labelW, rowH, text);
-        b->labelcolor(popupText);
+        onTheme([w = b] { w->labelcolor(popupText()); });
         b->box(FL_NO_BOX);
         b->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         return b;
@@ -47,9 +47,11 @@ ParamDefPopup::ParamDefPopup()
         in->range(0, 127);
         in->step(1);
         in->box(FL_FLAT_BOX);
-        in->color(popupInputBg);
-        in->textcolor(popupText);
-        in->cursor_color(popupText);
+        onTheme([in] {
+            in->color(popupInputBg());
+            in->textcolor(popupText());
+            in->cursor_color(popupText());
+        });
         in->when(FL_WHEN_CHANGED);
         in->callback([](Fl_Widget*, void* d) {
             static_cast<ParamDefPopup*>(d)->syncCcRows();
@@ -57,11 +59,13 @@ ParamDefPopup::ParamDefPopup()
         return in;
     };
     auto styleChoice = [this](ModernChoice* c) {
-        c->color(popupInputBg);
-        c->labelcolor(popupText);
-        c->textcolor(popupText);
-        c->setBorderColor(0x4B556300);
-        c->setArrowColor(popupText);
+        onTheme([c] {
+            c->color(popupInputBg());
+            c->labelcolor(popupText());
+            c->textcolor(popupText());
+            c->setBorderColor(theme().popupCtrlBorder);
+            c->setArrowColor(popupText());
+        });
         c->callback([](Fl_Widget*, void* d) {
             static_cast<ParamDefPopup*>(d)->syncCcRows();
         }, this);
@@ -70,9 +74,11 @@ ParamDefPopup::ParamDefPopup()
     label(nameY, "Name");
     nameInput = new Fl_Input(fieldX, nameY, fieldW, rowH);
     nameInput->box(FL_FLAT_BOX);
-    nameInput->color(popupInputBg);
-    nameInput->textcolor(popupText);
-    nameInput->cursor_color(popupText);
+    onTheme([this] {
+        nameInput->color(popupInputBg());
+        nameInput->textcolor(popupText());
+        nameInput->cursor_color(popupText());
+    });
 
     label(inY, "Receives");
     inChoice = new ModernChoice(fieldX, inY, fieldW, rowH);
@@ -90,7 +96,7 @@ ParamDefPopup::ParamDefPopup()
     ccLabel = label(ccY, "CC");
     ccInput = ccField(ccY);
     ccName = new Fl_Box(fieldX + ccW + 6, ccY, fieldW - ccW - 6, rowH);
-    ccName->labelcolor(popupText);
+    onTheme([w = ccName] { w->labelcolor(popupText()); });
     ccName->box(FL_NO_BOX);
     ccName->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
 
@@ -108,7 +114,7 @@ ParamDefPopup::ParamDefPopup()
 
     label(valueY, "Value");
     valueText = new Fl_Box(fieldX, valueY, fieldW, rowH);
-    valueText->labelcolor(popupText);
+    onTheme([w = valueText] { w->labelcolor(popupText()); });
     valueText->box(FL_NO_BOX);
     valueText->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
 

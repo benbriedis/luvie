@@ -36,9 +36,6 @@ class KeyBindingsOverlay : public OverlayWindow {
     static constexpr int rowH     = 26;
     static constexpr int keysColW = 180;
 
-    static constexpr Fl_Color headRuleCol = 0xCBD5E100;
-    static constexpr Fl_Color stripeCol   = 0xF9FAFB00;
-
     void drawStaticContent(int sy, int sbW) override {
         const int right = w() - sbW - pad;
         const int descX = pad + keysColW;
@@ -46,20 +43,20 @@ class KeyBindingsOverlay : public OverlayWindow {
 
         // Column headings
         fl_font(FL_HELVETICA_BOLD, 12);
-        fl_color(subTextCol);
+        fl_color(subTextCol());
         fl_draw("Key", pad + 8, y, keysColW - 8, rowH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         fl_draw("Operation", descX, y, right - descX, rowH, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
         y += rowH;
-        fl_color(headRuleCol);
+        fl_color(borderCol());
         fl_line(pad, y - 1, right, y - 1);
 
         for (int i = 0; i < rowCount; i++, y += rowH) {
             if (i % 2) {
-                fl_color(stripeCol);
+                fl_color(theme().overlayStripe);
                 fl_rectf(pad, y, right - pad, rowH);
             }
             fl_font(FL_HELVETICA_BOLD, 12);
-            fl_color(textCol);
+            fl_color(textCol());
             fl_draw(bindings[i].keys, pad + 8, y, keysColW - 8, rowH,
                     FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
             fl_font(FL_HELVETICA, 12);

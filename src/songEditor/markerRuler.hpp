@@ -43,8 +43,6 @@ private:
 
 	static constexpr Fl_Color tempoColor   = 0xF59E0B00;  // amber-400
 	static constexpr Fl_Color timeSigColor = 0x8B5CF600;  // violet-500
-	static constexpr Fl_Color tempoBg      = 0xFEF3C700;  // amber-50
-	static constexpr Fl_Color timeSigBg    = 0xEDE9FE00;  // violet-50
 
 	void draw()           override;
 	int  handle(int event) override;

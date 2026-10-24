@@ -7,13 +7,13 @@
 #include "loopFiring.hpp"
 #include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
+#include "theme.hpp"
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 
 static constexpr Fl_Color headColor     = 0xEF444400;  // red
-static constexpr Fl_Color headColorDim  = 0xD1D5DB00;  // light grey
 
 // Instrument of the track that holds an instance of `patId`. Used as the routing
 // fallback for patterns with no instrument of their own (instrumentId 0).
@@ -409,12 +409,12 @@ float Playhead::pixelToBars(int px) const
 Fl_Color Playhead::currentHeadColor() const
 {
 	if (patternTrack < 0 && songHead != SongHead::Live)
-		return headColorDim;   // greyed in loop mode, and through the hand-off
+		return theme().playheadDim;   // greyed in loop mode, and through the hand-off
 	if (patternTrack >= 0 && obsTl && loopMgr) {
 		const auto& tracks = obsTl->get().tracks;
 		if (patternTrack < (int)tracks.size()) {
 			if (!loopMgr->isPatternActive(displayedPatternId()))
-				return headColorDim;
+				return theme().playheadDim;
 		}
 	}
 	return headColor;
