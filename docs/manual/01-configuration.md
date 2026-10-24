@@ -121,6 +121,12 @@ Luvie can be run in Carla as a plugin. Here's a quick walk through.
     of the synth plugins. Clicking on the piano keys should produce sound.
 9. Create and test a quick test song in the Song Editor - see below (TODO add link)
 
+Re parameters etc...	 
+	  click Luvie's Edit button (wrench), go to the Edit tab → Settings group, and tick "Send Control Changes". While
+	  you're there, tick Send Channel Pressure, Send Pitchbend and Send Program Changes too — the pass-through I added handles all of them,
+	  but Carla withholds each one independently.  + there's one or two other checkboxes...
+
+
 ## Running in Ardour
 
 ### Running with Jack
