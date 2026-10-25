@@ -101,6 +101,18 @@ if(WIN32)
         set(LUVIE_EXPORTS_CONTROLLED TRUE)
     endif()
 
+    # mingw-w64 workaround (crt snapshot 14.0.0.r532, Oct 2026): upstream moved the x86
+    # __mingw_fe_dfl_env into CRT_fp10.o, which that snapshot still builds into
+    # libmingw32.a. GCC links libmingw32 before libmingwex, so a -static DLL whose
+    # libstdc++ pulls in fesetenv (libmingwex) is left with it undefined; EXEs escape
+    # because crt2.o drags CRT_fp10.o in up front. Marking the symbol undefined from the
+    # start makes ld take it from whichever archive defines it, so this stays harmless
+    # once upstream 5b128fcd5e (CRT_fp10.c moved into libmingwex.a) reaches MSYS2.
+    if(MINGW)
+        target_link_options(luvie_dsp PRIVATE -Wl,-u,__mingw_fe_dfl_env)
+        target_link_options(luvie_ui  PRIVATE -Wl,-u,__mingw_fe_dfl_env)
+    endif()
+
 elseif(APPLE)
     # Mach-O. ld64 has neither --version-script nor --exclude-libs, and needs neither:
     # -exported_symbol is absolute — everything not named becomes private extern,

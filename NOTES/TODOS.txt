@@ -68,7 +68,7 @@ FUTURE FUNCTIONALITY
 
 - Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
-- Add a dark theme
+- cf a metronome for recording - visual and auditory.
 
 - More MIDI parameters and features - see MIDI_EXTENSIONS.txt   [MUCH OF THIS HAS LIKELY BEEN DONE... CHECK]
 
@@ -341,9 +341,6 @@ Probably want a tool really...
    
 BUG: resizing window on left often causes an unwanted pattern instance block to be added on release.
 
-Look at changing time signatures: auto changes are a bit annoying.
-   Number of bars are also implicated. Don't want to (easily) lose notes.
-
 FEATURE: when the last time signature or tempo is off screen show it on the far left of the ruler and
          allow it to be editted.
 
@@ -397,50 +394,14 @@ cf possibility of having a section in the instrument settings showing bound (?) 
 
 Allow parameter recording sensitivity to be set for those Axiom 49 knobs? 
 
-Copy scene content to other scenes/move scenes?
-
-cf slice selection - allow deletion of a blank selected portion. 
-     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
-	 cf Insertion too.
-	 cf wrt Song Editor too.
-
 
 Manual: 
-   multi-select move, copy, delete descriptions.
-
-	USE IN CARLA - re parameters etc...	 
-	  click Luvie's Edit button (wrench), go to the Edit tab → Settings group, and tick "Send Control Changes". While
-	  you're there, tick Send Channel Pressure, Send Pitchbend and Send Program Changes too — the pass-through I added handles all of them,
-	  but Carla withholds each one independently.  + there's one or two other checkboxes...
-
-	Mention 'grow' option on website + docs (inc use case)
-
-	auditioning
-
 	It is possible to add custom MIDI parameters/automation. These are added to an instrument rather than across the app
 	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
 	the parameter are deleted then the parameter is removed.
 
-    - Scene triggers
-	- Loop triggers
-	- Base note trigger in harmony editor
-	- Play/pause and rewind triggers
     - Using a split instrument to select base notes for arpeggiators.
   
-	Maybe an optional toolbar to have tool versions for some copy/paste/move options.
-	Maybe allow some key mapping - esp wrt the 'Alt-click'.
-		Generally prefer to have 1 good set of bindings though...
-
-	OSC Ardour enable in: Edit > Preferences > Control Surfaces > Novation > Open Sound Control     (NB useful when no Jack)
-		[cf stability of this hardcoded instruction in the UI...] 
-	   [ ALSO missing Edit >   & Novation]
-
-	OSC Carla support (NB useful when no Jack)
-
-    Use this:
-		sudo usermod -aG audio ben
-	in Linux when use internal transport or native MIDI ports
-
     Maybe as part of a 'Workflows' chapter?
 		Use for sample triggers.
 			- Use Pianoroll editor.
@@ -451,6 +412,10 @@ Manual:
 		- Could describe incoming MIDI triggers in the chapter too, maybe...
     
 
+Maybe an optional toolbar to have tool versions for some copy/paste/move options.
+Maybe allow some key mapping - esp wrt the 'Alt-click'.
+	Generally prefer to have 1 good set of bindings though...
+
 
 Luvie could be transport master now...
   - Probably most straightforward when in standalone mode.
@@ -459,8 +424,15 @@ Luvie could be transport master now...
 
 Do I really need/want to compile across and older X library (NB I am using Wayland and FLTK1.5)... is this just a 
    plugin thing
-   
-Suspected bug - playing keyboard thru Luvie while playing arpeggio - think the arpeggio occasionally loses a note.
 
-cf a metronome for recording - visual and auditory.
+
+Copy scene content to other scenes/move scenes?
+
+cf slice selection - allow deletion of a blank selected portion. 
+     Think currently we can clear or move a slice, not delete it. Might be nice to trim leading bars...
+	 cf Insertion too.
+	 cf wrt Song Editor too.
+
+Look at changing time signatures: auto changes are a bit annoying.
+   Number of bars are also implicated. Don't want to (easily) lose notes.
 
