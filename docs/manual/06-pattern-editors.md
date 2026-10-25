@@ -108,7 +108,7 @@ means the pitch wheel can drive a Cutoff lane. The wheel springs back when you l
 recorded like any other movement. MIDI learn is optional. Where nothing is being recorded, as in the Song Editor
 and the Harmony Editor, a bound control still lets you play the parameter live while you audition.
 
-## Time slices
+## Copy and paste: time slices
 
 Sometimes you want to move or copy a whole stretch of a pattern - the notes and the automation
 together. Hold Alt and drag across the grid (or the automation lanes) to select a time slice. It runs
