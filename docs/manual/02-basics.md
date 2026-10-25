@@ -61,6 +61,12 @@ ends at the end marker.
 FIX THIS
 If looping is enabled then the playhead loops been the "start" and "end" markers.
 
+## MIDI Triggers
+
+TODO explain general concept
+
+TODO describe transport triggers
+
 ## Alerts
 
 To the right of the transport controls there is an "alerts" icon. Hover over it to 
