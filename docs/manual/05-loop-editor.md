@@ -21,6 +21,8 @@ Right click on a pattern block to open a pattern in the corresponding Pattern Ed
 
 It is possible to rename an instrument in the editor by double clicking on the instrument name.
 
+TODO include description of pattern triggers
+
 ## Switching between modes
 
 It is possible to switch between Song Mode and Loop Mode while music is playing.
@@ -43,4 +45,4 @@ yellow cancels the switch.
 ## Scenes
 TODO
 
-Include description of triggers
+Include description of scene triggers
