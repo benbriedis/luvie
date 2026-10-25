@@ -68,3 +68,7 @@ the pitch group decreases? Ie, what happens to the extra notes at the top of the
 pitch group? Well these are kept and converted into "bonus notes". The rows these notes sit in are 
 coloured grey, and are mapped on to notes in the pitch group above.  
 If the user removes all the bonus notes in a row then the grey row disappears.
+
+## Base note trigger
+
+TODO
