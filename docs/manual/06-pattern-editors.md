@@ -177,14 +177,14 @@ toggle, because its rows are chord degrees rather than pitches and there is no
 reliable way to turn a played note back into one.
 
 Set the MIDI input up first — see
-[MIDI input, output and instruments](03-outputs.md). Once a keyboard is
+[MIDI input, output and instruments](03-io.md). Once a keyboard is
 connected, playing it sounds each instrument that has **Pass through** on,
 whether or not you are recording, so you can try things out before committing to
 them.
 
 Only MIDI from the input and channel the pattern's instrument is played from is
 heard and recorded; see
-[Playing an instrument from a MIDI input](03-outputs.md#playing-an-instrument-from-a-midi-input).
+[Playing an instrument from a MIDI input](03-io.md#playing-an-instrument-from-a-midi-input).
 
 Notes are written only when **Record is armed *and* the transport is running**.
 Nothing is recorded while playback is stopped, so you can arm the toggle, find

@@ -17,7 +17,7 @@ Add a "luvie -h" option. Blocked last time on getting the FLTK options listed
 again alongside ours.
 
 Consider an (info) icon in the application explaining bank select MSB/LSB and
-default program selection, so docs/manual/03-outputs.md does not have to
+default program selection, so docs/manual/03-io.md does not have to
 carry the whole explanation.
 
 Consider building the ALSA/JACK MIDI bridge in, rather than telling people to

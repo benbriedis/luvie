@@ -400,17 +400,7 @@ Manual:
 	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
 	the parameter are deleted then the parameter is removed.
 
-    - Using a split instrument to select base notes for arpeggiators.
   
-    Maybe as part of a 'Workflows' chapter?
-		Use for sample triggers.
-			- Use Pianoroll editor.
-			- Can rename notes
-			- Can toggle to show note names/numbers
-			- Maybe use with Linux Sampler
-			- NB 'Chunky'
-		- Could describe incoming MIDI triggers in the chapter too, maybe...
-    
 
 Maybe an optional toolbar to have tool versions for some copy/paste/move options.
 Maybe allow some key mapping - esp wrt the 'Alt-click'.

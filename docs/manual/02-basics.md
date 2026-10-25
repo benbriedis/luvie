@@ -1,6 +1,6 @@
 # The Basics
 
-[← Configuration](01-configuration.md) · [Contents](README.md) · [MIDI input, output and instruments →](03-outputs.md)
+[← Configuration](01-configuration.md) · [Contents](README.md) · [MIDI input, output and instruments →](03-io.md)
 
 <img src="images/songEditor.png" alt="Luvie song editor" width="1000">
 
@@ -95,4 +95,4 @@ You can also export projects to give you save multiple versions, save backups, e
 
 - [The song editor](04-song-editor.md) — arranging patterns into a song
 - [The pattern editors](06-pattern-editors.md) — writing the patterns themselves
-- [MIDI input, output and instruments](03-outputs.md) — getting sound out of Luvie, and MIDI into it
+- [MIDI input, output and instruments](03-io.md) — getting sound out of Luvie, and MIDI into it
