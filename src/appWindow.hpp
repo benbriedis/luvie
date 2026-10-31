@@ -43,6 +43,10 @@ public:
 	std::function<void()> onUndo;
 	std::function<void()> onRedo;
 
+	// Ctrl-S saves in whatever way the session mode saves: the project file
+	// standalone (Save As if it has none yet), the session file under NSM.
+	std::function<void()> onSave;
+
 	// Escape closes any open context menu, and only that. Otherwise it clears
 	// any active multi-selection. It has to be routed through the
 	// window because the grids never take keyboard focus and the window swallows

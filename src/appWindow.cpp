@@ -304,6 +304,7 @@ int AppWindow::handle(int event)
         const int key = Fl::event_key();
         if (key == 'z' || key == 'Z') { if (onUndo) onUndo(); return 1; }
         if (key == 'y' || key == 'Y') { if (onRedo) onRedo(); return 1; }
+        if (key == 's' || key == 'S') { if (onSave) onSave(); return 1; }
         if (key == 'x' || key == 'X') { if (onCut)   onCut();   return 1; }
         if (key == 'c' || key == 'C') { if (onCopy)  onCopy();  return 1; }
         if (key == 'v' || key == 'V') { if (onPaste) onPaste(); return 1; }

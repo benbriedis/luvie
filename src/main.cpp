@@ -719,6 +719,9 @@ int main(int argc, char **argv) {
     // item is disabled above; standalone uses it to (re)name the project file,
     // after which auto-save and exit-save follow the new path.
     app.onSaveAs = [&]() { if (session->saveAs()) updateTitle(); };
+    // Ctrl-S. Under NSM this writes the session file the manager gave us and
+    // reports is_clean, just as a save the manager asked for would.
+    window.onSave = [&]() { if (session->save()) updateTitle(); };
 
     // On window close, prompt whether to save before quitting. The window
     // callback must be a plain function pointer, so the bits it needs are bundled
