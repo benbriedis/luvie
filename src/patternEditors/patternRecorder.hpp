@@ -69,9 +69,6 @@ public:
     // Closes the open take, committing any held notes with the length they reached.
     void endTake();
 
-    // Whoever sequences playback: drop the one firing of (instrument, MIDI pitch)
-    // within `tolBars` of song bar `bar`. See skipLiveEcho().
-    std::function<void(int instrumentId, int pitch, double bar, double tolBars)> onSkipNoteOnce;
     // Flexible bars just lengthened the pattern; `headBeat` is where the playhead is
     // in it. So an editor showing the pattern can keep the head on screen.
     std::function<void(int patId, float headBeat)> onGrew;
@@ -135,28 +132,15 @@ private:
     // End of take: thin what this take wrote down to the points that shape it.
     void thinRecordedParams();
 
-    // The pattern's Snap quantum in beats, or 0 when its Snap is off.
-    float snapBeats() const;
-    // `beat` rounded to the nearest division, or unchanged when Snap is off.
-    float quantiseBeat(float beat) const;
-    // A note just committed at `startBeat` was already heard live. If rounding put
-    // it ahead of the playhead, playback would reach it moments later and sound it
-    // again; ask (onSkipNoteOnce) for that one firing to be dropped.
-    void skipLiveEcho(int pitch, float startBeat);
-    // Turns the beats a key went down and came up at — both pattern-relative and
-    // unrounded — into the note to write.
+    // Turns the beats a key went down and came up at — both pattern-relative —
+    // into the note to write. Snap is not applied: a recorded note goes exactly
+    // where it was played, for as long as the key was held.
     //
-    // With Snap on, start and end are each rounded to the nearest division, and a
-    // note too short to survive that rounding is given one division rather than
-    // disappearing. The raw beats, not the rounded ones, decide whether the
-    // pattern wrapped under the key, because rounding can collapse a genuinely
-    // short note onto the same answer as a key held for a whole pass.
-    //
-    // Either way the note is kept inside the pattern: if the pattern wrapped, or
-    // the key outlasted what was left, it is clipped at the end rather than
-    // wrapped round to the front. That is the rule the grid already applies to a
-    // note dragged or pasted past the end, and in a loop the alternative — a note
-    // reappearing at bar 1 with no key pressed — is not what was played.
+    // The note is kept inside the pattern: if the pattern wrapped, or the key
+    // outlasted what was left, it is clipped at the end rather than wrapped round
+    // to the front. That is the rule the grid already applies to a note dragged or
+    // pasted past the end, and in a loop the alternative — a note reappearing at
+    // bar 1 with no key pressed — is not what was played.
     void recordedNoteSpan(float rawStart, float rawEnd,
                           float& startBeat, float& lenBeats) const;
 
@@ -244,7 +228,6 @@ public:
     // The transport started from song bar `bar`; < 0 when it stops.
     void setRunStart(float bar);
 
-    std::function<void(int instrumentId, int pitch, double bar, double tolBars)> onSkipNoteOnce;
     std::function<void(int patId, float headBeat)> onGrew;
 
 private:

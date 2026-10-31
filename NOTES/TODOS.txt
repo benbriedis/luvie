@@ -395,13 +395,6 @@ cf possibility of having a section in the instrument settings showing bound (?) 
 Allow parameter recording sensitivity to be set for those Axiom 49 knobs? 
 
 
-Manual: 
-	It is possible to add custom MIDI parameters/automation. These are added to an instrument rather than across the app
-	as a whole. Once present in an instrument it is available to all patterns belonging to the instrument. If all uses of
-	the parameter are deleted then the parameter is removed.
-
-  
-
 Maybe an optional toolbar to have tool versions for some copy/paste/move options.
 Maybe allow some key mapping - esp wrt the 'Alt-click'.
 	Generally prefer to have 1 good set of bindings though...

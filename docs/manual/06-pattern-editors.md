@@ -26,9 +26,9 @@ You can change the length of a note by clicking the left or right hand side of i
 dragging.
 
 Let's say you want your notes to be longer or shorter... change the 'Div' setting in the
-timing panel, or click on 'Snap' to disable it. The same two settings quantise notes
-played in from a MIDI keyboard — see
-[Recording from a MIDI keyboard](#recording-from-a-midi-keyboard) below.
+timing panel, or click on 'Snap' to disable it. These settings only affect notes
+added or changed with the mouse — notes recorded from a MIDI keyboard are never
+snapped.
 
 Note that it is possible to hear what a note sounds like immediately by clicking on the note
 name in the column on the left of the grid. This is called 'auditioning'.
@@ -239,13 +239,9 @@ Run Luvie with `LUVIE_DEBUG=1` and it will say when this happens.
 
 What gets recorded:
 
-- **Snap quantises what you play.** With **Snap** on, the start and end of each
-  note are rounded to the nearest division — the same **Div** setting that
-  positions notes you add with the mouse. A note too short to survive the
-  rounding is given one division rather than disappearing. Turn Snap off and
-  notes are written exactly where you played them, for as long as you held the
-  key. In the drum editor only the start is quantised, because drum notes have
-  no length.
+- **Notes go exactly where you played them.** **Snap** is ignored while
+  recording: each note is written where you pressed the key, for as long as you
+  held it. Snap still applies when you add or move notes with the mouse.
 - **Notes stop at the end of the pattern.** Hold a key past the last beat — over
   a loop's turnaround, say — and the note ends there rather than running past it
   or reappearing at the start. Let go and press again on the next pass to record

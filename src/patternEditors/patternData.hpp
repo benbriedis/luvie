@@ -113,8 +113,7 @@ inline int patternDivisor(int divisionsIdx)
 }
 
 // The Snap quantum in beats for a pattern's own Div and Snap settings, or 0 when
-// Snap is off. What the panel sends the editors for the pattern on screen, and what
-// recording into a pattern quantises to whether it is on screen or not.
+// Snap is off. What the panel sends the editors for the pattern on screen.
 inline float patternSnapBeats(const Pattern& p)
 {
 	return p.snapEnabled ? 1.0f / (float)patternDivisor(p.divisions) : 0.0f;

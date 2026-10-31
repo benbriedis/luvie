@@ -1060,19 +1060,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         heldNotes_[key] = std::move(heard);
     });
 
-    // A recorded note quantised just ahead of the playhead has already been heard
-    // live; the sequencing engine drops that one firing.
-    auto skipNoteOnce = [transport](int instrumentId, int pitch, double bar, double tol) {
-        transport->skipNoteOnce(instrumentId, pitch, bar, tol);
-    };
     recorders.setContext(pattern, transport, &loopMgr);
-    // Only an instrument with Pass through on was heard live; without it the
-    // recorded note has not been played yet, so its first firing must sound.
-    recorders.onSkipNoteOnce = [this, skipNoteOnce](int instrumentId, int pitch,
-                                                    double bar, double tol) {
-        if (outputsOverlay && !outputsOverlay->instrumentPassesThrough(instrumentId)) return;
-        skipNoteOnce(instrumentId, pitch, bar, tol);
-    };
     // Flexible bars lengthening a pattern: whichever editor shows it keeps the head
     // in view.
     recorders.onGrew = [this](int patId, float headBeat) {

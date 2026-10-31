@@ -103,11 +103,7 @@ void PatternRecorder::noteOn(int pitch, int velocity)
     if (!beginRecordedEvent(beat)) return;
 
     if (recordsOnNoteOn()) {
-        // No length to work out, but the start is quantised like any other.
-        float start = 0.0f, len = 0.0f;
-        recordedNoteSpan(beat, beat, start, len);
-        commitNote(pitch, start, len, velocity);
-        skipLiveEcho(pitch, start);
+        commitNote(pitch, beat, 0.0f, velocity);
         return;
     }
     recNotes_.push_back({pitch, beat, velocity});
@@ -271,62 +267,18 @@ void PatternRecorder::thinRecordedParams()
     for (int id : drop) pattern->removeParamPoint(id);
 }
 
-float PatternRecorder::snapBeats() const
-{
-    const Pattern* p = pat();
-    return p ? patternSnapBeats(*p) : 0.0f;
-}
-
-float PatternRecorder::quantiseBeat(float beat) const
-{
-    const float q = snapBeats();
-    if (q <= 0.0f) return beat;            // Snap off: play it as played
-    return std::round(beat / q) * q;
-}
-
-void PatternRecorder::skipLiveEcho(int pitch, float startBeat)
-{
-    // Only rounding moves a note forwards: unquantised, it lands where the head was.
-    const float q = snapBeats();
-    if (q <= 0.0f || !onSkipNoteOnce) return;
-    playhead.setNumCols(recordPatternBeats());
-    const float bars = playhead.transportBars();
-    const Playhead::PatternPos pp = playhead.patternPos(bars);
-    const float cur = playhead.patternBeat(bars);
-    if (!pp.running || pp.beatsPerBar <= 0.0f || cur < 0.0f) return;
-    // Rounding to the nearest division moves a start forwards by at most half of
-    // one; anything further ahead is not this note's echo.
-    const float ahead = startBeat - cur;
-    if (ahead <= 0.0f || ahead > q) return;
-    // A quarter of a division either side: loose enough for the float position the
-    // head is read at, tight enough never to reach a neighbouring grid line.
-    onSkipNoteOnce(instrumentId(), pitch,
-                   (double)bars + ahead / pp.beatsPerBar,
-                   0.25 * q / pp.beatsPerBar);
-}
-
 void PatternRecorder::recordedNoteSpan(float rawStart, float rawEnd,
                                        float& startBeat, float& lenBeats) const
 {
     const float total = (float)recordPatternBeats();
-    const float q     = snapBeats();
 
-    startBeat = quantiseBeat(rawStart);
-    // Rounding up can put the start on the end of the pattern, where no note
-    // fits; the last division is the nearest place it can actually go.
-    if (q > 0.0f) startBeat = std::clamp(startBeat, 0.0f, std::max(0.0f, total - q));
-
+    startBeat = std::clamp(rawStart, 0.0f, total);
     const float room = total - startBeat;   // what is left of the pattern
     if (rawEnd < rawStart) {                // the pattern wrapped under the key
         lenBeats = room;
         return;
     }
-
-    lenBeats = quantiseBeat(rawEnd) - startBeat;
-    // Start and end rounded to the same division: a note was played, so it gets
-    // the shortest one the grid can show rather than vanishing.
-    if (q > 0.0f && lenBeats < q) lenBeats = q;
-    if (lenBeats > room) lenBeats = room;
+    lenBeats = std::min(rawEnd - startBeat, room);
 }
 
 void PatternRecorder::noteOff(int pitch)
@@ -341,7 +293,6 @@ void PatternRecorder::noteOff(int pitch)
             float start = 0.0f, len = 0.0f;
             recordedNoteSpan(n.startBeat, end, start, len);
             commitNote(n.pitch, start, len, n.velocity);
-            skipLiveEcho(n.pitch, start);
         }
         break;   // one note-off releases one note-on
     }
@@ -395,9 +346,9 @@ void PatternRecorder::endTake()
 // The Bars spinner tops out here (patternPanel.cpp), and growth must not produce a
 // pattern that control cannot then express.
 static constexpr int   kGrowMaxBars = 64;
-// A hair of slack for float beats. quantiseBeat() is round(beat/q)*q, so a note that
-// "ends exactly on the bar line" can land a few millionths past it; a bare ceil()
-// would then buy it a whole empty bar.
+// A hair of slack for float beats: a note that "ends exactly on the bar line" can
+// land a few millionths past it, and a bare ceil() would then buy it a whole empty
+// bar.
 static constexpr float kGrowEps     = 1.0e-3f;
 
 float PatternRecorder::patternBarBeats() const
@@ -776,9 +727,6 @@ PatternRecorder& PatternRecorders::obtain(int patId, int laneId)
     PatternRecorder& r = *recs.back();
     r.setLoopMode(loopMode);
     r.setRunStart(runStart);
-    r.onSkipNoteOnce = [this](int instr, int pitch, double bar, double tol) {
-        if (onSkipNoteOnce) onSkipNoteOnce(instr, pitch, bar, tol);
-    };
     r.onGrew = [this](int id, float beat) { if (onGrew) onGrew(id, beat); };
     return r;
 }
