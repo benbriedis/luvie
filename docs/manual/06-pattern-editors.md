@@ -152,7 +152,18 @@ To the right of the main controls, with a dark pink background, are the timing c
 
 <img src="images/patternEditorControls.png" alt="The shared pattern editor controls" width="800">
 
-The first two controls define the time signature.
+The first control shows the pattern's time signature. Click on it to change it: a
+popup lets you set the numerator, the denominator and the number of bars together,
+and nothing changes until you press OK (or Enter). Escape or Cancel leaves the
+pattern as it was.
+
+Because a pattern's length is counted in bars, changing the time signature changes
+the length too. The popup shows the number of bars the pattern will have: the fewest
+bars of the new time signature that still hold the whole pattern, so no notes are
+lost. If that leaves more bars than you want, trim them afterwards with the **Bars**
+control.
+Notes keep their musical position when the denominator changes: a note on the
+second crotchet of 4/4 is on the third quaver of 8/8.
 
 Patterns have their own time signatures, and these are independent of those shown in the Song Editor. 
 As a result it is possible to play patterns with different time signatures against one another, 
@@ -163,7 +174,8 @@ The time signature denominator has three different '8' options, same as the Song
 These different versions determine how the beat is defined. See [BPM and time signatures](09-beats-and-times.md) for details.
 
 
-The next control determines the number of bars in the pattern.
+The next control sets the number of bars in the pattern, without changing the time
+signature. Shortening the pattern removes any notes past the new end.
 
 The next control declares how many parts to divide each beat into. This determines the granularity to to use when 
 adding and resizing notes. It is possible to go free-form by deselecting the 'Snap' control.

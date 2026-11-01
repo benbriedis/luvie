@@ -32,6 +32,7 @@
 #include "sceneContextPopup.hpp"
 #include "transportContextPopup.hpp"
 #include "rootTriggerPopup.hpp"
+#include "patternTimeSigPopup.hpp"
 #include "loopRulerContextPopup.hpp"
 #include "paramLaneContextPopup.hpp"
 #include "drumPatternEditor.hpp"
@@ -390,6 +391,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     auto* sceneCtxPop = new SceneContextPopup;
     auto* transportCtxPop = new TransportContextPopup;
     auto* rootTrigPop = new RootTriggerPopup;
+    auto* timeSigPop  = new PatternTimeSigPopup;
     auto* loopRulerPop = new LoopRulerContextPopup;
     auto* plcPop    = new ParamLaneContextPopup;
     auto* pdPop      = new ParamDotPopup{};
@@ -871,6 +873,20 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
         rootTrigPop->open(song_->get().instruments, harmonyRootTrigger_, wx, wy);
     };
     rootTrigPop->onSelect = [this](int instrId) { setHarmonyRootTrigger(instrId, true); };
+    // The pattern's time signature and bars, edited together in a popup that
+    // opens above the button: the panel sits at the bottom of the window.
+    patternPanel->onTimeSigClicked = [this, timeSigPop](int patId, int wx, int wy) {
+        if (!pattern_) return;
+        for (const auto& p : pattern_->get().patterns) {
+            if (p.id != patId) continue;
+            timeSigPop->open(wx, wy - timeSigPop->h() - 2,
+                p.timeSigTop, p.timeSigBottom, p.beat, p.lengthBeats,
+                [this, patId](int top, int bottom, timeSettings::BeatUnit beat, int bars) {
+                    pattern_->setPatternTimeSig(patId, top, bottom, beat, bars);
+                });
+            return;
+        }
+    };
     patternPanel->setRootTrigger(harmonyRootTrigger_);
     midiLearn.onLearnStarted       = [this]() {
         sceneTriggers.cancelLearn();
@@ -1178,6 +1194,7 @@ void LuvieApp::build(AppWindow* window, ObservableSong* song, ObservablePattern*
     window->add(sceneCtxPop); window->registerPopup(sceneCtxPop);
     window->add(transportCtxPop); window->registerPopup(transportCtxPop);
     window->add(rootTrigPop); window->registerPopup(rootTrigPop);
+    window->add(timeSigPop);  window->registerPopup(timeSigPop);
     window->add(loopRulerPop); window->registerPopup(loopRulerPop);
     window->add(plcPop); window->registerPopup(plcPop);
     window->add(plcPop->paramSubmenu); window->registerPopup(plcPop->paramSubmenu);

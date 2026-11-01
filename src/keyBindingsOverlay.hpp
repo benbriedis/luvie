@@ -22,6 +22,7 @@ class KeyBindingsOverlay : public OverlayWindow {
         { "Ctrl-C",           "Copy selection" },
         { "Ctrl-X",           "Cut selection" },
         { "Ctrl-V",           "Paste" },
+        { "Ctrl-S",           "Save" },
         { "Delete/Backspace", "Delete selection, or the item under the cursor" },
         { "Escape",           "Close menu, or clear selection" },
         { "Space",            "Play/pause" },

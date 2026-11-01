@@ -61,6 +61,9 @@ FUTURE FUNCTIONALITY
 
 - cf Is pitch randomisation possible for drums?
 
+- Maybe add quantise operation as a command to be applied to a whole pattern after recording.
+  Don't really like quantisation that much though, so maybe not...
+
 - Maybe add some "basic backups" - see DESIGN_DECISIONS.txt
 
 - In standalone implement "Recent projects" menu.
@@ -68,7 +71,8 @@ FUTURE FUNCTIONALITY
 
 - Clicking and dragging to reorder the tracks in the song editor doesnt look great.
 
-- cf a metronome for recording - visual and auditory.
+- cf a metronome for recording - visual and auditory? 
+  Can record to some drums or a tone fairly easily instead...
 
 - More MIDI parameters and features - see MIDI_EXTENSIONS.txt   [MUCH OF THIS HAS LIKELY BEEN DONE... CHECK]
 
@@ -416,6 +420,4 @@ cf slice selection - allow deletion of a blank selected portion.
 	 cf Insertion too.
 	 cf wrt Song Editor too.
 
-Look at changing time signatures: auto changes are a bit annoying.
-   Number of bars are also implicated. Don't want to (easily) lose notes.
 

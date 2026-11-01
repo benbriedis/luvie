@@ -7,7 +7,6 @@
 #include "observablePattern.hpp"
 #include "inlineInput.hpp"
 #include "controlBar.hpp"
-#include "timeSigSection.hpp"   // TimeSigSection: shared with the Loop Editor's bar
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Flex.H>
@@ -59,6 +58,48 @@ struct ChordSection : Fl_Flex {
     ChordSection(int x, int y, int h);
 };
 
+// The pattern's time signature, shown read-only ("7/8", with the dotted-beat
+// glyph where there is one). Clicking it opens the time signature popup, which
+// edits the signature and the bar count together (PatternTimeSigPopup).
+class TimeSigButton : public ModernButton {
+    int top_      = timeSettings::numeratorDefault;
+    int denomIdx_ = timeSettings::denomBeatDefaultIndex;
+
+protected:
+    void drawContent(int X, int Y, int W, int H, Fl_Color) override {
+        char num[8];
+        std::snprintf(num, sizeof num, "%d/", top_);
+        fl_font(labelfont(), labelsize());
+        const int numW = (int)fl_width(num);
+        const int denW = denomBeatLabel::contentWidth(denomIdx_, labelfont(), labelsize());
+        const int x0   = X + std::max(0, (W - numW - denW) / 2);
+        fl_color(labelcolor());
+        fl_draw(num, x0, Y, numW, H, FL_ALIGN_LEFT | FL_ALIGN_CENTER);
+        denomBeatLabel::drawOption(denomIdx_, x0 + numW, Y, H, labelcolor(),
+                                   labelfont(), labelsize());
+    }
+
+public:
+    TimeSigButton(int x, int y, int w, int h) : ModernButton(x, y, w, h) {
+        denomBeatLabel::ensureRegistered();
+    }
+    void set(int top, int bottom, timeSettings::BeatUnit beat) {
+        top_      = top;
+        denomIdx_ = timeSettings::denomBeatIndex(bottom, beat);
+        redraw();
+    }
+};
+
+struct PatternSigSection : Fl_Flex {
+    static constexpr int kGap    = 3;
+    static constexpr int kLabelW = 28;
+    static constexpr int kBtnW   = 64;   // "12/" plus the widest dotted denominator
+    static constexpr int kWidth  = kLabelW + kGap + kBtnW;
+    Fl_Box        timeSigLabel;
+    TimeSigButton timeSigBtn;
+    PatternSigSection(int x, int y, int h);
+};
+
 struct BarsSection : Fl_Flex {
     static constexpr int kGap    = 3;
     static constexpr int kLabelW = 36;
@@ -100,9 +141,9 @@ struct TimeControls : Fl_Flex {
     static constexpr int      kGap    = 3;
     static constexpr int      kMargin = 4;
     static constexpr int      kCtrlH  = 24;
-    static constexpr int      kWidth  = kMargin + TimeSigSection::kWidth + kGap + BarsSection::kWidth + kGap + DivisionsSection::kWidth + kMargin;
+    static constexpr int      kWidth  = kMargin + PatternSigSection::kWidth + kGap + BarsSection::kWidth + kGap + DivisionsSection::kWidth + kMargin;
     static constexpr Fl_Color kBg     = 0x894B9400;
-    TimeSigSection   timeSigSec;
+    PatternSigSection timeSigSec;
     BarsSection      barsSec;
     DivisionsSection divSec;
     TimeControls(int x, int y, int h);
@@ -246,6 +287,9 @@ public:
     // Right-click on the base note, at window coordinates: the owner opens the
     // menu that picks the base note's MIDI trigger instrument.
     std::function<void(int wx, int wy)> onRootContextMenu;
+    // The time signature of pattern patId was clicked; (wx, wy) is the button's
+    // top-left in window coordinates. The owner opens PatternTimeSigPopup.
+    std::function<void(int patId, int wx, int wy)> onTimeSigClicked;
 
     // The instrument whose notes set the base note, or -1 for none.
     void setRootTrigger(int instrId);

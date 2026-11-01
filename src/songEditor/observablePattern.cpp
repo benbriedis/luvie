@@ -389,27 +389,32 @@ static void truncatePatternNotes(Pattern& p)
         [&p](const DrumNote& n) { return n.beat >= p.lengthBeats; }), p.drumNotes.end());
 }
 
+// Positions are counted in denominator units, so a new denominator rescales them.
+static float denomScale(const Pattern& p, int bottom)
+{
+    return (p.timeSigBottom > 0) ? (float)bottom / (float)p.timeSigBottom : 1.0f;
+}
+
 void ObservablePattern::setPatternTimeSig(int patId, int top, int bottom,
-                                          timeSettings::BeatUnit beat)
+                                          timeSettings::BeatUnit beat, int bars)
 {
     for (auto& p : song_->data.patterns) {
         if (p.id == patId) {
-            int bars = std::max(1, (int)std::round(p.lengthBeats / (float)p.timeSigTop));
-            float denomScale = (p.timeSigBottom > 0) ? (float)bottom / (float)p.timeSigBottom : 1.0f;
+            const float scale = denomScale(p, bottom);
             p.timeSigTop    = top;
             p.timeSigBottom = bottom;
             p.beat          = beat;
-            p.lengthBeats   = (float)(bars * top);
-            if (denomScale != 1.0f) {
+            p.lengthBeats   = (float)(std::max(1, bars) * top);
+            if (scale != 1.0f) {
                 for (auto& n : p.notes) {
-                    n.beat   *= denomScale;
-                    n.length *= denomScale;
+                    n.beat   *= scale;
+                    n.length *= scale;
                 }
                 for (auto& n : p.drumNotes)
-                    n.beat *= denomScale;
+                    n.beat *= scale;
                 for (auto& lane : p.paramLanes)
                     for (auto& pt : lane.points)
-                        pt.beat *= denomScale;
+                        pt.beat *= scale;
             }
             truncatePatternNotes(p);
             song_->notify();

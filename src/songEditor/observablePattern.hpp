@@ -73,8 +73,12 @@ public:
     int copyPattern(int srcPatId);
 
     // Pattern properties
-    void setPatternTimeSig(int patId, int top, int bottom,
-                           timeSettings::BeatUnit beat = timeSettings::beatUnitDefault);
+    // Signature and length together, since one decides the other's units. Notes
+    // keep their musical place across a denominator change (positions are scaled
+    // by bottom/oldBottom); the pattern becomes `bars` bars of the new signature,
+    // and whatever no longer fits is removed. One edit, so one undo step.
+    void setPatternTimeSig(int patId, int top, int bottom, timeSettings::BeatUnit beat,
+                           int bars);
     void setPatternLength(int patId, float lengthBeats);
     void setPatternHarmony(int patId, int root, std::string chordHash, bool sharp);
     void setPatternDivisions(int patId, int divisions);

@@ -8,6 +8,7 @@
 #include "panelStyle.hpp"
 #include "inlineEditDispatch.hpp"
 #include "luvieDebug.hpp"
+#include "timeSigSection.hpp"   // the Loop Editor's; its constructor lives here
 #include <cstdio>
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -105,6 +106,17 @@ TimeSigSection::TimeSigSection(int x, int y, int h)
     end();
 }
 
+PatternSigSection::PatternSigSection(int x, int y, int h)
+    : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
+      timeSigLabel(0, 0, kLabelW, h, "Sig"),
+      timeSigBtn  (0, 0, kBtnW,   h)
+{
+    gap(kGap);
+    fixed(&timeSigLabel, kLabelW);
+    fixed(&timeSigBtn,   kBtnW);
+    end();
+}
+
 BarsSection::BarsSection(int x, int y, int h)
     : Fl_Flex(x, y, kWidth, h, Fl_Flex::HORIZONTAL),
       barsLabel(0, 0, kLabelW, h, "Bars"),
@@ -163,7 +175,7 @@ TimeControls::TimeControls(int x, int y, int h)
 {
     gap(kGap);
     margin(kMargin, 0, kMargin, 0);
-    fixed(&timeSigSec, TimeSigSection::kWidth);
+    fixed(&timeSigSec, PatternSigSection::kWidth);
     fixed(&barsSec,    BarsSection::kWidth);
     fixed(&divSec,     DivisionsSection::kWidth);
     end();
@@ -384,17 +396,6 @@ void PatternPanel::initHarmonyControls()
     cs.chordChoice.callback(paramsCb, this);
 }
 
-// The numerator just changed: snap the beat definition to the one the signature
-// implies, keeping the current denominator. Choosing a denominator/beat entry
-// from the dropdown is explicit and does not snap, so a beat the user picks that
-// way stays until the numerator changes again.
-static void snapBeatTo(TimeSigSection& ts, int top)
-{
-    int den = ts.timeSigDen.denominator();
-    ts.timeSigDen.set(den, timeSettings::impliedBeatUnit(top, den));
-    ts.timeSigDen.redraw();
-}
-
 void PatternPanel::initZoomChoice()
 {
     for (const char* v : kZoomLabels)
@@ -426,58 +427,15 @@ void PatternPanel::initTimeControls()
     ts.timeSigLabel.labelcolor(panelText);
     ts.timeSigLabel.align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
 
-    ts.timeSigNum.color(TimeControls::kBg);
-    ts.timeSigNum.setBorderColor(panelCtrlBorder);
-    ts.timeSigNum.textcolor(panelText);
-    ts.timeSigNum.cursor_color(panelText);
-    ts.timeSigNum.labelcolor(panelText);
-    ts.timeSigNum.range(timeSettings::numeratorMin, timeSettings::numeratorMax);
-    ts.timeSigNum.step(1);
-    ts.timeSigNum.value(timeSettings::numeratorDefault);
-    ts.timeSigNum.when(FL_WHEN_RELEASE);
-    ts.timeSigNum.callback([](Fl_Widget*, void* d) {
+    ts.timeSigBtn.color(TimeControls::kBg);
+    ts.timeSigBtn.labelcolor(panelText);
+    ts.timeSigBtn.setBorderWidth(1);
+    ts.timeSigBtn.setBorderColor(panelCtrlBorder);
+    ts.timeSigBtn.tooltip("Time signature and bars");
+    ts.timeSigBtn.callback([](Fl_Widget* w, void* d) {
         auto* self = static_cast<PatternPanel*>(d);
-        auto& ts   = self->timeControls.timeSigSec;
-        if (!self->pattern) return;
-        const auto& tl = self->pattern->get();
-        int sel = tl.selectedTrackIndex;
-        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.patternIdForSelectedLane();
-        int top = (int)ts.timeSigNum.value();
-        snapBeatTo(ts, top);
-        self->pattern->setPatternTimeSig(patId, top, ts.timeSigDen.denominator(),
-                                         ts.timeSigDen.beatUnit());
-    }, this);
-
-    ts.timeSigSlash.box(FL_NO_BOX);
-    ts.timeSigSlash.labelcolor(panelText);
-
-    ts.timeSigDen.color(TimeControls::kBg);
-    ts.timeSigDen.labelcolor(panelText);
-    ts.timeSigDen.textcolor(panelText);
-    ts.timeSigDen.setBorderColor(panelCtrlBorder);
-    ts.timeSigDen.tooltip("Denominator / beat");
-    ts.timeSigDen.value(timeSettings::denomBeatDefaultIndex);
-    ts.timeSigDen.callback([](Fl_Widget*, void* d) {
-        auto* self = static_cast<PatternPanel*>(d);
-        auto& ts   = self->timeControls.timeSigSec;
-        if (!self->pattern) return;
-        const auto& tl = self->pattern->get();
-        int sel = tl.selectedTrackIndex;
-        if (sel < 0 || sel >= (int)tl.tracks.size()) return;
-        int patId = tl.patternIdForSelectedLane();
-        int den = ts.timeSigDen.denominator();
-        int top = (int)ts.timeSigNum.value();
-        for (const auto& p : tl.patterns) {
-            if (p.id == patId && p.timeSigBottom > 0) {
-                // Keep the bar the same musical length across a denominator change.
-                top = std::clamp((int)std::round((float)p.timeSigTop * den / p.timeSigBottom),
-                                 timeSettings::numeratorMin, timeSettings::numeratorMax);
-                ts.timeSigNum.value(top);
-                break;
-            }
-        }
-        self->pattern->setPatternTimeSig(patId, top, den, ts.timeSigDen.beatUnit());
+        const int patId = self->selectedPatternId();
+        if (patId != 0 && self->onTimeSigClicked) self->onTimeSigClicked(patId, w->x(), w->y());
     }, this);
 
     bs.barsLabel.box(FL_NO_BOX);
@@ -785,24 +743,17 @@ void PatternPanel::refreshBars()
 
 void PatternPanel::refreshTimeSig()
 {
-    auto& ts = timeControls.timeSigSec;
-    auto showDefault = [&ts]() {
-        ts.timeSigNum.value(timeSettings::numeratorDefault);
-        ts.timeSigDen.value(timeSettings::denomBeatDefaultIndex);
-    };
-    if (!pattern) { showDefault(); return; }
-    const auto& tl = pattern->get();
-    int sel = tl.selectedTrackIndex;
-    if (sel < 0 || sel >= (int)tl.tracks.size()) { showDefault(); return; }
-    int patId = tl.patternIdForSelectedLane();
-    for (const auto& p : tl.patterns) {
-        if (p.id != patId) continue;
-        ts.timeSigNum.value(p.timeSigTop);
-        ts.timeSigDen.set(p.timeSigBottom, p.beat);
-        ts.timeSigNum.redraw();
-        ts.timeSigDen.redraw();
-        return;
+    auto& btn = timeControls.timeSigSec.timeSigBtn;
+    const int patId = selectedPatternId();
+    if (patId != 0) {
+        for (const auto& p : pattern->get().patterns) {
+            if (p.id != patId) continue;
+            btn.set(p.timeSigTop, p.timeSigBottom, p.beat);
+            return;
+        }
     }
+    const auto def = timeSettings::denomBeatAt(timeSettings::denomBeatDefaultIndex);
+    btn.set(timeSettings::numeratorDefault, def.denominator, def.beat);
 }
 
 void PatternPanel::commitHarmony()
