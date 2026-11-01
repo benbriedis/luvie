@@ -421,15 +421,20 @@ void HarmonyGrid::rapidTryCreate(int visualRow, int slot)
     float length = newNoteLength();          // 1.0 / divisions
     float col    = slot / (float)divisions;
 
-    // Clear any other note that starts in this same slot (same start time),
-    // on any row, so a slot holds at most one note-start.
+    // Clear any other note sounding in this slot, on any row, so a slot holds at
+    // most one note: one starting here, and one that started earlier and is still
+    // held over it (a note longer than the current division would otherwise end
+    // up with the new one drawn on top of it). A slack keeps a note that merely
+    // ends or starts on the slot's edge.
     // Collect ids first: removeNote rebuilds `notes`, invalidating iterators.
-    std::vector<int> sameSlot;
+    constexpr float eps = 1.0e-4f;
+    std::vector<int> overlapping;
     for (const auto& n : notes) {
-        if ((int)std::floor(n.beat * divisions) == slot)
-            sameSlot.push_back(n.id);
+        if ((int)std::floor(n.beat * divisions) == slot ||
+            (n.beat < col + length - eps && n.beat + n.length > col + eps))
+            overlapping.push_back(n.id);
     }
-    for (int id : sameSlot)
+    for (int id : overlapping)
         pattern->removeNote(id);
 
     addNoteAt(virtualPos, col, length);
