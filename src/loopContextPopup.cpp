@@ -71,8 +71,8 @@ void LoopContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int 
     canClone  ? cloneLaneBtn->activate()    : cloneLaneBtn->deactivate();
     canRemove ? removeLaneBtn->activate()   : removeLaneBtn->deactivate();
     flags.isDrumTrack ? addPianorollLaneBtn->deactivate() : addPianorollLaneBtn->activate();
-    // Add Pattern copies the track's existing pattern type, so name it for what
-    // it will actually create.
+    // Add Pattern makes a drum pattern on a drum track and a harmony pattern
+    // otherwise, so name it for what it will actually create.
     addLaneBtn->label(flags.isDrumTrack ? "Add drum pattern" : "Add harmony pattern");
 
     // MIDI learn needs a specific pattern, like Open; Clear shows only when there is

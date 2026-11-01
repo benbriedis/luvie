@@ -79,8 +79,8 @@ void TrackContextPopup::open(int trackId, int laneId, ObservablePattern* tl, int
     flags.canRemoveLane  ? removeLaneBtn->activate()       : removeLaneBtn->deactivate();
     flags.canAddParam    ? addParamBtn->activate()         : addParamBtn->deactivate();
     flags.isDrumTrack    ? addPianorollLaneBtn->deactivate(): addPianorollLaneBtn->activate();
-    // Add Pattern copies the track's existing pattern type, so name it for what
-    // it will actually create.
+    // Add Pattern makes a drum pattern on a drum track and a harmony pattern
+    // otherwise, so name it for what it will actually create.
     addLaneBtn->label(flags.isDrumTrack ? "Add drum pattern" : "Add harmony pattern");
 
     openAt(wx, wy);

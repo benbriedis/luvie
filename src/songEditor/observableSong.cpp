@@ -1431,14 +1431,16 @@ int ObservableSong::addLane(int trackId)
     for (auto& t : data.tracks) {
         if (t.id != trackId) continue;
 
-        // The new pattern takes its type and instrument from the track's first
-        // lane, but starts as a single bar — only a clone copies the length.
+        // The new pattern takes its instrument from the track's first lane, but
+        // starts as a single bar — only a clone copies the length. It is a drum
+        // pattern on a drum track and a harmony pattern otherwise, even when the
+        // first lane is a pianoroll (addPianorollLane() makes those).
         PatternType ptype  = PatternType::HARMONY;
         int         instrId = defaultInstrumentId;
         if (!t.lanes.empty()) {
             for (const auto& p : data.patterns)
                 if (p.id == t.lanes[0].patternId) {
-                    ptype   = p.type;
+                    if (p.type == PatternType::DRUM) ptype = PatternType::DRUM;
                     instrId = p.instrumentId;
                     break;
                 }
