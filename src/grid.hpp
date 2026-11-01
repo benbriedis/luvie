@@ -54,7 +54,9 @@ struct StateIdle {};
 // row the cursor is over, not by where in the item it was grabbed, so the
 // cursor never floats outside the item it is dragging.
 struct StateHoverMove   { int noteIdx; float grabX; };
-struct StateHoverResize { int noteIdx; Side side; };
+// At a join between two flush notes, noteIdx is the left note (side Right) and
+// joinIdx the right one: which of them gets resized waits for the drag direction.
+struct StateHoverResize { int noteIdx; Side side; int joinIdx = -1; };
 
 struct StateDragMove {
     int   noteIdx;
@@ -64,7 +66,9 @@ struct StateDragMove {
     bool  overlapping = false;
 };
 
-struct StateDragResize { int noteIdx; Side side; };
+// joinIdx >= 0 while a press on a join is still undecided (see StateHoverResize);
+// pressX is where it was pressed, to tell which way the drag sets off.
+struct StateDragResize { int noteIdx; Side side; int joinIdx = -1; float pressX = 0.0f; };
 
 // Shift-drag: sweeping out a rubber band. `additive` keeps whatever was already
 // selected, so several bands can build one selection.
@@ -166,6 +170,8 @@ protected:
     virtual int  overlappingCell(int noteIdx) const;
     virtual void moving(StateDragMove& s);
     virtual void resizing(StateDragResize& s);
+    float clearLeftLimit(int noteIdx, float target);
+    float clearRightLimit(int noteIdx, float target);
     void clampSelection();
 
     // ── Multi-selection ──────────────────────────────────────────────────────

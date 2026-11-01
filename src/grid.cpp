@@ -245,8 +245,10 @@ int Grid::handle(int event)
             } else if (auto* h = std::get_if<StateHoverResize>(&state)) {
                 int  noteIdx = h->noteIdx;
                 Side side    = h->side;
-                onBeginDrag(noteIdx);
-                state = StateDragResize{noteIdx, side};
+                int  joinIdx = h->joinIdx;
+                // A join's drag begins once its direction picks the note.
+                if (joinIdx < 0) onBeginDrag(noteIdx);
+                state = StateDragResize{noteIdx, side, joinIdx, dragX()};
             } else if (!selection.empty()) {
                 // A plain click on empty space with a selection active just
                 // clears it. Creating as well would make it impossible to
@@ -338,7 +340,7 @@ int Grid::handle(int event)
             } else if (auto* s = std::get_if<StateDragResize>(&state)) {
                 StateDragResize drag = *s;
                 state = StateIdle{};
-                onCommitResize(drag);
+                if (drag.joinIdx < 0) onCommitResize(drag);   // an undecided join never moved
             } else {
                 // Simple click — toggle note
                 if (Fl::event_button() == FL_LEFT_MOUSE && !creationForbidden)
@@ -804,9 +806,25 @@ void Grid::moving(StateDragMove& s)
     int ey     = Fl::event_y() - y();
     int newRow = std::clamp(rowAtPixelY(std::max(0, ey)), 0, numRows - 1);
     if (!isRowBlocked(newRow)) {
-        note->row     = (float)newRow;
-        s.overlapping = overlappingCell(s.noteIdx) >= 0;
+        note->row      = (float)newRow;
+        int  neighbour = overlappingCell(s.noteIdx);
+        s.overlapping  = neighbour >= 0;
         if (!s.overlapping) s.lastValid = {(int)note->row, note->beat};
+        else {
+            // Dropped over another note, the note settles flush against
+            // whichever side of it the note is mostly on. Falling back to the
+            // last clear position alone would leave a gap that depends on how
+            // fast the mouse moved, and on off-grid notes snapping can't close.
+            const Note& b   = notes[neighbour];
+            float dragged   = note->beat;
+            bool  leftSide  = dragged + note->length / 2 < b.beat + b.length / 2;
+            float flush     = leftSide ? b.beat - note->length : b.beat + b.length;
+            if (flush >= 0.0f && flush + note->length <= numCols) {
+                note->beat = flush;
+                if (overlappingCell(s.noteIdx) < 0) s.lastValid = {(int)note->row, flush};
+                note->beat = dragged;
+            }
+        }
     }
     if (s.overlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
     else               window()->cursor(FL_CURSOR_HAND);
@@ -815,15 +833,23 @@ void Grid::moving(StateDragMove& s)
 
 void Grid::resizing(StateDragResize& s)
 {
+    float ex = dragX();
+    if (s.joinIdx >= 0) {
+        // Pressed on a join between flush notes: only the note on the side the
+        // drag heads for can give way, so that is the one resized — the left
+        // note's end when heading left, the right note's start when heading right.
+        if (ex == s.pressX) return;
+        if (ex > s.pressX) { s.noteIdx = s.joinIdx; s.side = Side::Left; }
+        s.joinIdx = -1;
+        onBeginDrag(s.noteIdx);
+    }
     float minLength = 10.0f / colWidth;
     Note* note      = &notes[s.noteIdx];
-    float ex        = dragX();
     if (s.side == Side::Left) {
         float endCol  = note->beat + note->length;   // fixed (right) edge
         float newBeat = ex / (float)colWidth + colOffset;
         if (snap) newBeat = std::round(newBeat / snap) * snap;
-        int   neighbour = overlappingCell(s.noteIdx);
-        float min       = neighbour < 0 ? 0.0f : notes[neighbour].beat + notes[neighbour].length;
+        float min = clearLeftLimit(s.noteIdx, std::min(newBeat, note->beat));
         if (newBeat < min) newBeat = min;
         // Enforce the minimum length WITHOUT dragging the moving edge off the
         // grid: if the snapped position is too close to the fixed edge, back
@@ -838,8 +864,7 @@ void Grid::resizing(StateDragResize& s)
     } else {
         float endCol = ex / (float)colWidth + colOffset;   // moving (right) edge
         if (snap) endCol = std::round(endCol / snap) * snap;
-        int   neighbour = overlappingCell(s.noteIdx);
-        float max       = neighbour < 0 ? (float)numCols : notes[neighbour].beat;
+        float max = clearRightLimit(s.noteIdx, std::max(endCol, note->beat + note->length));
         if (endCol > max) endCol = max;
         if (endCol - note->beat < minLength) {
             float limit = note->beat + minLength;
@@ -851,6 +876,43 @@ void Grid::resizing(StateDragResize& s)
     redraw();
 }
 
+// How far left the note's left edge can go towards `target` without running
+// into another note. Tested against the extent the edge is heading for, not
+// where it was last event: a fast drag can carry it clean past a neighbour in
+// one step, which an overlap test of the old extent never sees.
+float Grid::clearLeftLimit(int noteIdx, float target)
+{
+    Note& n     = notes[noteIdx];
+    Note  saved = n;
+    float end   = n.beat + n.length;
+    float limit = std::max(0.0f, target);
+    for (;;) {
+        n.beat   = limit;
+        n.length = end - limit;
+        int neighbour = overlappingCell(noteIdx);
+        if (neighbour < 0) break;
+        limit = notes[neighbour].beat + notes[neighbour].length;
+    }
+    n = saved;
+    return limit;
+}
+
+// The right-edge counterpart of clearLeftLimit().
+float Grid::clearRightLimit(int noteIdx, float target)
+{
+    Note& n     = notes[noteIdx];
+    Note  saved = n;
+    float limit = std::min((float)numCols, target);
+    for (;;) {
+        n.length = limit - n.beat;
+        int neighbour = overlappingCell(noteIdx);
+        if (neighbour < 0) break;
+        limit = notes[neighbour].beat;
+    }
+    n = saved;
+    return limit;
+}
+
 void Grid::findNoteForCursor()
 {
     const int resizeZone = 5;
@@ -858,8 +920,11 @@ void Grid::findNoteForCursor()
     int   ey  = Fl::event_y() - y();
     int   row = rowAtPixelY(ey);
 
-    int  resizeIdx  = -1;
-    Side resizeSide = Side::Left;
+    int  resizeIdx    = -1;
+    Side resizeSide   = Side::Left;
+    bool resizeInside = false;   // the cursor is over the candidate's body
+    int  startHit     = -1;      // a note whose start is in reach
+    int  endHit       = -1;      // a note whose end is in reach
 
     // Resizing is off while a selection is live: what a selection is for is
     // moving, copying and deleting, and an edge that resized one item would be
@@ -874,10 +939,22 @@ void Grid::findNoteForCursor()
         float leftEdge  = (n.beat - colOffset) * colWidth;
         float rightEdge = (n.beat + n.length - colOffset) * colWidth;
 
+        // Where two notes nearly meet, both have an edge zone under the cursor.
+        // Only one should be resized: the one the cursor is over, so a
+        // candidate the cursor is outside of gives way to one it is inside.
+        // Notes that meet exactly are a join, settled below.
         if (resizable && leftEdge - ex <= resizeZone && ex - leftEdge <= resizeZone) {
-            resizeIdx = i; resizeSide = Side::Left;
+            startHit = i;
+            bool inside = ex >= leftEdge;
+            if (resizeIdx < 0 || (inside && !resizeInside)) {
+                resizeIdx = i; resizeSide = Side::Left; resizeInside = inside;
+            }
         } else if (resizable && rightEdge - ex <= resizeZone && ex - rightEdge <= resizeZone) {
-            resizeIdx = i; resizeSide = Side::Right;
+            endHit = i;
+            bool inside = ex <= rightEdge;
+            if (resizeIdx < 0 || (inside && !resizeInside)) {
+                resizeIdx = i; resizeSide = Side::Right; resizeInside = inside;
+            }
         } else if (ex >= leftEdge && ex <= rightEdge) {
             state = StateHoverMove{i, ex - leftEdge};
             window()->cursor(contextMenuCursorImage(), 0, 0);
@@ -886,7 +963,12 @@ void Grid::findNoteForCursor()
         }
     }
 
-    if (resizeIdx >= 0) {
+    if (startHit >= 0 && endHit >= 0 &&
+        std::fabs(notes[endHit].beat + notes[endHit].length - notes[startHit].beat) < kBeatEpsilon) {
+        // A join: which note is resized waits for the drag direction (resizing()).
+        state = StateHoverResize{endHit, Side::Right, startHit};
+        window()->cursor(FL_CURSOR_WE);
+    } else if (resizeIdx >= 0) {
         state = StateHoverResize{resizeIdx, resizeSide};
         window()->cursor(FL_CURSOR_WE);
     } else {
