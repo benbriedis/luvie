@@ -35,6 +35,7 @@ class SongEditor : public Editor, public ITimelineObserver {
     int                baseColWidth   = 0;   // colWidth at zoom x1
     bool               wasPlaying     = false;
     bool               pendingScroll  = false;  // snap playhead into view on next tick
+    float              lastBar        = 0.0f;   // playhead bar at the previous tick
     Fl_Widget*         topRuler       = nullptr;  // highest ruler stacked above, for 'p'
 
     static constexpr int wheelStepPx = 24;   // pixels per mouse-wheel notch

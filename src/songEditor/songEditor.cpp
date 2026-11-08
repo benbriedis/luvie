@@ -330,12 +330,14 @@ void SongEditor::followPlayhead()
         if (playheadPx < 0.0f || playheadPx >= (float)visibleGridW)
             setColOffset((int)bar);
         wasPlaying = playing;
+        lastBar    = bar;
         return;
     }
 
     if (playing) {
-        if (!wasPlaying) {
-            // Just started — snap if playhead is off screen
+        if (!wasPlaying || bar < lastBar) {
+            // Just started, or the playhead jumped back (the loop wrapped to its
+            // start marker, or a seek): snap if the playhead is off screen
             if (playheadPx < 0.0f || playheadPx >= (float)visibleGridW)
                 setColOffset((int)bar);
         } else {
@@ -345,6 +347,7 @@ void SongEditor::followPlayhead()
         }
     }
     wasPlaying = playing;
+    lastBar    = bar;
 }
 
 
