@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <mutex>
 #include <thread>
@@ -27,8 +28,9 @@ namespace {
 
 struct Received { int64_t ns; uint8_t status, d1, d2; };
 
-std::mutex            gMutex;
-std::vector<Received> gReceived;
+std::mutex              gMutex;
+std::condition_variable gArrived;
+std::vector<Received>   gReceived;
 
 constexpr double kBeatNs = 250e6;   // 240 BPM
 constexpr int    kKick   = 36;
@@ -57,6 +59,52 @@ std::vector<Received> noteOns(const std::vector<Received>& v)
     for (const auto& r : v)
         if ((r.status & 0xF0) == 0x90 && r.d2 > 0) out.push_back(r);
     return out;
+}
+
+// How many note-ons a pause should have let through: one per beat from the first
+// note up to the pause, inclusive. A pause landing within a few ms of a beat may or
+// may not catch that beat, so the range then admits both.
+struct Expect { size_t lo, hi; double beats; };
+
+// Plays, then pauses `beats` beats after the first note-on actually arrived, and
+// says how many note-ons to expect. Timing the pause from play() with a plain sleep
+// would also count the engine's start-up and the main thread's own wake-up slop,
+// which on a loaded CI VM is enough to gain or lose a beat; this way the expectation
+// follows when the pause really happened.
+Expect playAndPauseAfter(InternalTransport& tr, double beats)
+{
+    tr.play();
+    int64_t firstNs;
+    {
+        std::unique_lock<std::mutex> lk(gMutex);
+        if (!gArrived.wait_for(lk, std::chrono::seconds(2),
+                               [] { return !noteOns(gReceived).empty(); })) {
+            lk.unlock();
+            tr.pause();
+            return {1, 1, 0.0};   // nothing played: fail the count
+        }
+        firstNs = noteOns(gReceived)[0].ns;
+    }
+    rtSleepUntil(firstNs + static_cast<int64_t>(beats * kBeatNs));
+    const int64_t pauseNs = rtNowNs();
+    tr.pause();
+    sleepMs(50);
+
+    const double sounded = (pauseNs - firstNs) / kBeatNs;
+    const size_t n       = static_cast<size_t>(std::floor(sounded)) + 1;
+    const double frac    = sounded - std::floor(sounded);
+    if (frac < 0.05) return {n - 1, n, sounded};
+    if (frac > 0.95) return {n, n + 1, sounded};
+    return {n, n, sounded};
+}
+
+bool countOk(const std::vector<Received>& ons, const Expect& e)
+{
+    const bool ok = ons.size() >= e.lo && ons.size() <= e.hi;
+    if (!ok)
+        printf("  got %zu note-ons, expected %zu..%zu (paused %.3f beats after the first)\n",
+               ons.size(), e.lo, e.hi, e.beats);
+    return ok;
 }
 
 bool hasAllNotesOff(const std::vector<Received>& v)
@@ -108,9 +156,12 @@ int main()
 {
     MidiScheduler sched([](const char* port, const uint8_t* d, int len) {
         if (std::string(port) != "out") return;
-        std::lock_guard<std::mutex> lk(gMutex);
-        gReceived.push_back({rtNowNs(), d[0], len > 1 ? d[1] : (uint8_t)0,
-                             len > 2 ? d[2] : (uint8_t)0});
+        {
+            std::lock_guard<std::mutex> lk(gMutex);
+            gReceived.push_back({rtNowNs(), d[0], len > 1 ? d[1] : (uint8_t)0,
+                                 len > 2 ? d[2] : (uint8_t)0});
+        }
+        gArrived.notify_all();
     });
 
     ObservableSong song(240.0f, 4, 4);
@@ -123,14 +174,11 @@ int main()
     std::vector<double> allErrs;
 
     printf("plain playback\n");
-    tr.play();
-    sleepMs(1120);   // beats 0..4 (five notes), stopping between notes
-    tr.pause();
-    sleepMs(50);
     {
+        const Expect want = playAndPauseAfter(tr, 4.5);   // beats 0..4, stopping between notes
         auto got = take();
         auto ons = noteOns(got);
-        check(ons.size() == 5, "five note-ons in 1.12 s");
+        check(countOk(ons, want), "five note-ons in 4.5 beats");
         bool order = ons.size() >= 4 && ons[0].d1 == kKick && ons[1].d1 == kSnare &&
                      ons[2].d1 == kKick && ons[3].d1 == kSnare;
         check(order, "kick, snare, kick, snare");
@@ -145,13 +193,10 @@ int main()
     printf("song loop over bar 0 (four beats)\n");
     tr.rewind();
     tr.setSongLoop(true, 0.0f, 1.0f);
-    tr.play();
-    sleepMs(2120);   // two passes and a bit
-    tr.pause();
-    sleepMs(50);
     {
+        const Expect want = playAndPauseAfter(tr, 8.5);   // two passes and a bit
         auto ons = noteOns(take());
-        check(ons.size() == 9, "nine note-ons across two wraps");
+        check(countOk(ons, want), "nine note-ons across two wraps");
         bool pattern = true;
         for (size_t i = 0; i < ons.size(); ++i)
             pattern &= ons[i].d1 == (i % 2 == 0 ? kKick : kSnare);
