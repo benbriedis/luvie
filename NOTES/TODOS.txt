@@ -292,8 +292,6 @@ BUG: clicking a dragging two blocks in a collapsed track can be dragged into a s
 Check out Entropictron
 
 
-TAG distro with v1.0.0 when ready...
-
 ISSUE: Start and end markers - the combine loop functionality with song functionality.
     Rewind always goes to Start.
     NOTE at the moment play doesn't stop at End though...
@@ -350,7 +348,7 @@ FEATURE: when the last time signature or tempo is off screen show it on the far 
 
 	Could have a "activate/deactive at bar start" option if I want cleaner enabling of patterns in the looper   
 
-If I tag it I might be able to start writing some music with it...
+If I tag it 1.0.0 I might be able to start writing some music with it...
 
 
 -------
@@ -409,9 +407,6 @@ Luvie could be transport master now...
   - Should probably support in LV2 mode too, but possibly only if using Jack control.
 
 
-Do I really need/want to compile across and older X library (NB I am using Wayland and FLTK1.5)... is this just a 
-   plugin thing
-
 
 Copy scene content to other scenes/move scenes?
 
@@ -420,4 +415,15 @@ cf slice selection - allow deletion of a blank selected portion.
 	 cf Insertion too.
 	 cf wrt Song Editor too.
 
+Maybe have a Mute/Solo pair on the pattern editors
+   ... but this is really a Song mode thing. 
+   ... if in Loop mode would rather it toggled...
+   Could have a toggle that flicks on or off Mute
+   -- various options... may not be worth it...
+   
 
+Do I really need/want to compile across and older X library (NB I am using Wayland and FLTK1.5)... is this just a 
+   plugin thing
+
+FLTK - cf downgrading to 1.4  
+   
