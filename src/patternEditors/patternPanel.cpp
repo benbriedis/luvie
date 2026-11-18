@@ -718,10 +718,22 @@ void PatternPanel::refreshOutChoice()
         }
     }
 
-    // Current instrument not in the type-filtered list — assign first available.
-    outChoice.value(0);
-    if (!ids.empty())
-        instr_->setPatternInstrument(patId, ids[0]);
+    // Current instrument not in the type-filtered list (unset, removed, or the
+    // wrong type). Fall back to the track's own instrument, never an arbitrary
+    // first entry — that silently re-routed patterns to another instrument.
+    const int trackInstr = tl.tracks[sel].instrumentId;
+    for (int i = 0; i < (int)ids.size(); i++) {
+        if (ids[i] == trackInstr) {
+            outChoice.value(i);
+            outChoice.redraw();
+            if (currentId != trackInstr)
+                instr_->setPatternInstrument(patId, trackInstr);
+            return;
+        }
+    }
+
+    // No suitable instrument: show no selection and leave the pattern alone.
+    outChoice.value(-1);
     outChoice.redraw();
 }
 
