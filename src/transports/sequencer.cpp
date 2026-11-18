@@ -11,6 +11,10 @@
 #include <set>
 #include <thread>
 
+// Largest clock move on the cycle playback stops that is still read as the stop
+// itself rather than a seek (see renderCycle). Well above any host period.
+static constexpr double kStopSlipSecs = 0.5;
+
 // ── Construction / destruction ────────────────────────────────────────────────
 
 Sequencer::Sequencer()
@@ -740,6 +744,11 @@ void Sequencer::renderCycle(bool nowPlaying, bool jumped,
 
     const double dtSecs = cycleEndSecs - cycleStartSecs;
 
+    // How far this cycle's clock landed from where the previous one ended. Only
+    // meaningful when the previous cycle rolled (a stopped one parks the clock).
+    const double clockSlipSecs = cycleStartSecs - prevCycleEndSecs;
+    prevCycleEndSecs = cycleEndSecs;
+
     // The clock read against the song's own timeline. Everything below works in that
     // musical domain, so the offset appears here and in nothing but the reverse
     // conversions back to wall-clock seconds.
@@ -876,7 +885,15 @@ void Sequencer::renderCycle(bool nowPlaying, bool jumped,
             // folded here either: a stopped playhead belongs where playback left it or
             // where the user seeked, even when that is outside the region. Folding is
             // playback's, and happens below when the transport rolls again.
-            if (jumped || !loopCursorValid) {
+            // A host may also nudge the frame on the very cycle it stops (seen as
+            // a "relocate" of a cycle or so), which would otherwise throw the
+            // wrapped cursor away for the raw clock bar — somewhere past the End
+            // marker once the loop has wrapped. A small slip on the stop cycle is
+            // the stop itself, not a seek; keep the cursor and re-anchor to the
+            // parked frame below. A seek once stopped still lands as normal.
+            const bool stopSlip = jumped && wasPlaying && loopCursorValid
+                                  && std::fabs(clockSlipSecs) < kStopSlipSecs;
+            if ((jumped && !stopSlip) || !loopCursorValid) {
                 musicalPos      = linPrev;
                 loopCursorValid = true;
             }

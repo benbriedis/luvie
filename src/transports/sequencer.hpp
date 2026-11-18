@@ -384,6 +384,7 @@ private:
     double segMusicalStart   = 0.0;   // musical bar at that instant
     double musicalPos        = 0.0;   // current wrapped musical position
     bool   loopCursorValid   = false; // musicalPos synced to the clock?
+    double prevCycleEndSecs  = 0.0;   // clock at the end of the previous cycle
 
     // ── RT-thread-only state ──────────────────────────────────────────────────
     struct ActiveNote {

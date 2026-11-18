@@ -24,6 +24,7 @@
 #include "observableSong.hpp"
 #include "timelineIO.hpp"
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -63,6 +64,8 @@ public:
     // Setup runs with the setters applying directly; attach once cycles start, so
     // what follows reaches the engine as it would from a real owner thread.
     void attach() { attachRt(true); }
+
+    float position() const { return loopedPosition(); }
 
     void cycle(const ClockSample& c)
     {
@@ -351,6 +354,34 @@ int main(int argc, char** argv)
         report("relocate", v);
         check(clean(v), "invariants hold and nothing sounds after the stop");
         check(r.drv.rtStats().relocates.load() == 1, "the relocate is acted on once");
+    }
+
+    printf("stop after the loop has wrapped\n");
+    {
+        // A host can move the frame a cycle or so on the cycle it stops. That is the
+        // stop, not a seek: the playhead stays where playback left it, inside the
+        // region, rather than jumping to the raw clock bar past the End marker.
+        for (int64_t slip : {int64_t(0), int64_t(-256), int64_t(1024)}) {
+            Rig r(st);
+            r.drv.setSongLoop(true, loopStart, loopEnd);
+            int64_t f = 0;
+            for (int c = 0; c < 4000; c++) { r.drv.cycle({f, 256, true, false}); f += 256; }
+            const float before = r.drv.position();
+            r.drv.cycle({f + slip, 256, false, slip != 0});
+            for (int c = 0; c < 4; c++) r.drv.cycle({f + slip, 256, false, false});
+            const float after = r.drv.position();
+            char what[96];
+            snprintf(what, sizeof what, "frame slip %lld: stays at bar %.3f (got %.3f)",
+                     (long long)slip, before, after);
+            check(after >= loopStart && after < loopEnd && std::fabs(after - before) < 0.01f,
+                  what);
+            // A seek made once stopped still lands where it was asked to.
+            const int64_t target = static_cast<int64_t>(0.5 * 3.0 * kRate);  // bar 0.5
+            r.drv.cycle({target, 256, false, true});
+            if (slip == 0)
+                check(std::fabs(r.drv.position() - 0.5f) < 0.01f,
+                      "a seek while stopped still moves the playhead");
+        }
     }
 
     printf("Loop <-> Song hand-offs\n");
