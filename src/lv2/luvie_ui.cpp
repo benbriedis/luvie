@@ -571,10 +571,16 @@ static void refreshTransportControl(LuvieUI* ui)
 
     ITransport* command = nullptr;
     std::string alert, status;
+    std::vector<std::string> advice;   // extra popup lines under the alert
     switch (ov->control()) {
     case TransportOverlay::ControlJack:
         if (ui->jackObserver->state() == JackObserver::State::Up) {
             command = ui->jackControl;
+        } else if (ui->jackObserver->serverUnresponsive()) {
+            // There but hung (e.g. a wedged PipeWire): say so, and what to do.
+            alert  = "JACK server not responding \xe2\x80\x94 transport control disabled";
+            advice = JackObserver::unresponsiveAdvice();
+            status = advice.front();
         } else {
             alert  = "JACK unavailable \xe2\x80\x94 transport control disabled";
             status = "Waiting for JACK server\xe2\x80\xa6";
@@ -635,8 +641,10 @@ static void refreshTransportControl(LuvieUI* ui)
         bp->syncPlayState();
     } else {
         bp->disableButtons();
-        bp->setAlerts(alert.empty() ? std::vector<std::string>{}
-                                    : std::vector<std::string>{alert});
+        std::vector<std::string> lines;
+        if (!alert.empty()) lines.push_back(alert);
+        lines.insert(lines.end(), advice.begin(), advice.end());
+        bp->setAlerts(lines);
     }
     ov->setStatus(status);
 }

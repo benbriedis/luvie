@@ -35,6 +35,7 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+#include <cstring>
 #endif
 
 namespace {
@@ -271,3 +272,26 @@ int jack_midi_event_get(jack_midi_event_t* event, void* port_buffer, uint32_t ev
 }
 
 } // extern "C"
+
+// Load libjack (if not already) on the calling thread. ensureLoaded() is not
+// thread-safe on its first call, so JackObserver calls this on the UI thread before
+// handing jack_client_open() to a worker thread; every later call is one branch.
+bool luvieJackLoad() {
+    return ensureLoaded();
+}
+
+// True when the libjack we loaded is PipeWire's JACK implementation (pipewire-jack),
+// which lives under .../pipewire-0.3/jack/ rather than being jack2's own library.
+// Used to work around its crash in jack_client_close() on a client whose server
+// has died (see JackTransport::close()).
+bool luvieJackIsPipeWire() {
+#ifdef _WIN32
+    return false;
+#else
+    if (!ensureLoaded() || !g.client_close) return false;
+    Dl_info info{};
+    if (!dladdr(reinterpret_cast<void*>(g.client_close), &info) || !info.dli_fname)
+        return false;
+    return std::strstr(info.dli_fname, "pipewire") != nullptr;
+#endif
+}

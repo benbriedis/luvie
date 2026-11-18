@@ -12,6 +12,7 @@
 #include <atomic>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -36,7 +37,27 @@ public:
     JackTransport();
     ~JackTransport() override;
 
+    // connect() + adopt() in one go, on the calling thread.
     bool open(const char* clientName = "luvie", bool enableMidi = true);
+
+    // Opening is split in two so the part that waits on the server can run off the
+    // UI thread (see JackObserver). connect() is jack_client_open() and nothing
+    // else: it touches no transport state, so it is safe on any thread — and it is
+    // the call that never returns when the server is wedged (a hung PipeWire daemon
+    // accepts the connection but never answers). Returns null if no server is
+    // reachable. Call loadLibrary() on the UI thread first: the libjack shim's lazy
+    // load is not thread-safe.
+    static jack_client_t* connect(const char* clientName = "luvie");
+    // Take over a client from connect(): callbacks, RT attach, activate. UI thread.
+    // On failure the client has been closed and false is returned.
+    bool adopt(jack_client_t* c, bool enableMidi = true);
+    // Close a client from connect() that was never adopted. Any thread.
+    static void discard(jack_client_t* c);
+    // Load libjack now, on this thread, if it is not loaded yet; see connect().
+    static void loadLibrary();
+    // True when the libjack in use is PipeWire's (pipewire-jack), so the server is
+    // the PipeWire daemon. UI thread (it may load libjack on first call).
+    static bool isPipeWire();
 
     // Tear down a (possibly dead) JACK client so a fresh open() can reconnect.
     // Closes the client handle, drops the now-invalid MIDI ports and resets
@@ -157,6 +178,16 @@ private:
     // ── JACK process callback ─────────────────────────────────────────────────
     static int processCallback(jack_nframes_t nframes, void* arg);
     int process(jack_nframes_t nframes);
+
+    // jack_on_shutdown() context, one per opened client. The callback carries the
+    // generation of the client it was registered for and is ignored unless that is
+    // still the current client — so a zombie left unclosed under pipewire-jack (see
+    // close()) can never tear down its successor if it reports shutdown again.
+    // Tokens are never freed while the transport lives, since a zombie client may
+    // still hold a pointer to its own; one is added per (re)connect.
+    struct ShutdownToken { JackTransport* self; uint64_t gen; };
+    std::vector<std::unique_ptr<ShutdownToken>> shutdownTokens_;
+    std::atomic<uint64_t>                       clientGen_{0};
 
     static void shutdownThunk(void* arg);
 };

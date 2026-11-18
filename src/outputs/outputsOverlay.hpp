@@ -130,7 +130,8 @@ class OutputsOverlay : public OverlayWindow {
     int         splitSwallowNote_ = -1;
     std::string splitSwallowInput_;
 
-    bool jackWarning_ = false;  // show "JACK server not running" on the ports heading
+    bool jackWarning_      = false;  // show "JACK server not running" on the ports heading
+    bool jackUnresponsive_ = false;  // ...worded "not responding" instead (a hung server)
 
     // Column widths (recomputed by the rebuilds, read by the column headings)
     int instrNameW_       = 0;
@@ -225,8 +226,9 @@ public:
     void        setDefaultBackend(MidiBackend backend);
     MidiBackend getDefaultBackend() const { return defaultBackend_; }
 
-    // Show/hide the red "JACK server not running" warning under the title.
-    void setJackWarning(bool show);
+    // Show/hide the red "JACK server not running" warning under the title. With
+    // unresponsive it reads "not responding" instead: the server is there but hung.
+    void setJackWarning(bool show, bool unresponsive = false);
 
     // MIDI input API. Loading carries an input on a backend this mode cannot
     // drive over to one it can, as the single input always did, so a project moved

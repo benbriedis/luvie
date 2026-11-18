@@ -468,9 +468,10 @@ void OutputsOverlay::setDefaultBackend(MidiBackend backend) {
     if (defaultTypeChoice) defaultTypeChoice->value(static_cast<int>(backend));
 }
 
-void OutputsOverlay::setJackWarning(bool show) {
-    if (jackWarning_ == show) return;
-    jackWarning_ = show;
+void OutputsOverlay::setJackWarning(bool show, bool unresponsive) {
+    if (jackWarning_ == show && jackUnresponsive_ == unresponsive) return;
+    jackWarning_      = show;
+    jackUnresponsive_ = unresponsive;
     updateSummaries();
 }
 
@@ -767,7 +768,9 @@ void OutputsOverlay::rebuildAll() {
 void OutputsOverlay::updateSummaries() {
     inPane_->setSummary(countOf((int)inputs_.size(), "input", "inputs"));
     // The warning goes on the heading, so it is seen with the section folded too.
-    if (jackWarning_) portsPane_->setSummary("JACK server not running", delRedCol);
+    if (jackWarning_) portsPane_->setSummary(jackUnresponsive_ ? "JACK server not responding"
+                                                               : "JACK server not running",
+                                             delRedCol);
     else              portsPane_->setSummary(countOf((int)outputs_.size(), "port", "ports"));
     instrPane_->setSummary(countOf((int)instruments_.size(), "instrument", "instruments"));
 }

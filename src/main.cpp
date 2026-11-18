@@ -62,7 +62,21 @@ static void printUsage(FILE* out) {
             );
 }
 
+static int luvieMain(int argc, char **argv);
+
 int main(int argc, char **argv) {
+    const int rc = luvieMain(argc, argv);
+    // Every local of luvieMain() is gone by now, JackObserver included. If a JACK
+    // connect is still stuck in a wedged server (see JackObserver), skip the
+    // libraries' exit-time finalizers: PipeWire's would wait on that thread forever.
+    if (JackObserver::strandedConnects() > 0) {
+        fflush(nullptr);
+        std::_Exit(rc);
+    }
+    return rc;
+}
+
+static int luvieMain(int argc, char **argv) {
 #ifdef __linux__
     /* Force FLTK to use X11 (not native Wayland). FLTK 1.5's Wayland backend
        does not cleanly destroy a toplevel on hide(), so under a session manager
@@ -292,23 +306,35 @@ int main(int argc, char **argv) {
         if (!app.bottomPane) return;
         bool jackDown    = jackObserver.state() != JackObserver::State::Up;
         bool clockIsJack = app.transportOverlay && app.transportOverlay->selection() == 2;
+        // A wedged server (e.g. a hung PipeWire) is there but never answers, which
+        // the user fixes differently from one that isn't running at all.
+        const bool unresponsive = jackObserver.serverUnresponsive();
+        const std::string why = unresponsive
+            ? " but the JACK server is not responding" : " but JACK is not running";
         std::vector<std::string> alerts;
         if (clockIsJack && jackDown)
-            alerts.push_back("Jack transport selected but JACK is not running");
+            alerts.push_back("Jack transport selected" + why);
         if (portReg.anyJack() && jackDown)
-            alerts.push_back("Jack MIDI output in use but JACK is not running");
+            alerts.push_back("Jack MIDI output in use" + why);
         if (midiInIsJack() && app.anyRecordArmed() && jackDown)
-            alerts.push_back("Recording from Jack MIDI input but JACK is not running");
+            alerts.push_back("Recording from Jack MIDI input" + why);
+        // A missing server is self-explanatory (start one); a hung one is not, so
+        // say what to do. Only when something above actually wants JACK.
+        if (unresponsive && !alerts.empty())
+            for (auto& line : JackObserver::unresponsiveAdvice())
+                alerts.push_back(std::move(line));
         if (rtRefused && (router.active() != &jackTransport || portReg.anyNonJack()))
             alerts.push_back(rtAlert);
         app.bottomPane->setAlerts(alerts);
     };
 
-    // Red "JACK server not running" line shows while a Jack port exists but JACK is down.
+    // Red "JACK server not running" (or "not responding") line shows while a Jack
+    // port exists but JACK is down.
     auto updateJackWarning = [&]() {
         if (connOverlay)
             connOverlay->setJackWarning(portReg.anyJack() &&
-                                        jackObserver.state() != JackObserver::State::Up);
+                                        jackObserver.state() != JackObserver::State::Up,
+                                        jackObserver.serverUnresponsive());
         updateAlerts();
     };
 

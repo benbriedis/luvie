@@ -10,6 +10,9 @@
 #include <cstdio>
 #include <cstring>
 
+bool luvieJackIsPipeWire();   // jackShim.cpp
+bool luvieJackLoad();         // jackShim.cpp
+
 // ── Construction / destruction ────────────────────────────────────────────────
 
 JackTransport::JackTransport()
@@ -46,15 +49,40 @@ void JackTransport::silenceLogging()
     jack_set_info_function(jackSilentLog);
 }
 
-bool JackTransport::open(const char* clientName, bool enableMidi)
+void JackTransport::loadLibrary()
 {
-    midiEnabled = enableMidi;
+    luvieJackLoad();
+}
 
+bool JackTransport::isPipeWire()
+{
+    return luvieJackIsPipeWire();
+}
+
+jack_client_t* JackTransport::connect(const char* clientName)
+{
     // JackNoStartServer: connect only to an already-running server. Luvie waits
     // (polls) for an external JACK server rather than spawning one itself.
-    client = jack_client_open(clientName, JackNoStartServer, nullptr);
-    if (!client)
+    return jack_client_open(clientName, JackNoStartServer, nullptr);
+}
+
+void JackTransport::discard(jack_client_t* c)
+{
+    if (c) jack_client_close(c);
+}
+
+bool JackTransport::open(const char* clientName, bool enableMidi)
+{
+    loadLibrary();
+    return adopt(connect(clientName), enableMidi);
+}
+
+bool JackTransport::adopt(jack_client_t* c, bool enableMidi)
+{
+    if (!c)
         return false;
+    midiEnabled = enableMidi;
+    client = c;
 
     setDriverSampleRate(static_cast<double>(jack_get_sample_rate(client)));
 
@@ -66,12 +94,16 @@ bool JackTransport::open(const char* clientName, bool enableMidi)
     // Detect the server going away without polling: JACK invokes this from one
     // of its own threads, so the thunk only flips an atomic and hands off to the
     // main thread via Fl::awake.
-    jack_on_shutdown(client, &JackTransport::shutdownThunk, this);
+    // The callback is tied to this client's generation (see ShutdownToken).
+    const uint64_t gen = clientGen_.fetch_add(1) + 1;
+    shutdownTokens_.push_back(std::make_unique<ShutdownToken>(ShutdownToken{this, gen}));
+    jack_on_shutdown(client, &JackTransport::shutdownThunk, shutdownTokens_.back().get());
 
     if (jack_activate(client) != 0) {
         fprintf(stderr, "JackTransport: could not activate JACK client\n");
         jack_client_close(client);
         client = nullptr;
+        clientGen_.fetch_add(1);   // retire the token registered above
         attachRt(false);
         return false;
     }
@@ -87,15 +119,22 @@ void JackTransport::shutdownThunk(void* arg)
     // Runs on a JACK-internal thread. The client is already dead here, so we
     // must not call any JACK functions — just mark the transport down and run the
     // onShutdown handler, marshalled to the owner's thread via awakeFn if set.
-    auto* self = static_cast<JackTransport*>(arg);
+    // The token says which client this is for: a stale one (an earlier, already
+    // closed or abandoned client) is ignored, both here and again on delivery, in
+    // case close() + a reconnect ran in between.
+    auto* tok  = static_cast<ShutdownToken*>(arg);
+    auto* self = tok->self;
+    if (tok->gen != self->clientGen_.load()) return;
     self->jackAlive.store(false);
     self->playing_.store(false);
     auto deliver = [](void* a) {
-        auto* s = static_cast<JackTransport*>(a);
+        auto* t = static_cast<ShutdownToken*>(a);
+        auto* s = t->self;
+        if (t->gen != s->clientGen_.load()) return;
         if (s->onShutdown) s->onShutdown();
     };
-    if (self->awakeFn) self->awakeFn(deliver, self);
-    else               deliver(self);
+    if (self->awakeFn) self->awakeFn(deliver, tok);
+    else               deliver(tok);
 }
 
 void JackTransport::close()
@@ -105,9 +144,19 @@ void JackTransport::close()
     // jack_client_close() even on a dead client — and drop the MIDI ports,
     // whose handles belonged to the old client and are now invalid.
     if (client) {
-        jack_client_close(client);
+        // PipeWire's libjack (1.6.x at least) segfaults in pw_memmap_free() when
+        // jack_client_close() is called on a client whose server has died — seen
+        // when hot-plugging a USB MIDI device took the PipeWire daemon down. So on
+        // the server-lost path under pipewire-jack, deliberately leak the zombie
+        // handle (a few KB plus an idle thread, once per server crash) rather than
+        // take the whole app down with the server. A live client is still closed.
+        if (jackAlive.load() || !luvieJackIsPipeWire())
+            jack_client_close(client);
         client = nullptr;
     }
+    // Retire this client's generation: any shutdown it reports from now on (or one
+    // already queued for the main thread) no longer matches and is ignored.
+    clientGen_.fetch_add(1);
     // No process callback can run now: setters apply directly again.
     attachRt(false);
     {
