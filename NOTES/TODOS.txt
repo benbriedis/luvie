@@ -20,9 +20,17 @@ Suggestions for Carla (install newest first)
    adding 200px to each sides.
    Maybe a layout button.
 
-2. carla-patchbay currently can't be used because it doesn't support MIDI plugins  
+1. carla-patchbay currently can't be used because it doesn't support MIDI plugins  
    with multiple outputs.
 
+1. Changing the audio engine settings changes a global Carla default. 
+   This means switching from Jack to ALSA or back will break any existing projects using
+   carla-rack or carla-patchbay.  
+   YUCK.
+   It is possible to change the default engine back again, but the Carla errors aren't helpful.
+   The other 2 Carla options assume the audio engine is Jack. 
+   I'd rather the engine choice was stored in the project. A 'system default' option could be provided
+   for people who want projects to be fractionally easier to move between machines.
 
 
 Suggestions for RaySession (install newest first)
@@ -321,14 +329,6 @@ Consider allowing notes to hang over into start of the pattern...
 	Allow recording in song mode
 	If the pattern is in the Song Editor auto-grow the song block
 
-NB some horizontal red lines in Song Editor are thicker than others...
-
-Create SVG glyphs for a bunch of icons:
-  - Right triangle used in menus
-  - Settings gear
-  - Transport icons
-  - Also NB # glyphs not used in pianoroll in label column. Can we have flats as an option too?
-
 
 .........
 
@@ -372,12 +372,8 @@ Is there an 'aconnectgui' equivalent that works across Windows and Mac?
   
 'luviedrums1' and 'luvieinst1' not ideal native MIDI output names 
   
-There's some missing icon sitting next to MIDI learn in the Instrument's MIDI input
-
-Recording - cf disable snap by default? enable grow by default?
-  Maybe store grow and snap in project and copy when cloning a pattern?
-  Maybe disable snap by default for everything?
-  
+Recording - enable grow by default?
+  Maybe store grow in project and copy when cloning a pattern?
   
 How well does cmake install work wrt placing the standalone binaries, icons, suffix-app mapping, LV2 plugins across the different Linux distros?
 

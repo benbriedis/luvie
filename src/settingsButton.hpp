@@ -8,10 +8,14 @@
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 #include "theme.hpp"
+#include "modern/svgGlyph.hpp"
 #include <algorithm>
-#include <cmath>
 #include <functional>
-#include <numbers>   // std::numbers::pi — M_PI is POSIX, not standard C++
+
+// The artwork is src/icons/gear.svg, minus the XML declaration. Re-copy it after
+// editing the file: this constant is what gets compiled in.
+inline const char* kGearSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M10.27 3.98 L10.54 1.10 L13.46 1.10 L13.73 3.98 L16.45 5.11 L18.67 3.26 L20.74 5.33 L18.89 7.55 L20.02 10.27 L22.90 10.54 L22.90 13.46 L20.02 13.73 L18.89 16.45 L20.74 18.67 L18.67 20.74 L16.45 18.89 L13.73 20.02 L13.46 22.90 L10.54 22.90 L10.27 20.02 L7.55 18.89 L5.33 20.74 L3.26 18.67 L5.11 16.45 L3.98 13.73 L1.10 13.46 L1.10 10.54 L3.98 10.27 L5.11 7.55 L3.26 5.33 L5.33 3.26 L7.55 5.11Z M8 12 A4 4 0 1 0 16 12 A4 4 0 1 0 8 12Z"/></svg>)SVG";
 
 // Square gear button at the right end of the tab bar, in line with the editor
 // tabs. A left-click fires onClick; the owner pops up a context-menu-style
@@ -20,37 +24,16 @@ class SettingsButton : public Fl_Box {
     bool hovered = false;
 
     void drawGear() {
-        // Centre on the area right of the left divider (x()+1 .. x()+w()),
-        // which is a pixel narrower than the full button, else the gear reads
-        // as shifted left.
-        const double cx = x() + 1 + (w() - 1) / 2.0;
-        const double cy = y() + h() / 2.0;
-        const double R  = std::min(w(), h()) * 0.30;   // tooth-tip radius
-        const double r  = R * 0.72;                     // tooth-valley radius
-        const int    teeth = 8;
-
-        fl_color(active() ? theme().gearIcon : theme().gearIconInactive);
-        fl_begin_complex_polygon();
-        for (int i = 0; i < teeth * 2; ++i) {
-            double a0  = (i)     * std::numbers::pi / teeth;
-            double a1  = (i + 1) * std::numbers::pi / teeth;
-            double rad = (i % 2 == 0) ? R : r;
-            fl_vertex(cx + rad * std::cos(a0), cy + rad * std::sin(a0));
-            fl_vertex(cx + rad * std::cos(a1), cy + rad * std::sin(a1));
-        }
-        fl_end_complex_polygon();
-
-        // Punch the hub hole in the (possibly hovered) background colour.
-        // Use a polygon with the same double-precision centre as the teeth so
-        // the hole is exactly concentric (fl_pie's integer coords drift off).
-        double hole = R * 0.42;
-        fl_color(bg());
-        fl_begin_complex_polygon();
-        for (int i = 0; i < 32; ++i) {
-            double a = i * 2.0 * std::numbers::pi / 32;
-            fl_vertex(cx + hole * std::cos(a), cy + hole * std::sin(a));
-        }
-        fl_end_complex_polygon();
+        // 22px across in the stock 35px button. Kept even, so the glyph centres
+        // on a whole pixel: the area right of the left divider (x()+1 ..
+        // x()+w()), a pixel narrower than the full button, else the gear reads
+        // as shifted left. The hub is a hole in the artwork, so the (possibly
+        // hovered) background shows through it.
+        const int size = (int)(std::min(w(), h()) * 0.64) & ~1;
+        const int cx   = x() + 1 + (w() - 1) / 2;
+        const int cy   = y() + h() / 2;
+        svgGlyph::draw(kGearSvg, cx, cy,
+                       active() ? theme().gearIcon : theme().gearIconInactive, size);
     }
 
     Fl_Color bg() const {

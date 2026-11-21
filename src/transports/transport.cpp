@@ -5,6 +5,7 @@
 #include "editor.hpp"
 #include "popupStyle.hpp"
 #include "modern/cursors.hpp"
+#include "modern/svgGlyph.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <algorithm>
@@ -142,57 +143,41 @@ TransportButton::TransportButton(int x, int y, int w, int h, Icon icon, Icon alt
 	box(FL_NO_BOX);
 }
 
-void TransportButton::drawIcon(int cx, int cy, int s, Icon icon) {
+// The glyphs are src/icons/play.svg, pause.svg, rewind.svg, loop.svg and
+// loopOff.svg, and the button face buttonDisc.svg, buttonRing.svg and
+// learningRing.svg, minus the XML declaration. Re-copy them after editing the files:
+// these constants are what get compiled in. The glyphs share a 24-unit viewBox,
+// so they line up with one another at any size. The rings are drawn one unit to
+// the pixel in the stock 40px button, so their 2px stroke stays crisp there.
+namespace {
+inline const char* kPlaySvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M8.5 4.5 L8.5 19.5 L19.5 12 Z"/></svg>)SVG";
+inline const char* kPauseSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="4" width="4" height="16" rx="1"/><rect fill="currentColor" x="14" y="4" width="4" height="16" rx="1"/></svg>)SVG";
+inline const char* kRewindSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><rect fill="currentColor" x="5" y="4.5" width="3" height="15" rx="1"/><path fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M19.25 5.25 L19.25 18.75 L10 12 Z"/></svg>)SVG";
+inline const char* kLoopSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.01 6.27 A7 7 0 1 0 18 12"/><path fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" d="M18 7.5 L21.5 13.5 L14.5 13.5 Z"/></svg>)SVG";
+inline const char* kLoopOffSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.01 6.27 A7 7 0 1 0 18 12"/><path fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" d="M18 7.5 L21.5 13.5 L14.5 13.5 Z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4.5 19.5 L19.5 4.5"/></svg>)SVG";
+inline const char* kDiscSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 16 16"><circle fill="currentColor" cx="8" cy="8" r="8"/></svg>)SVG";
+inline const char* kRingSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 38 38"><circle fill="none" stroke="currentColor" stroke-width="2" cx="19" cy="19" r="18"/></svg>)SVG";
+inline const char* kLearningRingSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 40 40"><circle fill="none" stroke="currentColor" stroke-width="2" cx="20" cy="20" r="19"/></svg>)SVG";
+}
+
+void TransportButton::drawIcon(int cx, int cy, int height, Fl_Color col, Icon icon) {
+	const char* svg = kPlaySvg;
 	switch (icon) {
-	case PLAY:
-		fl_polygon(cx - s*2/3, cy - s,
-		           cx - s*2/3, cy + s,
-		           cx + s,     cy);
-		break;
-
-	case PAUSE: {
-		int bw   = std::max(2, s / 2);
-		int span = s * 8 / 10;
-		fl_rectf(cx - span,        cy - s, bw, s * 2);
-		fl_rectf(cx + span - bw,   cy - s, bw, s * 2);
-		break;
+	case PLAY:     svg = kPlaySvg;    break;
+	case PAUSE:    svg = kPauseSvg;   break;
+	case REWIND:   svg = kRewindSvg;  break;
+	case LOOP:     svg = kLoopSvg;    break;
+	case LOOP_OFF: svg = kLoopOffSvg; break;
 	}
-
-	case REWIND: {
-		int barW  = std::max(2, s / 3);
-		int triHW = s - barW - 2;
-		int lx    = cx - (barW + 2 + triHW * 2) / 2;
-		fl_rectf(lx, cy - s, barW, s * 2);
-		fl_polygon(lx + barW + 2 + triHW * 2, cy - s,
-		           lx + barW + 2 + triHW * 2, cy + s,
-		           lx + barW + 2,             cy);
-		break;
-	}
-
-	case LOOP:
-	case LOOP_OFF: {
-		// A ring with a gap on the right, capped by an arrowhead, suggesting a
-		// repeating cycle. LOOP_OFF adds a diagonal slash (looping disabled).
-		int rr = s;
-		int lineW = std::max(2, s * (3 / 8));
-		fl_line_style(FL_SOLID | FL_CAP_ROUND, lineW);
-		fl_arc(cx - rr, cy - rr, rr * 2, rr * 2, 55.0, 340.0);
-		fl_line_style(0);
-		// Arrowhead at the lower end of the gap, pointing up into it.
-		int ah = std::max(3, s * 2 / 3);
-		int ax = cx + rr;             // ~3 o'clock, at the ring
-		int ay = cy;
-		fl_polygon(ax, ay - ah,       // tip (up, into the gap)
-		           ax - ah, ay + ah/2,
-		           ax + ah, ay + ah/2);
-		if (icon == LOOP_OFF) {
-			fl_line_style(FL_SOLID | FL_CAP_ROUND, lineW);
-			fl_line(cx - rr, cy + rr, cx + rr, cy - rr);
-			fl_line_style(0);
-		}
-		break;
-	}
-	}
+	svgGlyph::draw(svg, cx, cy, col, height);
 }
 
 void TransportButton::draw() {
@@ -214,27 +199,21 @@ void TransportButton::draw() {
 	    ? fl_color_average(iconColor, bgColor(), 0.35f)
 	    : (pressed ? FL_WHITE : iconColor);
 
-	if (pressed && !inactive) {
-		fl_color(pressedColor);
-		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
-	} else {
-		fl_color(bgColor());
-		fl_pie(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
-		fl_color(border);
-		fl_line_style(FL_SOLID, 2);
-		fl_arc(cx - r, cy - r, r * 2, r * 2, 0.0, 360.0);
-		fl_line_style(0);
-	}
+	// Every face piece has an even height, so all of them centre on the same
+	// whole pixel as the glyph. The ring spans r-1 .. r+1, the learning ring
+	// just outside it.
+	if (pressed && !inactive)
+		svgGlyph::draw(kDiscSvg, cx, cy, pressedColor, r * 2);
+	else
+		svgGlyph::draw(kRingSvg, cx, cy, border, r * 2 + 2);
 
-	if (learning) {
-		fl_color(learningColor);
-		fl_line_style(FL_SOLID, 2);
-		fl_arc(cx - r - 1, cy - r - 1, r * 2 + 2, r * 2 + 2, 0.0, 360.0);
-		fl_line_style(0);
-	}
+	if (learning)
+		svgGlyph::draw(kLearningRingSvg, cx, cy, learningColor, r * 2 + 4);
 
-	fl_color(icon_col);
-	drawIcon(cx, cy, r / 2, useAlt ? altIcon : icon);
+	// The artwork's 24-unit box at two thirds of the button's diameter: 24px
+	// in the stock 40px button, one unit to the pixel. Kept even, so the glyph
+	// centres on a whole pixel as the ring does.
+	drawIcon(cx, cy, (r * 4 / 3) & ~1, icon_col, useAlt ? altIcon : icon);
 }
 
 int TransportButton::handle(int event) {

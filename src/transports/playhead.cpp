@@ -8,6 +8,7 @@
 #include "paramLaneTypes.hpp"
 #include <FL/Fl.H>
 #include "theme.hpp"
+#include "modern/svgGlyph.hpp"
 #include <FL/fl_draw.H>
 #include <algorithm>
 #include <cmath>
@@ -435,6 +436,11 @@ float Playhead::displayBars() const
 	}
 }
 
+// The ruler's head marker. The artwork is src/icons/playhead.svg, minus the XML
+// declaration. Re-copy it after editing the file: this is what gets compiled in.
+static const char* const kPlayheadSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 11 15"><path fill="currentColor" d="M0 0 L11 0 L5.5 15 Z"/></svg>)SVG";
+
 void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 {
 	if (!transport) return;
@@ -442,12 +448,12 @@ void Playhead::drawTriangle(int rulerX, int rulerY, int rulerH)
 	if (patternTrack < 0 && loopActive && songHead == SongHead::Live) return;
 	float bars = displayBars();
 	if (!isInPattern(bars)) return;
+	// The artwork's tip sits mid-way across its middle pixel column, so it
+	// points straight down the one-pixel line the grid draws at px. 15px tall
+	// (and so 11 across) in the stock 20px ruler.
 	int px  = rulerX + barsToPixel(bars);
-	int tw  = 11;
-	int top = rulerY + 2;
-	int tip = rulerY + rulerH - 3;
-	fl_color(currentHeadColor());
-	fl_polygon(px - tw/2, top, px + tw/2, top, px, tip);
+	Fl_SVG_Image* img = svgGlyph::image(kPlayheadSvg, currentHeadColor(), rulerH - 5);
+	img->draw(px - img->w() / 2, rulerY + 2);
 }
 
 void Playhead::drawLine(int gridX, int gridY, int gridH)

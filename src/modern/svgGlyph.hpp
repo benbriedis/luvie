@@ -19,9 +19,10 @@
 // split-across-lines tag whitespace stripped, so that the fill injection below
 // matches and nothing but our own fill decides the colour.
 //
-// The artwork carries no fill, so nanosvg would render it black; the wanted
-// colour is injected before rasterising, which lets one piece of artwork follow
-// whatever colour its widget draws in.
+// The artwork carries no colour of its own: either it has no fill at all, which
+// nanosvg would render black, or it names "currentColor" wherever the colour
+// goes. Either way the wanted colour is put in before rasterising, which lets one
+// piece of artwork follow whatever colour its widget draws in.
 namespace svgGlyph {
 
 // `svg` rasterised `height` pixels tall (the width follows from the viewBox) and
@@ -45,14 +46,24 @@ inline Fl_SVG_Image* image(const char* svg, Fl_Color col, int height)
 	char hex[8];
 	std::snprintf(hex, sizeof hex, "#%02x%02x%02x", r, g, b);
 
-	// Give every shape the wanted fill. Each needle ends in a space, so appending
-	// keeps the tag name intact.
 	std::string src = svg;
-	for (const char* tag : {"<path ", "<circle "}) {
-		std::string needle = tag;
-		std::string repl = needle + "fill=\"" + hex + "\" ";
-		for (size_t p = 0; (p = src.find(needle, p)) != std::string::npos; p += repl.size())
-			src.replace(p, needle.size(), repl);
+	static const std::string kCurrent = "currentColor";
+	if (src.find(kCurrent) != std::string::npos) {
+		// Artwork that says where the colour goes -- needed once it strokes
+		// lines or leaves a shape unfilled -- names it "currentColor", as an
+		// icon in a web page would. nanosvg knows no such colour, so it is
+		// swapped for the wanted one here.
+		for (size_t p = 0; (p = src.find(kCurrent, p)) != std::string::npos; p += 7)
+			src.replace(p, kCurrent.size(), hex);
+	} else {
+		// Otherwise give every shape the wanted fill. Each needle ends in a
+		// space, so appending keeps the tag name intact.
+		for (const char* tag : {"<path ", "<circle "}) {
+			std::string needle = tag;
+			std::string repl = needle + "fill=\"" + hex + "\" ";
+			for (size_t p = 0; (p = src.find(needle, p)) != std::string::npos; p += repl.size())
+				src.replace(p, needle.size(), repl);
+		}
 	}
 
 	auto img = std::make_unique<Fl_SVG_Image>(nullptr, src.c_str());

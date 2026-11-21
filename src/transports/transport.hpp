@@ -56,7 +56,7 @@ private:
 	bool visualDisabled = false;   // drawn greyed but still clickable
 	bool learning = false;         // outlined amber while its MIDI trigger is learned
 
-	void drawIcon(int cx, int cy, int s, Icon icon);
+	void drawIcon(int cx, int cy, int height, Fl_Color col, Icon icon);
 
 public:
 	TransportButton(int x, int y, int w, int h, Icon icon, Icon altIcon = PLAY);
