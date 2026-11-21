@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "collapsiblePane.hpp"
+#include "svgGlyph.hpp"
+#include "disclosureArrows.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 
@@ -127,11 +129,11 @@ void CollapsiblePane::draw()
     // Chevron: pointing right when folded, down when open.
     const int cx = x() + kTitlePad + kChevronW / 2;
     const int cy = y() + 12 + (kHeaderH - 12) / 2;   // level with the title
-    fl_color(subTextCol_);
+    // A size up on the Song Editor's track arrows, to suit the bigger title.
     if (expanded_)
-        fl_polygon(cx - 5, cy - 3, cx + 5, cy - 3, cx, cy + 3);
+        svgGlyph::draw(kDisclosureDownSvg, cx, cy, subTextCol_, 9);
     else
-        fl_polygon(cx - 3, cy - 5, cx - 3, cy + 5, cx + 3, cy);
+        svgGlyph::draw(kDisclosureRightSvg, cx, cy, subTextCol_, 11);
 
     const int tx = x() + kTitlePad + kChevronW + kChevronGap;
     fl_font(FL_HELVETICA_BOLD, 13);

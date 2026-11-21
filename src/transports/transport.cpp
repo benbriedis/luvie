@@ -90,37 +90,37 @@ void AlertIndicator::showPopup() {
 	popup->show();
 }
 
+// The warning triangle: src/icons/alertBorder.svg, alertFill.svg and
+// alertMark.svg, minus the XML declaration. Re-copy them after editing the
+// files: these constants are what get compiled in.
+static const char* const kAlertBorderSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 20 20"><path fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M10 2 L1.5 17.5 L18.5 17.5 Z"/></svg>)SVG";
+static const char* const kAlertFillSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 20 20"><path fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" d="M10 2 L1.5 17.5 L18.5 17.5 Z"/></svg>)SVG";
+static const char* const kAlertMarkSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 20 20"><rect fill="currentColor" x="9" y="6.5" width="2" height="6.5" rx="1"/><circle fill="currentColor" cx="10" cy="15.25" r="1.25"/></svg>)SVG";
+
 void AlertIndicator::draw() {
 	// Clear our slice of the bar first so a previous (larger) glyph doesn't
 	// show through when the state changes.
 	fl_color(bgColor());
 	fl_rectf(x(), y(), w(), h());
 
-	int cx = x() + w() / 2;
-	int cy = y() + h() / 2;
-	int s  = std::min(w(), h()) / 2 - 2;   // glyph half-extent
+	// The triangle is layered from three pieces of artwork, each a single
+	// colour: a fat-stroked triangle for the border, a thin-stroked one for the
+	// face inside it, and the '!'. 20px in the stock 26 x 22 indicator; kept
+	// even so the pieces centre on a whole pixel.
+	const int size = (std::min(w(), h()) - 2) & ~1;
+	const int cx   = x() + w() / 2;
+	const int cy   = y() + h() / 2;
+	const bool alerting = !alerts.empty();
 
-	if (!alerts.empty()) {
-		// Red warning triangle with a white '!'.
-		fl_color(alertColor);
-		fl_polygon(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
-		fl_color(fl_color_average(alertColor, FL_BLACK, 0.7f));
-		fl_loop(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
-		fl_color(FL_WHITE);
-		fl_font(FL_HELVETICA_BOLD, s + 4);
-		// Centre on the triangle's axis (+1 optical nudge for the glyph's bearing).
-		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
-	} else {
-		// Same warning triangle as the alert state, but with a white background.
-		fl_color(popupBg());
-		fl_polygon(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
-		fl_color(bubbleBorder);
-		fl_loop(cx, cy - s, cx - s, cy + s, cx + s, cy + s);
-		fl_color(theme().transportIcon);
-		fl_font(FL_HELVETICA_BOLD, s + 4);
-		// Centre on the triangle's axis (+1 optical nudge for the glyph's bearing).
-		fl_draw("!", cx - s + 1, cy - s + 2, s * 2, s * 2, FL_ALIGN_CENTER);
-	}
+	// Red with a white '!' while there are alerts; otherwise the same triangle,
+	// quiet, in the popup's background.
+	svgGlyph::draw(kAlertBorderSvg, cx, cy,
+	               alerting ? fl_color_average(alertColor, FL_BLACK, 0.7f) : bubbleBorder, size);
+	svgGlyph::draw(kAlertFillSvg, cx, cy, alerting ? alertColor : popupBg(), size);
+	svgGlyph::draw(kAlertMarkSvg, cx, cy, alerting ? FL_WHITE : theme().transportIcon, size);
 }
 
 int AlertIndicator::handle(int event) {
@@ -144,11 +144,9 @@ TransportButton::TransportButton(int x, int y, int w, int h, Icon icon, Icon alt
 }
 
 // The glyphs are src/icons/play.svg, pause.svg, rewind.svg, loop.svg and
-// loopOff.svg, and the button face buttonDisc.svg, buttonRing.svg and
-// learningRing.svg, minus the XML declaration. Re-copy them after editing the files:
-// these constants are what get compiled in. The glyphs share a 24-unit viewBox,
-// so they line up with one another at any size. The rings are drawn one unit to
-// the pixel in the stock 40px button, so their 2px stroke stays crisp there.
+// loopOff.svg, minus the XML declaration. Re-copy them after editing the files:
+// these constants are what get compiled in. All share a 24-unit viewBox, so they
+// line up with one another at any size.
 namespace {
 inline const char* kPlaySvg =
 	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M8.5 4.5 L8.5 19.5 L19.5 12 Z"/></svg>)SVG";
@@ -160,12 +158,6 @@ inline const char* kLoopSvg =
 	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.01 6.27 A7 7 0 1 0 18 12"/><path fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" d="M18 7.5 L21.5 13.5 L14.5 13.5 Z"/></svg>)SVG";
 inline const char* kLoopOffSvg =
 	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15.01 6.27 A7 7 0 1 0 18 12"/><path fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" d="M18 7.5 L21.5 13.5 L14.5 13.5 Z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4.5 19.5 L19.5 4.5"/></svg>)SVG";
-inline const char* kDiscSvg =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 16 16"><circle fill="currentColor" cx="8" cy="8" r="8"/></svg>)SVG";
-inline const char* kRingSvg =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 38 38"><circle fill="none" stroke="currentColor" stroke-width="2" cx="19" cy="19" r="18"/></svg>)SVG";
-inline const char* kLearningRingSvg =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 40 40"><circle fill="none" stroke="currentColor" stroke-width="2" cx="20" cy="20" r="19"/></svg>)SVG";
 }
 
 void TransportButton::drawIcon(int cx, int cy, int height, Fl_Color col, Icon icon) {
@@ -199,16 +191,15 @@ void TransportButton::draw() {
 	    ? fl_color_average(iconColor, bgColor(), 0.35f)
 	    : (pressed ? FL_WHITE : iconColor);
 
-	// Every face piece has an even height, so all of them centre on the same
-	// whole pixel as the glyph. The ring spans r-1 .. r+1, the learning ring
-	// just outside it.
+	// The ring's 2px stroke straddles radius r; the learning ring sits just
+	// outside it.
 	if (pressed && !inactive)
-		svgGlyph::draw(kDiscSvg, cx, cy, pressedColor, r * 2);
+		svgGlyph::disc(cx - r, cy - r, r * 2, pressedColor);
 	else
-		svgGlyph::draw(kRingSvg, cx, cy, border, r * 2 + 2);
+		svgGlyph::ring(cx - r - 1, cy - r - 1, r * 2 + 2, 2, border);
 
 	if (learning)
-		svgGlyph::draw(kLearningRingSvg, cx, cy, learningColor, r * 2 + 4);
+		svgGlyph::ring(cx - r - 2, cy - r - 2, r * 2 + 4, 2, learningColor);
 
 	// The artwork's 24-unit box at two thirds of the button's diameter: 24px
 	// in the stock 40px button, one unit to the pixel. Kept even, so the glyph
@@ -220,7 +211,7 @@ int TransportButton::handle(int event) {
 	if (onContextMenu) {
 		switch (event) {
 		case FL_ENTER:
-			window()->cursor(contextMenuCursorImage(), 0, 0);
+			window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
 			break;
 		case FL_LEAVE:
 			window()->cursor(FL_CURSOR_DEFAULT);

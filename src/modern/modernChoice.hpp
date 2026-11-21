@@ -61,7 +61,7 @@ private:
         if (event == FL_ENTER) {
             hovered = true;
             redraw();
-            if (onRightClick && window()) window()->cursor(contextMenuCursorImage(), 0, 0);
+            if (onRightClick && window()) window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             return 1;
         }
         if (event == FL_LEAVE) {

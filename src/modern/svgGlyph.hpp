@@ -6,6 +6,7 @@
 
 #include <FL/Fl.H>
 #include <FL/Fl_SVG_Image.H>
+#include <algorithm>
 #include <cstdio>
 #include <map>
 #include <memory>
@@ -25,6 +26,30 @@
 // piece of artwork follow whatever colour its widget draws in.
 namespace svgGlyph {
 
+namespace detail {
+
+// Parse `src` and rasterise it `height` pixels tall, the width following from
+// the viewBox. (Fl_SVG_Image's own proportional resize fits the artwork inside
+// the box it is given, so asking for height x height would shrink anything
+// wider than it is tall.)
+inline std::unique_ptr<Fl_SVG_Image> rasterise(const std::string& src, int height)
+{
+	auto img = std::make_unique<Fl_SVG_Image>(nullptr, src.c_str());
+	const int W = img->h() > 0 ? (int)(img->w() * (double)height / img->h() + 0.5) : height;
+	img->proportional = false;
+	img->resize(std::max(1, W), height);
+	return img;
+}
+
+inline void hex(Fl_Color col, char (&out)[8])
+{
+	uchar r, g, b;
+	Fl::get_color(col, r, g, b);
+	std::snprintf(out, sizeof out, "#%02x%02x%02x", r, g, b);
+}
+
+}
+
 // `svg` rasterised `height` pixels tall (the width follows from the viewBox) and
 // tinted to `col`. Widgets repaint often -- on hover, and on every menu open and
 // close -- and re-parsing the SVG each paint would be wasteful, so the results
@@ -41,10 +66,8 @@ inline Fl_SVG_Image* image(const char* svg, Fl_Color col, int height)
 	auto it = cache.find(key);
 	if (it != cache.end()) return it->second.get();
 
-	uchar r, g, b;
-	Fl::get_color(col, r, g, b);
 	char hex[8];
-	std::snprintf(hex, sizeof hex, "#%02x%02x%02x", r, g, b);
+	detail::hex(col, hex);
 
 	std::string src = svg;
 	static const std::string kCurrent = "currentColor";
@@ -66,9 +89,7 @@ inline Fl_SVG_Image* image(const char* svg, Fl_Color col, int height)
 		}
 	}
 
-	auto img = std::make_unique<Fl_SVG_Image>(nullptr, src.c_str());
-	img->resize(height, height);   // proportional: aspect < 1 sets the width
-	return (cache[key] = std::move(img)).get();
+	return (cache[key] = detail::rasterise(src, height)).get();
 }
 
 // The width `svg` takes at `height` pixels tall. The colour cannot change the
@@ -83,6 +104,51 @@ inline void draw(const char* svg, int cx, int cy, Fl_Color col, int height)
 {
 	Fl_SVG_Image* img = image(svg, col, height);
 	img->draw(cx - img->w() / 2, cy - img->h() / 2);
+}
+
+
+// Circles. These need no artwork: each is generated at exactly the size asked
+// for, so that a ring's stroke stays the given number of pixels however large
+// the circle. Both take the same box fl_pie() does -- a d x d square whose
+// top-left corner is (x, y) -- and keep inside it: the disc fills it, and the
+// ring's outer edge is its edge, the stroke lying inside, as a CSS border does.
+namespace detail {
+
+inline Fl_SVG_Image* circle(int d, double stroke, Fl_Color col)
+{
+	// Keyed on the stroke in hundredths: 0 for a disc.
+	static std::map<std::tuple<int, int, unsigned>, std::unique_ptr<Fl_SVG_Image>> cache;
+	auto key = std::make_tuple(d, (int)(stroke * 100 + 0.5), (unsigned)col);
+	auto it = cache.find(key);
+	if (it != cache.end()) return it->second.get();
+
+	char hex[8];
+	detail::hex(col, hex);
+	char src[256];
+	const double c = d / 2.0;
+	if (stroke > 0)
+		std::snprintf(src, sizeof src,
+			R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d"><circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="%g"/></svg>)",
+			d, d, c, c, c - stroke / 2, hex, stroke);
+	else
+		std::snprintf(src, sizeof src,
+			R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d"><circle cx="%g" cy="%g" r="%g" fill="%s"/></svg>)",
+			d, d, c, c, c, hex);
+	return (cache[key] = rasterise(src, d)).get();
+}
+
+}
+
+// A filled circle in the d x d box at (x, y).
+inline void disc(int x, int y, int d, Fl_Color col)
+{
+	if (d > 0) detail::circle(d, 0, col)->draw(x, y);
+}
+
+// A circle outline `stroke` pixels wide, its outer edge the d x d box at (x, y).
+inline void ring(int x, int y, int d, double stroke, Fl_Color col)
+{
+	if (d > 0 && stroke > 0) detail::circle(d, stroke, col)->draw(x, y);
 }
 
 }

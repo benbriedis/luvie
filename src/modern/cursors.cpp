@@ -2,78 +2,31 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "cursors.hpp"
-#include <cmath>
+#include <FL/Fl_SVG_Image.H>
+
+// The cursors are drawn from artwork that carries its own colours, unlike the
+// svgGlyph artwork, and whose viewBox is its size in pixels. Each is
+// rasterised once and handed back as a plain RGB image holding the pixels. It
+// must not be the Fl_SVG_Image itself: setting a cursor copies the image first,
+// and an Fl_SVG_Image's copy is a fresh, not yet rasterised SVG image with no
+// pixels in it, which the X11 driver then reads through a null pointer.
+static Fl_RGB_Image* rasteriseCursor(const char* svgText)
+{
+	Fl_SVG_Image svg(nullptr, svgText);
+	svg.normalize();
+	Fl_RGB_Image pixels((const uchar*)svg.data()[0], svg.w(), svg.h(), svg.d(), svg.ld());
+	return (Fl_RGB_Image*)pixels.copy();   // a deep copy, owning its pixels
+}
+
+// The forbidden cursor: a red ring and slash on a white outline, so it reads
+// over light and dark alike. The artwork is src/icons/forbiddenCursor.svg,
+// minus the XML declaration; re-copy it after editing the file, as this
+// constant is what gets compiled in.
+static const char* const kForbiddenCursorSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 20 20"><g fill="none" stroke="#ffffff"><circle cx="10" cy="10" r="7.5" stroke-width="4.5"/><path stroke-width="5" d="M4.7 4.7 L15.3 15.3"/></g><g fill="none" stroke="#dc5050"><circle cx="10" cy="10" r="7.5" stroke-width="2.25"/><path stroke-width="3" d="M4.7 4.7 L15.3 15.3"/></g></svg>)SVG";
 
 const Fl_RGB_Image* forbiddenCursorImage() {
-	static const int SIZE = 20;
-	static uchar pix[SIZE * SIZE * 4] = {};
-	static Fl_RGB_Image* img = nullptr;
-	if (img) return img;
-
-	const float cx      = (SIZE - 1) / 2.0f;
-	const float cy      = (SIZE - 1) / 2.0f;
-	const float outer_r = 8.5f;   // leave ~1px margin for white border
-	const float inner_r = 6.5f;   // 2px thick ring
-	const float slash_hw = 2.0f;  // half-width of slash (perpendicular distance)
-
-	const float inv_sqrt2 = 1.0f / std::sqrt(2.0f);
-
-	/* Pass 1: record which pixels are part of the cursor shape */
-	bool isCursor[SIZE * SIZE] = {};
-	for (int y = 0; y < SIZE; y++) {
-		for (int x = 0; x < SIZE; x++) {
-			float dx   = x - cx;
-			float dy   = y - cy;
-			float dist = std::sqrt(dx*dx + dy*dy);
-
-			// Ring: between inner and outer radius
-			bool onRing  = dist >= inner_r && dist <= outer_r;
-
-			// Slash: true perpendicular distance from the 45° diagonal (top-left to bottom-right)
-			// The diagonal direction is (1,1)/√2; perpendicular is (-1,1)/√2
-			// perp distance = |(-dx + dy)| / √2
-			float perp   = std::fabs(-dx + dy) * inv_sqrt2;
-			bool onSlash = perp <= slash_hw && dist <= outer_r;
-
-			isCursor[y * SIZE + x] = onRing || onSlash;
-		}
-	}
-
-	/* Pass 2: white border on any non-cursor pixel adjacent to a cursor pixel */
-	for (int y = 0; y < SIZE; y++) {
-		for (int x = 0; x < SIZE; x++) {
-			if (isCursor[y * SIZE + x]) continue;
-			bool nearCursor = false;
-			for (int dy = -1; dy <= 1 && !nearCursor; dy++)
-				for (int dx = -1; dx <= 1 && !nearCursor; dx++) {
-					int nx = x + dx, ny = y + dy;
-					if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE)
-						nearCursor = isCursor[ny * SIZE + nx];
-				}
-			if (nearCursor) {
-				int idx = (y * SIZE + x) * 4;
-				pix[idx+0] = 255;
-				pix[idx+1] = 255;
-				pix[idx+2] = 255;
-				pix[idx+3] = 255;
-			}
-		}
-	}
-
-	/* Pass 3: paint the red cursor shape on top */
-	for (int y = 0; y < SIZE; y++) {
-		for (int x = 0; x < SIZE; x++) {
-			if (isCursor[y * SIZE + x]) {
-				int idx = (y * SIZE + x) * 4;
-				pix[idx+0] = 220;
-				pix[idx+1] = 80;
-				pix[idx+2] = 80;
-				pix[idx+3] = 255;
-			}
-		}
-	}
-
-	img = new Fl_RGB_Image(pix, SIZE, SIZE, 4);
+	static Fl_RGB_Image* img = rasteriseCursor(kForbiddenCursorSvg);
 	return img;
 }
 
@@ -97,84 +50,19 @@ void flashForbiddenCursor(Fl_Window* win)
 	if (!win) return;
 	Fl::remove_timeout(endForbiddenFlash);
 	flashWindow = win;
-	win->cursor(forbiddenCursorImage(), 11, 11);
+	win->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
 	Fl::add_timeout(forbiddenFlashSecs, endForbiddenFlash);
 }
 
+// The context-menu cursor: an arrow with a little menu badge, black on a white
+// outline. The artwork is src/icons/contextCursor.svg, minus the XML
+// declaration; re-copy it after editing the file, as this constant is what gets
+// compiled in. Its viewBox being its size in pixels keeps the badge's lines on
+// whole pixels.
+static const char* const kContextCursorSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 20 22"><g fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"><path d="M1.5 1.5 L1.5 14.93 L5.06 11.49 L5.58 11.32 L11.3 11.32 Z"/><path d="M9.6 18.82 L7.39 19.75 L3.67 10.9 L5.88 9.97 Z"/></g><g fill="#000000"><path d="M1.5 1.5 L1.5 14.93 L5.06 11.49 L5.58 11.32 L11.3 11.32 Z"/><path d="M9.6 18.82 L7.39 19.75 L3.67 10.9 L5.88 9.97 Z"/></g><rect fill="#ffffff" x="9" y="9" width="11" height="13" rx="1"/><rect fill="#000000" x="10" y="10" width="9" height="11"/><rect fill="#ffffff" x="11" y="12" width="7" height="1"/><rect fill="#ffffff" x="11" y="15" width="7" height="1"/><rect fill="#ffffff" x="11" y="18" width="7" height="1"/></svg>)SVG";
+
 const Fl_RGB_Image* contextMenuCursorImage() {
-	static const int W = 20;
-	static const int H = 22;
-	static uchar pix[W * H * 4] = {};
-	static Fl_RGB_Image* img = nullptr;
-	if (img) return img;
-
-	const float scaleX = (float)W / 17.0f;
-	const float scaleY = (float)H / 19.0f;
-
-	auto pip = [](float px, float py, const float* xs, const float* ys, int n) -> bool {
-		bool inside = false;
-		for (int i = 0, j = n-1; i < n; j = i++) {
-			if (((ys[i] > py) != (ys[j] > py)) &&
-				(px < (xs[j]-xs[i])*(py-ys[i])/(ys[j]-ys[i])+xs[i]))
-				inside = !inside;
-		}
-		return inside;
-	};
-
-	// Inner black arrow body and tail polygons (from SVG)
-	const float aiX[] = {1.0f, 1.0f, 3.969f, 4.397f, 9.165f};
-	const float aiY[] = {2.814f, 14.002f, 11.136f, 10.997f, 10.997f};
-	const float tiX[] = {7.751f, 5.907f, 2.807f, 4.648f};
-	const float tiY[] = {16.416f, 17.190f, 9.816f, 9.041f};
-
-	bool black[W * H] = {};
-	bool white[W * H] = {};
-
-	for (int y = 0; y < H; y++) {
-		for (int x = 0; x < W; x++) {
-			float svgX = (x + 0.5f) / scaleX;
-			float svgY = (y + 0.5f) / scaleY;
-			int i = y * W + x;
-
-			bool inMenuOuter = svgX >= 8 && svgX <= 17 && svgY >= 8 && svgY <= 18;
-			bool inMenuInner = svgX >= 9 && svgX <= 16 && svgY >= 9 && svgY <= 17;
-			bool inMenuLine  = inMenuInner && (
-				(svgY >= 11 && svgY <= 12) || (svgY >= 13 && svgY <= 14) || (svgY >= 15 && svgY <= 16));
-
-			if (inMenuLine) {
-				white[i] = true;
-			} else if (inMenuInner) {
-				black[i] = true;
-			} else if (inMenuOuter) {
-				white[i] = true;
-			} else if (pip(svgX, svgY, aiX, aiY, 5) || pip(svgX, svgY, tiX, tiY, 4)) {
-				black[i] = true;
-			}
-		}
-	}
-
-	// White border: transparent pixels adjacent to black → white
-	for (int y = 0; y < H; y++) {
-		for (int x = 0; x < W; x++) {
-			int i = y * W + x;
-			if (black[i] || white[i]) continue;
-			bool nearBlack = false;
-			for (int dy = -1; dy <= 1 && !nearBlack; dy++)
-				for (int dx = -1; dx <= 1 && !nearBlack; dx++) {
-					int nx = x+dx, ny = y+dy;
-					if (nx >= 0 && nx < W && ny >= 0 && ny < H)
-						nearBlack = black[ny * W + nx];
-				}
-			if (nearBlack) white[i] = true;
-		}
-	}
-
-	for (int i = 0; i < W * H; i++) {
-		int idx = i * 4;
-		if (black[i])      { pix[idx]=0;   pix[idx+1]=0;   pix[idx+2]=0;   pix[idx+3]=255; }
-		else if (white[i]) { pix[idx]=255; pix[idx+1]=255; pix[idx+2]=255; pix[idx+3]=255; }
-	}
-
-	img = new Fl_RGB_Image(pix, W, H, 4);
+	static Fl_RGB_Image* img = rasteriseCursor(kContextCursorSvg);
 	return img;
 }

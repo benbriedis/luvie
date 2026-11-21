@@ -8,6 +8,7 @@
 #include <FL/Fl_Slider.H>
 #include <FL/Fl_Group.H>
 #include <FL/fl_draw.H>
+#include "svgGlyph.hpp"
 #include <functional>
 
 // A flat, modern horizontal slider: a thin rounded track with a filled
@@ -29,11 +30,14 @@ class ModernSlider : public Fl_Slider {
         return t < 0 ? 0 : (t > 1 ? 1 : t);
     }
 
-    static void capsule(int x0, int x1, int cy, int rad) {
+    // A rounded bar from x0 to x1: a straight run with an anti-aliased disc
+    // for each end.
+    static void capsule(int x0, int x1, int cy, int rad, Fl_Color col) {
+        fl_color(col);
         if (x1 > x0)
             fl_rectf(x0, cy - rad, x1 - x0, 2 * rad);
-        fl_pie(x0 - rad, cy - rad, 2 * rad, 2 * rad, 0, 360);
-        fl_pie(x1 - rad, cy - rad, 2 * rad, 2 * rad, 0, 360);
+        svgGlyph::disc(x0 - rad, cy - rad, 2 * rad, col);
+        svgGlyph::disc(x1 - rad, cy - rad, 2 * rad, col);
     }
 
     void draw() override {
@@ -50,24 +54,20 @@ class ModernSlider : public Fl_Slider {
 
         // Unfilled track, then the filled portion up to the thumb. The fill
         // colour may vary with the value (e.g. note-velocity colouring).
-        fl_color(trackCol);
-        capsule(x0, x1, cy, rad);
-        fl_color(fillColorFn ? fillColorFn(value()) : selection_color());
-        capsule(x0, thumbX, cy, rad);
+        capsule(x0, x1, cy, rad, trackCol);
+        capsule(x0, thumbX, cy, rad, fillColorFn ? fillColorFn(value()) : selection_color());
 
         // Hover/press halo behind the thumb.
         if (hovered || pressed) {
-            fl_color(fl_color_average(selection_color(), color(), 0.25f));
             int hr = thumbR + 3;
-            fl_pie(thumbX - hr, cy - hr, 2 * hr, 2 * hr, 0, 360);
+            svgGlyph::disc(thumbX - hr, cy - hr, 2 * hr,
+                           fl_color_average(selection_color(), color(), 0.25f));
         }
 
         // Thumb: accent ring with a white centre.
-        fl_color(selection_color());
-        fl_pie(thumbX - thumbR, cy - thumbR, 2 * thumbR, 2 * thumbR, 0, 360);
-        fl_color(FL_WHITE);
+        svgGlyph::disc(thumbX - thumbR, cy - thumbR, 2 * thumbR, selection_color());
         int ir = thumbR - 2;
-        fl_pie(thumbX - ir, cy - ir, 2 * ir, 2 * ir, 0, 360);
+        svgGlyph::disc(thumbX - ir, cy - ir, 2 * ir, FL_WHITE);
     }
 
     void setFromMouse() {

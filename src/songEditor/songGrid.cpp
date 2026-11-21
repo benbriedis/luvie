@@ -1192,7 +1192,7 @@ int SongGrid::handleParamEvent(int event)
             }
         }
         if (window()) {
-            if (useHand) window()->cursor(contextMenuCursorImage(), 0, 0);
+            if (useHand) window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             else         window()->cursor(FL_CURSOR_DEFAULT);
         }
         return 0;

@@ -73,6 +73,7 @@ struct Theme {
     // FLTK's own defaults, for stock widgets (Fl_Input, unstyled labels, fl_choice).
     // 0 leaves FLTK's original colour in place.
     Fl_Color fltkForeground;
+    Fl_Color fltkBackground;   // stock windows and buttons, e.g. fl_choice dialogs
     Fl_Color fltkBackground2;
 };
 

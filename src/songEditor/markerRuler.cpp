@@ -248,7 +248,7 @@ int MarkerRuler::handle(int event)
 		if (g == RAMP_START || g == RAMP_END)
 			window()->cursor(FL_CURSOR_WE);
 		else
-			window()->cursor(contextMenuCursorImage(), 0, 0);
+			window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
 		return 1;
 	}
 	case FL_PUSH: {
@@ -310,7 +310,7 @@ int MarkerRuler::handle(int event)
 		if (bar < 0 || isFixed(bar)) return 0;
 		if (kind == TEMPO) timeline->removeBpm(bar);
 		else               timeline->removeTimeSig(bar);
-		window()->cursor(contextMenuCursorImage(), 0, 0);
+		window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
 		return 1;
 	}
 	}

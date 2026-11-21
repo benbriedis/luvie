@@ -3,7 +3,7 @@
 
 #include <FL/Fl.H>
 #include <FL/Fl_Native_File_Chooser.H>
-#include <FL/fl_ask.H>
+#include "modern/modernDialog.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -718,7 +718,8 @@ static int luvieMain(int argc, char **argv) {
             session->save();   // new project: write out the empty default
         } else {
             fprintf(stderr, "[luvie] invalid project file: %s\n", projectPath.c_str());
-            fl_alert("Invalid project file");
+            modernDialog::alert("Invalid project file",
+                                "Couldn't read " + projectPath + " as a Luvie project.");
             return 1;
         }
     }
@@ -782,10 +783,15 @@ static int luvieMain(int argc, char **argv) {
         }
 
         // No project file yet: ask the user what to do with the session.
-        // b0 is the default (also fired by Esc / WM close), so make it Cancel.
-        int choice = fl_choice("Save this session before closing?",
-                               "Cancel", "Don't Save", "Save");
-        if (choice == 0) return;           // Cancel — keep the window open
+        // Escape and closing the dialog both mean Cancel; Enter means Save.
+        int choice = modernDialog::choice(
+            "Save this session before closing?",
+            "It hasn't been saved yet, so closing without saving loses it.",
+            {{"Don't Save", modernDialog::Button::Separate},
+             {"Cancel"},
+             {"Save", modernDialog::Button::Primary}},
+            1);
+        if (choice == 1) return;           // Cancel — keep the window open
         if (choice == 2) ctx->save();      // Save (prompts for a path), then close
         w->hide();                         // Save or Don't Save both close
     }, &closeCtx);

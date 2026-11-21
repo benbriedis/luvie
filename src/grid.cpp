@@ -272,7 +272,7 @@ int Grid::handle(int event)
                         creationForbidden = std::any_of(notes.begin(), notes.end(),
                             [=](const Note& n) { return n.row == row && beatsOverlap(col, length, n.beat, n.length); });
                         if (creationForbidden)
-                            window()->cursor(forbiddenCursorImage(), 11, 11);
+                            window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
                     }
                 }
             }
@@ -651,7 +651,7 @@ void Grid::movingGroup(StateDragGroup& s)
     }
     previewGroupExtras(dBeat);
 
-    if (s.blocked) window()->cursor(forbiddenCursorImage(), 11, 11);
+    if (s.blocked) window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
     else           window()->cursor(FL_CURSOR_HAND);
     redraw();
 }
@@ -826,7 +826,7 @@ void Grid::moving(StateDragMove& s)
             }
         }
     }
-    if (s.overlapping) window()->cursor(forbiddenCursorImage(), 11, 11);
+    if (s.overlapping) window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
     else               window()->cursor(FL_CURSOR_HAND);
     redraw();
 }
@@ -957,7 +957,7 @@ void Grid::findNoteForCursor()
             }
         } else if (ex >= leftEdge && ex <= rightEdge) {
             state = StateHoverMove{i, ex - leftEdge};
-            window()->cursor(contextMenuCursorImage(), 0, 0);
+            window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             redraw();
             return;
         }

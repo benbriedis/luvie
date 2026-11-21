@@ -61,6 +61,7 @@ constexpr Theme kLight {
     .sliderTrack      = 0xE5E7EB00,
 
     .fltkForeground   = 0,
+    .fltkBackground   = 0,
     .fltkBackground2  = 0,
 };
 
@@ -117,6 +118,7 @@ constexpr Theme kDark {
     .sliderTrack      = 0x5A5A5A00,
 
     .fltkForeground   = 0xE5E5E500,
+    .fltkBackground   = 0x3D3D3D00,   // overlayBg: dialogs match the overlays
     .fltkBackground2  = 0x2A2A2A00,
 };
 
@@ -134,6 +136,28 @@ std::vector<ThemeObserver*>& observers() {
 void applyFltkColor(Fl_Color index, Fl_Color themed, Fl_Color& original, bool& saved) {
     if (!saved) { original = Fl::get_color(index); saved = true; }
     Fl::set_color(index, themed ? themed : original);
+}
+
+// Set FLTK's background colour. Fl::background() rather than the one colour
+// index, since it also rebuilds the grey ramp that stock boxes draw their bevels
+// from -- otherwise a dark dialog's buttons keep light-grey edges. The ramp
+// (which holds FL_BACKGROUND_COLOR too) is saved first, so a theme that leaves
+// the background at 0 gets FLTK's own colours back exactly.
+void applyFltkBackground(Fl_Color themed) {
+    constexpr int kRampSize = FL_NUM_GRAY;
+    static Fl_Color original[kRampSize];
+    static bool saved = false;
+    if (!saved) {
+        for (int i = 0; i < kRampSize; ++i) original[i] = Fl::get_color(FL_GRAY_RAMP + i);
+        saved = true;
+    }
+    if (themed) {
+        uchar r, g, b;
+        Fl::get_color(themed, r, g, b);
+        Fl::background(r, g, b);
+    } else {
+        for (int i = 0; i < kRampSize; ++i) Fl::set_color(FL_GRAY_RAMP + i, original[i]);
+    }
 }
 
 // Subwindows (popups, overlays) keep their own damage, so mark every widget.
@@ -159,6 +183,7 @@ void setTheme(int index) {
     static bool fgSaved = false, bg2Saved = false;
     applyFltkColor(FL_FOREGROUND_COLOR,  theme().fltkForeground,  fg,  fgSaved);
     applyFltkColor(FL_BACKGROUND2_COLOR, theme().fltkBackground2, bg2, bg2Saved);
+    applyFltkBackground(theme().fltkBackground);
 
     // Copied: an observer may create or destroy others while it restyles.
     const auto list = observers();

@@ -7,6 +7,7 @@
 #include "editor.hpp"
 #include "cursors.hpp"
 #include "noteColor.hpp"
+#include "modern/svgGlyph.hpp"
 #include "sliceController.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
@@ -152,16 +153,14 @@ void DrumGrid::draw()
         int dotX = x() + padX + (int)((beat - colOffset) * colWidth);
         int dotY = y() + vr * rowHeight + rowHeight / 2;
         if (dotX + dotR < x() || dotX - dotR > x() + w()) continue;
-        fl_color(velocityFill(n.velocity));
-        fl_pie(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
-        fl_color(velocityAccent(n.velocity));
-        fl_arc(dotX - dotR, dotY - dotR, 2 * dotR, 2 * dotR, 0, 360);
+        // Anti-aliased, from cached images (one per size and colour; velocity
+        // colours come in a few hundred shades at most).
+        svgGlyph::disc(dotX - dotR, dotY - dotR, 2 * dotR, velocityFill(n.velocity));
+        svgGlyph::ring(dotX - dotR, dotY - dotR, 2 * dotR, 1, velocityAccent(n.velocity));
         if (selection.contains(n.id)) {
-            const int r = dotR + 2;
-            fl_color(selectionColor);
-            fl_line_style(FL_SOLID, 2);
-            fl_arc(dotX - r, dotY - r, 2 * r, 2 * r, 0, 360);
-            fl_line_style(0);
+            // A 2px ring centred a couple of pixels outside the dot's rim.
+            const int r = dotR + 3;
+            svgGlyph::ring(dotX - r, dotY - r, 2 * r, 2, selectionColor);
         }
     }
 
@@ -395,7 +394,7 @@ int DrumGrid::handle(int evt)
         int idx = findNoteAtCursor();
         if (idx >= 0) {
             state = DrumStateHover{idx};
-            if (window()) window()->cursor(contextMenuCursorImage(), 0, 0);
+            if (window()) window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
         } else {
             state = DrumStateIdle{};
             if (window()) window()->cursor(FL_CURSOR_DEFAULT);
@@ -704,7 +703,7 @@ void DrumGrid::movingGroup(DrumStateDragGroup& d)
     }
 
     if (window()) {
-        if (d.blocked) window()->cursor(forbiddenCursorImage(), 11, 11);
+        if (d.blocked) window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
         else           window()->cursor(FL_CURSOR_HAND);
     }
     redraw();

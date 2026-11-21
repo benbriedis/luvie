@@ -10,7 +10,13 @@
 #include <FL/Fl_Window.H>
 
 const Fl_RGB_Image* forbiddenCursorImage();
+// The forbidden cursor's centre, within its image.
+inline constexpr int kForbiddenCursorHotX = 10;
+inline constexpr int kForbiddenCursorHotY = 10;
 const Fl_RGB_Image* contextMenuCursorImage();
+// Where the context-menu cursor's arrow points, within its image.
+inline constexpr int kContextCursorHotX = 1;
+inline constexpr int kContextCursorHotY = 1;
 
 // Put the forbidden cursor up for a moment, then hand the window back to the
 // default one. It is how a command that acts where the cursor is says it could
@@ -70,7 +76,7 @@ inline int widgetCursorHandle(Fl_Widget* w, int event, Fl_Cursor cursor)
 
 inline int contextMenuCursorHandle(Fl_Widget* w, int event)
 {
-    return widgetCursorHandle(w, event, contextMenuCursorImage(), 0, 0);
+    return widgetCursorHandle(w, event, contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
 }
 
 #endif

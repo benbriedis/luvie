@@ -57,7 +57,7 @@ private:
         if (event == FL_ENTER) {
             hovered = true;
             redraw();
-            if (onRightClick && window()) window()->cursor(contextMenuCursorImage(), 0, 0);
+            if (onRightClick && window()) window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             if (onEnter) onEnter();
             return 1;
         }

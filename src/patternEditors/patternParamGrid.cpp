@@ -69,7 +69,7 @@ int PatternParamLabels::handle(int event)
 {
     switch (event) {
     case FL_ENTER:
-        window()->cursor(contextMenuCursorImage(), 0, 0);
+        window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
         return 1;
     case FL_PUSH:
         if (Fl::event_button() == FL_RIGHT_MOUSE) {
@@ -533,7 +533,7 @@ int PatternParamGrid::handle(int event)
         if (window()) {
             if (slice && slice->contains(beatAtX(Fl::event_x())))
                 window()->cursor(FL_CURSOR_HAND);   // a press drags the slice
-            else if (useHand) window()->cursor(contextMenuCursorImage(), 0, 0);
+            else if (useHand) window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             else              window()->cursor(FL_CURSOR_DEFAULT);
         }
         return 0;

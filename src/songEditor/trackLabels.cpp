@@ -9,6 +9,7 @@
 #include "inlineEditDispatch.hpp"
 #include "modern/recordButton.hpp"
 #include "modern/svgGlyph.hpp"
+#include "modern/disclosureArrows.hpp"
 #include <FL/fl_draw.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -25,6 +26,7 @@ static constexpr Fl_Color colBorder      = 0x37415100;
 static constexpr Fl_Color colTrackDiv    = 0x37415100;  // separator between tracks (darker than the grey header bg so it stays visible)
 static constexpr Fl_Color colInstrHeader = 0x64748B00;  // dedicated instrument name row bg
 static constexpr int      instrNameRowH  = 24;           // height of instrument header rows
+// The arrows in the icon area are modern/disclosureArrows.hpp.
 static constexpr int      iconAreaW      = 16;           // width reserved for expand/collapse arrow
 static constexpr int      btnColW        = 22;           // right column holding a collapsed track's / header's S/M
 
@@ -547,11 +549,7 @@ void TrackLabels::draw()
                     fl_rectf(x(), ry - 1, w(), 2);
                 }
                 // Down-arrow collapse icon
-                {
-                    fl_color(colNormal);
-                    int ax = x() + 3, ay = ry + rh / 2 - 3;
-                    fl_polygon(ax, ay, ax + 8, ay, ax + 4, ay + 6);
-                }
+                svgGlyph::draw(kDisclosureDownSvg, x() + 7, ry + rh / 2, colNormal, 8);
                 // Find the track name by track ID
                 for (const auto& t : tl.tracks) {
                     if (t.id == ref.id) {
@@ -615,9 +613,8 @@ void TrackLabels::draw()
                     } else if (isFirstLane) {
                         // ── Stacked first lane: right-arrow expand icon + track label ──
                         // Matches the expanded header row: dark arrow + text on grey.
+                        svgGlyph::draw(kDisclosureRightSvg, x() + 7, ry + rh / 2, colNormal, 9);
                         fl_color(colNormal);
-                        int ax = x() + 4, ay = ry + rh / 2 - 4;
-                        fl_polygon(ax, ay, ax, ay + 8, ax + 6, ay + 4);
                         fl_font(FL_HELVETICA_BOLD, 9);
                         fl_draw(tl.instrumentName(track.instrumentId).c_str(), x() + iconAreaW, ry, w() - iconAreaW - 4 - rightPad, rh,
                                 FL_ALIGN_LEFT | FL_ALIGN_CLIP | FL_ALIGN_INSIDE);
@@ -673,7 +670,7 @@ void TrackLabels::draw()
 
 int TrackLabels::handle(int event)
 {
-    if (int r = widgetCursorHandle(this, event, contextMenuCursorImage()); r >= 0) return r;
+    if (int r = widgetCursorHandle(this, event, contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY); r >= 0) return r;
 
     if (Fl_Group::handle(event))
         return 1;
@@ -834,8 +831,10 @@ int TrackLabels::handle(int event)
 
                 // Forbid dropping between drum and non-drum instruments.
                 dropForbidden = !trackDropAllowed();
-                window()->cursor(dropForbidden ? forbiddenCursorImage()
-                                               : contextMenuCursorImage(), 0, 0);
+                if (dropForbidden)
+                    window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
+                else
+                    window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             } else {
                 int cumY = 0;
                 int gap = rowOffset;
@@ -858,8 +857,10 @@ int TrackLabels::handle(int event)
                         trackIsDrum(srcTrack) != trackIsDrum(destTrack))
                         dropForbidden = true;
                 }
-                window()->cursor(dropForbidden ? forbiddenCursorImage()
-                                               : contextMenuCursorImage(), 0, 0);
+                if (dropForbidden)
+                    window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
+                else
+                    window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             }
             redraw();
         }

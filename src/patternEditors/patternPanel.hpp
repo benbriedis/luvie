@@ -21,6 +21,7 @@
 #include "modern/denomBeatChoice.hpp"
 #include "modern/sharpFlatButton.hpp"
 #include "modern/recordButton.hpp"
+#include "modern/svgGlyph.hpp"
 #include "modern/modernValueInput.hpp"
 #include "panelStyle.hpp"
 #include "chords.hpp"
@@ -153,6 +154,11 @@ struct TimeControls : Fl_Flex {
 
 // ---------------------------------------------------------------------------
 
+// The crosshair is src/icons/recentre.svg, minus the XML declaration. Re-copy it
+// after editing the file: this constant is what gets compiled in.
+inline const char* kRecentreSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 21 21"><circle fill="none" stroke="currentColor" stroke-width="1.25" cx="10.5" cy="10.5" r="6"/><circle fill="currentColor" cx="10.5" cy="10.5" r="1.25"/><path fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" d="M10.5 0.75 L10.5 4 M10.5 17 L10.5 20.25 M0.75 10.5 L4 10.5 M17 10.5 L20.25 10.5"/></svg>)SVG";
+
 class RecenterButton : public Fl_Widget {
     bool hovered = false;
 
@@ -162,18 +168,10 @@ class RecenterButton : public Fl_Widget {
         fl_rectf(x(), y(), w(), h());
         fl_color(panelCtrlBorder);
         fl_rect(x(), y(), w(), h());
-        int cx = x() + w() / 2;
-        int cy = y() + h() / 2;
-        int r  = std::min(w(), h()) / 4;
-        int tk = 3;
-        fl_color(0x94A3B800);
-        fl_line_style(FL_SOLID, 1);
-        fl_arc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);
-        fl_line(cx,         cy - r - 1,     cx,         cy - r - 1 - tk);
-        fl_line(cx,         cy + r + 1,     cx,         cy + r + 1 + tk);
-        fl_line(cx - r - 1, cy,             cx - r - 1 - tk, cy);
-        fl_line(cx + r + 1, cy,             cx + r + 1 + tk, cy);
-        fl_line_style(0);
+        // 21px in the stock 24px-tall button. Kept odd: the crosshair's lines
+        // run down the middle of a pixel column and row.
+        const int size = (std::min(w(), h()) - 3) | 1;
+        svgGlyph::draw(kRecentreSvg, x() + w() / 2, y() + h() / 2, 0x94A3B800, size);
     }
 
     int handle(int event) override {

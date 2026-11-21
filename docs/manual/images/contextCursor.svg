@@ -1,23 +1,7 @@
 <!-- SPDX-FileCopyrightText: Ben Briedis -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- The context-menu cursor, matching contextMenuCursorImage() in src/modern/cursors.cpp -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 23 25" width="46" height="50">
-  <!-- Light backdrop so the cursor reads in both light and dark themes -->
-  <rect x="-3" y="-3" width="23" height="25" rx="2" fill="#eef1f5"/>
-  <!-- White outline under the arrow -->
-  <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round">
-    <polygon points="1,2.814 1,14.002 3.969,11.136 4.397,10.997 9.165,10.997"/>
-    <polygon points="7.751,16.416 5.907,17.190 2.807,9.816 4.648,9.041"/>
-  </g>
-  <!-- Arrow body and tail -->
-  <g fill="#000000">
-    <polygon points="1,2.814 1,14.002 3.969,11.136 4.397,10.997 9.165,10.997"/>
-    <polygon points="7.751,16.416 5.907,17.190 2.807,9.816 4.648,9.041"/>
-  </g>
-  <!-- Menu badge: white border, black panel, three white lines -->
-  <rect x="8" y="8" width="9" height="10" fill="#ffffff"/>
-  <rect x="9" y="9" width="7" height="8" fill="#000000"/>
-  <rect x="9" y="11" width="7" height="1" fill="#ffffff"/>
-  <rect x="9" y="13" width="7" height="1" fill="#ffffff"/>
-  <rect x="9" y="15" width="7" height="1" fill="#ffffff"/>
+<!-- The context-menu cursor: src/icons/contextCursor.svg on a light backdrop, so it reads in both light and dark themes -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 26 28" width="52" height="56">
+  <rect x="-3" y="-3" width="26" height="28" rx="2" fill="#eef1f5"/>
+  <g fill="#ffffff" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"><path d="M1.5 1.5 L1.5 14.93 L5.06 11.49 L5.58 11.32 L11.3 11.32 Z"/><path d="M9.6 18.82 L7.39 19.75 L3.67 10.9 L5.88 9.97 Z"/></g><g fill="#000000"><path d="M1.5 1.5 L1.5 14.93 L5.06 11.49 L5.58 11.32 L11.3 11.32 Z"/><path d="M9.6 18.82 L7.39 19.75 L3.67 10.9 L5.88 9.97 Z"/></g><rect fill="#ffffff" x="9" y="9" width="11" height="13" rx="1"/><rect fill="#000000" x="10" y="10" width="9" height="11"/><rect fill="#ffffff" x="11" y="12" width="7" height="1"/><rect fill="#ffffff" x="11" y="15" width="7" height="1"/><rect fill="#ffffff" x="11" y="18" width="7" height="1"/>
 </svg>

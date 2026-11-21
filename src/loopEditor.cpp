@@ -1278,7 +1278,7 @@ int LoopEditor::handle(int event)
             // Labels and cells both get the context cursor; the move cursor is
             // shown only while actually dragging an instrument (see FL_DRAG).
             if (overLabel || overCell || overMenuChild)
-                window()->cursor(contextMenuCursorImage(), 0, 0);
+                window()->cursor(contextMenuCursorImage(), kContextCursorHotX, kContextCursorHotY);
             else                       window()->cursor(FL_CURSOR_DEFAULT);
         }
         if (newCol != hoveredCol || newRow != hoveredRow) {
@@ -1420,7 +1420,7 @@ int LoopEditor::handle(int event)
             if (patternDragging) {
                 computePatternDrop(mx, my);
                 if (window()) {
-                    if (dropForbidden) window()->cursor(forbiddenCursorImage(), 0, 0);
+                    if (dropForbidden) window()->cursor(forbiddenCursorImage(), kForbiddenCursorHotX, kForbiddenCursorHotY);
                     else               window()->cursor(FL_CURSOR_MOVE);
                 }
                 redraw();
