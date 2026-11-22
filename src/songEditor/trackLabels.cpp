@@ -453,8 +453,8 @@ void TrackLabels::draw()
     // the button column.
     auto drawKindTag = [&](const char* kind, int ry, int rh, Fl_Color bg) {
         if (!kind) return;
-        fl_font(FL_HELVETICA, 8);
-        fl_color(fl_color_average(colText, bg, 0.45f));
+        fl_font(FL_HELVETICA, patternKindSize);
+        fl_color(fl_color_average(colText, bg, patternKindBlend));
         int bandY = laneBandY(ry, rh);
         fl_draw(kind, x() + 4, bandY, laneBtnX(x(), w()) - x() - 8, laneBtnH,
                 FL_ALIGN_LEFT | FL_ALIGN_CLIP);

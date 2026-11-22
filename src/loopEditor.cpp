@@ -323,7 +323,7 @@ static constexpr Fl_Color headerText     = 0xCBD5E100;
 static constexpr Fl_Color triggerLearningColor = 0xF59E0B00;   // amber
 static constexpr Fl_Color triggerBoundColor    = 0x22C55E00;   // green
 static constexpr int nameLineH = 17;
-static constexpr int kindLineH = 11;
+static constexpr int kindLineH = 12;
 
 // ======================================================
 // LoopEditor
@@ -1109,8 +1109,8 @@ void LoopEditor::draw()
                     fl_color(FL_WHITE);
                     fl_draw(patName, bx + 4, blockY, bw - 8, nameLineH,
                             FL_ALIGN_CENTER | FL_ALIGN_CLIP);
-                    fl_font(FL_HELVETICA, 8);
-                    fl_color(fl_color_average(FL_WHITE, bg, 0.45f));
+                    fl_font(FL_HELVETICA, patternKindSize);
+                    fl_color(fl_color_average(FL_WHITE, bg, patternKindBlend));
                     fl_draw(patKind, bx + 4, blockY + nameLineH, bw - 8, kindLineH,
                             FL_ALIGN_CENTER | FL_ALIGN_CLIP);
                     fl_font(FL_HELVETICA_BOLD, 13);   // restore for the next cell's name

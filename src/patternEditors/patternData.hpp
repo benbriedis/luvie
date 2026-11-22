@@ -29,6 +29,11 @@ inline const char* patternKindLabel(PatternType type)
 	}
 }
 
+// How the kind tag is drawn, in both places: its point size, and how far its colour
+// sits from the background towards the text colour (fl_color_average's weight).
+inline constexpr int   patternKindSize  = 9;
+inline constexpr float patternKindBlend = 0.6f;
+
 // What the drum and pianoroll editors label a row with when the instrument has no
 // name of its own for that note. Auto is the pattern type's default: MIDI numbers
 // for drums, note names (C4) for a pianoroll.
