@@ -34,6 +34,13 @@ License: 0BSD or ISC
  A static-analysis configuration file taken from the LV2 project. It
  contributes no code to any built artefact.
 
+Files: src/fonts/*
+Copyright: 2022 The Noto Project Authors
+License: OFL-1.1
+ Luvie Sans, the UI font compiled into the binaries: Noto Sans, cut down and
+ renamed by tools/make-ui-font.py. The full licence text is installed as
+ LICENSES/LuvieSans/OFL.txt.
+
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License"); you may not
  use this file except in compliance with the License. You may obtain a copy of

@@ -32,6 +32,7 @@ add_library(luvie_core STATIC
     patternEditors/noteAuditioner.cpp patternEditors/patternRecorder.cpp
     midiLearn.cpp sceneTriggers.cpp
     session/standaloneSession.cpp session/nsmSession.cpp
+    uiFont.cpp
 )
 
 # NsmClient has two implementations of one interface: the real liblo-backed one, and an
@@ -76,6 +77,30 @@ target_link_libraries(luvie_core PUBLIC
     nlohmann_json::nlohmann_json   # header-only; songEditor/timelineIO.cpp
 )
 
+# ---- Embedded UI font (Linux) ----
+# Luvie Sans -- Noto Sans cut down to Latin; see
+# tools/make-ui-font.py, which builds the committed .ttf files in src/fonts/. Compiled
+# in rather than installed, so text looks the same on every distribution and from a
+# build tree, and src/uiFont.cpp hands the bytes to fontconfig at startup. In
+# luvie_core because the plugin UI draws with it too.
+#
+# Linux only for now: macOS and Windows keep their system UI fonts, which uiFont.cpp
+# leaves alone there.
+if(LUVIE_EMBED_UI_FONT)
+    include(${CMAKE_SOURCE_DIR}/cmake/EmbedBytes.cmake)
+    luvie_bytes_to_c("${CMAKE_CURRENT_SOURCE_DIR}/fonts/LuvieSans-Regular.ttf" LUVIE_FONT_REGULAR)
+    luvie_bytes_to_c("${CMAKE_CURRENT_SOURCE_DIR}/fonts/LuvieSans-Bold.ttf"    LUVIE_FONT_BOLD)
+    configure_file(fonts/uiFontData.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/uiFontData.cpp @ONLY)
+    target_sources(luvie_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/uiFontData.cpp)
+    target_compile_definitions(luvie_core PRIVATE LUVIE_EMBED_UI_FONT)
+    find_package(Fontconfig REQUIRED)
+    target_link_libraries(luvie_core PRIVATE Fontconfig::Fontconfig)
+endif()
+# Tells uiFont.cpp which font-name syntax FLTK's text driver expects.
+if(LUVIE_PANGO)
+    target_compile_definitions(luvie_core PRIVATE LUVIE_HAVE_PANGO)
+endif()
+
 # ---- Version header generated from git at build time ----
 # A custom target re-runs the script every build so the embedded version stays
 # current as commits/tags change; the script itself only rewrites the header
@@ -106,37 +131,17 @@ target_link_libraries(luvie PRIVATE luvie_core)
 # icon does not depend on having been installed, or on finding its own datadir.
 # Attached to the executable only: the LV2 UI is a child widget inside the host's
 # window and never owns a toplevel, so luvie_core has no use for the bytes.
+include(${CMAKE_SOURCE_DIR}/cmake/EmbedBytes.cmake)
 set(LUVIE_ICON_SIZES 16 32 48 64 128 256)
 set(LUVIE_ICON_DECLS "")
 set(LUVIE_ICON_TABLE "")
 foreach(sz ${LUVIE_ICON_SIZES})
     set(png "${CMAKE_SOURCE_DIR}/logo/png/luvie-${sz}.png")
-    file(READ "${png}" hex HEX)
-    # Wrap at 16 bytes a line. Done by slicing the hex string (2 chars a byte, so
-    # 32 a line) rather than by regex: CMake's regex engine has no {n} repetition
-    # operator, and a "{16}" written there matches literally and silently leaves
-    # the whole array on one multi-kilobyte line.
-    string(LENGTH "${hex}" hexLen)
-    set(bytes "")
-    set(pos 0)
-    while(pos LESS hexLen)
-        math(EXPR remaining "${hexLen} - ${pos}")
-        set(take 32)
-        if(remaining LESS 32)
-            set(take ${remaining})
-        endif()
-        string(SUBSTRING "${hex}" ${pos} ${take} line)
-        string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," line "${line}")
-        string(APPEND bytes "\t${line}\n")
-        math(EXPR pos "${pos} + 32")
-    endwhile()
+    luvie_bytes_to_c("${png}" bytes)
     string(APPEND LUVIE_ICON_DECLS
            "static const unsigned char luvieIcon${sz}[] = {\n${bytes}};\n\n")
     string(APPEND LUVIE_ICON_TABLE
            "\t{ ${sz}, luvieIcon${sz}, (int)sizeof(luvieIcon${sz}) },\n")
-    # configure_file() below re-runs when the template changes, but not when a PNG
-    # does; this is what makes a re-exported logo actually reach the binary.
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${png}")
 endforeach()
 configure_file(appIconData.h.in ${CMAKE_CURRENT_BINARY_DIR}/appIconData.h @ONLY)
 

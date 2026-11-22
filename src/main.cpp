@@ -42,6 +42,7 @@
 #include "session/dirtyTracker.hpp"
 #include "luvieVersion.hpp"
 #include <memory>
+#include "uiFont.hpp"
 
 static void printUsage(FILE* out) {
     fprintf(out,
@@ -90,6 +91,7 @@ static int luvieMain(int argc, char **argv) {
        (GDI), so there is nothing to choose between — and setenv is POSIX. */
     setenv("FLTK_BACKEND", "x11", 0);
 #endif
+    uiFont::install();   // before anything is drawn
 
     bool  verbose = false;
     bool  testMode = false;

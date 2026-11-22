@@ -288,6 +288,24 @@ Text then falls back to plain Xft. macOS and Windows never use Pango; they have
 font fallback of their own.
 
 
+UI font (Linux)
+---------------
+
+The Linux binaries carry their own UI font, Luvie Sans: Noto Sans cut down to
+Latin. The UI's symbols (menu arrows, ticks, sharps and flats) are SVG artwork,
+not text, so the font needs none of them. src/uiFont.cpp hands it to
+fontconfig at startup from memory; nothing is installed. Anything it lacks
+falls back to the system's fonts, as above.
+
+The two .ttf files in src/fonts/ are built by hand and committed. To change
+what goes into them, edit TEXT in tools/make-ui-font.py and re-run it; it needs fontTools:
+
+    pip install fonttools
+    python3 tools/make-ui-font.py
+
+macOS and Windows keep their system UI fonts (Helvetica, Arial).
+
+
 Plugin symbol exports
 ---------------------
 

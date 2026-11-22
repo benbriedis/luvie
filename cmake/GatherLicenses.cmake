@@ -76,6 +76,13 @@ if(LUVIE_NSM)
     luvie_add_library_license(liblo     "${liblo_SOURCE_DIR}/COPYING")
 endif()
 
+# Luvie Sans, the UI font compiled into the Linux binaries, is a modified Noto Sans under
+# the SIL Open Font License. Its licence lives in the tree beside the font rather than in
+# a fetched source, since the font is built by tools/make-ui-font.py and committed.
+if(LUVIE_EMBED_UI_FONT)
+    luvie_add_library_license(LuvieSans "${CMAKE_SOURCE_DIR}/src/fonts/OFL.txt")
+endif()
+
 # Re-run configure if Luvie's own terms change, so the gathered copies cannot go stale.
 # Editing LICENSE or NOTICE therefore costs one reconfigure — rare enough to be worth the
 # guarantee that what ships matches what is in the tree.

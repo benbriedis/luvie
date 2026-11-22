@@ -48,6 +48,7 @@ extern "C" FL_EXPORT bool fl_disable_wayland = true;
 #include "luvieApp.hpp"
 #include "luvieDebug.hpp"
 #include "timelineIO.hpp"
+#include "uiFont.hpp"
 
 #define LUVIE_STATE_URI "https://github.com/benbriedis/luvie#FullState"
 #define LUVIE_MIDI_URI  "https://github.com/benbriedis/luvie#AuditionMidi"
@@ -793,6 +794,8 @@ static LV2UI_Handle instantiate(
         ui->time_speed          = m(LV2_TIME__speed);
         ui->param_sampleRate    = m(LV2_PARAMETERS__sampleRate);
     }
+
+    uiFont::install();   // before anything is drawn
 
     /* ---- Window ---- */
     const char* title = (ui->extHost && ui->extHost->plugin_human_id)

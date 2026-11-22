@@ -68,6 +68,14 @@ if(UNIX AND NOT APPLE)
     set(FLTK_USE_PANGO ${LUVIE_PANGO})
 endif()
 
+# Compile Luvie's own UI font (src/fonts/, see src/CMakeLists.txt) into the binaries.
+# Linux only for now; also decides whether its licence ships (cmake/GatherLicenses.cmake).
+if(UNIX AND NOT APPLE)
+    set(LUVIE_EMBED_UI_FONT ON)
+else()
+    set(LUVIE_EMBED_UI_FONT OFF)
+endif()
+
 FetchContent_Declare(fltk
     GIT_REPOSITORY https://github.com/fltk/fltk.git
     # FLTK 1.5 is unreleased (dev/master), so there is no version tag — pin the

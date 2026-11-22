@@ -5,6 +5,7 @@
 #include "noteContextPopup.hpp"
 #include "cursors.hpp"
 #include "theme.hpp"
+#include "modern/svgGlyph.hpp"
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Window.H>
@@ -15,6 +16,32 @@
 // Shared by draw() and hitTest() so what is drawn and what is grabbable agree.
 static constexpr int flagW    = 44;   // width of a point marker's flag
 static constexpr int grabZone = 5;    // pixels either side of a line that grab it
+
+// The arrow in a tempo ramp's "120 -> 140". The artwork is src/icons/rampArrow.svg,
+// minus the XML declaration; re-copy it after editing the file. It is drawn at its
+// design height, so each unit is one pixel and the shaft stays a crisp single row.
+static const char* kRampArrowSvg =
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 9 7"><path fill="currentColor" d="M0 3 L5 3 L5 0.5 L9 3.5 L5 6.5 L5 4 L0 4 Z"/></svg>)SVG";
+static constexpr int rampArrowH   = 7;
+static constexpr int rampArrowGap = 2;   // air between the arrow and each number
+
+// "from -> to" centred in the box, in the current font and colour, the arrow level
+// with the middle of the digits.
+static void drawRampLabel(const char* from, const char* to, int X, int Y, int W, int H)
+{
+	const int arrowW = svgGlyph::width(kRampArrowSvg, rampArrowH);
+	const int fromW  = (int)(fl_width(from) + 0.5);
+	const int totalW = fromW + rampArrowGap + arrowW + rampArrowGap + (int)(fl_width(to) + 0.5);
+	const int lx     = X + (W - totalW) / 2;
+	// Where fl_draw's FL_ALIGN_CENTER puts the baseline of a line in this box.
+	const int base   = Y + (H - fl_height()) / 2 + fl_height() - fl_descent();
+	int dx, dy, dw, dh;
+	fl_text_extents("0", dx, dy, dw, dh);   // a digit's ink, relative to the baseline
+	fl_draw(from, lx, base);
+	svgGlyph::draw(kRampArrowSvg, lx + fromW + rampArrowGap + arrowW / 2, base + dy + dh / 2,
+	               fl_color(), rampArrowH);
+	fl_draw(to, lx + fromW + rampArrowGap + arrowW + rampArrowGap, base);
+}
 
 MarkerRuler::MarkerRuler(int x, int y, int w, int h, int numCols, int colWidth,
                          Kind kind, ObservableSong* timeline,
@@ -55,7 +82,7 @@ void MarkerRuler::draw()
 
 	// A ramp is a band spanning the bars it covers, ending flush with the right
 	// edge of its last bar, with a line at each draggable edge.
-	auto drawRamp = [&](const BpmMarker& m, const char* label) {
+	auto drawRamp = [&](const BpmMarker& m) {
 		int lx = barToPixel(m.bar);
 		int rx = barToPixel(m.rampEndBar());
 		fl_color(fl_color_average(mc, theme().tempoRulerBg, 0.75f));
@@ -66,15 +93,17 @@ void MarkerRuler::draw()
 		fl_rect(lx, y() + 1, std::max(2, rx - lx + 1), flagH);
 		fl_color(FL_WHITE);
 		fl_font(FL_HELVETICA, 10);
-		fl_draw(label, lx + 1, y() + 1, std::max(1, rx - lx - 1), flagH, FL_ALIGN_CENTER);
+		char from[12], to[12];
+		std::snprintf(from, sizeof(from), "%.0f", m.bpm);
+		std::snprintf(to,   sizeof(to),   "%.0f", m.endBpm);
+		drawRampLabel(from, to, lx + 1, y() + 1, std::max(1, rx - lx - 1), flagH);
 	};
 
 	char label[24];
 	if (kind == TEMPO) {
 		for (auto& m : timeline->get().bpms) {
 			if (m.isRamp()) {
-				std::snprintf(label, sizeof(label), "%.0f→%.0f", m.bpm, m.endBpm);
-				drawRamp(m, label);
+				drawRamp(m);
 			} else {
 				std::snprintf(label, sizeof(label), "%.0f", m.bpm);
 				drawMarker(m.bar, label);
