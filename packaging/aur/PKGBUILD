@@ -30,8 +30,11 @@ license=('Apache-2.0')
 # this package for free through gtk3 or qt6; Luvie is FLTK and none of the libraries above
 # pulls it in, so on a minimal install it would genuinely be missing. The .deb and .rpm
 # declare it too -- see CPACK_DEBIAN_PACKAGE_DEPENDS in cmake/Packaging.cmake.
-depends=('alsa-lib' 'fontconfig' 'gcc-libs' 'glibc' 'hicolor-icon-theme' 'libpng'
-         'libx11' 'libxcursor' 'libxfixes' 'libxft' 'libxinerama' 'libxrender' 'zlib')
+# cairo, glib2 (for libgobject) and pango come from FLTK's Pango text drawing -- see
+# LUVIE_PANGO in CMakeLists.txt.
+depends=('alsa-lib' 'cairo' 'fontconfig' 'gcc-libs' 'glib2' 'glibc' 'hicolor-icon-theme'
+         'libpng' 'libx11' 'libxcursor' 'libxfixes' 'libxft' 'libxinerama' 'libxrender'
+         'pango' 'zlib')
 # git is a build dependency twice over: makepkg needs it for the source below, and the
 # build itself runs `git describe` for the version string and FetchContent for the
 # vendored libraries.

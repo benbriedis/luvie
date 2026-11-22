@@ -45,6 +45,29 @@ set(FLTK_BUILD_TEST     OFF)
 set(FLTK_BUILD_EXAMPLES OFF)
 set(FLTK_BUILD_GL       OFF)
 set(FLTK_BUILD_FORMS    OFF)
+
+# Pango text on Linux. Without it FLTK draws through plain Xft, which renders every
+# character with the one font "sans" resolves to and never falls back to another, so a
+# track name in Korean, Japanese, Arabic... comes out as boxes unless the locale happens
+# to steer fontconfig to a font covering it. Pango falls back per character to whatever
+# installed font has the glyph, and shapes the scripts (Arabic, Devanagari, RTL) that Xft
+# cannot. Luvie's own code never calls Pango, so the option only changes how FLTK draws.
+#
+# Pango is linked, not dlopen'd, so a Pango build will not start without libpangoxft --
+# hence the option, for anyone building for a system without it. FLTK on its own would
+# quietly drop back to plain Xft when the Pango development files are missing; checking
+# here instead turns that into a configure error, so a build without Pango is always a
+# deliberate -DLUVIE_PANGO=OFF. macOS and Windows have font fallback of their own and
+# never use Pango.
+if(UNIX AND NOT APPLE)
+    option(LUVIE_PANGO "Draw text with Pango, for font fallback on non-Latin scripts (links pangoxft)" ON)
+    if(LUVIE_PANGO)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(LUVIE_PANGO_LIBS REQUIRED pangoxft pangocairo cairo)
+    endif()
+    set(FLTK_USE_PANGO ${LUVIE_PANGO})
+endif()
+
 FetchContent_Declare(fltk
     GIT_REPOSITORY https://github.com/fltk/fltk.git
     # FLTK 1.5 is unreleased (dev/master), so there is no version tag — pin the

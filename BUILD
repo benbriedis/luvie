@@ -268,6 +268,26 @@ drops liblo's licence from the distribution, since the binary no longer contains
 any of it.
 
 
+Pango text (Linux)
+------------------
+
+On Linux FLTK draws text through Pango by default, so characters the UI font
+lacks -- a track name in Korean, say -- fall back to whatever installed font
+has them, and scripts needing shaping (Arabic, Devanagari) render correctly.
+Plain Xft would draw them as boxes. Pango is linked, not dlopen'd, so the
+binary then needs libpangoxft, libpangocairo and libcairo at runtime; the .deb
+and .rpm pick these up through shlibdeps, the AUR package lists them. The
+LV2 DSP module never links them -- only the app and the plugin UI.
+
+Configure fails if the Pango development files (libpango1.0-dev) are missing,
+rather than quietly building without them. To build without Pango deliberately:
+
+    cmake --preset linux-dist -DLUVIE_PANGO=OFF
+
+Text then falls back to plain Xft. macOS and Windows never use Pango; they have
+font fallback of their own.
+
+
 Plugin symbol exports
 ---------------------
 
