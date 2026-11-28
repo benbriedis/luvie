@@ -1225,6 +1225,14 @@ void ObservableSong::moveRow(int from, int toGap)
                 }
             for (auto& p : data.patterns)
                 if (p.id == patId) { p.instrumentId = destInstr; break; }
+
+            // Keep selection valid: if the moved lane was selected, follow it
+            // (parity with moveLoopPattern). Otherwise selectedTrackIndex still
+            // names the source track, the lane isn't found there, and
+            // patternIdForSelectedLane() falls back to the source track's first
+            // lane — so the pattern editor silently edits a different pattern.
+            if (patId >= 0 && data.selectedLaneId == ref.id)
+                data.selectedTrackIndex = trackIndexForId(destTrackId);
         }
 
         // Sync the affected track's lanes[] order to match the new rowOrder sequence.

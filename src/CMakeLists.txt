@@ -273,6 +273,14 @@ target_link_libraries(internal_transport_test PRIVATE luvie_core)
 add_test(NAME internal_transport COMMAND internal_transport_test)
 set_tests_properties(internal_transport PROPERTIES TIMEOUT 60)
 
+# ---- Song model test ----------------------------------------------------------
+# Headless checks of ObservableSong edits the Song Editor drives (e.g. a cloned
+# pattern dragged to another instrument keeps the pattern editor on the clone).
+add_executable(song_model_test tests/songModelTest.cpp)
+target_link_libraries(song_model_test PRIVATE luvie_core)
+add_test(NAME song_model COMMAND song_model_test)
+set_tests_properties(song_model PROPERTIES TIMEOUT 30)
+
 # ---- RT engine conformance test -----------------------------------------------
 # Renders a song-loop fixture through the shared Sequencer/CycleDriver under a fake
 # clock, in many buffer sizes, with a wandering host clock, rebuilds racing the RT
